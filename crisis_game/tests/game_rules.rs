@@ -1,7 +1,7 @@
 use crisis_game::{
     check_objective, new_crisis_session, AttackResolvedEvent, BoardResource,
-    DeclareAttackCommand, EliminatedPlayersResource, EndPhaseCommand, ObjectiveCard,
-    PendingAttack, PendingAttackResource, PlayerEliminatedEvent, PlayerObjectivesResource,
+    DeclareAttackCommand, EliminatedPlayersResource, EndPhaseCommand, FortifyCommand, ObjectiveCard,
+    PendingAttack, PendingAttackResource, PlaceArmiesCommand, PlayerEliminatedEvent, PlayerObjectivesResource,
     RollAttackCommand, TegGameOverEvent, TerritoryConqueredEvent, TerritoryId, TerritoryMapResource,
     TerritoryStateResource, TurnPhase, TurnStateResource, CONTINENT_SOUTH_AMERICA,
 };
