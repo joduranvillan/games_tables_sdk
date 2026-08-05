@@ -154,6 +154,8 @@ impl<R: bevy_ecs::system::Resource + Clone + 'static, F: Fn(&R) + Send + Sync + 
     }
 }
 
+pub type CommandMiddleware = Box<dyn Fn(&CommandEnvelope, &mut BevyWorld) -> Result<(), EngineError> + Send + Sync + 'static>;
+
 pub struct Session {
     pub id: SessionId,
     pub mode: SessionMode,
@@ -164,6 +166,7 @@ pub struct Session {
     initial_setup: Option<std::sync::Arc<dyn Fn(&mut BevyWorld) + Send + Sync + 'static>>,
     paused: bool,
     watchers: Vec<Box<dyn ResourceWatcher + Send + Sync>>,
+    middlewares: Vec<CommandMiddleware>,
 }
 
 impl Session {
@@ -228,7 +231,15 @@ impl Session {
             initial_setup: None,
             paused: false,
             watchers: Vec::new(),
+            middlewares: Vec::new(),
         }
+    }
+
+    pub fn add_middleware(
+        &mut self,
+        mw: impl Fn(&CommandEnvelope, &mut BevyWorld) -> Result<(), EngineError> + Send + Sync + 'static,
+    ) {
+        self.middlewares.push(Box::new(mw));
     }
 
     pub fn watch<R: bevy_ecs::system::Resource + Clone + 'static>(
@@ -467,6 +478,15 @@ impl Session {
                 return Err(EngineError::RateLimitExceeded(sender));
             }
             history.push(now);
+        }
+
+        let envelope = CommandEnvelope {
+            tick: self.current_tick(),
+            payload: command.clone(),
+        };
+
+        for mw in &self.middlewares {
+            mw(&envelope, &mut self.world)?;
         }
 
         self.world.clear_trackers();

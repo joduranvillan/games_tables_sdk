@@ -533,3 +533,40 @@ fn test_into_result_contiene_datos_correctos_de_partida() {
     assert_eq!(result.game_name, "DiceGame");
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct GroupMessageEvent {
+    group: Vec<PlayerId>,
+    text: String,
+}
+
+#[typetag::serde]
+impl Event for GroupMessageEvent {
+    fn visibility(&self) -> Visibility {
+        Visibility::PrivateToGroup(self.group.clone())
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+#[test]
+fn test_private_to_group_llega_solo_a_los_jugadores_del_grupo() {
+    let p1 = PlayerId(1);
+    let p2 = PlayerId(2);
+    let p3 = PlayerId(3);
+
+    let event: Box<dyn Event> = Box::new(GroupMessageEvent {
+        group: vec![p1, p2],
+        text: "Mensaje secreto de grupo".to_string(),
+    });
+    let events: Vec<Box<dyn Event>> = vec![event];
+
+    let p1_events = filter_events_for_player(&events, p1);
+    let p2_events = filter_events_for_player(&events, p2);
+    let p3_events = filter_events_for_player(&events, p3);
+
+    assert_eq!(p1_events.len(), 1, "P1 está en el grupo y debe recibir el evento");
+    assert_eq!(p2_events.len(), 1, "P2 está en el grupo y debe recibir el evento");
+    assert_eq!(p3_events.len(), 0, "P3 NO está en el grupo y NO debe recibir el evento");
+}
+
