@@ -35,11 +35,11 @@ como transporte nuevo sin tocar una línea de `checkers_game` ni de
     └────────────────────┘   └────────────────────┘   └────────────────────┘
 
     Transporte (implementan Transport, intercambiables sin tocar Session):
-    ┌────────────────────────┐   ┌──────────────────────────────────────┐
-    │ open_table_transport_  │   │ open_table_transport_native_bridge   │
-    │ tcp (desktop, probado) │   │ (Nearby/Multipeer, protocolo probado, │
-    │                         │   │  falta el RawByteLink real)          │
-    └────────────────────────┘   └──────────────────────────────────────┘
+    ┌────────────────────────┐   ┌────────────────────────┐   ┌──────────────────────────────────────┐
+    │ open_table_transport_  │   │ open_table_transport_  │   │ open_table_transport_native_bridge   │
+    │ tcp (desktop, probado) │   │ websocket (WS probado) │   │ (Nearby/Multipeer, protocolo probado, │
+    │                        │   │                        │   │  falta el RawByteLink real)          │
+    └────────────────────────┘   └────────────────────────┘   └──────────────────────────────────────┘
 
     Vista:
     ┌─────────────────────────────────────────────────────────┐
@@ -69,6 +69,7 @@ graph TD
 
     subgraph Transports [Capa de Transporte]
         OTT[open_table_transport_tcp]:::transport
+        OTW[open_table_transport_websocket]:::transport
         OTN[open_table_transport_native_bridge]:::transport
     end
 
@@ -231,6 +232,10 @@ de cada crate, o el resumen en `README.md` raíz.
 - **`open_table_transport_tcp`** — sockets TCP reales, con reconexión
   autenticada (token CSPRNG, timeout configurable). Es el que usa
   `open_table_godot` hoy.
+- **`open_table_transport_websocket`** — transporte sobre WebSockets usando
+  `tokio-tungstenite` (`WsHostTransport` y `WsClientTransport`), con las mismas
+  interfaces `send_command` / `poll_events` e ideal para clientes web o entornos
+  detrás de proxies/firewalls HTTP/WS.
 - **`open_table_transport_native_bridge`** — mismo protocolo de
   identidad/reconexión que `_tcp` (handshake `Join`/`Reconnect`,
   tokens, `ConnectionEvent::{Joined, Reconnected, Disconnected,

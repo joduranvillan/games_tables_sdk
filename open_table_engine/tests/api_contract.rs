@@ -83,3 +83,26 @@ fn test_watch_dispara_cuando_turn_resource_cambia() {
     assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 1);
 }
 
+#[test]
+fn test_middleware_puede_rechazar_comandos_antes_del_despacho() {
+    let mut session = checkers_game::new_checkers_session(SessionId(1), 42, P1, P2);
+
+    session.add_middleware(|_envelope, _world| {
+        Err(EngineError::Custom("Rechazado por middleware".to_string()))
+    });
+
+    let cmd = Box::new(checkers_game::MovePieceCommand {
+        player: P1,
+        from: checkers_game::Position::new(2, 1),
+        to: checkers_game::Position::new(3, 2),
+    });
+
+    let res = session.process_command(P1, cmd);
+    assert!(res.is_err());
+    if let Err(EngineError::Custom(msg)) = res {
+        assert_eq!(msg, "Rechazado por middleware");
+    } else {
+        panic!("Debería devolver un EngineError::Custom");
+    }
+}
+

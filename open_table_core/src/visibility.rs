@@ -25,6 +25,8 @@ pub enum Visibility {
     Public,
     /// Solo estos jugadores lo ven (ej: los jugadores de una alianza).
     Players(Vec<PlayerId>),
+    /// Solo los jugadores pertenecientes al grupo específico lo ven.
+    PrivateToGroup(Vec<PlayerId>),
     /// Solo un jugador lo ve (ej: "estas son tus cartas").
     Owner(PlayerId),
     /// Nadie más que el host lo ve (uso interno / debug / replay).
@@ -38,6 +40,7 @@ impl Visibility {
         match self {
             Visibility::Public => true,
             Visibility::Players(list) => list.contains(&player),
+            Visibility::PrivateToGroup(list) => list.contains(&player),
             Visibility::Owner(owner) => *owner == player,
             Visibility::HostOnly => false,
             Visibility::Spectators(_) => false,
@@ -49,7 +52,7 @@ impl Visibility {
             Visibility::Public => true,
             Visibility::Spectators(SpectatorVisibility::AllSpectators) => true,
             Visibility::Spectators(SpectatorVisibility::Spectators(list)) => list.contains(&spectator),
-            Visibility::Players(_) | Visibility::Owner(_) | Visibility::HostOnly => false,
+            Visibility::Players(_) | Visibility::PrivateToGroup(_) | Visibility::Owner(_) | Visibility::HostOnly => false,
         }
     }
 }
