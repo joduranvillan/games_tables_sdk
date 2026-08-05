@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::io::{self, ErrorKind};
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::ToSocketAddrs;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;

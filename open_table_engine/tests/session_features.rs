@@ -58,10 +58,10 @@ fn build_dummy_rules(version: u32) -> RuleEngine {
 
 #[test]
 fn test_export_log_comprimido_es_menor_que_el_original() {
-    let p1 = PlayerId::new();
+    let p1 = PlayerId(1);
     let players = vec![p1];
     let rules = build_dummy_rules(1);
-    let mut session = Session::new(SessionId::new(), 12345, players, rules);
+    let mut session = Session::new(SessionId(100), 12345, players, rules);
 
     for i in 0..120 {
         let _ = session.process_command(
@@ -89,10 +89,10 @@ fn test_export_log_comprimido_es_menor_que_el_original() {
 
 #[test]
 fn test_replay_desde_log_comprimido_produce_estado_correcto() {
-    let p1 = PlayerId::new();
+    let p1 = PlayerId(1);
     let players = vec![p1];
     let rules = build_dummy_rules(1);
-    let mut session = Session::new(SessionId::new(), 42, players.clone(), rules.clone());
+    let mut session = Session::new(SessionId(101), 42, players.clone(), rules);
 
     for i in 1..=20 {
         session
@@ -111,7 +111,8 @@ fn test_replay_desde_log_comprimido_produce_estado_correcto() {
         .expect("export_log_compressed falló");
 
     // Replay usando replay_from_compressed en una nueva sesión
-    let mut new_session = Session::new(SessionId::new(), 42, players.clone(), rules.clone());
+    let rules_for_replay = build_dummy_rules(1);
+    let mut new_session = Session::new(SessionId(102), 42, players.clone(), rules_for_replay);
     new_session
         .replay_from_compressed(&compressed)
         .expect("replay_from_compressed falló");
@@ -127,7 +128,8 @@ fn test_replay_desde_log_comprimido_produce_estado_correcto() {
     assert_eq!(state_orig, state_new);
 
     // Replay usando el método estático replay_compressed
-    let reconstructed = Session::replay_compressed(SessionId::new(), 42, players, rules, &compressed)
+    let rules_for_static_replay = build_dummy_rules(1);
+    let reconstructed = Session::replay_compressed(SessionId(103), 42, players, rules_for_static_replay, &compressed)
         .expect("replay_compressed estático falló");
 
     assert_eq!(reconstructed.current_tick(), session.current_tick());
@@ -137,10 +139,10 @@ fn test_replay_desde_log_comprimido_produce_estado_correcto() {
 
 #[test]
 fn test_log_signed_firma_valida_e_invalida() {
-    let p1 = PlayerId::new();
+    let p1 = PlayerId(1);
     let players = vec![p1];
     let rules = build_dummy_rules(1);
-    let mut session = Session::new(SessionId::new(), 100, players, rules);
+    let mut session = Session::new(SessionId(104), 100, players, rules);
 
     for i in 1..=5 {
         session
@@ -185,12 +187,12 @@ fn test_log_signed_firma_valida_e_invalida() {
 
 #[test]
 fn test_hot_reload_de_reglas_preserva_el_estado_del_mundo() {
-    let p1 = PlayerId::new();
+    let p1 = PlayerId(1);
     let players = vec![p1];
     let rules_v1 = build_dummy_rules(1);
     let rules_v2 = build_dummy_rules(2);
 
-    let mut session = Session::new(SessionId::new(), 777, players, rules_v1);
+    let mut session = Session::new(SessionId(105), 777, players, rules_v1);
 
     // Aplicar comando en V1
     session
@@ -212,7 +214,7 @@ fn test_hot_reload_de_reglas_preserva_el_estado_del_mundo() {
     assert_eq!(state_before.version, 1);
 
     // Intentar swap sin pausar la sesión debe fallar
-    let swap_unpaused_res = session.swap_rule_engine(rules_v2.clone());
+    let swap_unpaused_res = session.swap_rule_engine(rules_v2);
     assert!(
         swap_unpaused_res.is_err(),
         "swap_rule_engine debe fallar si la sesión no está pausada"
@@ -222,8 +224,9 @@ fn test_hot_reload_de_reglas_preserva_el_estado_del_mundo() {
     session.pause().unwrap();
     assert!(session.is_paused());
 
+    let rules_v2_fresh = build_dummy_rules(2);
     session
-        .swap_rule_engine(rules_v2)
+        .swap_rule_engine(rules_v2_fresh)
         .expect("swap_rule_engine falló en estado pausado");
 
     // El estado del mundo se preserva

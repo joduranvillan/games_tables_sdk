@@ -11,7 +11,6 @@ use open_table_core::ids::PlayerId;
 use open_table_core::transport::Transport;
 use tokio::sync::mpsc;
 use tokio_tungstenite::accept_async;
-use tokio_tungstenite::tungstenite::Message;
 
 use crate::framing::{extract_bytes, wrap_binary};
 use crate::handshake::{HandshakeRequest, HandshakeResponse, PROTOCOL_VERSION};
