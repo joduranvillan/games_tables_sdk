@@ -88,7 +88,7 @@ fn test_middleware_puede_rechazar_comandos_antes_del_despacho() {
     let mut session = checkers_game::new_checkers_session(SessionId(1), 42, P1, P2);
 
     session.add_middleware(|_envelope, _world| {
-        Err(EngineError::Custom("Rechazado por middleware".to_string()))
+        Err(EngineError::Internal("Rechazado por middleware".to_string()))
     });
 
     let cmd = Box::new(checkers_game::MovePieceCommand {
@@ -99,10 +99,10 @@ fn test_middleware_puede_rechazar_comandos_antes_del_despacho() {
 
     let res = session.process_command(P1, cmd);
     assert!(res.is_err());
-    if let Err(EngineError::Custom(msg)) = res {
+    if let Err(EngineError::Internal(msg)) = res {
         assert_eq!(msg, "Rechazado por middleware");
     } else {
-        panic!("Debería devolver un EngineError::Custom");
+        panic!("Debería devolver un EngineError::Internal");
     }
 }
 

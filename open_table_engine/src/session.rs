@@ -832,6 +832,7 @@ impl Session {
             initial_setup: None,
             paused: false,
             watchers: Vec::new(),
+            middlewares: Vec::new(),
         })
     }
 
