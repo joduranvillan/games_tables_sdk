@@ -10,6 +10,8 @@
 use godot::prelude::*;
 use godot::classes::{INode, Node};
 
+pub use godot;
+
 use checkers_game::{new_checkers_session, GameOverEvent, MovePieceCommand, PieceMovedEvent, Position};
 use shogi_game::new_shogi_session;
 use xiangqi_game::new_xiangqi_session;
@@ -365,7 +367,7 @@ impl OpenTableBridge {
     // LOCAL (hotseat)
     // ------------------------------------------------------------------
     #[func]
-    fn start_local_match(&mut self, player_top_id: i64, player_bottom_id: i64) {
+    pub fn start_local_match(&mut self, player_top_id: i64, player_bottom_id: i64) {
         let session = new_checkers_session(
             SessionId(1),
             1,
@@ -619,7 +621,7 @@ impl OpenTableBridge {
     // HOST TCP
     // ------------------------------------------------------------------
     #[func]
-    fn start_hosting(&mut self, port: i64, player_top_id: i64, player_bottom_id: i64) {
+    pub fn start_hosting(&mut self, port: i64, player_top_id: i64, player_bottom_id: i64) {
         let session = new_checkers_session(
             SessionId(1),
             1,
@@ -663,7 +665,7 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn connect_to_host(&mut self, host: GString, port: i64, player_name: GString) -> bool {
+    pub fn connect_to_host(&mut self, host: GString, port: i64, player_name: GString) -> bool {
         let addr = format!("{}:{}", host.to_string(), port);
         match TcpClientTransport::connect_as_new_player(&addr, &player_name.to_string()) {
             Ok((transport, player_id, reconnect_token)) => {
@@ -906,7 +908,7 @@ impl OpenTableBridge {
     // UNIVERSAL COMMANDS & STATE
     // ------------------------------------------------------------------
     #[func]
-    fn send_command_json(&mut self, player: i64, json_str: GString) {
+    pub fn send_command_json(&mut self, player: i64, json_str: GString) {
         let player_id = PlayerId(player as u32);
         let command: Box<dyn Command> = match parse_command_json(&json_str.to_string()) {
             Ok(cmd) => cmd,
@@ -956,7 +958,7 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn export_log(&self) -> PackedByteArray {
+    pub fn export_log(&self) -> PackedByteArray {
         let log_bytes = match &self.mode {
             BridgeMode::Local { session } => session.export_log().unwrap_or_default(),
             BridgeMode::Host { session, .. } => session.export_log().unwrap_or_default(),
@@ -975,7 +977,7 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn load_replay(&mut self, log_bytes: PackedByteArray, game_type: GString) -> bool {
+    pub fn load_replay(&mut self, log_bytes: PackedByteArray, game_type: GString) -> bool {
         let bytes = log_bytes.to_vec();
         let log: Vec<open_table_engine::session::LoggedCommand> = match serde_json::from_slice(&bytes) {
             Ok(l) => l,
@@ -1005,7 +1007,7 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn step_replay(&mut self) -> bool {
+    pub fn step_replay(&mut self) -> bool {
         let (sender, command) = {
             let BridgeMode::Replay { session, pending_commands } = &mut self.mode else {
                 return false;
@@ -1024,7 +1026,7 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn current_player(&self) -> i64 {
+    pub fn current_player(&self) -> i64 {
         match &self.mode {
             BridgeMode::Local { session } => session.current_player().0 as i64,
             BridgeMode::Host { session, .. } => session.current_player().0 as i64,
