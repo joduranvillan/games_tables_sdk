@@ -2164,11 +2164,7 @@ dependencies = [
 name = "url"
 version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-<<<<<<< HEAD
-checksum = "e89da841a80418a9b391ebaea17f5c112ffaaa96f621d2c285b5174da76b9011"
-=======
 checksum = "ff67a8a4397373c3ef660812acab3268222035010ab8680ec4215f38ba3d0eed"
->>>>>>> 8293847 (issues en el sistema  testing)
 dependencies = [
  "form_urlencoded",
  "idna",
