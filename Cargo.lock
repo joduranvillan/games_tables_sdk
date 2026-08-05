@@ -1288,7 +1288,7 @@ dependencies = [
 name = "tempfile"
 version = "3.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3328227b9efeb56bc2b771eefeb311b714b62dbd2e1c95ee132d751515eb89cf"
+checksum = "a3e2c3daef883ecc1b5d58c15adae93470a91d425f3532ba1695849656af3fc1"
 dependencies = [
  "cfg-if",
  "fastrand 2.1.1",
@@ -1421,7 +1421,7 @@ dependencies = [
 name = "uuid"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11b439c2c8f8b835ddc00a6f3045869a2da387f5d6f102cfc02f06a88b503046"
+checksum = "5f7b0a21988c1bf877cf4759ef5ddaac04c1c9fe808c9142ecb78ba97d97a28a"
 dependencies = [
  "getrandom 0.2.17",
  "wasm-bindgen",
