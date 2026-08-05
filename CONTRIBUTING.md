@@ -133,18 +133,43 @@ redot --headless --path godot_project --script res://tests/bridge_smoke.gd
 
 ## 6. Proceso de Release y Publicación en Crates.io (`cargo publish`)
 
-Para publicar una nueva versión de los crates fundamentales (por ejemplo `open_table_core`):
+Para preparar y publicar una nueva versión de los crates de OpenTable SDK:
 
-1. **Incrementar Versión**: Ejecuta el script de sincronización de versión para actualizar todos los `Cargo.toml`:
+1. **Automatización de Release con `tools/release.sh`**:
+   Ejecuta el script de release especificando el incremento desead (por defecto `--patch`):
    ```bash
-   ./tools/bump_version.sh [--patch | --minor | --major]
+   ./tools/release.sh [--patch | --minor | --major]
    ```
-2. **Validar la Verificación de Empaquetado**:
+   El script realizará las siguientes validaciones y acciones automáticamente:
+   - Verificará que el repositorio no tenga cambios sin commitear (`git status --porcelain`).
+   - Sincronizará las versiones en todos los `Cargo.toml` invocando `tools/bump_version.sh`.
+   - Ejecutará la suite completa de pruebas (`cargo test --workspace --exclude open_table_godot`).
+   - Commiteará los cambios de versión y creará el tag anotado en Git (`vX.Y.Z`).
+
+2. **Pasos Manuales de Publicación**:
+   Por seguridad, el script **nunca realiza push ni publica automáticamente**. Debes completar el proceso manualmente:
    ```bash
-   cargo publish --dry-run -p open_table_core
-   ```
-3. **Publicar en Crates.io**:
-   ```bash
+   # Subir commit de versión y tags a GitHub
+   git push origin main --tags
+
+   # Publicar en Crates.io
    cargo publish -p open_table_core
    ```
+
+---
+
+## 7. Mantenimiento de Dependencias con Dependabot
+
+OpenTable SDK utiliza **Dependabot** (`.github/dependabot.yml`) para mantener las dependencias de Cargo y de GitHub Actions actualizadas automáticamente.
+
+### Configuración
+- **Cargo**: Revisiones semanales los lunes.
+- **GitHub Actions**: Revisiones semanales.
+- **Asignados / Revisores**: `@joduranvillan`.
+
+### Cómo Revisar y Aprobar PRs de Dependabot
+1. **Verificar CI**: Asegúrate de que todos los jobs de integración continua (`Test Rust Workspace` en `stable` y `Build Godot Bridge`) hayan pasado en verde.
+2. **Revisar Parches**:
+   - Para actualizaciones de versión `patch` o `minor` sin romper compatibilidad: Aprueba y fusiona (`Squash and merge`).
+   - Para actualizaciones `major` o cambios breaking: Descarga la rama localmente (`gh pr checkout <PR_NUMBER>`) y ejecuta `cargo test --workspace --exclude open_table_godot` para verificar la retrocompatibilidad antes de aprobar.
 

@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test Rust Workspace (${{ matrix.rust }})
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.rust == 'beta' }}
+    strategy:
+      matrix:
+        rust: [stable, beta]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
+
+      - name: Check MSRV
+        run: cargo check --manifest-path Cargo.toml --rust-version 1.80.0
+
+      - name: Run clippy
+        run: cargo clippy --workspace --exclude open_table_godot -- -D warnings
+
+      - name: Run fmt check
+        run: cargo fmt --workspace --check
+
+      - name: Run tests
+        run: cargo test --workspace --exclude open_table_godot
+
+  build-godot-bridge:
+    name: Build Godot Bridge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev
+
+      - name: Build open_table_godot
+        run: cargo build -p open_table_godot
+
+      - name: Verify .so artifact output
+        run: |
+          test -f target/debug/libopen_table_godot.so || test -f target/debug/libopen_table_godot.dylib || test -f target/debug/open_table_godot.dll
+          echo "Godot bridge artifact produced successfully!"
