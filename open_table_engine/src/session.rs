@@ -16,11 +16,19 @@
 //!    eventos resultantes por `Visibility`, reconstruir lo que un cliente
 //!    que se reconectó se perdió (resync).
 
+use std::io::{Read, Write};
 use std::time::{Duration, Instant};
 
 use bevy_ecs::world::World as BevyWorld;
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
+use hmac::{Hmac, Mac};
 use open_table_core::prelude::*;
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
+
+type HmacSha256 = Hmac<Sha256>;
 
 use crate::rule_engine::RuleEngine;
 use crate::turn::{TurnOrder, TurnResource};
@@ -844,6 +852,93 @@ impl Session {
             bytes.hash(&mut hasher);
         }
         hasher.finish()
+    }
+
+    /// Exporta el log completo de comandos comprimido con gzip (flate2).
+    pub fn export_log_compressed(&self) -> EngineResult<Vec<u8>> {
+        let uncompressed = self.export_log()?;
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder
+            .write_all(&uncompressed)
+            .map_err(|e| EngineError::IoError(format!("error al comprimir log: {e}")))?;
+        encoder
+            .finish()
+            .map_err(|e| EngineError::IoError(format!("error al finalizar compresión de log: {e}")))
+    }
+
+    /// Reproduce los comandos de un log comprimido con gzip sobre esta sesión.
+    pub fn replay_from_compressed(&mut self, bytes: &[u8]) -> EngineResult<Vec<Box<dyn Event>>> {
+        let mut decoder = GzDecoder::new(bytes);
+        let mut uncompressed = Vec::new();
+        decoder
+            .read_to_end(&mut uncompressed)
+            .map_err(|e| EngineError::Replay(format!("error al descomprimir log: {e}")))?;
+        self.replay_from(&uncompressed, 0)
+    }
+
+    /// Reconstruye una nueva `Session` desde un log comprimido con gzip.
+    pub fn replay_compressed(
+        id: SessionId,
+        seed: u64,
+        players: Vec<PlayerId>,
+        rules: RuleEngine,
+        bytes: &[u8],
+    ) -> EngineResult<Session> {
+        let mut decoder = GzDecoder::new(bytes);
+        let mut uncompressed = Vec::new();
+        decoder
+            .read_to_end(&mut uncompressed)
+            .map_err(|e| EngineError::Replay(format!("error al descomprimir log: {e}")))?;
+        Self::replay(id, seed, players, rules, &uncompressed)
+    }
+
+    /// Exporta el log de comandos serializado en JSON y firmado con HMAC-SHA256 usando `secret`.
+    /// Añade los 32 bytes de la firma HMAC al final de los bytes del JSON.
+    pub fn export_log_signed(&self, secret: &[u8]) -> EngineResult<Vec<u8>> {
+        let json_bytes = self.export_log()?;
+        let mut mac = HmacSha256::new_from_slice(secret)
+            .map_err(|e| EngineError::Internal(format!("error al inicializar HMAC: {e}")))?;
+        mac.update(&json_bytes);
+        let signature = mac.finalize().into_bytes();
+
+        let mut signed_payload = Vec::with_capacity(json_bytes.len() + signature.len());
+        signed_payload.extend_from_slice(&json_bytes);
+        signed_payload.extend_from_slice(&signature);
+        Ok(signed_payload)
+    }
+
+    /// Verifica la integridad del log firmado con HMAC-SHA256 antes de reproducirlo.
+    pub fn verify_log(bytes: &[u8], secret: &[u8]) -> EngineResult<()> {
+        if bytes.len() < 32 {
+            return Err(EngineError::Replay(
+                "log firmado inválido: tamaño insuficiente para incluir la firma HMAC".into(),
+            ));
+        }
+
+        let (json_bytes, signature_tag) = bytes.split_at(bytes.len() - 32);
+
+        let mut mac = HmacSha256::new_from_slice(secret)
+            .map_err(|e| EngineError::Internal(format!("error al inicializar HMAC: {e}")))?;
+        mac.update(json_bytes);
+
+        mac.verify_slice(signature_tag).map_err(|_| {
+            EngineError::Replay(
+                "firma HMAC inválida: el log ha sido alterado o la clave es incorrecta".into(),
+            )
+        })
+    }
+
+    /// Reemplaza el `RuleEngine` activo sin modificar el estado del `World`.
+    /// El swap solo es válido si la sesión está pausada (`self.is_paused()`).
+    pub fn swap_rule_engine(&mut self, new_rules: RuleEngine) -> EngineResult<()> {
+        if !self.is_paused() {
+            return Err(EngineError::InvalidCommand {
+                reason: "el swap de motor de reglas solo se permite cuando la sesión está pausada"
+                    .into(),
+            });
+        }
+        self.rules = new_rules;
+        Ok(())
     }
 }
 
