@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>OpenTable SDK utiliza la red local para conectar salas P2P sin necesidad de servidor central.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>OpenTable SDK utiliza Bluetooth para descubrir dispositivos cercanos y crear salas de juego P2P.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_opentable._tcp</string>
+        <string>_opentable._udp</string>
+    </array>
+</dict>
+</plist>

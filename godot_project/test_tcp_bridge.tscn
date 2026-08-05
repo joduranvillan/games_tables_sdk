@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://test_tcp_bridge.gd" id="1_script"]
+
+[node name="TCPBridgeTest" type="Node"]
+script = ExtResource("1_script")
+
+[node name="Label" type="Label" parent="."]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 800.0
+offset_bottom = 100.0
+theme_override_font_sizes/font_size = 18
+text = "TCP Bridge Test (Abierto) - Mirá la consola (Output) para ver los eventos
+Host: 127.0.0.1:9090
+Cliente: conectándose automáticamente
+Esperando eventos..."

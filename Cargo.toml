@@ -1,0 +1,34 @@
+# Workspace raíz del OpenTable SDK.
+#
+# Consolida los 15 crates en un solo `target/` con un `Cargo.lock`
+# compartido y commiteado: esa es la forma moderna de garantizar builds
+# reproducibles (reemplaza los pines de versión `=x.y.z` que antes se
+# ponían a mano por la limitación del toolchain viejo del sandbox).
+#
+# Comandos útiles desde la raíz:
+#   cargo test --workspace          # corre los ~74 tests de todo el SDK
+#   cargo build -p open_table_godot # compila solo el puente de Godot/Redot
+[workspace]
+resolver = "2"
+members = [
+    "open_table_core",
+    "open_table_engine",
+    "open_table_macros",
+    "open_table_qr",
+    "open_table_transport_tcp",
+    "open_table_transport_native_bridge",
+    "open_table_godot",
+    "checkers_game",
+    "battleship_game",
+    "ludo_game",
+    "mille_bornes_game",
+    "backgammon_game",
+    "chinese_checkers_game",
+    "monopoly_game",
+    "chess_game",
+    "shogi_game",
+    "xiangqi_game",
+    "go_game",
+    "uno_game",
+    "crisis_game",
+]

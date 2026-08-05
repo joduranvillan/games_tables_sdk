@@ -1,0 +1,20 @@
+[package]
+name = "open_table_transport_tcp"
+version = "0.1.0"
+edition = "2021"
+description = "Implementación de Transport sobre TCP para desktop. Sirve para probar el ciclo completo Command -> red -> RuleEngine -> Events -> red sin depender de Nearby Connections / MultipeerConnectivity."
+
+[dependencies]
+open_table_core = { path = "../open_table_core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+getrandom = "0.2"
+
+[dev-dependencies]
+checkers_game = { path = "../checkers_game" }
+chess_game = { path = "../chess_game" }
+open_table_engine = { path = "../open_table_engine" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+typetag = "0.2"
+tokio = { version = "1", features = ["full"] }

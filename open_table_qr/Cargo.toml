@@ -1,0 +1,12 @@
+[package]
+name = "open_table_qr"
+version = "0.1.0"
+edition = "2021"
+description = "Genera el código QR de invitación a una sala de OpenTable SDK. No maneja transporte ni descubrimiento: eso lo hacen Nearby Connections / MultipeerConnectivity, este crate solo resuelve el problema de UX de 'a cuál sala nos unimos' sin que el jugador tenga que tipear nada."
+
+[dependencies]
+open_table_core = { path = "../open_table_core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+thiserror = "1"

@@ -1,0 +1,7 @@
+target/
+*.rs.bk
+Cargo.lock
+# Cargo.lock SÍ se commitea: este repo es una aplicación (juegos + app de
+# Godot), no una librería publicada, así que fijar el árbol de dependencias
+# exacto es lo correcto para builds reproducibles.
+

@@ -1,0 +1,15 @@
+; Le dice a Godot/Redot dónde está el binario compilado del puente Rust
+; (crate open_table_godot, crate-type cdylib). Las rutas son res:// y suben
+; un nivel porque el proyecto vive en godot_project/ y el target/ del
+; workspace queda en la raíz del repo.
+;
+; Recompilar el .so:  cargo build -p open_table_godot   (desde la raíz)
+
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.1
+reloadable = true
+
+[libraries]
+linux.debug.x86_64 = "res://../target/debug/libopen_table_godot.so"
+linux.release.x86_64 = "res://../target/release/libopen_table_godot.so"

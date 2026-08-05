@@ -1,0 +1,10 @@
+# El crate open_table_godot usa gdext con feature `api-custom`, que en su
+# build script ejecuta el binario de Godot/Redot para generar los bindings.
+# Acá fijamos GODOT4_BIN al shim que hace pasar a Redot por un Godot 4
+# (ver tools/redot_gdext_shim.sh), así `cargo build`/`test` funciona sin
+# tener que exportar la variable a mano en cada terminal.
+#
+# `relative = true` -> la ruta se resuelve respecto de la raíz del repo,
+# de modo que sigue andando en cualquier clon, sin rutas absolutas.
+[env]
+GODOT4_BIN = { value = "tools/redot_gdext_shim.sh", relative = true }

@@ -1,0 +1,459 @@
+extends Node2D
+
+const BOARD_SIZE = 9
+const CELL_SIZE = 68.0
+const P_SENTE = 1 # Player 1 (Sente / Black / Points UP)
+const P_GOTE = 2  # Player 2 (Gote / White / Points DOWN)
+
+# Kanji mapping for Shogi pieces
+const KANJI_MAP = {
+	"King": "王",
+	"Jewel": "玉",
+	"Rook": "飛",
+	"Bishop": "角",
+	"Gold": "金",
+	"Silver": "銀",
+	"Knight": "桂",
+	"Lance": "香",
+	"Pawn": "歩",
+	"PromotedPawn": "と",
+	"PromotedLance": "杏",
+	"PromotedKnight": "圭",
+	"PromotedSilver": "全",
+	"Horse": "馬",
+	"Dragon": "龍"
+}
+
+# Colors
+const COL_BOARD = Color(0.92, 0.82, 0.62)
+const COL_LINE = Color(0.2, 0.15, 0.1)
+const COL_PIECE_BG = Color(0.96, 0.90, 0.75)
+const COL_SELECT = Color(1.0, 0.9, 0.2, 0.55)
+const COL_VALID_MOVE = Color(0.2, 0.8, 0.2, 0.55)
+
+var bridge
+var board: Array = [] # 9x9 array of piece dictionaries or null
+var hands = {P_SENTE: {}, P_GOTE: {}} # player_id -> {piece_kind: count}
+var current: int = P_SENTE
+var winner: int = -1
+
+var selected_board_pos = null # Vector2i(row, col)
+var selected_hand_piece: String = "" # e.g. "Pawn"
+var valid_moves: Array = [] # Array of Vector2i
+
+var grid_container: GridContainer
+var sente_hand_panel: VBoxContainer
+var gote_hand_panel: VBoxContainer
+var piece_nodes: Array = [] # 9x9 array of Node2D/Control nodes
+
+var turn_indicator: TurnIndicator
+var current_theme: BoardTheme
+var network_hud: NetworkStatusHUD
+
+@onready var status: Label = $Status
+
+func _ready() -> void:
+	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
+		var tm = get_node_or_null("/root/ThemeManager")
+		if tm != null:
+			current_theme = tm.get_theme()
+			tm.theme_changed.connect(_on_theme_changed)
+
+	_setup_ui()
+	_init_board_state()
+	
+	bridge = OpenTableBridge.new()
+	bridge.name = "Bridge"
+	add_child(bridge)
+	
+	bridge.connect("game_over", _on_game_over)
+	bridge.connect("move_rejected", _on_move_rejected)
+	bridge.connect("event_json", _on_event_json)
+	
+	if network_hud != null:
+		network_hud.bind_bridge(bridge)
+
+	bridge.start_local_match_shogi(P_SENTE, P_GOTE)
+	current = bridge.current_player()
+	
+	_update_hand_panels()
+	_update_status()
+	queue_redraw()
+
+func _on_theme_changed(theme: BoardTheme) -> void:
+	current_theme = theme
+	if grid_container:
+		for cell in grid_container.get_children():
+			if cell is ColorRect:
+				cell.color = theme.board_color
+	queue_redraw()
+
+func _setup_ui() -> void:
+	# 9x9 GridContainer for the board
+	grid_container = GridContainer.new()
+	grid_container.name = "GridContainer"
+	grid_container.columns = BOARD_SIZE
+	grid_container.position = Vector2(120, 20)
+	add_child(grid_container)
+	
+	for r in range(BOARD_SIZE):
+		for c in range(BOARD_SIZE):
+			var cell = ColorRect.new()
+			cell.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
+			cell.color = COL_BOARD
+			
+			var border = ReferenceRect.new()
+			border.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
+			border.border_color = COL_LINE
+			border.border_width = 1.0
+			border.editor_only = false
+			cell.add_child(border)
+			
+			grid_container.add_child(cell)
+			
+	# Left Side Panel for Gote Hand (P2)
+	var gote_label = Label.new()
+	gote_label.text = "Gote (P2) Mano:"
+	gote_label.position = Vector2(10, 20)
+	add_child(gote_label)
+	
+	gote_hand_panel = VBoxContainer.new()
+	gote_hand_panel.position = Vector2(10, 50)
+	gote_hand_panel.custom_minimum_size = Vector2(95, 250)
+	add_child(gote_hand_panel)
+	
+	# Right Side Panel for Sente Hand (P1)
+	var sente_label = Label.new()
+	sente_label.text = "Sente (P1) Mano:"
+	sente_label.position = Vector2(750, 20)
+	add_child(sente_label)
+	
+	sente_hand_panel = VBoxContainer.new()
+	sente_hand_panel.position = Vector2(750, 50)
+	sente_hand_panel.custom_minimum_size = Vector2(95, 250)
+	add_child(sente_hand_panel)
+
+	# Turn Indicator Widget
+	turn_indicator = TurnIndicator.new()
+	turn_indicator.name = "TurnIndicator"
+	turn_indicator.position = Vector2(120, BOARD_SIZE * CELL_SIZE + 35)
+	add_child(turn_indicator)
+
+	# Network Status HUD
+	network_hud = NetworkStatusHUD.new()
+	network_hud.name = "NetworkStatusHUD"
+	add_child(network_hud)
+
+func _init_board_state() -> void:
+	board.clear()
+	piece_nodes.clear()
+	
+	for r in range(BOARD_SIZE):
+		var row_arr = []
+		var node_arr = []
+		for c in range(BOARD_SIZE):
+			row_arr.append(null)
+			node_arr.append(null)
+		board.append(row_arr)
+		piece_nodes.append(node_arr)
+		
+	# Initial Shogi setup
+	var row0 = ["Lance", "Knight", "Silver", "Gold", "Jewel", "Gold", "Silver", "Knight", "Lance"]
+	for c in range(9):
+		_place_piece_on_board(0, c, P_GOTE, row0[c])
+	_place_piece_on_board(1, 1, P_GOTE, "Rook")
+	_place_piece_on_board(1, 7, P_GOTE, "Bishop")
+	for c in range(9):
+		_place_piece_on_board(2, c, P_GOTE, "Pawn")
+		
+	var row8 = ["Lance", "Knight", "Silver", "Gold", "King", "Gold", "Silver", "Knight", "Lance"]
+	for c in range(9):
+		_place_piece_on_board(8, c, P_SENTE, row8[c])
+	_place_piece_on_board(7, 7, P_SENTE, "Rook")
+	_place_piece_on_board(7, 1, P_SENTE, "Bishop")
+	for c in range(9):
+		_place_piece_on_board(6, c, P_SENTE, "Pawn")
+		
+	hands = {
+		P_SENTE: {"Pawn": 0, "Silver": 0, "Gold": 0, "Bishop": 0, "Rook": 0, "Lance": 0, "Knight": 0},
+		P_GOTE: {"Pawn": 0, "Silver": 0, "Gold": 0, "Bishop": 0, "Rook": 0, "Lance": 0, "Knight": 0}
+	}
+
+func _is_promoted(kind: String) -> bool:
+	return kind.begins_with("Promoted") or kind == "Horse" or kind == "Dragon"
+
+func _create_pentagon_piece_node(player: int, kind: String) -> Control:
+	var w = CELL_SIZE - 6.0
+	var h = CELL_SIZE - 6.0
+	
+	var piece_ctrl = Control.new()
+	piece_ctrl.custom_minimum_size = Vector2(w, h)
+	piece_ctrl.size = Vector2(w, h)
+
+	# Pentagon points
+	var pts = PackedVector2Array()
+	if player == P_SENTE: # Pointing UP
+		pts.append(Vector2(w * 0.5, 2.0))
+		pts.append(Vector2(w - 2.0, h * 0.35))
+		pts.append(Vector2(w - 4.0, h - 2.0))
+		pts.append(Vector2(4.0, h - 2.0))
+		pts.append(Vector2(2.0, h * 0.35))
+	else: # Pointing DOWN for Gote
+		pts.append(Vector2(w * 0.5, h - 2.0))
+		pts.append(Vector2(w - 2.0, h * 0.65))
+		pts.append(Vector2(w - 4.0, 2.0))
+		pts.append(Vector2(4.0, 2.0))
+		pts.append(Vector2(2.0, h * 0.65))
+
+	var bg_poly = Polygon2D.new()
+	bg_poly.polygon = pts
+	bg_poly.color = COL_PIECE_BG
+	piece_ctrl.add_child(bg_poly)
+
+	var border_line = Line2D.new()
+	border_line.width = 2.0
+	border_line.default_color = COL_LINE
+	for pt in pts: border_line.add_point(pt)
+	border_line.add_point(pts[0])
+	piece_ctrl.add_child(border_line)
+
+	var kanji = Label.new()
+	kanji.text = KANJI_MAP.get(kind, "?")
+	kanji.add_theme_font_size_override("font_size", 30)
+	kanji.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	kanji.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	kanji.size = Vector2(w, h)
+
+	# Promoted pieces display RED text
+	var text_col = Color(0.85, 0.15, 0.15) if _is_promoted(kind) else Color(0.1, 0.1, 0.1)
+	kanji.add_theme_color_override("font_color", text_col)
+	piece_ctrl.add_child(kanji)
+
+	return piece_ctrl
+
+func _place_piece_on_board(row: int, col: int, player: int, kind: String) -> void:
+	board[row][col] = {"player": player, "kind": kind}
+	
+	var piece_ctrl = _create_pentagon_piece_node(player, kind)
+	piece_ctrl.position = Vector2(120 + col * CELL_SIZE + 3, 20 + row * CELL_SIZE + 3)
+	add_child(piece_ctrl)
+	piece_nodes[row][col] = piece_ctrl
+
+func _input(event: InputEvent) -> void:
+	if winner != -1:
+		return
+		
+	var click_pos = Vector2.ZERO
+	var handled = false
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		click_pos = event.position
+		handled = true
+	elif event is InputEventScreenTouch and event.pressed:
+		click_pos = event.position
+		handled = true
+		
+	if handled:
+		var board_x = click_pos.x - 120
+		var board_y = click_pos.y - 20
+		
+		if board_x >= 0 and board_x < BOARD_SIZE * CELL_SIZE and board_y >= 0 and board_y < BOARD_SIZE * CELL_SIZE:
+			var col = int(board_x / CELL_SIZE)
+			var row = int(board_y / CELL_SIZE)
+			_handle_board_click(row, col)
+
+func _calculate_valid_shogi_moves(r: int, c: int) -> Array:
+	var moves: Array = []
+	var piece = board[r][c]
+	if piece == null: return moves
+	
+	var player = piece.get("player")
+	var dir = -1 if player == P_SENTE else 1
+	
+	# Basic direction offsets for Shogi
+	for dr in [-1, 0, 1]:
+		for dc in [-1, 0, 1]:
+			if dr == 0 and dc == 0: continue
+			var tr = r + dr
+			var tc = c + dc
+			if tr >= 0 and tr < BOARD_SIZE and tc >= 0 and tc < BOARD_SIZE:
+				var target = board[tr][tc]
+				if target == null or target.get("player") != player:
+					moves.append(Vector2i(tr, tc))
+	return moves
+
+func _calculate_valid_drops() -> Array:
+	var drops: Array = []
+	for r in range(BOARD_SIZE):
+		for c in range(BOARD_SIZE):
+			if board[r][c] == null:
+				drops.append(Vector2i(r, c))
+	return drops
+
+func _handle_board_click(row: int, col: int) -> void:
+	# 1. Drop piece from hand
+	if selected_hand_piece != "":
+		var drop_kind = selected_hand_piece
+		selected_hand_piece = ""
+		valid_moves.clear()
+		queue_redraw()
+		
+		var cmd = {
+			"command_type": "DropPieceCommand",
+			"player": current,
+			"piece": drop_kind,
+			"to": [row, col]
+		}
+		bridge.send_command_json(current, JSON.stringify(cmd))
+		return
+		
+	# 2. Board selection & movement
+	if selected_board_pos == null:
+		var cell = board[row][col]
+		if cell != null and cell.get("player") == current:
+			selected_board_pos = Vector2i(row, col)
+			valid_moves = _calculate_valid_shogi_moves(row, col)
+			queue_redraw()
+	else:
+		if selected_board_pos.x == row and selected_board_pos.y == col:
+			selected_board_pos = null
+			valid_moves.clear()
+			queue_redraw()
+			return
+			
+		var from_pos = selected_board_pos
+		selected_board_pos = null
+		valid_moves.clear()
+		queue_redraw()
+		
+		var cmd = {
+			"command_type": "MovePieceCommand",
+			"player": current,
+			"from": [from_pos.x, from_pos.y],
+			"to": [row, col],
+			"promote": false
+		}
+		bridge.send_command_json(current, JSON.stringify(cmd))
+
+func _update_hand_panels() -> void:
+	for child in sente_hand_panel.get_children(): child.queue_free()
+	for child in gote_hand_panel.get_children(): child.queue_free()
+	
+	_populate_hand_container(sente_hand_panel, P_SENTE)
+	_populate_hand_container(gote_hand_panel, P_GOTE)
+
+func _populate_hand_container(panel: VBoxContainer, player: int) -> void:
+	var player_hand = hands.get(player, {})
+	for kind in player_hand.keys():
+		var count = player_hand[kind]
+		if count > 0:
+			var btn = Button.new()
+			btn.custom_minimum_size = Vector2(85, 45)
+			var kanji_symbol = KANJI_MAP.get(kind, kind)
+			btn.text = "%s x%d" % [kanji_symbol, count]
+			btn.add_theme_font_size_override("font_size", 18)
+			
+			if player == current:
+				btn.pressed.connect(func():
+					selected_board_pos = null
+					selected_hand_piece = kind
+					valid_moves = _calculate_valid_drops()
+					queue_redraw()
+				)
+			panel.add_child(btn)
+
+func _on_event_json(json_str: String) -> void:
+	var parser = JSON.new()
+	if parser.parse(json_str) == OK:
+		var event = parser.data
+		if event is Dictionary:
+			var event_type = event.get("command_type", event.get("event_type", ""))
+			if event_type == "PieceMovedEvent":
+				var from = event.get("from", [0, 0])
+				var to = event.get("to", [0, 0])
+				var from_r = int(from[0])
+				var from_c = int(from[1])
+				var to_r = int(to[0])
+				var to_c = int(to[1])
+				
+				var piece_data = board[from_r][from_c]
+				if piece_data != null:
+					if board[to_r][to_c] != null:
+						var cap_kind = board[to_r][to_c].get("kind", "Pawn")
+						var p_hand = hands[piece_data.player]
+						p_hand[cap_kind] = p_hand.get(cap_kind, 0) + 1
+						if piece_nodes[to_r][to_c] != null:
+							piece_nodes[to_r][to_c].queue_free()
+						if has_node("/root/AudioManager"):
+							get_node("/root/AudioManager").play_capture()
+					else:
+						if has_node("/root/AudioManager"):
+							get_node("/root/AudioManager").play_move()
+							
+					board[from_r][from_c] = null
+					board[to_r][to_c] = piece_data
+					
+					var node = piece_nodes[from_r][from_c]
+					piece_nodes[from_r][from_c] = null
+					piece_nodes[to_r][to_c] = node
+					if node != null:
+						node.position = Vector2(120 + to_c * CELL_SIZE + 3, 20 + to_r * CELL_SIZE + 3)
+						
+			elif event_type == "PieceDroppedEvent":
+				var to = event.get("to", [0, 0])
+				var kind = str(event.get("piece", "Pawn"))
+				var p = int(event.get("player", current))
+				var to_r = int(to[0])
+				var to_c = int(to[1])
+				
+				_place_piece_on_board(to_r, to_c, p, kind)
+				if hands.has(p) and hands[p].has(kind):
+					hands[p][kind] = max(0, hands[p][kind] - 1)
+				if has_node("/root/AudioManager"):
+					get_node("/root/AudioManager").play_move()
+					
+			elif event_type == "GameOverEvent":
+				var w = event.get("winner", -1)
+				if w == null: w = 0
+				_on_game_over(int(w))
+				
+	current = bridge.current_player()
+	_update_hand_panels()
+	_update_status()
+	queue_redraw()
+
+func _on_game_over(w: int) -> void:
+	winner = w
+	_update_status()
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_game_over()
+	var overlay = preload("res://game_over_overlay.tscn").instantiate()
+	add_child(overlay)
+	overlay.show_winner(w)
+
+func _on_move_rejected(reason: String) -> void:
+	status.text = "Movimiento inválido: %s" % reason
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_invalid()
+
+func _draw() -> void:
+	if selected_board_pos != null:
+		var rect = Rect2(120 + selected_board_pos.y * CELL_SIZE, 20 + selected_board_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		draw_rect(rect, COL_SELECT)
+
+	# Draw valid move / drop destinations with green circles
+	for pos in valid_moves:
+		var center = Vector2(120 + pos.y * CELL_SIZE + CELL_SIZE / 2.0, 20 + pos.x * CELL_SIZE + CELL_SIZE / 2.0)
+		draw_circle(center, CELL_SIZE * 0.25, COL_VALID_MOVE)
+
+func _update_status() -> void:
+	if winner != -1:
+		status.text = "¡Jaque mate! Ganó el jugador %s" % winner
+		if turn_indicator != null:
+			turn_indicator.stop_timer()
+	else:
+		var name = "Sente (P1)" if current == P_SENTE else "Gote (P2)"
+		var col = GameManager.get_player_color(current)
+		var hand_sel_text = " (Mano: %s)" % selected_hand_piece if selected_hand_piece != "" else ""
+		status.text = "Turno: Jugador %s (Shogi)%s" % [name, hand_sel_text]
+		if turn_indicator != null:
+			turn_indicator.set_turn(current, name, col)

@@ -1,0 +1,10 @@
+# Copy this file to the root of your Godot project as: OpenTableNearby.gdap
+# Then replace the path below to point to your compiled AAR.
+
+[config]
+name="OpenTableNearby"
+binary_type="local"
+binary="res://addons/opentable_nearby/bin/OpenTableNearby.aar"
+
+[dependencies]
+remote=["com.google.android.gms:play-services-nearby:19.3.0"]

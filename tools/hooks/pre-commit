@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PATH="$HOME/.cargo/bin:/root/.cargo/bin:/usr/local/cargo/bin:$PATH"
+
+echo "Running pre-commit checks for OpenTable SDK..."
+
+if command -v cargo >/dev/null 2>&1; then
+    echo "1/2 Checking formatting with 'cargo fmt --check --all'..."
+    if ! cargo fmt --check --all; then
+        echo "Error: Code formatting check failed." >&2
+        echo "Please run 'cargo fmt --all' to fix formatting issues before committing." >&2
+        exit 1
+    fi
+
+    echo "2/2 Running linter with 'cargo clippy --workspace -- -D warnings'..."
+    if ! cargo clippy --workspace -- -D warnings; then
+        echo "Error: Clippy check failed with warnings or errors." >&2
+        echo "Please fix all clippy warnings before committing." >&2
+        exit 1
+    fi
+
+    echo "All pre-commit checks passed successfully!"
+else
+    echo "Warning: 'cargo' binary not found in PATH; skipping pre-commit checks."
+fi

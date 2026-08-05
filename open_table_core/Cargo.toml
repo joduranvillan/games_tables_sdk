@@ -1,0 +1,20 @@
+[package]
+name = "open_table_core"
+version = "0.1.0"
+edition = "2021"
+description = "Tipos y contratos fundacionales de OpenTable Engine. Sin dependencias de motor (ECS, red, Godot)."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/joduranvillan/games_tables_sdk"
+keywords = ["game-engine", "board-games", "opentable", "sdk", "networking"]
+categories = ["game-engines", "data-structures"]
+readme = "README.md"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+typetag = "0.2"
+thiserror = "1"
+rand_chacha = { version = "0.3", features = ["serde1"] }
+rand_core = "0.6"
+
+[dev-dependencies]
+serde_json = "1"

@@ -1,0 +1,14 @@
+[config]
+name="OpenTableMultipeer"
+binary="OpenTableMultipeer.xcframework"
+
+[dependencies]
+frameworks=[]
+embedded_frameworks=[]
+system_frameworks=["MultipeerConnectivity.framework"]
+architectures=["arm64"]
+
+[plist]
+NSLocalNetworkUsageDescription="Esta aplicación utiliza la red local y Bluetooth para conectar partidas multijugador P2P cercanas."
+NSBluetoothAlwaysUsageDescription="Esta aplicación requiere Bluetooth para descubrir y conectar partidas multijugador P2P en las cercanías."
+NSBonjourServices=["_opentable._tcp", "_opentable._udp"]

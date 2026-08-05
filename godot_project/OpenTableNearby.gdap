@@ -1,0 +1,7 @@
+[config]
+name="OpenTableNearby"
+binary_type="local"
+binary="res://addons/opentable_nearby/bin/OpenTableNearby.aar"
+
+[dependencies]
+remote=["com.google.android.gms:play-services-nearby:19.3.0"]

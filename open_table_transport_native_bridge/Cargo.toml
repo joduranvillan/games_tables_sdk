@@ -1,0 +1,11 @@
+[package]
+name = "open_table_transport_native_bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Capa de protocolo (handshake, identidad, reconexión, timeout) reutilizable para CUALQUIER transporte nativo móvil (Nearby Connections, MultipeerConnectivity). El plugin nativo solo mueve bytes; toda la lógica sensible vive acá y ya está probada."
+
+[dependencies]
+open_table_core = { path = "../open_table_core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+getrandom = "0.2"

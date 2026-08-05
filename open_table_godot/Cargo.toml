@@ -1,0 +1,30 @@
+[package]
+name = "open_table_godot"
+version = "0.1.0"
+edition = "2021"
+description = "Puente GDExtension entre OpenTable SDK y Godot/Redot. Expone la Session del motor Rust como un nodo con señales."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+godot = { version = "0.2", features = ["api-custom"] }
+open_table_engine = { path = "../open_table_engine" }
+open_table_core = { path = "../open_table_core" }
+open_table_qr = { path = "../open_table_qr" }
+open_table_transport_tcp = { path = "../open_table_transport_tcp" }
+open_table_transport_native_bridge = { path = "../open_table_transport_native_bridge" }
+checkers_game = { path = "../checkers_game" }
+shogi_game = { path = "../shogi_game" }
+xiangqi_game = { path = "../xiangqi_game" }
+go_game = { path = "../go_game" }
+uno_game = { path = "../uno_game" }
+crisis_game = { path = "../crisis_game" }
+chess_game = { path = "../chess_game" }
+chinese_checkers_game = { path = "../chinese_checkers_game" }
+mille_bornes_game = { path = "../mille_bornes_game" }
+backgammon_game = { path = "../backgammon_game" }
+monopoly_game = { path = "../monopoly_game" }
+ludo_game = { path = "../ludo_game" }
+battleship_game = { path = "../battleship_game" }
+serde_json = "1.0"

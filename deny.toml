@@ -1,0 +1,19 @@
+[advisories]
+vulnerability = "deny"
+unmaintained = "warn"
+yanked = "warn"
+notice = "warn"
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+]
+
+[bans]
+multiple-versions = "warn"
+deny = [
+    { name = "serde", deny-multiple-versions = true },
+    { name = "bevy_ecs", deny-multiple-versions = true },
+]

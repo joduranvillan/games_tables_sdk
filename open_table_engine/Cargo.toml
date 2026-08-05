@@ -1,0 +1,32 @@
+[package]
+name = "open_table_engine"
+version = "0.1.0"
+edition = "2021"
+description = "Motor de OpenTable Engine: bevy_ecs + scheduler + rule engine sobre los contratos de open_table_core."
+
+[dependencies]
+open_table_core = { path = "../open_table_core" }
+bevy_ecs = "0.12"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+typetag = "0.2"
+
+[dev-dependencies]
+criterion = "0.5"
+open_table_godot = { path = "../open_table_godot" }
+backgammon_game = { path = "../backgammon_game" }
+checkers_game = { path = "../checkers_game" }
+chess_game = { path = "../chess_game" }
+chinese_checkers_game = { path = "../chinese_checkers_game" }
+crisis_game = { path = "../crisis_game" }
+go_game = { path = "../go_game" }
+ludo_game = { path = "../ludo_game" }
+mille_bornes_game = { path = "../mille_bornes_game" }
+monopoly_game = { path = "../monopoly_game" }
+shogi_game = { path = "../shogi_game" }
+uno_game = { path = "../uno_game" }
+xiangqi_game = { path = "../xiangqi_game" }
+
+[[bench]]
+name = "session_throughput"
+harness = false

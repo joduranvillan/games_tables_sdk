@@ -1,0 +1,1460 @@
+//! Puente unificado entre los motores Rust (`open_table_engine`, juegos) y Godot/Redot.
+//!
+//! Expone un único nodo Godot (`OpenTableBridge`) con dispatch interno por modo:
+//! - Local: partida hotseat en un solo dispositivo (`start_local_match_*`).
+//! - Host: servidor TCP local que procesa comandos y transmite eventos (`start_hosting`).
+//! - Client: cliente TCP que envía comandos y recibe eventos (`connect_to_host`, `reconnect_to_host`).
+//! - NativeHost: servidor P2P nativo (Nearby Connections / MultipeerConnectivity).
+//! - NativeClient: cliente P2P nativo con handshake de token automático (`start_native_client`, `reconnect_native`).
+
+use godot::prelude::*;
+use godot::classes::{INode, Node};
+
+use checkers_game::{new_checkers_session, GameOverEvent, MovePieceCommand, PieceMovedEvent, Position};
+use shogi_game::new_shogi_session;
+use xiangqi_game::new_xiangqi_session;
+use go_game::new_go_session;
+use uno_game::new_uno_session;
+use crisis_game::{
+    new_crisis_session, ArmiesPlacedEvent, AttackResolvedEvent, CardsExchangedEvent,
+    PhaseChangedEvent, PlayerEliminatedEvent, TegGameOverEvent, TerritoryConqueredEvent,
+};
+use chess_game::new_chess_session;
+use chinese_checkers_game::new_chinese_checkers_session;
+use mille_bornes_game::new_mille_bornes_session;
+use backgammon_game::new_backgammon_session;
+use monopoly_game::new_monopoly_session;
+use ludo_game::new_ludo_session;
+use battleship_game::{new_battleship_session, ShotResultEvent, ShotResult};
+
+use open_table_engine::prelude::*;
+use open_table_transport_tcp::{TcpHostTransport, TcpClientTransport, ConnectionEvent};
+use open_table_transport_native_bridge::{
+    RawByteLink, RawLinkEvent, NativeHostTransport, NativeClientTransport, HandshakeStatus,
+};
+use std::sync::{Arc, Mutex};
+
+struct OpenTableExtension;
+
+#[gdextension]
+unsafe impl ExtensionLibrary for OpenTableExtension {}
+
+#[derive(Clone, Default)]
+pub struct SharedLinkQueue {
+    pub incoming: Vec<(String, Vec<u8>)>,
+    pub events: Vec<RawLinkEvent>,
+    pub outgoing_sends: Vec<(String, Vec<u8>)>,
+    pub outgoing_broadcasts: Vec<Vec<u8>>,
+}
+
+pub struct GodotNearbyLink {
+    pub queue: Arc<Mutex<SharedLinkQueue>>,
+}
+
+impl RawByteLink for GodotNearbyLink {
+    fn send_raw(&mut self, peer_tag: &str, bytes: &[u8]) -> EngineResult<()> {
+        let mut q = self.queue.lock().unwrap();
+        q.outgoing_sends.push((peer_tag.to_string(), bytes.to_vec()));
+        Ok(())
+    }
+
+    fn broadcast_raw(&mut self, bytes: &[u8]) -> EngineResult<()> {
+        let mut q = self.queue.lock().unwrap();
+        q.outgoing_broadcasts.push(bytes.to_vec());
+        Ok(())
+    }
+
+    fn poll_raw_received(&mut self) -> Vec<(String, Vec<u8>)> {
+        let mut q = self.queue.lock().unwrap();
+        std::mem::take(&mut q.incoming)
+    }
+
+    fn poll_link_events(&mut self) -> Vec<RawLinkEvent> {
+        let mut q = self.queue.lock().unwrap();
+        std::mem::take(&mut q.events)
+    }
+}
+
+#[derive(Clone)]
+struct TournamentMatch {
+    player1: PlayerId,
+    player2: PlayerId,
+    round: usize,
+}
+
+enum BridgeMode {
+    None,
+    Local {
+        session: Session,
+    },
+    Host {
+        session: Session,
+        transport: TcpHostTransport,
+    },
+    Client {
+        transport: TcpClientTransport,
+        player_id: PlayerId,
+    },
+    Spectator {
+        transport: TcpClientTransport,
+    },
+    NativeHost {
+        session: Session,
+        transport: NativeHostTransport<GodotNearbyLink>,
+        queue: Arc<Mutex<SharedLinkQueue>>,
+    },
+    NativeClient {
+        transport: NativeClientTransport<GodotNearbyLink>,
+        player_id: PlayerId,
+        queue: Arc<Mutex<SharedLinkQueue>>,
+        handshake_complete: bool,
+    },
+    Replay {
+        session: Session,
+        pending_commands: Vec<open_table_engine::session::LoggedCommand>,
+    },
+    Tournament {
+        game_type: String,
+        #[allow(dead_code)]
+        players: Vec<PlayerId>,
+        #[allow(dead_code)]
+        rounds: usize,
+        matches: Vec<TournamentMatch>,
+        current_match_idx: usize,
+        session: Session,
+        scores: std::collections::HashMap<PlayerId, i32>,
+    },
+    MultiSession {
+        sessions: Vec<(String, Session)>,
+        active: usize,
+    },
+}
+
+fn create_session_for_players(game_type: &str, p1: PlayerId, p2: PlayerId) -> Option<Session> {
+    let id = SessionId(1);
+    let seed = 1;
+    match game_type.to_lowercase().as_str() {
+        "checkers" => Some(new_checkers_session(id, seed, p1, p2)),
+        "chess" => Some(new_chess_session(id, seed, p1, p2)),
+        "shogi" => Some(new_shogi_session(id, seed, p1, p2)),
+        "xiangqi" => Some(new_xiangqi_session(id, seed, p1, p2)),
+        "go" => Some(new_go_session(id, seed, p1, p2)),
+        "uno" => Some(new_uno_session(id, seed, vec![p1, p2])),
+        "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => Some(new_chinese_checkers_session(id, seed, vec![p1, p2])),
+        "mille_bornes" | "mille-bornes" | "millebornes" => Some(new_mille_bornes_session(id, seed, p1, p2)),
+        "backgammon" => Some(new_backgammon_session(id, seed, p1, p2)),
+        "monopoly" => Some(new_monopoly_session(id, seed, p1, p2)),
+        "ludo" => Some(new_ludo_session(id, seed, vec![p1, p2])),
+        "battleship" => Some(new_battleship_session(id, seed, p1, p2)),
+        _ => None,
+    }
+}
+
+fn create_initial_session(game_type: &str) -> Option<Session> {
+    let id = SessionId(1);
+    let seed = 1;
+    let p1 = PlayerId(1);
+    let p2 = PlayerId(2);
+    match game_type.to_lowercase().as_str() {
+        "checkers" => Some(new_checkers_session(id, seed, p1, p2)),
+        "chess" => Some(new_chess_session(id, seed, p1, p2)),
+        "shogi" => Some(new_shogi_session(id, seed, p1, p2)),
+        "xiangqi" => Some(new_xiangqi_session(id, seed, p1, p2)),
+        "go" => Some(new_go_session(id, seed, p1, p2)),
+        "uno" => Some(new_uno_session(id, seed, vec![p1, p2])),
+        "crisis" => new_crisis_session(id, seed, &[p1, p2]).ok(),
+        "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => Some(new_chinese_checkers_session(id, seed, vec![p1, p2])),
+        "mille_bornes" | "mille-bornes" | "millebornes" => Some(new_mille_bornes_session(id, seed, p1, p2)),
+        "backgammon" => Some(new_backgammon_session(id, seed, p1, p2)),
+        "monopoly" => Some(new_monopoly_session(id, seed, p1, p2)),
+        "ludo" => Some(new_ludo_session(id, seed, vec![p1, p2])),
+        "battleship" => Some(new_battleship_session(id, seed, p1, p2)),
+        _ => None,
+    }
+}
+
+fn parse_command_json(json_str: &str) -> Result<Box<dyn Command>, serde_json::Error> {
+    if let Ok(cmd) = serde_json::from_str::<Box<dyn Command>>(json_str) {
+        return Ok(cmd);
+    }
+
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
+        if let Some(obj) = val.as_object() {
+            if let Some(serde_json::Value::String(ct)) = obj.get("command_type") {
+                if !ct.contains("::") {
+                    let ct_clone = ct.clone();
+                    let prefixes = [
+                        "chess_game::",
+                        "checkers_game::",
+                        "backgammon_game::",
+                        "shogi_game::",
+                        "xiangqi_game::",
+                        "go_game::",
+                        "uno_game::",
+                        "crisis_game::",
+                        "ludo_game::",
+                        "chinese_checkers_game::",
+                        "mille_bornes_game::",
+                        "monopoly_game::",
+                        "battleship_game::",
+                        "open_table_engine::",
+                        "open_table_core::",
+                    ];
+                    for prefix in prefixes {
+                        let mut test_val = val.clone();
+                        if let Some(test_obj) = test_val.as_object_mut() {
+                            test_obj.insert(
+                                "command_type".to_string(),
+                                serde_json::Value::String(format!("{prefix}{ct_clone}")),
+                            );
+                        }
+                        if let Ok(new_str) = serde_json::to_string(&test_val) {
+                            if let Ok(cmd) = serde_json::from_str::<Box<dyn Command>>(&new_str) {
+                                return Ok(cmd);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    serde_json::from_str::<Box<dyn Command>>(json_str)
+}
+
+#[derive(GodotClass)]
+#[class(base=Node)]
+pub struct OpenTableBridge {
+    base: Base<Node>,
+    mode: BridgeMode,
+}
+
+#[godot_api]
+impl INode for OpenTableBridge {
+    fn init(base: Base<Node>) -> Self {
+        Self {
+            base,
+            mode: BridgeMode::None,
+        }
+    }
+}
+
+#[godot_api]
+impl OpenTableBridge {
+    // --- SIGNALS ---
+    #[signal]
+    fn piece_moved(
+        player: i64,
+        from_row: i64,
+        from_col: i64,
+        to_row: i64,
+        to_col: i64,
+        captured_row: i64,
+        captured_col: i64,
+        promoted: bool,
+    );
+
+    #[signal]
+    fn token_moved(
+        player: i64,
+        token_index: i64,
+        from_steps: i64,
+        to_steps: i64,
+        finished: bool,
+    );
+
+    #[signal]
+    fn checker_moved(
+        player: i64,
+        from: i64,
+        to: i64,
+        captured_opponent: bool,
+        borne_off: bool,
+    );
+
+    #[signal]
+    fn shot_result(player: i64, row: i64, col: i64, is_hit: bool);
+
+    #[signal]
+    fn game_over(winner: i64);
+
+    #[signal]
+    fn move_rejected(reason: GString);
+
+    #[signal]
+    fn peer_joined(player_id: i64);
+
+    #[signal]
+    fn player_joined(player_id: i64);
+
+    #[signal]
+    fn peer_disconnected(player_id: i64);
+
+    #[signal]
+    fn connected(player_id: i64);
+
+    #[signal]
+    fn disconnected();
+
+    #[signal]
+    fn native_send_requested(peer_tag: GString, bytes: PackedByteArray);
+
+    #[signal]
+    fn native_broadcast_requested(bytes: PackedByteArray);
+
+    #[signal]
+    fn native_handshake_established(player_id: i64, token: GString);
+
+    #[signal]
+    fn event_json(json: GString);
+
+    #[signal]
+    fn turn_changed(player_id: i64);
+
+    #[signal]
+    fn spectator_event_received(event_json: GString);
+
+    #[signal]
+    fn territory_conquered(
+        player_id: i64,
+        territory_id: i64,
+        from_armies: i64,
+        to_armies: i64,
+    );
+
+    #[signal]
+    fn attack_resolved(
+        from_id: i64,
+        to_id: i64,
+        attacker_rolls: VariantArray,
+        defender_rolls: VariantArray,
+        attacker_losses: i64,
+        defender_losses: i64,
+    );
+
+    #[signal]
+    fn armies_placed(
+        player_id: i64,
+        territory_id: i64,
+        count: i64,
+        remaining: i64,
+    );
+
+    #[signal]
+    fn player_eliminated(player_id: i64, by_player_id: i64);
+
+    #[signal]
+    fn phase_changed(player_id: i64, new_phase: GString);
+
+    #[signal]
+    fn cards_exchanged(player_id: i64, armies_gained: i64);
+
+    #[signal]
+    fn crisis_game_over(winner_id: i64, objective: GString);
+
+    #[signal]
+    fn tournament_match_started(player1: i64, player2: i64, round: i64);
+
+    #[signal]
+    fn tournament_match_ended(winner: i64, round: i64);
+
+    #[signal]
+    fn tournament_over(standings: Dictionary);
+
+    // ------------------------------------------------------------------
+    // LOCAL (hotseat)
+    // ------------------------------------------------------------------
+    #[func]
+    fn start_local_match(&mut self, player_top_id: i64, player_bottom_id: i64) {
+        let session = new_checkers_session(
+            SessionId(1),
+            1,
+            PlayerId(player_top_id as u32),
+            PlayerId(player_bottom_id as u32),
+        );
+        self.mode = BridgeMode::Local { session };
+    }
+
+    #[func]
+    fn start_local_match_checkers(&mut self, player_top_id: i64, player_bottom_id: i64) {
+        self.start_local_match(player_top_id, player_bottom_id);
+    }
+
+    #[func]
+    fn start_local_match_shogi(&mut self, p1: i64, p2: i64) {
+        let session = new_shogi_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        self.mode = BridgeMode::Local { session };
+    }
+
+    #[func]
+    fn start_local_match_xiangqi(&mut self, p1: i64, p2: i64) {
+        let session = new_xiangqi_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        self.mode = BridgeMode::Local { session };
+    }
+
+    #[func]
+    fn start_local_match_go(&mut self, p1: i64, p2: i64) {
+        let session = new_go_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        self.mode = BridgeMode::Local { session };
+    }
+
+    #[func]
+    fn start_local_match_uno(&mut self, p1: i64, p2: i64) {
+        let session = new_uno_session(SessionId(1), 1, vec![PlayerId(p1 as u32), PlayerId(p2 as u32)]);
+        self.mode = BridgeMode::Local { session };
+    }
+
+    #[func]
+    fn start_local_match_crisis(&mut self, seed: i64, players: Array<i64>) -> bool {
+        if players.len() < 2 || players.len() > 6 {
+            return false;
+        }
+        let player_ids: Vec<PlayerId> = players.iter_shared().map(|p| PlayerId(p as u32)).collect();
+        let session = match new_crisis_session(SessionId(1), seed as u64, &player_ids) {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+        self.mode = BridgeMode::Local { session };
+        true
+    }
+
+    #[func]
+    fn start_local_match_chess(&mut self, p1: i64, p2: i64) {
+        let session = new_chess_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        self.mode = BridgeMode::Local { session };
+    }
+
+    #[func]
+    fn start_local_match_chinese_checkers(&mut self, p1: i64, p2: i64) {
+        let session = new_chinese_checkers_session(SessionId(1), 1, vec![PlayerId(p1 as u32), PlayerId(p2 as u32)]);
+        self.mode = BridgeMode::Local { session };
+    }
+
+    #[func]
+    fn start_local_match_mille_bornes(&mut self, p1: i64, p2: i64) {
+        let session = new_mille_bornes_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        self.mode = BridgeMode::Local { session };
+    }
+
+    #[func]
+    fn start_local_match_backgammon(&mut self, p1: i64, p2: i64) {
+        let session = new_backgammon_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        self.mode = BridgeMode::Local { session };
+    }
+
+    #[func]
+    fn start_local_match_monopoly(&mut self, p1: i64, p2: i64) {
+        let session = new_monopoly_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        self.mode = BridgeMode::Local { session };
+    }
+
+    #[func]
+    fn start_local_match_ludo(&mut self, p1: i64, p2: i64) {
+        let session = new_ludo_session(SessionId(1), 1, vec![PlayerId(p1 as u32), PlayerId(p2 as u32)]);
+        self.mode = BridgeMode::Local { session };
+    }
+
+    #[func]
+    fn start_tournament(&mut self, game_type: GString, players: Array<i64>, rounds: i64) -> bool {
+        if players.len() < 2 || rounds < 1 {
+            return false;
+        }
+
+        let p_vec: Vec<PlayerId> = players.iter_shared().map(|p| PlayerId(p as u32)).collect();
+        let gt = game_type.to_string();
+
+        let mut matches = Vec::new();
+        for r in 1..=(rounds as usize) {
+            for i in 0..p_vec.len() {
+                for j in (i + 1)..p_vec.len() {
+                    matches.push(TournamentMatch {
+                        player1: p_vec[i],
+                        player2: p_vec[j],
+                        round: r,
+                    });
+                }
+            }
+        }
+
+        if matches.is_empty() {
+            return false;
+        }
+
+        let first_match = &matches[0];
+        let session = match create_session_for_players(&gt, first_match.player1, first_match.player2) {
+            Some(s) => s,
+            None => return false,
+        };
+
+        let mut scores = std::collections::HashMap::new();
+        for &p in &p_vec {
+            scores.insert(p, 0);
+        }
+
+        let first_p1 = first_match.player1.0 as i64;
+        let first_p2 = first_match.player2.0 as i64;
+        let first_round = first_match.round as i64;
+        let first_turn = session.current_player().0 as i64;
+
+        self.mode = BridgeMode::Tournament {
+            game_type: gt,
+            players: p_vec,
+            rounds: rounds as usize,
+            matches,
+            current_match_idx: 0,
+            session,
+            scores,
+        };
+
+        self.base_mut().emit_signal(
+            "tournament_match_started",
+            &[Variant::from(first_p1), Variant::from(first_p2), Variant::from(first_round)],
+        );
+        self.base_mut().emit_signal(
+            "turn_changed",
+            &[Variant::from(first_turn)],
+        );
+
+        true
+    }
+
+    #[func]
+    fn start_multi_session(&mut self) {
+        self.mode = BridgeMode::MultiSession {
+            sessions: Vec::new(),
+            active: 0,
+        };
+    }
+
+    #[func]
+    fn add_multi_session(&mut self, game_id: GString, game_type: GString, p1: i64, p2: i64) -> bool {
+        let gid = game_id.to_string();
+        let gtype = game_type.to_string();
+        let p1_id = PlayerId(p1 as u32);
+        let p2_id = PlayerId(p2 as u32);
+        let session = match create_session_for_players(&gtype, p1_id, p2_id) {
+            Some(s) => s,
+            None => return false,
+        };
+
+        match &mut self.mode {
+            BridgeMode::MultiSession { sessions, .. } => {
+                if let Some(pos) = sessions.iter().position(|(id, _)| id == &gid) {
+                    sessions[pos].1 = session;
+                } else {
+                    sessions.push((gid, session));
+                }
+                true
+            }
+            _ => {
+                self.mode = BridgeMode::MultiSession {
+                    sessions: vec![(gid, session)],
+                    active: 0,
+                };
+                true
+            }
+        }
+    }
+
+    #[func]
+    fn switch_session(&mut self, game_id: GString) -> bool {
+        let gid = game_id.to_string();
+        if let BridgeMode::MultiSession { sessions, active } = &mut self.mode {
+            if let Some(pos) = sessions.iter().position(|(id, _)| id == &gid) {
+                *active = pos;
+                return true;
+            }
+        }
+        false
+    }
+
+    #[func]
+    fn get_active_game_id(&self) -> GString {
+        if let BridgeMode::MultiSession { sessions, active } = &self.mode {
+            if let Some((gid, _)) = sessions.get(*active) {
+                return GString::from(gid);
+            }
+        }
+        GString::from("")
+    }
+
+    #[func]
+    fn load_chess_fen(&mut self, fen: GString) -> bool {
+        match &mut self.mode {
+            BridgeMode::Local { session }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::Tournament { session, .. } => {
+                chess_game::load_chess_position_from_fen(session, &fen.to_string()).is_ok()
+            }
+            BridgeMode::MultiSession { sessions, active } => {
+                if let Some((_, session)) = sessions.get_mut(*active) {
+                    chess_game::load_chess_position_from_fen(session, &fen.to_string()).is_ok()
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    #[func]
+    fn export_chess_pgn(&self) -> GString {
+        let pgn_opt = match &self.mode {
+            BridgeMode::Local { session }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::Tournament { session, .. } => {
+                session.export_chess_pgn()
+            }
+            BridgeMode::MultiSession { sessions, active } => {
+                sessions.get(*active).and_then(|(_, s)| s.export_chess_pgn())
+            }
+            _ => None,
+        };
+        GString::from(pgn_opt.unwrap_or_default())
+    }
+
+    // ------------------------------------------------------------------
+    // HOST TCP
+    // ------------------------------------------------------------------
+    #[func]
+    fn start_hosting(&mut self, port: i64, player_top_id: i64, player_bottom_id: i64) {
+        let session = new_checkers_session(
+            SessionId(1),
+            1,
+            PlayerId(player_top_id as u32),
+            PlayerId(player_bottom_id as u32),
+        );
+        let socket_addr: std::net::SocketAddr = format!("0.0.0.0:{}", port)
+            .parse()
+            .expect("puerto inválido");
+        let transport = TcpHostTransport::bind_with_timeout(socket_addr, std::time::Duration::from_secs(60))
+            .expect("no pude crear host");
+        self.mode = BridgeMode::Host { session, transport };
+        godot_print!("✅ Host escuchando en puerto {}", port);
+    }
+
+    #[func]
+    fn get_join_qr_svg(&self, join_code: GString, host_name: GString, game_type: GString) -> GString {
+        let payload = open_table_qr::JoinPayload {
+            session_id: open_table_core::ids::SessionId(1),
+            join_code: join_code.to_string(),
+            host_name: host_name.to_string(),
+            game_type: game_type.to_string(),
+        };
+        match open_table_qr::generate_join_qr_svg(&payload) {
+            Ok(svg) => GString::from(svg),
+            Err(_) => GString::from(""),
+        }
+    }
+
+    #[func]
+    fn generate_join_qr_svg(&self, join_code: GString, host_name: GString, game_type: GString) -> GString {
+        self.get_join_qr_svg(join_code, host_name, game_type)
+    }
+
+    // ------------------------------------------------------------------
+    // CLIENT TCP
+    // ------------------------------------------------------------------
+    #[func]
+    fn connect_as_client(&mut self, host: GString, port: i64) -> bool {
+        self.connect_to_host(host, port, GString::from("Jugador"))
+    }
+
+    #[func]
+    fn connect_to_host(&mut self, host: GString, port: i64, player_name: GString) -> bool {
+        let addr = format!("{}:{}", host.to_string(), port);
+        match TcpClientTransport::connect_as_new_player(&addr, &player_name.to_string()) {
+            Ok((transport, player_id, reconnect_token)) => {
+                self.mode = BridgeMode::Client { transport, player_id };
+                self.base_mut()
+                    .emit_signal("connected", &[Variant::from(player_id.0 as i64)]);
+                self.base_mut()
+                    .emit_signal("native_handshake_established", &[Variant::from(player_id.0 as i64), Variant::from(reconnect_token)]);
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    #[func]
+    fn reconnect_to_host(&mut self, host: GString, port: i64, player_id: i64, token: GString) -> bool {
+        let addr = format!("{}:{}", host.to_string(), port);
+        let pid = PlayerId(player_id as u32);
+        match TcpClientTransport::reconnect(&addr, pid, token.to_string()) {
+            Ok(transport) => {
+                self.mode = BridgeMode::Client { transport, player_id: pid };
+                self.base_mut()
+                    .emit_signal("connected", &[Variant::from(pid.0 as i64)]);
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    #[func]
+    fn start_spectating(&mut self, host_addr: GString) -> bool {
+        let addr = host_addr.to_string();
+        match TcpClientTransport::connect_as_new_player(&addr, "Spectator") {
+            Ok((transport, _player_id, _reconnect_token)) => {
+                self.mode = BridgeMode::Spectator { transport };
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    #[func]
+    fn my_player_id(&self) -> i64 {
+        match &self.mode {
+            BridgeMode::Client { player_id, .. } => player_id.0 as i64,
+            BridgeMode::NativeClient { player_id, .. } => player_id.0 as i64,
+            _ => -1,
+        }
+    }
+
+    #[func]
+    fn is_native_connected(&self) -> bool {
+        match &self.mode {
+            BridgeMode::NativeClient { handshake_complete, .. } => *handshake_complete,
+            BridgeMode::NativeHost { .. } => true,
+            _ => false,
+        }
+    }
+
+    #[func]
+    fn send_move_client(&mut self, from_row: i64, from_col: i64, to_row: i64, to_col: i64) {
+        let command_parts = match &self.mode {
+            BridgeMode::Client { player_id, .. } => Some(*player_id),
+            BridgeMode::NativeClient { player_id, handshake_complete, .. } if *handshake_complete => Some(*player_id),
+            _ => None,
+        };
+        let Some(player_id) = command_parts else {
+            return;
+        };
+
+        let command: Box<dyn Command> = Box::new(MovePieceCommand {
+            player: player_id,
+            from: Position::new(from_row as u8, from_col as u8),
+            to: Position::new(to_row as u8, to_col as u8),
+        });
+
+        if let Ok(serialized) = serde_json::to_vec(&command) {
+            match &mut self.mode {
+                BridgeMode::Client { transport, .. } => {
+                    let _ = transport.send(open_table_transport_tcp::HOST_PLAYER_ID, &serialized);
+                }
+                BridgeMode::NativeClient { transport, .. } => {
+                    let _ = transport.send(open_table_transport_native_bridge::HOST_PLAYER_ID, &serialized);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // NATIVE BRIDGE (Android Nearby Connections / iOS Multipeer)
+    // ------------------------------------------------------------------
+    #[func]
+    fn start_native_hosting(&mut self, player_top_id: i64, player_bottom_id: i64) {
+        let session = new_checkers_session(
+            SessionId(1),
+            1,
+            PlayerId(player_top_id as u32),
+            PlayerId(player_bottom_id as u32),
+        );
+        let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
+        let link = GodotNearbyLink { queue: queue.clone() };
+        let transport = NativeHostTransport::new(link);
+        self.mode = BridgeMode::NativeHost { session, transport, queue };
+        godot_print!("✅ Native Host iniciado");
+    }
+
+    #[func]
+    fn start_native_client(&mut self, player_name: GString) {
+        let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
+        let link = GodotNearbyLink { queue: queue.clone() };
+        let transport = NativeClientTransport::begin_join(link, &player_name.to_string())
+            .expect("no pude iniciar handshake nativo");
+        self.mode = BridgeMode::NativeClient {
+            transport,
+            player_id: PlayerId(0),
+            queue,
+            handshake_complete: false,
+        };
+        godot_print!("✅ Handshake nativo iniciado");
+    }
+
+    #[func]
+    fn reconnect_native(&mut self, player_id: i64, token: GString) {
+        let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
+        let link = GodotNearbyLink { queue: queue.clone() };
+        let pid = PlayerId(player_id as u32);
+        let transport = NativeClientTransport::begin_reconnect(link, pid, token.to_string())
+            .expect("no pude iniciar reconexión nativa");
+        self.mode = BridgeMode::NativeClient {
+            transport,
+            player_id: pid,
+            queue,
+            handshake_complete: false,
+        };
+        godot_print!("✅ Reconexión nativa iniciada para PlayerId={}", player_id);
+    }
+
+    #[func]
+    fn feed_native_data_received(&mut self, peer_tag: GString, bytes: PackedByteArray) {
+        let incoming_bytes = bytes.to_vec();
+        match &self.mode {
+            BridgeMode::NativeHost { queue, .. } | BridgeMode::NativeClient { queue, .. } => {
+                let mut q = queue.lock().unwrap();
+                q.incoming.push((peer_tag.to_string(), incoming_bytes));
+            }
+            _ => {}
+        }
+    }
+
+    #[func]
+    fn feed_native_peer_disconnected(&mut self, peer_tag: GString) {
+        match &self.mode {
+            BridgeMode::NativeHost { queue, .. } | BridgeMode::NativeClient { queue, .. } => {
+                let mut q = queue.lock().unwrap();
+                q.events.push(RawLinkEvent::Disconnected(peer_tag.to_string()));
+            }
+            _ => {}
+        }
+    }
+
+    fn emit_bridge_signal(&mut self, signal_name: &str, args: &[Variant]) {
+        if let BridgeMode::MultiSession { sessions, active } = &self.mode {
+            if let Some((gid, _)) = sessions.get(*active) {
+                let mut multi_args = vec![Variant::from(GString::from(gid))];
+                multi_args.extend_from_slice(args);
+                self.base_mut().emit_signal(signal_name, &multi_args);
+                return;
+            }
+        }
+        self.base_mut().emit_signal(signal_name, args);
+    }
+
+    fn process_and_emit(&mut self, sender: PlayerId, command: Box<dyn Command>) -> EngineResult<Vec<Box<dyn Event>>> {
+        let (prev_player, result) = match &mut self.mode {
+            BridgeMode::Local { session } => {
+                let prev = session.current_player();
+                let res = session.process_command(sender, command);
+                (prev, res)
+            }
+            BridgeMode::Host { session, .. } => {
+                let prev = session.current_player();
+                let res = session.process_command(sender, command);
+                (prev, res)
+            }
+            BridgeMode::NativeHost { session, .. } => {
+                let prev = session.current_player();
+                let res = session.process_command(sender, command);
+                (prev, res)
+            }
+            BridgeMode::Replay { session, .. } => {
+                let prev = session.current_player();
+                let res = session.process_command(sender, command);
+                (prev, res)
+            }
+            BridgeMode::Tournament { session, .. } => {
+                let prev = session.current_player();
+                let res = session.process_command(sender, command);
+                (prev, res)
+            }
+            BridgeMode::MultiSession { sessions, active } => {
+                if let Some((_, session)) = sessions.get_mut(*active) {
+                    let prev = session.current_player();
+                    let res = session.process_command(sender, command);
+                    (prev, res)
+                } else {
+                    return Err(EngineError::InvalidCommand { reason: "No active session in MultiSession".into() });
+                }
+            }
+            _ => return Err(EngineError::InvalidCommand { reason: "El modo no soporta comandos".into() }),
+        };
+
+        match &result {
+            Ok(events) => {
+                self.emit_game_events(events);
+                let new_player = match &self.mode {
+                    BridgeMode::Local { session } => session.current_player(),
+                    BridgeMode::Host { session, .. } => session.current_player(),
+                    BridgeMode::NativeHost { session, .. } => session.current_player(),
+                    BridgeMode::Replay { session, .. } => session.current_player(),
+                    BridgeMode::Tournament { session, .. } => session.current_player(),
+                    BridgeMode::MultiSession { sessions, active } => {
+                        sessions.get(*active).map(|(_, s)| s.current_player()).unwrap_or(prev_player)
+                    }
+                    _ => prev_player,
+                };
+                if new_player != prev_player {
+                    self.emit_bridge_signal("turn_changed", &[Variant::from(new_player.0 as i64)]);
+                }
+            }
+            Err(err) => {
+                self.emit_bridge_signal("move_rejected", &[Variant::from(err.to_string())]);
+            }
+        }
+
+        result
+    }
+
+    // ------------------------------------------------------------------
+    // UNIVERSAL COMMANDS & STATE
+    // ------------------------------------------------------------------
+    #[func]
+    fn send_command_json(&mut self, player: i64, json_str: GString) {
+        let player_id = PlayerId(player as u32);
+        let command: Box<dyn Command> = match parse_command_json(&json_str.to_string()) {
+            Ok(cmd) => cmd,
+            Err(e) => {
+                self.emit_bridge_signal("move_rejected", &[Variant::from(format!("Error parsing command JSON: {e}"))]);
+                return;
+            }
+        };
+
+        if let Ok(events) = self.process_and_emit(player_id, command) {
+            match &mut self.mode {
+                BridgeMode::Host { transport, .. } => {
+                    let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                    let _ = transport.broadcast(&serialized);
+                }
+                BridgeMode::NativeHost { transport, .. } => {
+                    let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                    let _ = transport.broadcast(&serialized);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[func]
+    fn send_move(&mut self, player: i64, from_row: i64, from_col: i64, to_row: i64, to_col: i64) {
+        let player_id = PlayerId(player as u32);
+        let command: Box<dyn Command> = Box::new(MovePieceCommand {
+            player: player_id,
+            from: Position::new(from_row as u8, from_col as u8),
+            to: Position::new(to_row as u8, to_col as u8),
+        });
+
+        if let Ok(events) = self.process_and_emit(player_id, command) {
+            match &mut self.mode {
+                BridgeMode::Host { transport, .. } => {
+                    let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                    let _ = transport.broadcast(&serialized);
+                }
+                BridgeMode::NativeHost { transport, .. } => {
+                    let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                    let _ = transport.broadcast(&serialized);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[func]
+    fn export_log(&self) -> PackedByteArray {
+        let log_bytes = match &self.mode {
+            BridgeMode::Local { session } => session.export_log().unwrap_or_default(),
+            BridgeMode::Host { session, .. } => session.export_log().unwrap_or_default(),
+            BridgeMode::NativeHost { session, .. } => session.export_log().unwrap_or_default(),
+            BridgeMode::Replay { session, .. } => session.export_log().unwrap_or_default(),
+            BridgeMode::MultiSession { sessions, active } => {
+                sessions.get(*active).and_then(|(_, s)| s.export_log().ok()).unwrap_or_default()
+            }
+            _ => vec![],
+        };
+        let mut packed = PackedByteArray::new();
+        for b in log_bytes {
+            packed.push(b);
+        }
+        packed
+    }
+
+    #[func]
+    fn load_replay(&mut self, log_bytes: PackedByteArray, game_type: GString) -> bool {
+        let bytes = log_bytes.to_vec();
+        let log: Vec<open_table_engine::session::LoggedCommand> = match serde_json::from_slice(&bytes) {
+            Ok(l) => l,
+            Err(_) => return false,
+        };
+
+        let initial_session = match create_initial_session(&game_type.to_string()) {
+            Some(s) => s,
+            None => return false,
+        };
+
+        let test_session = match create_initial_session(&game_type.to_string()) {
+            Some(s) => s,
+            None => return false,
+        };
+
+        if Session::replay_on_session(test_session, &bytes).is_err() {
+            return false;
+        }
+
+        self.mode = BridgeMode::Replay {
+            session: initial_session,
+            pending_commands: log,
+        };
+
+        true
+    }
+
+    #[func]
+    fn step_replay(&mut self) -> bool {
+        let (sender, command) = {
+            let BridgeMode::Replay { session, pending_commands } = &mut self.mode else {
+                return false;
+            };
+
+            if pending_commands.is_empty() {
+                return false;
+            }
+
+            let (_tick, _elapsed, command) = pending_commands.remove(0);
+            let sender = command.issuer().unwrap_or_else(|| session.current_player());
+            (sender, command)
+        };
+
+        self.process_and_emit(sender, command).is_ok()
+    }
+
+    #[func]
+    fn current_player(&self) -> i64 {
+        match &self.mode {
+            BridgeMode::Local { session } => session.current_player().0 as i64,
+            BridgeMode::Host { session, .. } => session.current_player().0 as i64,
+            BridgeMode::NativeHost { session, .. } => session.current_player().0 as i64,
+            BridgeMode::Replay { session, .. } => session.current_player().0 as i64,
+            BridgeMode::Tournament { session, .. } => session.current_player().0 as i64,
+            BridgeMode::MultiSession { sessions, active } => {
+                sessions.get(*active).map(|(_, s)| s.current_player().0 as i64).unwrap_or(-1)
+            }
+            _ => -1,
+        }
+    }
+
+    #[func]
+    fn poll_events(&mut self) {
+        match &mut self.mode {
+            BridgeMode::Host { .. } => self.poll_host_events(),
+            BridgeMode::Client { .. } => self.poll_client_events(),
+            BridgeMode::Spectator { .. } => self.poll_spectator_events(),
+            BridgeMode::NativeHost { .. } => self.poll_native_host_events(),
+            BridgeMode::NativeClient { .. } => self.poll_native_client_events(),
+            BridgeMode::Local { .. } | BridgeMode::None | BridgeMode::Replay { .. } | BridgeMode::Tournament { .. } | BridgeMode::MultiSession { .. } => {}
+        }
+        self.flush_native_outgoing();
+    }
+
+    fn poll_host_events(&mut self) {
+        let BridgeMode::Host { transport, .. } = &mut self.mode else {
+            return;
+        };
+
+        let connection_events = transport.poll_connection_events();
+        for event in connection_events {
+            match event {
+                ConnectionEvent::Joined { player } => {
+                    self.base_mut()
+                        .emit_signal("peer_joined", &[Variant::from(player.0 as i64)]);
+                    self.base_mut()
+                        .emit_signal("player_joined", &[Variant::from(player.0 as i64)]);
+                }
+                ConnectionEvent::Disconnected { player } => {
+                    self.base_mut()
+                        .emit_signal("peer_disconnected", &[Variant::from(player.0 as i64)]);
+                }
+                _ => {}
+            }
+        }
+
+        let BridgeMode::Host { transport, .. } = &mut self.mode else {
+            return;
+        };
+
+        let received = transport.poll_received();
+        for (player_id, command_bytes) in received {
+            let cmd_str = String::from_utf8_lossy(&command_bytes);
+            if let Ok(command) = parse_command_json(&cmd_str) {
+                if let Ok(events) = self.process_and_emit(player_id, command) {
+                    if let BridgeMode::Host { transport, .. } = &mut self.mode {
+                        let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                        let _ = transport.broadcast(&serialized);
+                    }
+                }
+            }
+        }
+    }
+
+    fn poll_client_events(&mut self) {
+        let BridgeMode::Client { transport, .. } = &mut self.mode else {
+            return;
+        };
+        let received = transport.poll_received();
+        for (_host_id, event_bytes) in received {
+            if let Ok(events) = serde_json::from_slice::<Vec<Box<dyn Event>>>(&event_bytes) {
+                self.emit_game_events(&events);
+            }
+        }
+    }
+
+    fn poll_spectator_events(&mut self) {
+        let BridgeMode::Spectator { transport } = &mut self.mode else {
+            return;
+        };
+        let received = transport.poll_received();
+        for (_host_id, event_bytes) in received {
+            if let Ok(events) = serde_json::from_slice::<Vec<Box<dyn Event>>>(&event_bytes) {
+                for event in &events {
+                    if let Ok(json) = serde_json::to_string(event) {
+                        self.base_mut()
+                            .emit_signal("spectator_event_received", &[Variant::from(json)]);
+                    }
+                }
+                self.emit_game_events(&events);
+            }
+        }
+    }
+
+    fn poll_native_host_events(&mut self) {
+        let BridgeMode::NativeHost { transport, .. } = &mut self.mode else {
+            return;
+        };
+
+        let connection_events = transport.poll_connection_events();
+        for event in connection_events {
+            match event {
+                open_table_transport_native_bridge::ConnectionEvent::Joined { player } => {
+                    self.base_mut()
+                        .emit_signal("peer_joined", &[Variant::from(player.0 as i64)]);
+                    self.base_mut()
+                        .emit_signal("player_joined", &[Variant::from(player.0 as i64)]);
+                }
+                open_table_transport_native_bridge::ConnectionEvent::Disconnected { player } => {
+                    self.base_mut()
+                        .emit_signal("peer_disconnected", &[Variant::from(player.0 as i64)]);
+                }
+                _ => {}
+            }
+        }
+
+        let BridgeMode::NativeHost { transport, .. } = &mut self.mode else {
+            return;
+        };
+
+        let received = transport.poll_received();
+        for (player_id, command_bytes) in received {
+            let cmd_str = String::from_utf8_lossy(&command_bytes);
+            if let Ok(command) = parse_command_json(&cmd_str) {
+                if let Ok(events) = self.process_and_emit(player_id, command) {
+                    if let BridgeMode::NativeHost { transport, .. } = &mut self.mode {
+                        let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                        let _ = transport.broadcast(&serialized);
+                    }
+                }
+            }
+        }
+    }
+
+    fn poll_native_client_events(&mut self) {
+        let BridgeMode::NativeClient { transport, player_id, handshake_complete, .. } = &mut self.mode else {
+            return;
+        };
+
+        if !*handshake_complete {
+            match transport.poll_handshake() {
+                HandshakeStatus::Pending => {}
+                HandshakeStatus::Established { player_id: pid, reconnect_token } => {
+                    *player_id = pid;
+                    *handshake_complete = true;
+                    self.base_mut()
+                        .emit_signal("connected", &[Variant::from(pid.0 as i64)]);
+                    self.base_mut()
+                        .emit_signal("native_handshake_established", &[Variant::from(pid.0 as i64), Variant::from(reconnect_token)]);
+                }
+                HandshakeStatus::Rejected { .. } => {
+                    self.base_mut()
+                        .emit_signal("disconnected", &[]);
+                }
+            }
+        }
+
+        let BridgeMode::NativeClient { transport, .. } = &mut self.mode else {
+            return;
+        };
+
+        let received = transport.poll_received();
+        for (_host_id, event_bytes) in received {
+            if let Ok(events) = serde_json::from_slice::<Vec<Box<dyn Event>>>(&event_bytes) {
+                self.emit_game_events(&events);
+            }
+        }
+    }
+
+    fn flush_native_outgoing(&mut self) {
+        let (sends, broadcasts) = match &self.mode {
+            BridgeMode::NativeHost { queue, .. } | BridgeMode::NativeClient { queue, .. } => {
+                let mut q = queue.lock().unwrap();
+                let sends = std::mem::take(&mut q.outgoing_sends);
+                let broadcasts = std::mem::take(&mut q.outgoing_broadcasts);
+                (sends, broadcasts)
+            }
+            _ => return,
+        };
+
+        for (peer_tag, bytes) in sends {
+            let mut packed = PackedByteArray::new();
+            for b in bytes {
+                packed.push(b);
+            }
+            self.base_mut()
+                .emit_signal("native_send_requested", &[Variant::from(peer_tag), Variant::from(packed)]);
+        }
+
+        for bytes in broadcasts {
+            let mut packed = PackedByteArray::new();
+            for b in bytes {
+                packed.push(b);
+            }
+            self.base_mut()
+                .emit_signal("native_broadcast_requested", &[Variant::from(packed)]);
+        }
+    }
+
+    fn emit_game_events(&mut self, events: &[Box<dyn Event>]) {
+        for event in events {
+            if let Ok(json) = serde_json::to_string(event) {
+                self.emit_bridge_signal("event_json", &[Variant::from(json)]);
+            }
+
+            if let Some(moved) = event.as_any().downcast_ref::<PieceMovedEvent>() {
+                let (captured_row, captured_col) = moved
+                    .captured
+                    .map(|p| (p.row as i64, p.col as i64))
+                    .unwrap_or((-1, -1));
+                self.emit_bridge_signal(
+                    "piece_moved",
+                    &[
+                        Variant::from(moved.player.0 as i64),
+                        Variant::from(moved.from.row as i64),
+                        Variant::from(moved.from.col as i64),
+                        Variant::from(moved.to.row as i64),
+                        Variant::from(moved.to.col as i64),
+                        Variant::from(captured_row),
+                        Variant::from(captured_col),
+                        Variant::from(moved.promoted),
+                    ],
+                );
+            }
+
+            if let Some(game_over) = event.as_any().downcast_ref::<GameOverEvent>() {
+                let winner_id = game_over.winner.0 as i64;
+                self.emit_bridge_signal("game_over", &[Variant::from(winner_id)]);
+                self.check_advance_tournament(winner_id);
+            }
+
+            if let Some(game_over) = event.as_any().downcast_ref::<go_game::GameOverEvent>() {
+                let winner_id = game_over.winner.map(|p| p.0 as i64).unwrap_or(0);
+                self.emit_bridge_signal("game_over", &[Variant::from(winner_id)]);
+                self.check_advance_tournament(winner_id);
+            }
+
+            if let Some(shot) = event.as_any().downcast_ref::<ShotResultEvent>() {
+                let is_hit = shot.result == ShotResult::Hit || shot.result == ShotResult::Sunk;
+                self.emit_bridge_signal(
+                    "shot_result",
+                    &[
+                        Variant::from(shot.shooter.0 as i64),
+                        Variant::from(shot.target.row as i64),
+                        Variant::from(shot.target.col as i64),
+                        Variant::from(is_hit),
+                    ],
+                );
+            }
+
+            if let Some(t_moved) = event.as_any().downcast_ref::<ludo_game::TokenMovedEvent>() {
+                self.emit_bridge_signal(
+                    "token_moved",
+                    &[
+                        Variant::from(t_moved.player.0 as i64),
+                        Variant::from(t_moved.token_index as i64),
+                        Variant::from(t_moved.from_steps as i64),
+                        Variant::from(t_moved.to_steps as i64),
+                        Variant::from(t_moved.finished),
+                    ],
+                );
+            }
+
+            if let Some(c_moved) = event.as_any().downcast_ref::<backgammon_game::CheckerMovedEvent>() {
+                let from_val = c_moved.from.map(|v| v as i64).unwrap_or(-1);
+                let to_val = c_moved.to.map(|v| v as i64).unwrap_or(-1);
+                self.emit_bridge_signal(
+                    "checker_moved",
+                    &[
+                        Variant::from(c_moved.player.0 as i64),
+                        Variant::from(from_val),
+                        Variant::from(to_val),
+                        Variant::from(c_moved.captured_opponent),
+                        Variant::from(c_moved.borne_off),
+                    ],
+                );
+            }
+
+            if let Some(c_conquered) = event.as_any().downcast_ref::<TerritoryConqueredEvent>() {
+                self.emit_bridge_signal(
+                    "territory_conquered",
+                    &[
+                        Variant::from(c_conquered.player.0 as i64),
+                        Variant::from(c_conquered.territory.0 as i64),
+                        Variant::from(c_conquered.from_armies as i64),
+                        Variant::from(c_conquered.to_armies as i64),
+                    ],
+                );
+            }
+
+            if let Some(c_attack) = event.as_any().downcast_ref::<AttackResolvedEvent>() {
+                let mut att_rolls = VariantArray::new();
+                for &r in &c_attack.attacker_rolls {
+                    att_rolls.push(&Variant::from(r as i64));
+                }
+                let mut def_rolls = VariantArray::new();
+                for &r in &c_attack.defender_rolls {
+                    def_rolls.push(&Variant::from(r as i64));
+                }
+                self.emit_bridge_signal(
+                    "attack_resolved",
+                    &[
+                        Variant::from(c_attack.from.0 as i64),
+                        Variant::from(c_attack.to.0 as i64),
+                        Variant::from(att_rolls),
+                        Variant::from(def_rolls),
+                        Variant::from(c_attack.attacker_losses as i64),
+                        Variant::from(c_attack.defender_losses as i64),
+                    ],
+                );
+            }
+
+            if let Some(c_placed) = event.as_any().downcast_ref::<ArmiesPlacedEvent>() {
+                self.emit_bridge_signal(
+                    "armies_placed",
+                    &[
+                        Variant::from(c_placed.player.0 as i64),
+                        Variant::from(c_placed.territory.0 as i64),
+                        Variant::from(c_placed.count as i64),
+                        Variant::from(c_placed.armies_remaining as i64),
+                    ],
+                );
+            }
+
+            if let Some(c_elim) = event.as_any().downcast_ref::<PlayerEliminatedEvent>() {
+                self.emit_bridge_signal(
+                    "player_eliminated",
+                    &[
+                        Variant::from(c_elim.player.0 as i64),
+                        Variant::from(c_elim.by.0 as i64),
+                    ],
+                );
+            }
+
+            if let Some(c_phase) = event.as_any().downcast_ref::<PhaseChangedEvent>() {
+                self.emit_bridge_signal(
+                    "phase_changed",
+                    &[
+                        Variant::from(c_phase.player.0 as i64),
+                        Variant::from(GString::from(&c_phase.new_phase)),
+                    ],
+                );
+            }
+
+            if let Some(c_cards) = event.as_any().downcast_ref::<CardsExchangedEvent>() {
+                self.emit_bridge_signal(
+                    "cards_exchanged",
+                    &[
+                        Variant::from(c_cards.player.0 as i64),
+                        Variant::from(c_cards.armies_gained as i64),
+                    ],
+                );
+            }
+
+            if let Some(c_over) = event.as_any().downcast_ref::<TegGameOverEvent>() {
+                let winner_id = c_over.winner.0 as i64;
+                self.emit_bridge_signal(
+                    "crisis_game_over",
+                    &[
+                        Variant::from(winner_id),
+                        Variant::from(GString::from(&c_over.objective)),
+                    ],
+                );
+                self.check_advance_tournament(winner_id);
+            }
+        }
+    }
+
+    fn check_advance_tournament(&mut self, winner_id: i64) {
+        let (ended_round, next_match_info, is_over, standings) = match &mut self.mode {
+            BridgeMode::Tournament {
+                game_type,
+                matches,
+                current_match_idx,
+                session,
+                scores,
+                ..
+            } => {
+                let current_match = &matches[*current_match_idx];
+                let round = current_match.round as i64;
+
+                if winner_id > 0 {
+                    let w_pid = PlayerId(winner_id as u32);
+                    *scores.entry(w_pid).or_insert(0) += 1;
+                }
+
+                *current_match_idx += 1;
+
+                if *current_match_idx < matches.len() {
+                    let next_m = &matches[*current_match_idx];
+                    if let Some(new_sess) = create_session_for_players(game_type, next_m.player1, next_m.player2) {
+                        *session = new_sess;
+                    }
+                    let p1 = next_m.player1.0 as i64;
+                    let p2 = next_m.player2.0 as i64;
+                    let r = next_m.round as i64;
+                    let turn = session.current_player().0 as i64;
+                    (round, Some((p1, p2, r, turn)), false, Dictionary::new())
+                } else {
+                    let mut dict = Dictionary::new();
+                    for (pid, score) in scores.iter() {
+                        let _ = dict.insert(pid.0 as i64, *score as i64);
+                    }
+                    (round, None, true, dict)
+                }
+            }
+            _ => return,
+        };
+
+        self.base_mut().emit_signal(
+            "tournament_match_ended",
+            &[Variant::from(winner_id), Variant::from(ended_round)],
+        );
+
+        if let Some((p1, p2, r, turn)) = next_match_info {
+            self.base_mut().emit_signal(
+                "tournament_match_started",
+                &[Variant::from(p1), Variant::from(p2), Variant::from(r)],
+            );
+            self.base_mut().emit_signal(
+                "turn_changed",
+                &[Variant::from(turn)],
+            );
+        } else if is_over {
+            self.base_mut().emit_signal(
+                "tournament_over",
+                &[Variant::from(standings)],
+            );
+        }
+    }
+}
