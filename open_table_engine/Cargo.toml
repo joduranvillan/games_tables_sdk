@@ -12,7 +12,7 @@ serde_json = "1"
 typetag = "0.2"
 
 [dev-dependencies]
-criterion = "0.8"
+criterion = "0.5"
 open_table_godot = { path = "../open_table_godot" }
 backgammon_game = { path = "../backgammon_game" }
 checkers_game = { path = "../checkers_game" }

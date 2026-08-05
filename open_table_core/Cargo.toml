@@ -13,7 +13,7 @@ readme = "README.md"
 serde = { version = "1", features = ["derive"] }
 typetag = "0.2"
 thiserror = "1"
-rand_chacha = { version = "0.10", features = ["serde1"] }
+rand_chacha = { version = "0.3", features = ["serde1"] }
 rand_core = "0.6"
 
 [dev-dependencies]
