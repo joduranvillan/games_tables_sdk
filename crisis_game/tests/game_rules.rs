@@ -482,5 +482,5 @@ fn test_crisis_error_paths_cobertura_de_ramas() {
             }),
         )
         .unwrap_err();
-    assert!(format!("{err:?}").contains("no estás en la fase de reagrupar"));
+    assert!(format!("{err:?}").contains("no estás en la fase de fortificación"));
 }
