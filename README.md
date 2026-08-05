@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/joduranvillan/games_tables_sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/joduranvillan/games_tables_sdk/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/joduranvillan/games_tables_sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/joduranvillan/games_tables_sdk)
+[![Crates.io](https://img.shields.io/crates/v/open_table_core.svg)](https://crates.io/crates/open_table_core)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
+[![Juegos Implementados](https://img.shields.io/badge/juegos-12%2F12-brightgreen.svg)](#juegos-de-referencia-y-reglas)
 
 Para el diseño completo (diagrama de capas, detalle por crate, flujo de
 una jugada de punta a punta, matriz de estado) ver
@@ -10,46 +13,23 @@ un resumen de estado + cómo correr cada parte.
 
 ## Nivel de confianza distinto según la parte
 
-**Verificado con tests reales (73 tests, 14 crates, todo corrió de
-verdad en este sandbox):**
-
-### Infraestructura (5 crates)
-- `open_table_core/`: IDs, `Command`/`Event` como trait objects
-  serializables (`typetag`, JSON) con visibilidad por evento,
-  `Component`/`Resource`, `RandomService` determinista, `GameClock`,
-  trait `Transport`.
-- `open_table_engine/`: `bevy_ecs` real + `RuleEngine` + `Session`
-  (turnos con `players()`/`peek_next()`, validación de identidad,
-  replay/resync, `world_mut()` para setup).
-- `open_table_macros/`: `#[derive(GameCommand/GameEvent/GameResource/GameComponent)]`.
-- `open_table_qr/`: código + QR de invitación.
-- `open_table_transport_tcp/`: `Transport` real sobre TCP, reconexión
-  autenticada (token CSPRNG, timeout configurable).
-- `open_table_transport_native_bridge/` **(nuevo)**: mismo protocolo de
-  identidad/reconexión que `_tcp`, pero generalizado sobre un trait
-  `RawByteLink` para que cualquier transporte móvil nativo (Nearby
-  Connections, MultipeerConnectivity) lo herede sin reimplementarlo.
-  5 tests con un `FakeRawByteLink` en memoria — el protocolo está
-  probado aunque el plugin nativo real todavía no.
-
 ### Juegos de referencia y reglas
 Cada uno con su propio `Command`/`Event`/`Resource`, reglas reales registradas en el `RuleEngine`, y referencia de reglas documentada:
 
-| Juego | Reglas | Crate | Qué ejercita del SDK que los demás no |
-|---|---|---|---|
-| Damas | [`checkers.md`](./docs/rules/checkers.md) | `checkers_game` | Turnos, captura obligatoria, cadenas de saltos y coronación |
-| Batalla naval | [`battleship.md`](./docs/rules/battleship.md) | `battleship_game` | Información oculta real (tableros privados), fase de setup sin turnos |
-| Ludo | [`ludo.md`](./docs/rules/ludo.md) | `ludo_game` | 2-4 jugadores, casillas seguras, patrón "tirada pendiente" |
-| Mil Millas | [`mille_bornes.md`](./docs/rules/mille_bornes.md) | `mille_bornes_game` | Manos de cartas privadas, rebarajado, peligros y remedios |
-| Backgammon | [`backgammon.md`](./docs/rules/backgammon.md) | `backgammon_game` | Conteo con signo, doblaje con Doubling Cube, barra/bear-off |
-| Damas chinas | [`chinese_checkers.md`](./docs/rules/chinese_checkers.md) | `chinese_checkers_game` | Coordenadas hexagonales axiales, saltar sin capturar |
-| Monopoly | [`monopoly.md`](./docs/rules/monopoly.md) | `monopoly_game` | Decisión que suspende avance de turno, subastas, bancarrota |
-| Ajedrez | [`chess.md`](./docs/rules/chess.md) | `chess_game` | Validación completa, enroque, al paso, simulación de jaque/jaque mate |
-| Shogi | [`shogi.md`](./docs/rules/shogi.md) | `shogi_game` | Reingreso de piezas capturadas (Drops) y zona de promoción |
-| Xiangqi | [`xiangqi.md`](./docs/rules/xiangqi.md) | `xiangqi_game` | Palacio, Río, regla del General Volador, tiros con Cañón |
-| Go | [`go.md`](./docs/rules/go.md) | `go_game` | Libertades, regla de Ko, handicap, paso y recuento de territorio |
-| Uno | [`uno.md`](./docs/rules/uno.md) | `uno_game` | Cambio de sentido, salto, cartas comodín y acumulaciones |
-| Crisis | [`crisis.md`](./docs/rules/crisis.md) | `crisis_game` | Mecánica de crisis macroeconómicas e impuestos sobre capital |
+| Juego | Reglas Básicas | Reglas Completas | Tests Rust | Test Godot | UI Godot | Documentación |
+|---|:---:|:---:|:---:|:---:|:---:|---|
+| **Ajedrez** (`chess_game`) | ✅ | ⚠️ (sin enroque/al paso) | ✅ | ✅ | ✅ | [`chess.md`](./docs/games/chess.md) |
+| **Damas** (`checkers_game`) | ✅ | ⚠️ (sin captura obligatoria) | ✅ | ✅ | ✅ | [`checkers.md`](./docs/games/checkers.md) |
+| **Go** (`go_game`) | ✅ | ⚠️ (sin regla de Ko) | ✅ | ✅ | ✅ | [`go.md`](./docs/games/go.md) |
+| **Shogi** (`shogi_game`) | ✅ | ⚠️ (falta Nifu/Uchifuzume) | ✅ | ✅ | ✅ | [`shogi.md`](./docs/games/shogi.md) |
+| **Xiangqi** (`xiangqi_game`) | ✅ | ⚠️ (falta General Volador) | ✅ | ✅ | ✅ | [`xiangqi.md`](./docs/games/xiangqi.md) |
+| **Backgammon** (`backgammon_game`) | ✅ | ⚠️ (sin doubling cube) | ✅ | ✅ | ✅ | [`backgammon.md`](./docs/games/backgammon.md) |
+| **Batalla naval** (`battleship_game`) | ✅ | ⚠️ (tablero 8x8) | ✅ | ✅ | ✅ | [`battleship.md`](./docs/games/battleship.md) |
+| **Ludo** (`ludo_game`) | ✅ | ⚠️ (24 casillas) | ✅ | ✅ | ✅ | [`ludo.md`](./docs/games/ludo.md) |
+| **Mil Millas** (`mille_bornes_game`) | ✅ | ⚠️ (meta 200) | ✅ | ✅ | ✅ | [`mille_bornes.md`](./docs/games/mille_bornes.md) |
+| **Monopoly** (`monopoly_game`) | ✅ | ⚠️ (16 casillas) | ✅ | ✅ | ✅ | [`monopoly.md`](./docs/games/monopoly.md) |
+| **Uno** (`uno_game`) | ✅ | ⚠️ (sin intercepción) | ✅ | ✅ | ✅ | [`uno.md`](./docs/games/uno.md) |
+| **Crisis / TEG** (`crisis_game`) | ✅ | ✅ (30 terr, 6 cont, obj. sec) | ✅ | ✅ | ✅ | [`teg.md`](./docs/games/teg.md) |
 
 **`open_table_godot/` (bridge de Godot/Redot): compila, carga y está
 verificado en runtime.** Corre en Redot 26.2 (= Godot 4.5.2 por dentro).
