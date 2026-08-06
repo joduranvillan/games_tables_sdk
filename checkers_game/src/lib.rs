@@ -9,6 +9,7 @@
 //! Para jugarlo de punta a punta sin esperar a `open_table_godot`, ver
 //! `examples/local_match.rs` (dos jugadores por consola, mismo proceso).
 
+pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod events;
@@ -16,6 +17,7 @@ pub mod piece;
 pub mod position;
 pub mod rules;
 
+pub use ai::checkers_ai_pick_move;
 pub use board::{initial_board, BoardResource, MultiCaptureResource, Sides};
 pub use commands::{MovePieceCommand, ResignCommand};
 pub use events::{GameOverEvent, PieceMovedEvent};
