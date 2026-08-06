@@ -39,6 +39,9 @@ jobs:
       - name: Run code quality metrics
         run: ./tools/metrics.sh
 
+      - name: Verify workspace consistency
+        run: ./tools/verify_workspace.sh
+
   build-godot-bridge:
     name: Build Godot Bridge
     runs-on: ubuntu-latest

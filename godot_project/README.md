@@ -28,11 +28,24 @@ redot --path godot_project
 
 ## Test headless (sin abrir ventana)
 
-Verifica en runtime que el bridge arranca la partida, valida movimientos
-contra el motor real y emite las señales correctas (modo local):
+Verifica en runtime que el bridge arranca las partidas, valida movimientos
+contra el motor real y emite las señales correctas en modo local y multijugador.
+
+La suite incluye más de 18 scripts de prueba headless (`*.gd` en `tests/`) que cubren todos los juegos (Damas, Ajedrez, Go, Shogi, Xiangqi, Backgammon, Batalla Naval, Ludo, Mille Bornes, Monopoly, Uno, Crisis/TEG, Damas Chinas, Regresión Visual, P2P, Multisesión, etc.).
 
 ```bash
-redot --headless --path godot_project --script res://tests/bridge_smoke.gd
+# Correr la suite completa de tests headless de Godot:
+./tools/run_godot_tests.sh
+
+# O mediante Makefile:
+make test-godot
+```
+
+**Tiempo estimado de ejecución:** ~15 a 30 segundos para la suite completa (ampliamente inferior al límite de 5 minutos en hardware de desarrollo estándar como Intel i7 / 16GB RAM).
+
+Para probar un script específico de forma individual:
+```bash
+redot --headless --path godot_project --script res://tests/monopoly_smoke.gd
 ```
 
 Para el modo host/cliente por red (dos instancias de `OpenTableBridge`

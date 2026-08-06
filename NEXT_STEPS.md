@@ -10,12 +10,13 @@
 | **Shogi** (`shogi_game`) | ✅ | ⚠️ (falta Nifu/Uchifuzume) | ✅ (100%) | ✅ (`shogi_smoke.gd`) | ✅ |
 | **Xiangqi** (`xiangqi_game`) | ✅ | ⚠️ (falta General Volador) | ✅ (100%) | ✅ (`xiangqi_smoke.gd`) | ✅ |
 | **Backgammon** (`backgammon_game`) | ✅ | ⚠️ (sin doubling cube) | ✅ (100%) | ✅ (`backgammon_smoke.gd`) | ✅ |
-| **Batalla Naval** (`battleship_game`) | ✅ | ⚠️ (tablero 8x8) | ✅ (100%) | ✅ | ✅ |
+| **Batalla Naval** (`battleship_game`) | ✅ | ⚠️ (tablero 8x8) | ✅ (100%) | ✅ (`battleship_smoke.gd`) | ✅ |
 | **Ludo** (`ludo_game`) | ✅ | ⚠️ (24 casillas) | ✅ (100%) | ✅ (`ludo_smoke.gd`) | ✅ |
-| **Mille Bornes** (`mille_bornes_game`) | ✅ | ⚠️ (meta 200) | ✅ (100%) | ✅ | ✅ |
-| **Monopoly** (`monopoly_game`) | ✅ | ⚠️ (16 casillas) | ✅ (100%) | ✅ | ✅ |
+| **Mille Bornes** (`mille_bornes_game`) | ✅ | ⚠️ (meta 200) | ✅ (100%) | ✅ (`mille_bornes_smoke.gd`) | ✅ |
+| **Monopoly** (`monopoly_game`) | ✅ | ⚠️ (16 casillas) | ✅ (100%) | ✅ (`monopoly_smoke.gd`) | ✅ |
 | **Uno** (`uno_game`) | ✅ | ⚠️ (sin intercepción) | ✅ (100%) | ✅ (`uno_smoke.gd`) | ✅ |
 | **Crisis / TEG** (`crisis_game`) | ✅ | ✅ (30 terr, 6 cont, obj. sec) | ✅ (100%) | ✅ (`crisis_smoke.gd`) | ✅ |
+| **Damas Chinas** (`chinese_checkers_game`) | ✅ | ✅ (tablero hexagonal) | ✅ (100%) | ✅ (`chinese_checkers_smoke.gd`) | ✅ |
 
 ## 2. `crisis_game` Reescrito como TEG — Estado
 
