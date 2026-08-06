@@ -975,7 +975,7 @@ impl OpenTableBridge {
     pub fn save_game(&self, filename: GString) -> bool {
         let mut path = filename.to_string();
         if path.starts_with("user://") {
-            let user_dir = godot::classes::OS::singleton().get_user_data_dir().to_string();
+            let user_dir = godot::classes::Os::singleton().get_user_data_dir().to_string();
             let fname = path.trim_start_matches("user://");
             path = format!("{}/{}", user_dir, fname);
         }
@@ -1001,7 +1001,7 @@ impl OpenTableBridge {
     pub fn load_game(&mut self, filename: GString) -> bool {
         let mut path = filename.to_string();
         if path.starts_with("user://") {
-            let user_dir = godot::classes::OS::singleton().get_user_data_dir().to_string();
+            let user_dir = godot::classes::Os::singleton().get_user_data_dir().to_string();
             let fname = path.trim_start_matches("user://");
             path = format!("{}/{}", user_dir, fname);
         }
