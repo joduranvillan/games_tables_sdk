@@ -48,6 +48,7 @@ var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
 var network_hud: NetworkStatusHUD
 var mandatory_label: Label
+var rules_popup: RulesPopup
 
 @onready var status: Label = $Status
 
@@ -106,6 +107,18 @@ func _setup_ui_layers() -> void:
 	network_hud = NetworkStatusHUD.new()
 	network_hud.name = "NetworkStatusHUD"
 	add_child(network_hud)
+
+	var btn_rules = Button.new()
+	btn_rules.text = " ? "
+	btn_rules.position = Vector2(BOARD * CELL - 45, BOARD * CELL + 45)
+	btn_rules.custom_minimum_size = Vector2(36, 36)
+	btn_rules.pressed.connect(func(): rules_popup.show_for_game("checkers"))
+	add_child(btn_rules)
+
+	rules_popup = RulesPopup.new()
+	rules_popup.visible = false
+	rules_popup.position = Vector2(80, 100)
+	add_child(rules_popup)
 
 func _on_theme_changed(theme: BoardTheme) -> void:
 	current_theme = theme

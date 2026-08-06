@@ -32,6 +32,8 @@ var map_panel: Panel
 var sidebar_panel: Panel
 var dice_popup: PopupPanel
 var dice_label: Label
+var dice_widget: DiceWidget
+var rules_popup: RulesPopup
 
 var btn_place: Button
 var btn_attack: Button
@@ -162,16 +164,35 @@ func _setup_ui() -> void:
 	
 	dice_popup = PopupPanel.new()
 	dice_popup.title = "Resultado del Ataque"
-	dice_popup.size = Vector2i(300, 150)
+	dice_popup.size = Vector2i(320, 200)
 	dice_popup.position = Vector2i(400, 300)
 	add_child(dice_popup)
 	
+	var dice_vbox = VBoxContainer.new()
+	dice_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	dice_popup.add_child(dice_vbox)
+
 	dice_label = Label.new()
-	dice_label.position = Vector2(10, 10)
-	dice_label.custom_minimum_size = Vector2(280, 130)
+	dice_label.custom_minimum_size = Vector2(280, 80)
 	dice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dice_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	dice_popup.add_child(dice_label)
+	dice_vbox.add_child(dice_label)
+
+	dice_widget = DiceWidget.new()
+	dice_vbox.add_child(dice_widget)
+
+	# Rules Button
+	var btn_rules = Button.new()
+	btn_rules.text = "📖 Reglas (?)"
+	btn_rules.position = Vector2(15, btn_y)
+	btn_rules.custom_minimum_size = Vector2(320, 40)
+	btn_rules.pressed.connect(func(): rules_popup.show_for_game("teg"))
+	sidebar_panel.add_child(btn_rules)
+
+	rules_popup = RulesPopup.new()
+	rules_popup.visible = false
+	rules_popup.position = Vector2(100, 80)
+	add_child(rules_popup)
 
 func _update_ui_state() -> void:
 	current_player_id = bridge.current_player()
@@ -232,6 +253,8 @@ func _on_attack_resolved(from_id: int, to_id: int, attacker_rolls: Array, defend
 	dice_label.text = "Ataque: %s -> %s\nAtacante: [%s] (-%d)\nDefensor: [%s] (-%d)" % [
 		TERRITORY_NAMES[from_id], TERRITORY_NAMES[to_id], att_str, attacker_losses, def_str, defender_losses
 	]
+	if dice_widget != null and attacker_rolls.size() > 0:
+		dice_widget.show_roll(attacker_rolls)
 	dice_popup.popup_centered()
 	_update_ui_state()
 

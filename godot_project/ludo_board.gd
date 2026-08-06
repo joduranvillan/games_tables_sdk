@@ -21,6 +21,8 @@ var token_steps = {
 var token_buttons = {1: [], 2: [], 3: [], 4: []}
 var dice_button: Button
 var dice_label: Label
+var dice_widget: DiceWidget
+var rules_popup: RulesPopup
 
 var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
@@ -80,6 +82,23 @@ func _setup_ui() -> void:
 	dice_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	dice_label.add_theme_font_size_override("font_size", 48)
 	add_child(dice_label)
+
+	dice_widget = DiceWidget.new()
+	dice_widget.position = Vector2(640, 320)
+	add_child(dice_widget)
+
+	# Rules Button
+	var rules_btn = Button.new()
+	rules_btn.text = " ? "
+	rules_btn.position = Vector2(675, 10)
+	rules_btn.custom_minimum_size = Vector2(36, 36)
+	rules_btn.pressed.connect(func(): rules_popup.show_for_game("ludo"))
+	add_child(rules_btn)
+
+	rules_popup = RulesPopup.new()
+	rules_popup.visible = false
+	rules_popup.position = Vector2(80, 80)
+	add_child(rules_popup)
 
 	# Turn Indicator Widget
 	turn_indicator = TurnIndicator.new()
@@ -258,6 +277,8 @@ func _on_event_json(json_str: String) -> void:
 			if event_type == "DiceRolledEvent":
 				var val = int(event.get("value", 1))
 				_animate_dice_roll(val)
+				if dice_widget != null:
+					dice_widget.show_roll([val])
 			elif event_type == "TokenMovedEvent":
 				var p = int(event.get("player", current_p))
 				var t_idx = int(event.get("token_index", 0))

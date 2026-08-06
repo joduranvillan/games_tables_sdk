@@ -16,6 +16,7 @@ config/features=PackedStringArray("26.2", "Redot")
 
 [autoload]
 
+ErrorLogger="*res://error_logger.gd"
 TranslationLoader="*res://translation_loader.gd"
 GameManager="*res://game_manager.gd"
 ThemeManager="*res://theme_manager.gd"

@@ -34,6 +34,8 @@ var checker_nodes = []
 # UI Controls
 var roll_btn: Button
 var dice_label: Label
+var dice_widget: DiceWidget
+var rules_popup: RulesPopup
 
 var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
@@ -105,6 +107,23 @@ func _setup_ui() -> void:
 	dice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dice_label.add_theme_font_size_override("font_size", 16)
 	add_child(dice_label)
+
+	dice_widget = DiceWidget.new()
+	dice_widget.position = Vector2(610, 360)
+	add_child(dice_widget)
+
+	# Rules Button
+	var rules_btn = Button.new()
+	rules_btn.text = " ? "
+	rules_btn.position = Vector2(675, 10)
+	rules_btn.custom_minimum_size = Vector2(36, 36)
+	rules_btn.pressed.connect(func(): rules_popup.show_for_game("backgammon"))
+	add_child(rules_btn)
+
+	rules_popup = RulesPopup.new()
+	rules_popup.visible = false
+	rules_popup.position = Vector2(80, 100)
+	add_child(rules_popup)
 
 	# Turn Indicator Widget
 	turn_indicator = TurnIndicator.new()
@@ -306,6 +325,8 @@ func _on_event_json(json_str: String) -> void:
 			if event_type == "DiceRolledEvent":
 				rolled_dice = event.get("values", [])
 				dice_label.text = "Dados: %s" % str(rolled_dice)
+				if dice_widget != null:
+					dice_widget.show_roll(rolled_dice)
 			elif event_type == "CheckerMovedEvent":
 				var p = int(event.get("player", current))
 				var from_p = event.get("from", null)

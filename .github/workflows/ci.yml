@@ -36,6 +36,9 @@ jobs:
       - name: Run tests
         run: cargo test --workspace --exclude open_table_godot
 
+      - name: Run code quality metrics
+        run: ./tools/metrics.sh
+
   build-godot-bridge:
     name: Build Godot Bridge
     runs-on: ubuntu-latest

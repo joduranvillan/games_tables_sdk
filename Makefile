@@ -1,4 +1,4 @@
-.PHONY: test test-stress build-godot build-android test-godot android-aar docs install-hooks
+.PHONY: test test-stress build-godot build-android test-godot android-aar docs metrics install-hooks
 
 test:
 	cargo test --workspace
@@ -20,6 +20,9 @@ android-aar:
 
 docs:
 	cargo doc --no-deps --workspace --document-private-items
+
+metrics:
+	./tools/metrics.sh
 
 install-hooks:
 	mkdir -p .git/hooks

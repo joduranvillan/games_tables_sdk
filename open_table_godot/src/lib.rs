@@ -88,6 +88,7 @@ enum BridgeMode {
     None,
     Local {
         session: Session,
+        ai_player: Option<PlayerId>,
     },
     Host {
         session: Session,
@@ -377,7 +378,10 @@ impl OpenTableBridge {
             PlayerId(player_top_id as u32),
             PlayerId(player_bottom_id as u32),
         );
-        self.mode = BridgeMode::Local { session };
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
     }
 
     #[func]
@@ -386,31 +390,79 @@ impl OpenTableBridge {
     }
 
     #[func]
+    fn start_local_match_checkers_vs_ai(
+        &mut self,
+        seed: i64,
+        human_player: i64,
+        ai_player: i64,
+    ) -> bool {
+        if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "checkers".to_string();
+        let p_human = PlayerId(human_player as u32);
+        let p_ai = PlayerId(ai_player as u32);
+
+        let (p1, p2) = if human_player < ai_player {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let session = new_checkers_session(SessionId(1), seed as u64, p1, p2);
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        let current_p = session.current_player().0 as i64;
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
+    }
+
+    #[func]
     fn start_local_match_shogi(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "shogi".to_string();
         let session = new_shogi_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
-        self.mode = BridgeMode::Local { session };
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
     }
 
     #[func]
     fn start_local_match_xiangqi(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "xiangqi".to_string();
         let session = new_xiangqi_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
-        self.mode = BridgeMode::Local { session };
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
     }
 
     #[func]
     fn start_local_match_go(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "go".to_string();
         let session = new_go_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
-        self.mode = BridgeMode::Local { session };
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
     }
 
     #[func]
     fn start_local_match_uno(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "uno".to_string();
         let session = new_uno_session(SessionId(1), 1, vec![PlayerId(p1 as u32), PlayerId(p2 as u32)]);
-        self.mode = BridgeMode::Local { session };
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
     }
 
     #[func]
@@ -424,7 +476,10 @@ impl OpenTableBridge {
             Ok(s) => s,
             Err(_) => return false,
         };
-        self.mode = BridgeMode::Local { session };
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
         true
     }
 
@@ -432,42 +487,70 @@ impl OpenTableBridge {
     fn start_local_match_chess(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "chess".to_string();
         let session = new_chess_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
-        self.mode = BridgeMode::Local { session };
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
     }
 
     #[func]
     fn start_local_match_chinese_checkers(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "chinese_checkers".to_string();
         let session = new_chinese_checkers_session(SessionId(1), 1, vec![PlayerId(p1 as u32), PlayerId(p2 as u32)]);
-        self.mode = BridgeMode::Local { session };
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
     }
 
     #[func]
     fn start_local_match_mille_bornes(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "mille_bornes".to_string();
         let session = new_mille_bornes_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
-        self.mode = BridgeMode::Local { session };
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
     }
 
     #[func]
     fn start_local_match_backgammon(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "backgammon".to_string();
         let session = new_backgammon_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
-        self.mode = BridgeMode::Local { session };
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
     }
 
     #[func]
     fn start_local_match_monopoly(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "monopoly".to_string();
         let session = new_monopoly_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
-        self.mode = BridgeMode::Local { session };
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
     }
 
     #[func]
     fn start_local_match_ludo(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "ludo".to_string();
         let session = new_ludo_session(SessionId(1), 1, vec![PlayerId(p1 as u32), PlayerId(p2 as u32)]);
-        self.mode = BridgeMode::Local { session };
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
+    }
+
+    #[func]
+    fn start_local_match_battleship(&mut self, p1: i64, p2: i64) {
+        self.current_game_type = "battleship".to_string();
+        let session = new_battleship_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
     }
 
     #[func]
@@ -597,7 +680,7 @@ impl OpenTableBridge {
     #[func]
     fn load_chess_fen(&mut self, fen: GString) -> bool {
         match &mut self.mode {
-            BridgeMode::Local { session }
+            BridgeMode::Local { session, .. }
             | BridgeMode::Host { session, .. }
             | BridgeMode::NativeHost { session, .. }
             | BridgeMode::Tournament { session, .. } => {
@@ -617,7 +700,7 @@ impl OpenTableBridge {
     #[func]
     fn export_chess_pgn(&self) -> GString {
         let pgn_opt = match &self.mode {
-            BridgeMode::Local { session }
+            BridgeMode::Local { session, .. }
             | BridgeMode::Host { session, .. }
             | BridgeMode::NativeHost { session, .. }
             | BridgeMode::Tournament { session, .. } => {
@@ -855,7 +938,7 @@ impl OpenTableBridge {
 
     fn process_and_emit(&mut self, sender: PlayerId, command: Box<dyn Command>) -> EngineResult<Vec<Box<dyn Event>>> {
         let (prev_player, result) = match &mut self.mode {
-            BridgeMode::Local { session } => {
+            BridgeMode::Local { session, .. } => {
                 let prev = session.current_player();
                 let res = session.process_command(sender, command);
                 (prev, res)
@@ -896,7 +979,7 @@ impl OpenTableBridge {
             Ok(events) => {
                 self.emit_game_events(events);
                 let new_player = match &self.mode {
-                    BridgeMode::Local { session } => session.current_player(),
+                    BridgeMode::Local { session, .. } => session.current_player(),
                     BridgeMode::Host { session, .. } => session.current_player(),
                     BridgeMode::NativeHost { session, .. } => session.current_player(),
                     BridgeMode::Replay { session, .. } => session.current_player(),
@@ -911,6 +994,7 @@ impl OpenTableBridge {
                 }
             }
             Err(err) => {
+                godot_error!("[EngineError] {}", err);
                 self.emit_bridge_signal("move_rejected", &[Variant::from(err.to_string())]);
             }
         }
@@ -927,7 +1011,9 @@ impl OpenTableBridge {
         let command: Box<dyn Command> = match parse_command_json(&json_str.to_string()) {
             Ok(cmd) => cmd,
             Err(e) => {
-                self.emit_bridge_signal("move_rejected", &[Variant::from(format!("Error parsing command JSON: {e}"))]);
+                let msg = format!("Error parsing command JSON: {e}");
+                godot_error!("[EngineError] {}", msg);
+                self.emit_bridge_signal("move_rejected", &[Variant::from(msg)]);
                 return;
             }
         };
@@ -945,6 +1031,7 @@ impl OpenTableBridge {
                 _ => {}
             }
         }
+        self.process_ai_turn_if_needed();
     }
 
     #[func]
@@ -969,6 +1056,7 @@ impl OpenTableBridge {
                 _ => {}
             }
         }
+        self.process_ai_turn_if_needed();
     }
 
     #[func]
@@ -980,7 +1068,7 @@ impl OpenTableBridge {
             path = format!("{}/{}", user_dir, fname);
         }
         match &self.mode {
-            BridgeMode::Local { session }
+            BridgeMode::Local { session, .. }
             | BridgeMode::Host { session, .. }
             | BridgeMode::NativeHost { session, .. }
             | BridgeMode::Tournament { session, .. } => {
@@ -1039,7 +1127,10 @@ impl OpenTableBridge {
         match Session::replay_collecting_events(id, seed, players, rules, &log_bytes) {
             Ok((loaded_session, events)) => {
                 let current_p = loaded_session.current_player().0 as i64;
-                self.mode = BridgeMode::Local { session: loaded_session };
+                self.mode = BridgeMode::Local {
+                    session: loaded_session,
+                    ai_player: None,
+                };
                 self.emit_game_events(&events);
                 self.base_mut().emit_signal("turn_changed", &[Variant::from(current_p)]);
                 true
@@ -1051,7 +1142,7 @@ impl OpenTableBridge {
     #[func]
     pub fn export_log(&self) -> PackedByteArray {
         let log_bytes = match &self.mode {
-            BridgeMode::Local { session } => session.export_log().unwrap_or_default(),
+            BridgeMode::Local { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::Host { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::NativeHost { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::Replay { session, .. } => session.export_log().unwrap_or_default(),
@@ -1119,7 +1210,7 @@ impl OpenTableBridge {
     #[func]
     pub fn current_player(&self) -> i64 {
         match &self.mode {
-            BridgeMode::Local { session } => session.current_player().0 as i64,
+            BridgeMode::Local { session, .. } => session.current_player().0 as i64,
             BridgeMode::Host { session, .. } => session.current_player().0 as i64,
             BridgeMode::NativeHost { session, .. } => session.current_player().0 as i64,
             BridgeMode::Replay { session, .. } => session.current_player().0 as i64,
@@ -1139,7 +1230,8 @@ impl OpenTableBridge {
             BridgeMode::Spectator { .. } => self.poll_spectator_events(),
             BridgeMode::NativeHost { .. } => self.poll_native_host_events(),
             BridgeMode::NativeClient { .. } => self.poll_native_client_events(),
-            BridgeMode::Local { .. } | BridgeMode::None | BridgeMode::Replay { .. } | BridgeMode::Tournament { .. } | BridgeMode::MultiSession { .. } => {}
+            BridgeMode::Local { .. } => self.process_ai_turn_if_needed(),
+            BridgeMode::None | BridgeMode::Replay { .. } | BridgeMode::Tournament { .. } | BridgeMode::MultiSession { .. } => {}
         }
         self.flush_native_outgoing();
     }
@@ -1548,6 +1640,31 @@ impl OpenTableBridge {
                 "tournament_over",
                 &[Variant::from(standings)],
             );
+        }
+    }
+
+    fn process_ai_turn_if_needed(&mut self) {
+        loop {
+            let (ai_p, cmd_opt) = match &self.mode {
+                BridgeMode::Local {
+                    session,
+                    ai_player: Some(ai_p),
+                } => {
+                    if session.current_player() == *ai_p {
+                        let cmd = checkers_game::checkers_ai_pick_move(session, *ai_p);
+                        (*ai_p, cmd)
+                    } else {
+                        break;
+                    }
+                }
+                _ => break,
+            };
+
+            if let Some(cmd) = cmd_opt {
+                let _ = self.process_and_emit(ai_p, Box::new(cmd));
+            } else {
+                break;
+            }
         }
     }
 }
