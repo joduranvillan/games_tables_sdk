@@ -15,3 +15,8 @@ bevy_ecs = "0.12"
 [dev-dependencies]
 serde_json = "1"
 proptest = "1"
+
+[profile.release]
+opt-level = "z"
+codegen-units = 1
+

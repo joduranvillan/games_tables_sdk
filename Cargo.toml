@@ -33,3 +33,11 @@ members = [
     "uno_game",
     "crisis_game",
 ]
+
+[profile.release]
+opt-level = "z"
+codegen-units = 1
+strip = true
+lto = true
+panic = "abort"
+

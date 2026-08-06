@@ -1,4 +1,4 @@
-.PHONY: test test-stress build-godot test-godot android-aar docs install-hooks
+.PHONY: test test-stress build-godot build-android test-godot android-aar docs install-hooks
 
 test:
 	cargo test --workspace
@@ -8,6 +8,9 @@ test-stress:
 
 build-godot:
 	cargo build -p open_table_godot
+
+build-android:
+	cargo build --target aarch64-linux-android --release -p open_table_godot
 
 test-godot:
 	./tools/run_godot_tests.sh

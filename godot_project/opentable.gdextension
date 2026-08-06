@@ -13,3 +13,7 @@ reloadable = true
 [libraries]
 linux.debug.x86_64 = "res://../target/debug/libopen_table_godot.so"
 linux.release.x86_64 = "res://../target/release/libopen_table_godot.so"
+android.debug.aarch64 = "res://../target/aarch64-linux-android/debug/libopen_table_godot.so"
+android.release.aarch64 = "res://../target/aarch64-linux-android/release/libopen_table_godot.so"
+ios.debug.aarch64 = "res://bin/ios/libopen_table_godot.dylib"
+ios.release.aarch64 = "res://bin/ios/libopen_table_godot.dylib"

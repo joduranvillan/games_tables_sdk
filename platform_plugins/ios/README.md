@@ -1,37 +1,79 @@
-# Integrar `OpenTableMultipeerNetwork.swift` en un proyecto Godot iOS
+# Guía de Integración para iOS (Redot / Godot GDExtension & MultipeerConnectivity)
 
-No compilado ni probado acá (no hay Xcode en el sandbox). El sistema de
-plugins iOS de Godot 4 es menos estandarizado que el de Android — varía
-más entre versiones del editor, así que esta guía es más una checklist
-de piezas que necesitás armar que una receta exacta.
+Esta guía documenta paso a paso el proceso de compilación, empaquetado, configuración de GDExtension y firmado de la aplicación para iOS en Redot/Godot.
 
-## 1. Empaquetado
+---
 
-El archivo `.swift` de este directorio es la lógica de red pura (no
-depende de Godot). Necesitás:
+## Paso 1: Compilar el Crate Rust (`open_table_godot`) como `cdylib` para iOS
 
-1. Compilarlo como parte de un `.xcframework` (o directamente como
-   fuente dentro del proyecto Xcode que genera Godot al exportar a iOS).
-2. Un archivo `plugin.cfg` (formato similar al de GDExtension) que le
-   diga a Godot qué framework/librería cargar.
-3. Una capa de glue (típicamente Objective-C++ o el propio GDExtension
-   en Rust vía `gdext`, si tu versión de Godot lo soporta) que exponga
-   `startHosting`, `startDiscovery`, `sendBytes`, `broadcastBytes` a
-   GDScript, y traduzca los callbacks de `OpenTableMultipeerDelegate` a
-   señales de Godot — el mismo rol que `GodotPlugin`/`@UsedByGodot`
-   cumple en Android.
+Para compilar la librería nativa para dispositivos iOS reales (`aarch64-apple-ios`):
 
-Esta tercera pieza es la que más varía según la versión de Godot que
-uses (el soporte de GDExtension para iOS maduró bastante entre 4.1 y
-4.3+), así que no la incluyo acá para no darte glue código que podría
-estar desactualizado para tu versión específica — mejor que la arms
-mirando la documentación de exportación iOS de tu versión exacta.
+```bash
+# Agregar el target de Rust para iOS
+rustup target add aarch64-apple-ios
 
-## 2. Info.plist y Entitlements
+# Compilar en modo release
+cargo build --target aarch64-apple-ios --release -p open_table_godot
+```
 
-MultipeerConnectivity requiere que la aplicación iOS exportada declare permisos de red local, Bluetooth y servicios Bonjour en el archivo `Info.plist`, así como el entitlement correspondiente en `OpenTableMultipeer.entitlements`:
+Si vas a probar en el **Simulador de iOS** (Apple Silicon M1/M2/M3/M4):
 
-### 2.1 Info.plist (`platform_plugins/ios/Info.plist`)
+```bash
+rustup target add aarch64-apple-ios-sim
+cargo build --target aarch64-apple-ios-sim --release -p open_table_godot
+```
+
+El artefacto generado estará disponible en:
+- Dispositivo real: `target/aarch64-apple-ios/release/libopen_table_godot.dylib`
+- Simulador: `target/aarch64-apple-ios-sim/release/libopen_table_godot.dylib`
+
+---
+
+## Paso 2: Copiar el `.dylib` al Proyecto Xcode Generado por Redot
+
+Una vez exportado el proyecto desde Redot Engine o mediante la CLI:
+
+1. Crear un directorio para binarios iOS en la estructura del proyecto Xcode (p. ej., `Frameworks/` o `ios/bin/`).
+2. Copiar el archivo `libopen_table_godot.dylib` compilado en el Paso 1 a esa carpeta.
+3. En Xcode, abrir el proyecto `.xcodeproj` generado, ir a la pestaña **General** -> **Frameworks, Libraries, and Embedded Content**, y asegurarse de que `libopen_table_godot.dylib` figure como **Embed & Sign**.
+
+---
+
+## Paso 3: Configurar el `.gdextension` con la Ruta Correcta para iOS
+
+En el archivo `godot_project/opentable.gdextension`, declarar la ruta del binario para las plataformas iOS en depuración y producción:
+
+```ini
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.1
+reloadable = true
+
+[libraries]
+linux.debug.x86_64 = "res://../target/debug/libopen_table_godot.so"
+linux.release.x86_64 = "res://../target/release/libopen_table_godot.so"
+ios.debug.aarch64 = "res://bin/ios/libopen_table_godot.dylib"
+ios.release.aarch64 = "res://bin/ios/libopen_table_godot.dylib"
+```
+
+---
+
+## Paso 4: Verificar que el Bridge Funciona en el Simulador de iOS
+
+1. Compilar el crate especificando el target del simulador:
+   `cargo build --target aarch64-apple-ios-sim --release -p open_table_godot`
+2. Abrir el proyecto exportado en Xcode y seleccionar un simulador (p. ej., `iPhone 15 Pro`).
+3. Ejecutar el proyecto (`Cmd + R`).
+4. Verificar en la consola de Xcode que el singleton `OpenTableBridge` se inicializa correctamente sin errores de vinculación dinámica (`dyld: Symbol not found`).
+
+---
+
+## Paso 5: Firmar la App con los Entitlements Necesarios para MultipeerConnectivity
+
+MultipeerConnectivity requiere que la aplicación iOS declare permisos de red local, Bluetooth y servicios Bonjour en `Info.plist`, además de activar el entitlement en el archivo `.entitlements`.
+
+### 5.1 Configuración de `Info.plist`
+Asegurarse de incluir las siguientes claves en el `Info.plist` del proyecto iOS:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -51,7 +93,7 @@ MultipeerConnectivity requiere que la aplicación iOS exportada declare permisos
 </plist>
 ```
 
-### 2.2 Entitlements (`platform_plugins/ios/OpenTableMultipeer.entitlements`)
+### 5.2 Archivo de Entitlements (`OpenTableMultipeer.entitlements`)
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -64,45 +106,20 @@ MultipeerConnectivity requiere que la aplicación iOS exportada declare permisos
 </plist>
 ```
 
-## 3. Modo Background y Tiempo de Ejecución Adicional (`OpenTableMultipeer.swift`)
+### 5.3 Configuración en Xcode
+1. En Xcode, seleccionar el Target principal de la app.
+2. Ir a **Signing & Capabilities**.
+3. Seleccionar tu **Development Team** y un **Provisioning Profile** válido.
+4. Agregar el archivo `OpenTableMultipeer.entitlements` en **Code Signing Entitlements**.
 
-A diferencia de Android (donde se utiliza un Foreground Service con notificación persistente), iOS no permite ejecutar servicios continuos ilimitados en segundo plano para aplicaciones de juegos o redes genéricas.
+---
 
-Para gestionar las transiciones en segundo plano sin interrumpir partidas P2P durante bloqueos temporales o minimizaciones rápidas:
+## Comando Exacto de Exportación de Redot para iOS
 
-1. **Gestión de Notificaciones**:
-   - `OpenTableMultipeer.swift` registra observadores para `UIApplication.didEnterBackgroundNotification` y `UIApplication.willEnterForegroundNotification`.
+Para exportar el proyecto a un archivo `.xcodeproj` de Xcode desde la línea de comandos de Redot en modo headless:
 
-2. **Extensión de Tiempo (`UIApplication.shared.beginBackgroundTask`)**:
-   - Al minimizar la app, se invoca `beginBackgroundTask(withName: "OpenTableMultipeerBackgroundSession")`. Esto solicita a iOS tiempo de ejecución extra en segundo plano.
-
-3. **Limitaciones de iOS**:
-   - **Tiempo máximo otorgado por iOS**: iOS concede un máximo estricto de **~30 segundos** de tiempo de ejecución continuo tras minimizar la aplicación.
-   - Si la aplicación permanece en segundo plano más de 30 segundos, el closure de expiración es ejecutado por el SO, pausando la sesión limpiamente (`isSessionPaused = true`) y llamando a `endBackgroundTask()` para evitar la terminación forzosa de la app por parte de iOS.
-   - Al regresar a primer plano (`willEnterForegroundNotification`), la sesión se reanuda limpiamente.
-
-## 4. Desde GDScript (una vez armada la capa de glue)
-
-```gdscript
-var multipeer = Engine.get_singleton("OpenTableMultipeer")
-multipeer.peer_connected.connect(_on_peer_connected)
-multipeer.data_received.connect(_on_data_received)
-multipeer.start_hosting(join_code)
+```bash
+redot --headless --export-release "iOS" build/ios/OpenTable.xcodeproj
 ```
 
-## Lo que ya NO hace falta conectar del lado de Rust
-
-Igual que en Android: la lógica de identidad/reconexión (`Join`/
-`Reconnect`, validación de token) ya NO vive acá ni en Kotlin — vive en
-`open_table_transport_native_bridge`, un crate de Rust puro compartido
-entre Android e iOS, con 5 tests que prueban todo el mecanismo (join,
-datos en los dos sentidos, reconexión, token falso rechazado, timeout)
-sin necesitar un dispositivo real.
-
-Esta clase (`OpenTableMultipeerNetwork`) sigue siendo lo que ya era: un
-caño de bytes. La capa de glue que falta armar (Objective-C++ o
-`gdext`, según la versión de Godot) tiene que implementar el trait
-`RawByteLink` de ese crate — `send_raw`/`broadcast_raw` llamando a
-`sendBytes`/`broadcastBytes` de esta clase, y `poll_raw_received`/
-`poll_link_events` drenando lo que llega por `onDataReceived`/
-`onPeerDisconnected` del `OpenTableMultipeerDelegate`.
+*(Nota: Si usas el binario de Godot directamente, reemplaza `redot` por `godot`).*
