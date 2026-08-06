@@ -23,6 +23,7 @@ ThemeManager="*res://theme_manager.gd"
 SceneManager="*res://scene_manager.gd"
 AudioManager="*res://audio_manager.gd"
 ScoreTracker="*res://score_tracker.gd"
+AchievementManager="*res://achievement_manager.gd"
 
 [display]
 

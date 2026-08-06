@@ -354,6 +354,12 @@ real. Ver `open_table_godot/BRIDGE_USAGE.md` para ejemplos de GDScript.
 | `platform_plugins/ios` | ❌ No hay estructura todavía (necesita macOS + Xcode) |
 | `RawByteLink` real (Android/iOS ↔ `open_table_godot`) | ❌ Pendiente — mecánico, ver sección de arriba |
 
+## Registros de Decisiones de Arquitectura (ADR)
+
+* [`docs/adr/ADR-001-bevy-ecs-como-motor-de-estado.md`](./docs/adr/ADR-001-bevy-ecs-como-motor-de-estado.md) — Bevy ECS como motor de estado central.
+* [`docs/adr/ADR-002-gdext-para-godot-bridge.md`](./docs/adr/ADR-002-gdext-para-godot-bridge.md) — Uso de GDExtension (`gdext`) para el bridge con Godot / Redot.
+* [`docs/adr/ADR-003-teg-en-lugar-de-monopoly-para-crisis.md`](./docs/adr/ADR-003-teg-en-lugar-de-monopoly-para-crisis.md) — Reescritura de `crisis_game` con reglas de TEG.
+
 ## Ver también
 
 - [`NEXT_STEPS.md`](./NEXT_STEPS.md) — setup exacto de máquina y lista
