@@ -197,6 +197,66 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	highlight_checkbox.text = "Resaltar movimientos válidos"
 	parent.add_child(highlight_checkbox)
 
+	parent.add_child(HSeparator.new())
+	var save_load_lbl = Label.new()
+	save_load_lbl.text = "Persistencia Local de Partida"
+	parent.add_child(save_load_lbl)
+
+	var save_load_hbox = HBoxContainer.new()
+	save_load_hbox.add_theme_constant_override("separation", 10)
+	parent.add_child(save_load_hbox)
+
+	var save_game_btn = Button.new()
+	save_game_btn.text = "Guardar partida"
+	save_game_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	save_game_btn.pressed.connect(_on_save_game_pressed)
+	save_load_hbox.add_child(save_game_btn)
+
+	var load_game_btn = Button.new()
+	load_game_btn.text = "Cargar partida"
+	load_game_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	load_game_btn.pressed.connect(_on_load_game_pressed)
+	save_load_hbox.add_child(load_game_btn)
+
+func _on_save_game_pressed() -> void:
+	var user_dir = OS.get_user_data_dir()
+	var save_path = user_dir + "/saved_game.json"
+	var bridge = _find_active_bridge()
+	if bridge != null and bridge.has_method("save_game"):
+		var ok: bool = bridge.save_game(save_path)
+		if ok:
+			print("Partida guardada exitosamente en: ", save_path)
+		else:
+			print("Error al guardar la partida.")
+	else:
+		print("No se encontró el nodo OpenTableBridge activo.")
+
+func _on_load_game_pressed() -> void:
+	var user_dir = OS.get_user_data_dir()
+	var save_path = user_dir + "/saved_game.json"
+	var bridge = _find_active_bridge()
+	if bridge != null and bridge.has_method("load_game"):
+		var ok: bool = bridge.load_game(save_path)
+		if ok:
+			print("Partida cargada exitosamente desde: ", save_path)
+		else:
+			print("Error al cargar la partida.")
+	else:
+		print("No se encontró el nodo OpenTableBridge activo.")
+
+func _find_active_bridge() -> Object:
+	if has_node("/root/OpenTableBridge"):
+		return get_node("/root/OpenTableBridge")
+	var root = get_tree().root
+	if root != null:
+		for child in root.get_children():
+			if child.get_class() == "OpenTableBridge" or child.has_method("save_game"):
+				return child
+			for grandchild in child.get_children():
+				if grandchild.get_class() == "OpenTableBridge" or grandchild.has_method("save_game"):
+					return grandchild
+	return null
+
 func _setup_stats_tab(parent: VBoxContainer) -> void:
 	var lbl = Label.new()
 	lbl.text = "Estadísticas de Victorias y Derrotas"

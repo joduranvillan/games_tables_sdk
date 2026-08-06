@@ -229,6 +229,7 @@ fn parse_command_json(json_str: &str) -> Result<Box<dyn Command>, serde_json::Er
 pub struct OpenTableBridge {
     base: Base<Node>,
     mode: BridgeMode,
+    current_game_type: String,
 }
 
 #[godot_api]
@@ -237,6 +238,7 @@ impl INode for OpenTableBridge {
         Self {
             base,
             mode: BridgeMode::None,
+            current_game_type: String::from("checkers"),
         }
     }
 }
@@ -368,6 +370,7 @@ impl OpenTableBridge {
     // ------------------------------------------------------------------
     #[func]
     pub fn start_local_match(&mut self, player_top_id: i64, player_bottom_id: i64) {
+        self.current_game_type = "checkers".to_string();
         let session = new_checkers_session(
             SessionId(1),
             1,
@@ -384,24 +387,28 @@ impl OpenTableBridge {
 
     #[func]
     fn start_local_match_shogi(&mut self, p1: i64, p2: i64) {
+        self.current_game_type = "shogi".to_string();
         let session = new_shogi_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
         self.mode = BridgeMode::Local { session };
     }
 
     #[func]
     fn start_local_match_xiangqi(&mut self, p1: i64, p2: i64) {
+        self.current_game_type = "xiangqi".to_string();
         let session = new_xiangqi_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
         self.mode = BridgeMode::Local { session };
     }
 
     #[func]
     fn start_local_match_go(&mut self, p1: i64, p2: i64) {
+        self.current_game_type = "go".to_string();
         let session = new_go_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
         self.mode = BridgeMode::Local { session };
     }
 
     #[func]
     fn start_local_match_uno(&mut self, p1: i64, p2: i64) {
+        self.current_game_type = "uno".to_string();
         let session = new_uno_session(SessionId(1), 1, vec![PlayerId(p1 as u32), PlayerId(p2 as u32)]);
         self.mode = BridgeMode::Local { session };
     }
@@ -411,6 +418,7 @@ impl OpenTableBridge {
         if players.len() < 2 || players.len() > 6 {
             return false;
         }
+        self.current_game_type = "crisis".to_string();
         let player_ids: Vec<PlayerId> = players.iter_shared().map(|p| PlayerId(p as u32)).collect();
         let session = match new_crisis_session(SessionId(1), seed as u64, &player_ids) {
             Ok(s) => s,
@@ -422,36 +430,42 @@ impl OpenTableBridge {
 
     #[func]
     fn start_local_match_chess(&mut self, p1: i64, p2: i64) {
+        self.current_game_type = "chess".to_string();
         let session = new_chess_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
         self.mode = BridgeMode::Local { session };
     }
 
     #[func]
     fn start_local_match_chinese_checkers(&mut self, p1: i64, p2: i64) {
+        self.current_game_type = "chinese_checkers".to_string();
         let session = new_chinese_checkers_session(SessionId(1), 1, vec![PlayerId(p1 as u32), PlayerId(p2 as u32)]);
         self.mode = BridgeMode::Local { session };
     }
 
     #[func]
     fn start_local_match_mille_bornes(&mut self, p1: i64, p2: i64) {
+        self.current_game_type = "mille_bornes".to_string();
         let session = new_mille_bornes_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
         self.mode = BridgeMode::Local { session };
     }
 
     #[func]
     fn start_local_match_backgammon(&mut self, p1: i64, p2: i64) {
+        self.current_game_type = "backgammon".to_string();
         let session = new_backgammon_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
         self.mode = BridgeMode::Local { session };
     }
 
     #[func]
     fn start_local_match_monopoly(&mut self, p1: i64, p2: i64) {
+        self.current_game_type = "monopoly".to_string();
         let session = new_monopoly_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
         self.mode = BridgeMode::Local { session };
     }
 
     #[func]
     fn start_local_match_ludo(&mut self, p1: i64, p2: i64) {
+        self.current_game_type = "ludo".to_string();
         let session = new_ludo_session(SessionId(1), 1, vec![PlayerId(p1 as u32), PlayerId(p2 as u32)]);
         self.mode = BridgeMode::Local { session };
     }
@@ -954,6 +968,83 @@ impl OpenTableBridge {
                 }
                 _ => {}
             }
+        }
+    }
+
+    #[func]
+    pub fn save_game(&self, filename: GString) -> bool {
+        let mut path = filename.to_string();
+        if path.starts_with("user://") {
+            let user_dir = godot::classes::OS::singleton().get_user_data_dir().to_string();
+            let fname = path.trim_start_matches("user://");
+            path = format!("{}/{}", user_dir, fname);
+        }
+        match &self.mode {
+            BridgeMode::Local { session }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::Tournament { session, .. } => {
+                session.save_to_file(&path).is_ok()
+            }
+            BridgeMode::MultiSession { sessions, active } => {
+                if let Some((_, s)) = sessions.get(*active) {
+                    s.save_to_file(&path).is_ok()
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    #[func]
+    pub fn load_game(&mut self, filename: GString) -> bool {
+        let mut path = filename.to_string();
+        if path.starts_with("user://") {
+            let user_dir = godot::classes::OS::singleton().get_user_data_dir().to_string();
+            let fname = path.trim_start_matches("user://");
+            path = format!("{}/{}", user_dir, fname);
+        }
+
+        let game_type = if self.current_game_type.is_empty() {
+            "checkers"
+        } else {
+            &self.current_game_type
+        };
+
+        let p1 = PlayerId(1);
+        let p2 = PlayerId(2);
+        let (id, seed, players, rules) = match game_type.to_lowercase().as_str() {
+            "checkers" => (SessionId(1), 1, vec![p1, p2], checkers_game::build_checkers_rules()),
+            "chess" => (SessionId(1), 1, vec![p1, p2], chess_game::build_chess_rules()),
+            "shogi" => (SessionId(1), 1, vec![p1, p2], shogi_game::build_shogi_rules()),
+            "xiangqi" => (SessionId(1), 1, vec![p1, p2], xiangqi_game::build_xiangqi_rules()),
+            "go" => (SessionId(1), 1, vec![p1, p2], go_game::build_go_rules()),
+            "uno" => (SessionId(1), 1, vec![p1, p2], uno_game::build_uno_rules()),
+            "crisis" => (SessionId(1), 1, vec![p1, p2], crisis_game::build_crisis_rules()),
+            "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => (SessionId(1), 1, vec![p1, p2], chinese_checkers_game::build_chinese_checkers_rules()),
+            "mille_bornes" | "mille-bornes" | "millebornes" => (SessionId(1), 1, vec![p1, p2], mille_bornes_game::build_mille_bornes_rules()),
+            "backgammon" => (SessionId(1), 1, vec![p1, p2], backgammon_game::build_backgammon_rules()),
+            "monopoly" => (SessionId(1), 1, vec![p1, p2], monopoly_game::build_monopoly_rules()),
+            "ludo" => (SessionId(1), 1, vec![p1, p2], ludo_game::build_ludo_rules()),
+            "battleship" => (SessionId(1), 1, vec![p1, p2], battleship_game::build_battleship_rules()),
+            _ => (SessionId(1), 1, vec![p1, p2], checkers_game::build_checkers_rules()),
+        };
+
+        let log_bytes = match std::fs::read(&path) {
+            Ok(b) => b,
+            Err(_) => return false,
+        };
+
+        match Session::replay_collecting_events(id, seed, players, rules, &log_bytes) {
+            Ok((loaded_session, events)) => {
+                let current_p = loaded_session.current_player().0 as i64;
+                self.mode = BridgeMode::Local { session: loaded_session };
+                self.emit_game_events(&events);
+                self.base_mut().emit_signal("turn_changed", &[Variant::from(current_p)]);
+                true
+            }
+            Err(_) => false,
         }
     }
 
