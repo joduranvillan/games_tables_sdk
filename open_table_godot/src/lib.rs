@@ -411,12 +411,12 @@ impl OpenTableBridge {
         };
 
         let session = new_checkers_session(SessionId(1), seed as u64, p1, p2);
+        let current_p = session.current_player().0 as i64;
         self.mode = BridgeMode::Local {
             session,
             ai_player: Some(p_ai),
         };
 
-        let current_p = session.current_player().0 as i64;
         self.base_mut()
             .emit_signal("turn_changed", &[Variant::from(current_p)]);
 
