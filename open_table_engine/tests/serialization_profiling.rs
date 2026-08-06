@@ -40,7 +40,7 @@ fn test_profile_1000_commands_serialization() {
                 total_serde_json_ns += json_dur.as_nanos();
 
                 let t2 = Instant::now();
-                let bin_bytes = bincode::serialize(&json_bytes).unwrap_or_default();
+                let _bin_bytes = bincode::serialize(&json_bytes).unwrap_or_default();
                 let bin_dur = t2.elapsed();
                 total_bincode_ns += bin_dur.as_nanos();
             }
