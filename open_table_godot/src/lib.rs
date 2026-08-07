@@ -502,7 +502,7 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
 
     #[func]
     fn start_local_match_crisis(&mut self, seed: i64, players: Variant) -> bool {
-        let player_ids = parse_player_ids(&players);
+        let player_ids = Self::parse_player_ids(&players);
         if player_ids.len() < 2 || player_ids.len() > 6 {
             return false;
         }
@@ -590,7 +590,7 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
 
     #[func]
     fn start_tournament(&mut self, game_type: GString, players: Variant, rounds: i64) -> bool {
-        let p_vec = parse_player_ids(&players);
+        let p_vec = Self::parse_player_ids(&players);
         if p_vec.len() < 2 || rounds < 1 {
             return false;
         }
