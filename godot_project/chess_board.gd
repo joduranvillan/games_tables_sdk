@@ -35,6 +35,12 @@ var drag_layer: DragDropLayer
 var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
 var network_hud: NetworkStatusHUD
+var opening_option_button: OptionButton
+
+var in_opening_practice: bool = false
+var current_opening_key: String = ""
+var opening_step_index: int = 0
+var opening_moves: Array = []
 
 @onready var status: Label = $Status
 
@@ -111,6 +117,51 @@ func _setup_ui() -> void:
 	network_hud = NetworkStatusHUD.new()
 	network_hud.name = "NetworkStatusHUD"
 	add_child(network_hud)
+
+	# Opening Practice Selector
+	opening_option_button = OptionButton.new()
+	opening_option_button.name = "OpeningOptionButton"
+	opening_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
+	opening_option_button.custom_minimum_size = Vector2(300, 32)
+	opening_option_button.add_item("Partida libre (Sin apertura)")
+	opening_option_button.add_item("Ruy López (e4 e5 Nf3 Nc6 Bb5)")
+	opening_option_button.add_item("Gambito de Dama (d4 d5 c4)")
+	opening_option_button.add_item("Defensa Siciliana (e4 c5 Nf3 d6 d4)")
+	opening_option_button.add_item("Defensa Francesa (e4 e6 d4 d5)")
+	opening_option_button.add_item("Apertura Italiana (e4 e5 Nf3 Nc6 Bc4)")
+	opening_option_button.add_item("Defensa Caro-Kann (e4 c6 d4 d5)")
+	opening_option_button.item_selected.connect(_on_opening_selected)
+	add_child(opening_option_button)
+
+func _on_opening_selected(index: int) -> void:
+	if index == 0:
+		in_opening_practice = false
+		current_opening_key = ""
+		opening_step_index = 0
+		opening_moves.clear()
+		_update_status()
+		queue_redraw()
+		return
+
+	var keys = ["ruy_lopez", "queen_gambit", "sicilian", "french", "italian", "caro_kann"]
+	var key = keys[index - 1]
+	start_opening_practice(key)
+
+func start_opening_practice(key: String) -> void:
+	if bridge != null:
+		bridge.start_local_match_chess(P1, P2)
+	_init_board_state()
+	current = bridge.current_player() if bridge else P1
+	in_opening_practice = true
+	current_opening_key = key
+	opening_step_index = 0
+	var op_data = ChessOpenings.get_opening(key)
+	opening_moves = op_data.get("moves", [])
+	selected_pos = null
+	valid_moves.clear()
+	winner = -1
+	_update_status()
+	queue_redraw()
 
 func _on_theme_changed(theme: BoardTheme) -> void:
 	current_theme = theme
@@ -390,6 +441,15 @@ func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promo
 	)
 
 func _on_piece_moved_signal(player: int, from_r: int, from_c: int, to_r: int, to_c: int, cap_r: int, cap_c: int, prom: bool) -> void:
+	if in_opening_practice and opening_step_index < opening_moves.size():
+		var expected = opening_moves[opening_step_index]
+		if from_r == expected.from.x and from_c == expected.from.y and to_r == expected.to.x and to_c == expected.to.y:
+			opening_step_index += 1
+			if opening_step_index >= opening_moves.size():
+				in_opening_practice = false
+		else:
+			in_opening_practice = false
+
 	var is_capture = (cap_r >= 0 and cap_c >= 0) or (piece_sprites[to_r][to_c] != null)
 	if is_capture:
 		if has_node("/root/AudioManager"):
@@ -458,6 +518,17 @@ func _on_move_rejected(reason: String) -> void:
 	)
 
 func _draw() -> void:
+	if in_opening_practice and opening_step_index < opening_moves.size():
+		var exp_move = opening_moves[opening_step_index]
+		var from_pos = exp_move.from
+		var to_pos = exp_move.to
+		var from_rect = Rect2(from_pos.y * CELL_SIZE, from_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		var to_rect = Rect2(to_pos.y * CELL_SIZE, to_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		draw_rect(from_rect, Color(0.0, 0.7, 1.0, 0.45))
+		draw_rect(from_rect, Color(0.0, 0.5, 1.0, 0.9), false, 3.0)
+		draw_rect(to_rect, Color(0.2, 0.9, 0.3, 0.45))
+		draw_rect(to_rect, Color(0.1, 0.8, 0.2, 0.9), false, 3.0)
+
 	if selected_pos != null:
 		var sel_rect = Rect2(selected_pos.y * CELL_SIZE, selected_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
 		draw_rect(sel_rect, COL_SELECT)
@@ -480,6 +551,17 @@ func _update_status() -> void:
 	else:
 		var p_name = "Jugador %s" % current
 		var p_col = GameManager.get_player_color(current)
-		status.text = "Turno: Jugador %s (Ajedrez)" % current
+		if in_opening_practice and opening_step_index < opening_moves.size():
+			var expected = opening_moves[opening_step_index]
+			var op_data = ChessOpenings.get_opening(current_opening_key)
+			status.text = "Práctica: %s | Esperado: %s" % [op_data.get("name", "Apertura"), expected.get("notation", "")]
+		else:
+			if opening_moves.size() > 0 and opening_step_index >= opening_moves.size():
+				status.text = "¡Apertura completada! Continúa en partida libre (Turno: P%s)" % current
+			elif opening_moves.size() > 0:
+				status.text = "Desviado de apertura. Partida libre (Turno: P%s)" % current
+			else:
+				status.text = "Turno: Jugador %s (Ajedrez)" % current
+
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, p_name, p_col)

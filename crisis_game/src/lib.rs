@@ -3,12 +3,15 @@
 pub mod board;
 pub mod commands;
 pub mod events;
+pub mod i18n;
 pub mod resources;
 pub mod rules;
 
+pub use i18n::territory_name;
+
 pub use board::{
     are_adjacent, check_continent_bonus, check_objective, Continent, ContinentId, ObjectiveCard, Territory,
-    TerritoryId, ADJACENCIES, CONTINENTS, TERRITORIES,
+    TerritoryId, ADJACENCIES, CONTINENTS, TERRITORIES, TERRITORY_CENTERS,
     CONTINENT_AFRICA, CONTINENT_ASIA, CONTINENT_EUROPE, CONTINENT_NORTH_AMERICA,
     CONTINENT_OCEANIA, CONTINENT_SOUTH_AMERICA,
 };

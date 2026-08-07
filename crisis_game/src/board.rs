@@ -75,6 +75,50 @@ pub const TERRITORIES: &[Territory] = &[
     Territory { id: TerritoryId(29), name: "Borneo", continent: CONTINENT_OCEANIA },
 ];
 
+pub const TERRITORY_CENTERS: &[(f32, f32)] = &[
+    // América del Sur (0..=4)
+    (180.0, 520.0), // 0: Argentina
+    (240.0, 440.0), // 1: Brasil
+    (150.0, 480.0), // 2: Chile
+    (170.0, 390.0), // 3: Colombia
+    (160.0, 430.0), // 4: Perú
+
+    // América del Norte (5..=8)
+    (140.0, 280.0), // 5: México
+    (120.0, 200.0), // 6: California
+    (200.0, 190.0), // 7: Nueva York
+    (160.0, 110.0), // 8: Canadá
+
+    // Europa (9..=13)
+    (360.0, 130.0), // 9: Gran Bretaña
+    (350.0, 220.0), // 10: España
+    (400.0, 190.0), // 11: Francia
+    (450.0, 170.0), // 12: Alemania
+    (520.0, 140.0), // 13: Rusia
+
+    // África (14..=17)
+    (380.0, 320.0), // 14: Sahara
+    (450.0, 310.0), // 15: Egipto
+    (430.0, 400.0), // 16: Congo
+    (440.0, 490.0), // 17: Sudáfrica
+
+    // Asia (18..=25)
+    (540.0, 210.0), // 18: Aral
+    (600.0, 150.0), // 19: Tartaria
+    (650.0, 100.0), // 20: Taymir
+    (690.0, 140.0), // 21: Siberia
+    (730.0, 120.0), // 22: Kamchatka
+    (620.0, 240.0), // 23: China
+    (560.0, 290.0), // 24: India
+    (730.0, 220.0), // 25: Japón
+
+    // Oceanía (26..=29)
+    (700.0, 480.0), // 26: Australia
+    (650.0, 380.0), // 27: Java
+    (600.0, 350.0), // 28: Sumatra
+    (660.0, 340.0), // 29: Borneo
+];
+
 pub const CONTINENTS: &[Continent] = &[
     Continent {
         id: CONTINENT_SOUTH_AMERICA,

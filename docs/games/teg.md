@@ -8,47 +8,50 @@ TEG (Plan Táctico y Estratégico de Guerra) es el juego clásico de estrategia 
 
 ## 2. Mapa de 30 Territorios y Continentes
 
+### Soporte Multilingüe (i18n)
+El juego expone `crisis_game::territory_name(id: TerritoryId, lang: &str) -> &'static str` con traducciones en español ("es"), inglés ("en"), francés ("fr"), alemán ("de") y portugués ("pt").
+
 ### América del Sur (5 territorios, Bono: +2 ejércitos)
-- `0`: Argentina
-- `1`: Brasil
-- `2`: Chile
-- `3`: Colombia
-- `4`: Perú
+- `0`: Argentina (es: Argentina, fr: Argentine, de: Argentinien)
+- `1`: Brasil (es: Brasil, en: Brazil, fr: Brésil, de: Brasilien)
+- `2`: Chile (es: Chile, fr: Chili)
+- `3`: Colombia (es: Colombia, fr: Colombie, de: Kolumbien)
+- `4`: Perú (es: Perú, en: Peru, fr: Pérou)
 
 ### América del Norte (4 territorios, Bono: +3 ejércitos)
-- `5`: México
-- `6`: California
-- `7`: Nueva York
-- `8`: Canadá
+- `5`: México (es: México, en: Mexico, fr: Mexique)
+- `6`: California (es: California, fr: Californie, de: Kalifornien)
+- `7`: Nueva York (es: Nueva York, en: New York, pt: Nova Iorque)
+- `8`: Canadá (es: Canadá, en: Canada, de: Kanada)
 
 ### Europa (5 territorios, Bono: +5 ejércitos)
-- `9`: Gran Bretaña
-- `10`: España
-- `11`: Francia
-- `12`: Alemania
-- `13`: Rusia
+- `9`: Gran Bretaña (es: Gran Bretaña, en: Great Britain, fr: Grande-Bretagne)
+- `10`: España (es: España, en: Spain, fr: Espagne, de: Spanien)
+- `11`: Francia (es: Francia, en: France, de: Frankreich)
+- `12`: Alemania (es: Alemania, en: Germany, fr: Allemagne, de: Deutschland)
+- `13`: Rusia (es: Rusia, en: Russia, fr: Russie, de: Russland)
 
 ### África (4 territorios, Bono: +3 ejércitos)
-- `14`: Sahara
-- `15`: Egipto
-- `16`: Congo
-- `17`: Sudáfrica
+- `14`: Sahara (es: Sahara, pt: Saara)
+- `15`: Egipto (es: Egipto, en: Egypt, fr: Égypte, de: Ägypten)
+- `16`: Congo (es: Congo, de: Kongo)
+- `17`: Sudáfrica (es: Sudáfrica, en: South Africa, fr: Afrique du Sud, de: Südafrika)
 
 ### Asia (8 territorios, Bono: +7 ejércitos)
 - `18`: Aral
-- `19`: Tartaria
-- `20`: Taymir
-- `21`: Siberia
-- `22`: Kamchatka
-- `23`: China
-- `24`: India
-- `25`: Japón
+- `19`: Tartaria (es: Tartaria, en: Tartary, fr: Tartarie)
+- `20`: Taymir (es: Taymir, en: Taymyr, de: Taimyr)
+- `21`: Siberia (es: Siberia, fr: Sibérie, de: Sibirien)
+- `22`: Kamchatka (es: Kamchatka, fr: Kamtchatka)
+- `23`: China (es: China, fr: Chine)
+- `24`: India (es: India, fr: Inde, de: Indien, pt: Índia)
+- `25`: Japón (es: Japón, en: Japan, fr: Japon)
 
 ### Oceanía (4 territorios, Bono: +2 ejércitos)
-- `26`: Australia
+- `26`: Australia (es: Australia, fr: Australie, de: Australien)
 - `27`: Java
 - `28`: Sumatra
-- `29`: Borneo
+- `29`: Borneo (es: Borneo, fr: Bornéo, pt: Bornéu)
 
 ## 3. Tabla de Adyacencias
 | Territorio Origen | Territorios Adyacentes |

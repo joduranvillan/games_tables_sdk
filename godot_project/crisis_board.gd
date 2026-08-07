@@ -80,6 +80,16 @@ func _setup_ui() -> void:
 	map_panel.custom_minimum_size = Vector2(750, 680)
 	add_child(map_panel)
 	
+	if FileAccess.file_exists("res://assets/crisis/world_map.svg"):
+		var map_tex = load("res://assets/crisis/world_map.svg")
+		if map_tex:
+			var bg_rect = TextureRect.new()
+			bg_rect.texture = map_tex
+			bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			bg_rect.stretch_mode = TextureRect.STRETCH_SCALE
+			bg_rect.custom_minimum_size = Vector2(750, 680)
+			map_panel.add_child(bg_rect)
+	
 	for i in range(30):
 		var row: int = i / 5
 		var col: int = i % 5
@@ -116,9 +126,14 @@ func _setup_ui() -> void:
 	sidebar_title.add_theme_font_size_override("font_size", 22)
 	sidebar_panel.add_child(sidebar_title)
 	
+	var turn_indicator = TurnIndicator.new()
+	turn_indicator.name = "TurnIndicator"
+	turn_indicator.position = Vector2(15, 50)
+	sidebar_panel.add_child(turn_indicator)
+
 	player_stats_label = Label.new()
-	player_stats_label.position = Vector2(15, 55)
-	player_stats_label.custom_minimum_size = Vector2(320, 180)
+	player_stats_label.position = Vector2(15, 100)
+	player_stats_label.custom_minimum_size = Vector2(320, 140)
 	sidebar_panel.add_child(player_stats_label)
 
 	var btn_y: float = 250.0

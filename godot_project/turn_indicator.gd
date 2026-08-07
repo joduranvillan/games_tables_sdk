@@ -8,6 +8,8 @@ var color_rect: ColorRect
 var label: Label
 var timer_bar: ProgressBar
 var theme_btn: Button
+var undo_btn: Button
+var redo_btn: Button
 
 var timer_active: bool = false
 var time_max: float = 30.0
@@ -81,7 +83,27 @@ func _setup_nodes() -> void:
 	timer_bar.value = 100.0
 	add_child(timer_bar)
 	
-	# 4. Theme switcher button
+	# 4. Undo button
+	undo_btn = Button.new()
+	undo_btn.name = "UndoButton"
+	undo_btn.text = "⟵ Deshacer"
+	undo_btn.custom_minimum_size = Vector2(80, 30)
+	undo_btn.size_flags_vertical = SIZE_SHRINK_CENTER
+	undo_btn.add_theme_font_size_override("font_size", 12)
+	undo_btn.pressed.connect(_on_undo_pressed)
+	add_child(undo_btn)
+
+	# 5. Redo button
+	redo_btn = Button.new()
+	redo_btn.name = "RedoButton"
+	redo_btn.text = "Rehacer ⟶"
+	redo_btn.custom_minimum_size = Vector2(80, 30)
+	redo_btn.size_flags_vertical = SIZE_SHRINK_CENTER
+	redo_btn.add_theme_font_size_override("font_size", 12)
+	redo_btn.pressed.connect(_on_redo_pressed)
+	add_child(redo_btn)
+
+	# 6. Theme switcher button
 	theme_btn = Button.new()
 	theme_btn.name = "ThemeButton"
 	theme_btn.text = "🎨 Tema"
@@ -158,6 +180,40 @@ func _process(delta: float) -> void:
 			time_left = 0.0
 			timer_active = false
 		timer_bar.value = (time_left / time_max) * 100.0
+	_update_undo_redo_status()
+
+func _on_undo_pressed() -> void:
+	if bridge_node != null and bridge_node.has_method("undo"):
+		bridge_node.undo()
+		_update_undo_redo_status()
+
+func _on_redo_pressed() -> void:
+	if bridge_node != null and bridge_node.has_method("redo"):
+		bridge_node.redo()
+		_update_undo_redo_status()
+
+func _update_undo_redo_status() -> void:
+	if bridge_node == null:
+		if undo_btn: undo_btn.disabled = true
+		if redo_btn: redo_btn.disabled = true
+		return
+
+	if bridge_node.has_method("is_multiplayer") and bridge_node.is_multiplayer():
+		if undo_btn: undo_btn.disabled = true
+		if redo_btn: redo_btn.disabled = true
+		return
+
+	if undo_btn:
+		if bridge_node.has_method("can_undo"):
+			undo_btn.disabled = not bridge_node.can_undo()
+		else:
+			undo_btn.disabled = false
+
+	if redo_btn:
+		if bridge_node.has_method("can_redo"):
+			redo_btn.disabled = not bridge_node.can_redo()
+		else:
+			redo_btn.disabled = false
 
 func _on_theme_pressed() -> void:
 	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):

@@ -231,6 +231,8 @@ pub struct OpenTableBridge {
     base: Base<Node>,
     mode: BridgeMode,
     current_game_type: String,
+    undone_commands: Vec<(PlayerId, String)>,
+    recent_events: Vec<Dictionary>,
 }
 
 #[godot_api]
@@ -240,6 +242,8 @@ impl INode for OpenTableBridge {
             base,
             mode: BridgeMode::None,
             current_game_type: String::from("checkers"),
+            undone_commands: Vec::new(),
+            recent_events: Vec::new(),
         }
     }
 }
@@ -371,6 +375,8 @@ impl OpenTableBridge {
     // ------------------------------------------------------------------
     #[func]
     pub fn start_local_match(&mut self, player_top_id: i64, player_bottom_id: i64) {
+        self.recent_events.clear();
+        self.undone_commands.clear();
         self.current_game_type = "checkers".to_string();
         let session = new_checkers_session(
             SessionId(1),
@@ -1208,6 +1214,132 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn is_multiplayer(&self) -> bool {
+        matches!(
+            self.mode,
+            BridgeMode::Host { .. }
+                | BridgeMode::Client { .. }
+                | BridgeMode::NativeHost { .. }
+                | BridgeMode::NativeClient { .. }
+                | BridgeMode::Spectator { .. }
+        )
+    }
+
+    #[func]
+    pub fn can_undo(&self) -> bool {
+        if self.is_multiplayer() {
+            return false;
+        }
+        if let BridgeMode::Local { session, .. } = &self.mode {
+            return session.export_log().map(|b| !b.is_empty()).unwrap_or(false);
+        }
+        false
+    }
+
+    #[func]
+    pub fn can_redo(&self) -> bool {
+        if self.is_multiplayer() {
+            return false;
+        }
+        !self.undone_commands.is_empty()
+    }
+
+    #[func]
+    pub fn undo_last_command(&mut self) -> bool {
+        self.undo()
+    }
+
+    #[func]
+    pub fn undo(&mut self) -> bool {
+        if self.is_multiplayer() {
+            return false;
+        }
+
+        let BridgeMode::Local { ref mut session, .. } = self.mode else {
+            return false;
+        };
+
+        let log_bytes = match session.export_log() {
+            Ok(b) if !b.is_empty() => b,
+            _ => return false,
+        };
+
+        let logged: Vec<open_table_engine::session::LoggedCommand> = match serde_json::from_slice(&log_bytes) {
+            Ok(l) if !l.is_empty() => l,
+            _ => return false,
+        };
+
+        let last_logged = logged.last().cloned();
+
+        if session.undo_last_command().is_err() {
+            return false;
+        }
+
+        if let Some((_, _, cmd)) = last_logged {
+            let sender = cmd.issuer().unwrap_or_else(|| PlayerId(1));
+            if let Ok(json_str) = serde_json::to_string(&cmd) {
+                self.undone_commands.push((sender, json_str));
+            }
+        }
+
+        let game_type = self.current_game_type.clone();
+        let new_log_bytes = session.export_log().unwrap_or_default();
+        let p1 = PlayerId(1);
+        let p2 = PlayerId(2);
+        let (id, seed, players, rules) = match game_type.to_lowercase().as_str() {
+            "checkers" => (SessionId(1), 1, vec![p1, p2], checkers_game::build_checkers_rules()),
+            "chess" => (SessionId(1), 1, vec![p1, p2], chess_game::build_chess_rules()),
+            "shogi" => (SessionId(1), 1, vec![p1, p2], shogi_game::build_shogi_rules()),
+            "xiangqi" => (SessionId(1), 1, vec![p1, p2], xiangqi_game::build_xiangqi_rules()),
+            "go" => (SessionId(1), 1, vec![p1, p2], go_game::build_go_rules()),
+            "uno" => (SessionId(1), 1, vec![p1, p2], uno_game::build_uno_rules()),
+            "crisis" => (SessionId(1), 1, vec![p1, p2], crisis_game::build_crisis_rules()),
+            "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => (SessionId(1), 1, vec![p1, p2], chinese_checkers_game::build_chinese_checkers_rules()),
+            "mille_bornes" | "mille-bornes" | "millebornes" => (SessionId(1), 1, vec![p1, p2], mille_bornes_game::build_mille_bornes_rules()),
+            "backgammon" => (SessionId(1), 1, vec![p1, p2], backgammon_game::build_backgammon_rules()),
+            "monopoly" => (SessionId(1), 1, vec![p1, p2], monopoly_game::build_monopoly_rules()),
+            "ludo" => (SessionId(1), 1, vec![p1, p2], ludo_game::build_ludo_rules()),
+            "battleship" => (SessionId(1), 1, vec![p1, p2], battleship_game::build_battleship_rules()),
+            _ => (SessionId(1), 1, vec![p1, p2], checkers_game::build_checkers_rules()),
+        };
+
+        if let Ok((_, events)) = Session::replay_collecting_events(id, seed, players, rules, &new_log_bytes) {
+            self.emit_game_events(&events);
+        }
+
+        let current_p = match &self.mode {
+            BridgeMode::Local { session, .. } => session.current_player().0 as i64,
+            _ => 1,
+        };
+        self.base_mut().emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        true
+    }
+
+    #[func]
+    pub fn redo(&mut self) -> bool {
+        if self.is_multiplayer() {
+            return false;
+        }
+
+        if let Some((sender, json_str)) = self.undone_commands.pop() {
+            if let Ok(cmd) = parse_command_json(&json_str) {
+                return self.process_and_emit(sender, cmd).is_ok();
+            }
+        }
+        false
+    }
+
+    #[func]
+    pub fn get_recent_events(&self) -> Array<Dictionary> {
+        let mut arr = Array::new();
+        for dict in &self.recent_events {
+            arr.push(dict.clone());
+        }
+        arr
+    }
+
+    #[func]
     pub fn current_player(&self) -> i64 {
         match &self.mode {
             BridgeMode::Local { session, .. } => session.current_player().0 as i64,
@@ -1414,7 +1546,14 @@ impl OpenTableBridge {
     fn emit_game_events(&mut self, events: &[Box<dyn Event>]) {
         for event in events {
             if let Ok(json) = serde_json::to_string(event) {
-                self.emit_bridge_signal("event_json", &[Variant::from(json)]);
+                self.emit_bridge_signal("event_json", &[Variant::from(json.clone())]);
+                let parsed_var = godot::classes::Json::parse_string(&GString::from(&json));
+                if let Ok(dict) = parsed_var.try_to::<Dictionary>() {
+                    self.recent_events.push(dict);
+                    if self.recent_events.len() > 100 {
+                        self.recent_events.remove(0);
+                    }
+                }
             }
 
             if let Some(moved) = event.as_any().downcast_ref::<PieceMovedEvent>() {
