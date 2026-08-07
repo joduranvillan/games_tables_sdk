@@ -1264,7 +1264,7 @@ impl OpenTableBridge {
             _ => return false,
         };
 
-        let logged: Vec<open_table_engine::session::LoggedCommand> = match serde_json::from_slice(&log_bytes) {
+        let logged: Vec<open_table_engine::session::LoggedCommand> = match serde_json::from_slice::<Vec<open_table_engine::session::LoggedCommand>>(&log_bytes) {
             Ok(l) if !l.is_empty() => l,
             _ => return false,
         };
@@ -1334,7 +1334,7 @@ impl OpenTableBridge {
     pub fn get_recent_events(&self) -> Array<Dictionary> {
         let mut arr = Array::new();
         for dict in &self.recent_events {
-            arr.push(dict.clone());
+            arr.push(dict);
         }
         arr
     }
