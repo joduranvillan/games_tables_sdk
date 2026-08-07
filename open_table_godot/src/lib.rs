@@ -176,7 +176,7 @@ fn create_initial_session(game_type: &str) -> Option<Session> {
     }
 }
 
-fn parse_command_json(json_str: &str) -> Result<Box<dyn Command>, serde_json::Error> {
+fn parse_command_json(json_str: &str, current_game_type: &str) -> Result<Box<dyn Command>, serde_json::Error> {
     if let Ok(cmd) = serde_json::from_str::<Box<dyn Command>>(json_str) {
         return Ok(cmd);
     }
@@ -186,7 +186,12 @@ fn parse_command_json(json_str: &str) -> Result<Box<dyn Command>, serde_json::Er
             if let Some(serde_json::Value::String(ct)) = obj.get("command_type") {
                 if !ct.contains("::") {
                     let ct_clone = ct.clone();
-                    let prefixes = [
+                    let dynamic_prefix = if !current_game_type.is_empty() {
+                        format!("{current_game_type}_game::")
+                    } else {
+                        String::new()
+                    };
+                    let base_prefixes = [
                         "chess_game::",
                         "checkers_game::",
                         "backgammon_game::",
@@ -203,6 +208,15 @@ fn parse_command_json(json_str: &str) -> Result<Box<dyn Command>, serde_json::Er
                         "open_table_engine::",
                         "open_table_core::",
                     ];
+                    let mut prefixes = Vec::new();
+                    if !dynamic_prefix.is_empty() {
+                        prefixes.push(dynamic_prefix.as_str());
+                    }
+                    for p in base_prefixes {
+                        if p != dynamic_prefix {
+                            prefixes.push(p);
+                        }
+                    }
                     for prefix in prefixes {
                         let mut test_val = val.clone();
                         if let Some(test_obj) = test_val.as_object_mut() {
@@ -1014,7 +1028,7 @@ impl OpenTableBridge {
     #[func]
     pub fn send_command_json(&mut self, player: i64, json_str: GString) {
         let player_id = PlayerId(player as u32);
-        let command: Box<dyn Command> = match parse_command_json(&json_str.to_string()) {
+        let command: Box<dyn Command> = match parse_command_json(&json_str.to_string(), &self.current_game_type) {
             Ok(cmd) => cmd,
             Err(e) => {
                 let msg = format!("Error parsing command JSON: {e}");
@@ -1323,7 +1337,7 @@ impl OpenTableBridge {
         }
 
         if let Some((sender, json_str)) = self.undone_commands.pop() {
-            if let Ok(cmd) = parse_command_json(&json_str) {
+            if let Ok(cmd) = parse_command_json(&json_str, &self.current_game_type) {
                 return self.process_and_emit(sender, cmd).is_ok();
             }
         }
@@ -1408,7 +1422,7 @@ impl OpenTableBridge {
         let received = transport.poll_received();
         for (player_id, command_bytes) in received {
             let cmd_str = String::from_utf8_lossy(&command_bytes);
-            if let Ok(command) = parse_command_json(&cmd_str) {
+            if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
                 if let Ok(events) = self.process_and_emit(player_id, command) {
                     if let BridgeMode::Host { transport, .. } = &mut self.mode {
                         let serialized = serde_json::to_vec(&events).unwrap_or_default();
@@ -1478,7 +1492,7 @@ impl OpenTableBridge {
         let received = transport.poll_received();
         for (player_id, command_bytes) in received {
             let cmd_str = String::from_utf8_lossy(&command_bytes);
-            if let Ok(command) = parse_command_json(&cmd_str) {
+            if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
                 if let Ok(events) = self.process_and_emit(player_id, command) {
                     if let BridgeMode::NativeHost { transport, .. } = &mut self.mode {
                         let serialized = serde_json::to_vec(&events).unwrap_or_default();

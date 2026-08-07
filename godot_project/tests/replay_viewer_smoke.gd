@@ -24,6 +24,7 @@ func _initialize() -> void:
 
 	# 4. Crear ReplayViewer y cargar datos
 	var viewer = ReplayViewer.new()
+	root.add_child(viewer)
 	var move_events_count: int = 0
 
 	# Escuchar los eventos de movimiento del bridge de ReplayViewer

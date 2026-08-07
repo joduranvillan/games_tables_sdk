@@ -165,6 +165,10 @@ func _setup_ui() -> void:
 	add_child(file_dialog)
 
 func load_replay_data(bytes: PackedByteArray, type_str: String) -> void:
+	if step_slider == null:
+		_setup_ui()
+		_setup_timer()
+
 	raw_log_bytes = bytes
 	game_type = type_str
 

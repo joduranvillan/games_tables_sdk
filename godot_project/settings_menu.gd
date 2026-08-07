@@ -277,7 +277,7 @@ func _setup_stats_tab(parent: VBoxContainer) -> void:
 
 	var root = stats_tree.create_item()
 	var scores_dict = {}
-	if has_node("/root/ScoreTracker"):
+	if is_inside_tree() and has_node("/root/ScoreTracker"):
 		scores_dict = get_node("/root/ScoreTracker").scores
 
 	if scores_dict.is_empty():

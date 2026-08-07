@@ -51,7 +51,7 @@ func bind_bridge(p_bridge) -> void:
 
 func _on_turn_changed(player_id: int) -> void:
 	var p_col = Color.WHITE
-	if has_node("/root/GameManager"):
+	if is_inside_tree() and has_node("/root/GameManager"):
 		p_col = get_node("/root/GameManager").get_player_color(player_id)
 	var p_name = get_configured_player_name(player_id)
 	set_turn(player_id, p_name, p_col)
@@ -114,7 +114,7 @@ func _setup_nodes() -> void:
 	add_child(theme_btn)
 
 func get_configured_player_name(player_id: int, fallback_name: String = "") -> String:
-	if has_node("/root/SettingsMenu"):
+	if is_inside_tree() and has_node("/root/SettingsMenu"):
 		var settings = SettingsMenu.get_saved_settings()
 		if player_id == 1:
 			var p1 = settings.get("player1_name", "")
@@ -216,7 +216,7 @@ func _update_undo_redo_status() -> void:
 			redo_btn.disabled = false
 
 func _on_theme_pressed() -> void:
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
 		var tm = get_node_or_null("/root/ThemeManager")
 		if tm != null:
 			var new_t = tm.toggle_theme()
