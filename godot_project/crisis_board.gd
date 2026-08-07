@@ -69,7 +69,7 @@ func _ready() -> void:
 	if bridge.has_signal("crisis_game_over"):
 		bridge.connect("crisis_game_over", _on_crisis_game_over)
 		
-	bridge.start_local_match_crisis(42, [1, 2])
+	bridge.start_local_match_crisis(42, [1, 2] as Array[int])
 	current_player_id = bridge.current_player()
 	
 	_update_ui_state()

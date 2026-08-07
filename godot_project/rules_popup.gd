@@ -181,8 +181,6 @@ func _on_search_changed(new_text: String) -> void:
 		return
 
 	# Simple BBCode search highlighting
-	var highlighted = raw_text
-	var idx = 0
 	var lower_raw = raw_text.to_lower()
 	var lower_q = q.to_lower()
 

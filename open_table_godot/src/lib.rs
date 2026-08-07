@@ -486,12 +486,16 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn start_local_match_crisis(&mut self, seed: i64, players: Array<i64>) -> bool {
-        if players.len() < 2 || players.len() > 6 {
+    fn start_local_match_crisis(&mut self, seed: i64, players: VariantArray) -> bool {
+        let player_ids: Vec<PlayerId> = players
+            .iter_shared()
+            .filter_map(|p| p.try_to::<i64>().ok())
+            .map(|p| PlayerId(p as u32))
+            .collect();
+        if player_ids.len() < 2 || player_ids.len() > 6 {
             return false;
         }
         self.current_game_type = "crisis".to_string();
-        let player_ids: Vec<PlayerId> = players.iter_shared().map(|p| PlayerId(p as u32)).collect();
         let session = match new_crisis_session(SessionId(1), seed as u64, &player_ids) {
             Ok(s) => s,
             Err(_) => return false,
@@ -574,12 +578,16 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn start_tournament(&mut self, game_type: GString, players: Array<i64>, rounds: i64) -> bool {
-        if players.len() < 2 || rounds < 1 {
+    fn start_tournament(&mut self, game_type: GString, players: VariantArray, rounds: i64) -> bool {
+        let p_vec: Vec<PlayerId> = players
+            .iter_shared()
+            .filter_map(|p| p.try_to::<i64>().ok())
+            .map(|p| PlayerId(p as u32))
+            .collect();
+        if p_vec.len() < 2 || rounds < 1 {
             return false;
         }
 
-        let p_vec: Vec<PlayerId> = players.iter_shared().map(|p| PlayerId(p as u32)).collect();
         let gt = game_type.to_string();
 
         let mut matches = Vec::new();
