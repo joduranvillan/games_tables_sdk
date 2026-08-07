@@ -31,20 +31,7 @@ func _initialize() -> void:
 	}))
 	results.append(["SetupDeckCommand procesado sin errores", move_rejected_reasons.size() == 0])
 
-	# 3. Robo de carta
-	bridge.send_command_json(1, JSON.stringify({
-		"command_type": "DrawCardCommand",
-		"player": 1
-	}))
-	var drawn_event = false
-	for ev in events_received:
-		var et = ev.get("event_type", ev.get("command_type", ""))
-		if "CardDrawnEvent" in et:
-			drawn_event = true
-			break
-	results.append(["DrawCardCommand emite CardDrawnEvent", drawn_event])
-
-	# 4. Jugar carta de distancia válida
+	# 3. Jugar carta de distancia válida (P1)
 	move_rejected_reasons.clear()
 	bridge.send_command_json(1, JSON.stringify({
 		"command_type": "PlayDistanceCommand",
@@ -58,6 +45,26 @@ func _initialize() -> void:
 			distance_played_event = true
 			break
 	results.append(["PlayDistanceCommand con 25 km emite DistancePlayedEvent", distance_played_event])
+
+	# 4. P2 juega carta de distancia para que el turno vuelva a P1
+	bridge.send_command_json(2, JSON.stringify({
+		"command_type": "PlayDistanceCommand",
+		"player": 2,
+		"distance": 25
+	}))
+
+	# 5. Robo de carta (P1 tiene 5 cartas en mano tras jugar, ahora sí puede robar)
+	bridge.send_command_json(1, JSON.stringify({
+		"command_type": "DrawCardCommand",
+		"player": 1
+	}))
+	var drawn_event = false
+	for ev in events_received:
+		var et = ev.get("event_type", ev.get("command_type", ""))
+		if "CardDrawnEvent" in et:
+			drawn_event = true
+			break
+	results.append(["DrawCardCommand emite CardDrawnEvent", drawn_event])
 
 	var ok := true
 	for r in results:

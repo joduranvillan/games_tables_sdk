@@ -57,6 +57,9 @@ func _initialize() -> void:
 		if not r[1]:
 			ok = false
 
+	bridge.free()
+	viewer.free()
+
 	if ok:
 		print("RESULTADO: TODOS LOS TESTS PASARON EXITOSAMENTE")
 		quit(0)
