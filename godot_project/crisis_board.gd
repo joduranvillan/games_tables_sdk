@@ -91,7 +91,7 @@ func _setup_ui() -> void:
 			map_panel.add_child(bg_rect)
 	
 	for i in range(30):
-		var row: int = i / 5
+		var row: int = int(float(i) / 5.0)
 		var col: int = i % 5
 		var pos_x: float = 20.0 + col * 144.0
 		var pos_y: float = 20.0 + row * 105.0
@@ -241,12 +241,12 @@ func _update_territory_label(t_id: int) -> void:
 	if not territory_labels.has(t_id):
 		return
 	var lbl: Label = territory_labels[t_id]
-	var owner: int = territory_owners.get(t_id, 0)
+	var t_owner: int = territory_owners.get(t_id, 0)
 	var armies: int = territory_armies.get(t_id, 0)
 	
-	lbl.text = "%s\n[P%d: %d]" % [TERRITORY_NAMES[t_id], owner, armies]
+	lbl.text = "%s\n[P%d: %d]" % [TERRITORY_NAMES[t_id], t_owner, armies]
 	
-	var color = PLAYER_COLORS.get(owner, Color(0.25, 0.25, 0.25))
+	var color = PLAYER_COLORS.get(t_owner, Color(0.25, 0.25, 0.25))
 	var style = StyleBoxFlat.new()
 	style.bg_color = color
 	style.corner_radius_top_left = 6
@@ -255,7 +255,7 @@ func _update_territory_label(t_id: int) -> void:
 	style.corner_radius_bottom_right = 6
 	lbl.add_theme_stylebox_override("normal", style)
 
-func _on_territory_conquered(player_id: int, territory_id: int, from_armies: int, to_armies: int) -> void:
+func _on_territory_conquered(player_id: int, territory_id: int, _from_armies: int, to_armies: int) -> void:
 	territory_owners[territory_id] = player_id
 	territory_armies[territory_id] = to_armies
 	_update_territory_label(territory_id)
@@ -273,7 +273,7 @@ func _on_attack_resolved(from_id: int, to_id: int, attacker_rolls: Array, defend
 	dice_popup.popup_centered()
 	_update_ui_state()
 
-func _on_armies_placed(player_id: int, territory_id: int, count: int, remaining: int) -> void:
+func _on_armies_placed(player_id: int, territory_id: int, count: int, _remaining: int) -> void:
 	territory_owners[territory_id] = player_id
 	territory_armies[territory_id] = territory_armies.get(territory_id, 0) + count
 	_update_territory_label(territory_id)
@@ -283,7 +283,7 @@ func _on_player_eliminated(player_id: int, by_player_id: int) -> void:
 	print("Jugador %d fue eliminado por Jugador %d" % [player_id, by_player_id])
 	_update_ui_state()
 
-func _on_phase_changed(player_id: int, new_phase: String) -> void:
+func _on_phase_changed(_player_id: int, new_phase: String) -> void:
 	current_phase = new_phase
 	_update_ui_state()
 
