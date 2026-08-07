@@ -485,13 +485,24 @@ impl OpenTableBridge {
         };
     }
 
-    #[func]
-    fn start_local_match_crisis(&mut self, seed: i64, players: VariantArray) -> bool {
-        let player_ids: Vec<PlayerId> = players
-            .iter_shared()
+fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
+    if let Ok(arr) = players.try_to::<Array<i64>>() {
+        arr.iter_shared().map(|p| PlayerId(p as u32)).collect()
+    } else if let Ok(arr) = players.try_to::<VariantArray>() {
+        arr.iter_shared()
             .filter_map(|p| p.try_to::<i64>().ok())
             .map(|p| PlayerId(p as u32))
-            .collect();
+            .collect()
+    } else if let Ok(arr) = players.try_to::<PackedInt64Array>() {
+        arr.as_slice().iter().map(|&p| PlayerId(p as u32)).collect()
+    } else {
+        Vec::new()
+    }
+}
+
+    #[func]
+    fn start_local_match_crisis(&mut self, seed: i64, players: Variant) -> bool {
+        let player_ids = parse_player_ids(&players);
         if player_ids.len() < 2 || player_ids.len() > 6 {
             return false;
         }
@@ -578,12 +589,8 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn start_tournament(&mut self, game_type: GString, players: VariantArray, rounds: i64) -> bool {
-        let p_vec: Vec<PlayerId> = players
-            .iter_shared()
-            .filter_map(|p| p.try_to::<i64>().ok())
-            .map(|p| PlayerId(p as u32))
-            .collect();
+    fn start_tournament(&mut self, game_type: GString, players: Variant, rounds: i64) -> bool {
+        let p_vec = parse_player_ids(&players);
         if p_vec.len() < 2 || rounds < 1 {
             return false;
         }

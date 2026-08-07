@@ -2,7 +2,9 @@ extends Node
 
 signal theme_changed(theme: BoardTheme)
 signal font_size_changed(tier: int)
+@warning_ignore("unused_signal")
 signal sfx_toggled(enabled: bool)
+@warning_ignore("unused_signal")
 signal animations_toggled(enabled: bool)
 
 var themes: Dictionary = {}
@@ -90,3 +92,11 @@ func get_theme() -> BoardTheme:
 		else:
 			_create_presets()
 	return current_theme
+
+func set_sfx_enabled(enabled: bool) -> void:
+	sfx_enabled = enabled
+	sfx_toggled.emit(sfx_enabled)
+
+func set_animations_enabled(enabled: bool) -> void:
+	animations_enabled = enabled
+	animations_toggled.emit(animations_enabled)
