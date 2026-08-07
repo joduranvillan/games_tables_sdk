@@ -2,6 +2,15 @@ extends Control
 
 var bridge: Node
 
+var idle_time: float = 0.0
+const ATTRACT_IDLE_LIMIT: float = 30.0
+var is_attract_mode: bool = false
+
+var demo_node: Node2D
+var demo_bridge: Node
+var demo_timer: Timer
+var demo_overlay: CanvasLayer
+
 const GAMES = [
 	{ "id": "checkers", "name": "Damas (Checkers)", "method": "start_local_match_checkers", "scene": "res://checkers_board.tscn", "color": Color(0.85, 0.25, 0.25) },
 	{ "id": "chess", "name": "Ajedrez (Chess)", "method": "start_local_match_chess", "scene": "res://chess_board.tscn", "color": Color(0.35, 0.35, 0.75) },
@@ -27,6 +36,109 @@ func _ready() -> void:
 
 	_setup_buttons()
 	_play_entry_animation()
+
+func _process(delta: float) -> void:
+	if not is_attract_mode:
+		idle_time += delta
+		if idle_time >= ATTRACT_IDLE_LIMIT:
+			_start_attract_mode()
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion or event is InputEventMouseButton or event is InputEventKey or event is InputEventScreenTouch:
+		idle_time = 0.0
+		if is_attract_mode:
+			_stop_attract_mode()
+			get_viewport().set_input_as_handled()
+
+func _start_attract_mode() -> void:
+	is_attract_mode = true
+
+	demo_node = Node2D.new()
+	demo_node.name = "AttractModeDemo"
+	demo_node.z_index = -1
+	demo_node.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(demo_node)
+
+	demo_bridge = OpenTableBridge.new()
+	demo_bridge.name = "AttractBridge"
+	demo_node.add_child(demo_bridge)
+
+	if demo_bridge.has_method("start_local_match_checkers_vs_ai"):
+		demo_bridge.call("start_local_match_checkers_vs_ai", 42, 1, 2)
+	elif demo_bridge.has_method("start_local_match"):
+		demo_bridge.call("start_local_match", 1, 2)
+
+	var checkers_scene = load("res://checkers_board.tscn")
+	if checkers_scene:
+		var checkers_inst = checkers_scene.instantiate()
+		checkers_inst.scale = Vector2(0.85, 0.85)
+		checkers_inst.position = Vector2(200, 40)
+		demo_node.add_child(checkers_inst)
+
+	# Grid container dimming
+	grid_container.modulate.a = 0.15
+	if has_node("Title"):
+		get_node("Title").modulate.a = 0.25
+
+	# Overlay Banner
+	demo_overlay = CanvasLayer.new()
+	demo_overlay.layer = 20
+	add_child(demo_overlay)
+
+	var banner = Panel.new()
+	banner.position = Vector2(100, 680)
+	banner.custom_minimum_size = Vector2(600, 50)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.15, 0.9)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	banner.add_theme_stylebox_override("normal", style)
+	demo_overlay.add_child(banner)
+
+	var lbl = Label.new()
+	lbl.text = "🎮 MODO DEMO — Haz click en cualquier parte para volver al menú"
+	lbl.position = Vector2(10, 10)
+	lbl.custom_minimum_size = Vector2(580, 30)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
+	banner.add_child(lbl)
+
+	# Timer for AI vs AI step
+	demo_timer = Timer.new()
+	demo_timer.wait_time = 0.8
+	demo_timer.autostart = true
+	demo_timer.timeout.connect(_on_demo_tick)
+	demo_node.add_child(demo_timer)
+
+	# Set scene process mode paused for background demo as requested
+	get_tree().paused = false
+
+func _on_demo_tick() -> void:
+	if not is_instance_valid(demo_bridge):
+		return
+	var cur_p = demo_bridge.current_player()
+	if cur_p > 0 and demo_bridge.has_method("checkers_ai_pick_move"):
+		var moved = demo_bridge.call("checkers_ai_pick_move", cur_p)
+		if not moved:
+			var next_p = 2 if cur_p == 1 else 1
+			demo_bridge.call("checkers_ai_pick_move", next_p)
+
+func _stop_attract_mode() -> void:
+	is_attract_mode = false
+	idle_time = 0.0
+
+	if is_instance_valid(demo_node):
+		demo_node.queue_free()
+	if is_instance_valid(demo_overlay):
+		demo_overlay.queue_free()
+
+	grid_container.modulate.a = 1.0
+	if has_node("Title"):
+		get_node("Title").modulate.a = 1.0
 
 func _generate_placeholder_icon(main_color: Color) -> Texture2D:
 	var img = Image.create(32, 32, false, Image.FORMAT_RGBA8)
@@ -71,6 +183,28 @@ func _setup_buttons() -> void:
 		btn.pressed.connect(_on_game_selected.bind(game))
 		grid_container.add_child(btn)
 		
+	# Tutorial TEG button
+	var tutorial_btn = Button.new()
+	tutorial_btn.text = "🎓 Tutorial TEG"
+	tutorial_btn.custom_minimum_size = Vector2(310, 52)
+	tutorial_btn.pivot_offset = Vector2(155, 26)
+	tutorial_btn.add_theme_font_size_override("font_size", 18)
+	tutorial_btn.mouse_entered.connect(func():
+		var tw = tutorial_btn.create_tween()
+		tw.tween_property(tutorial_btn, "scale", Vector2(1.05, 1.05), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	)
+	tutorial_btn.mouse_exited.connect(func():
+		var tw = tutorial_btn.create_tween()
+		tw.tween_property(tutorial_btn, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	)
+	tutorial_btn.pressed.connect(func():
+		if has_node("/root/SceneManager"):
+			get_node("/root/SceneManager").transition_to("res://crisis_tutorial.gd")
+		else:
+			get_tree().change_scene_to_file("res://crisis_tutorial.gd")
+	)
+	grid_container.add_child(tutorial_btn)
+
 	# Settings button
 	var settings_btn = Button.new()
 	settings_btn.text = "⚙️ " + tr("BTN_SETTINGS")
@@ -156,3 +290,4 @@ func _on_game_selected(game: Dictionary) -> void:
 		get_node("/root/SceneManager").transition_to(game["scene"])
 	else:
 		get_tree().change_scene_to_file(game["scene"])
+

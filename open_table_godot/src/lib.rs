@@ -1355,6 +1355,17 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn checkers_ai_pick_move(&mut self, player_id: i64) -> bool {
+        let p_id = PlayerId(player_id as u32);
+        if let BridgeMode::Local { session, .. } = &mut self.mode {
+            if let Some(cmd) = checkers_game::checkers_ai_pick_move(session, p_id) {
+                return self.process_and_emit(p_id, Box::new(cmd)).is_ok();
+            }
+        }
+        false
+    }
+
+    #[func]
     fn poll_events(&mut self) {
         match &mut self.mode {
             BridgeMode::Host { .. } => self.poll_host_events(),
