@@ -163,6 +163,7 @@ impl<R: bevy_ecs::system::Resource + Clone + 'static, F: Fn(&R) + Send + Sync + 
 }
 
 pub type CommandMiddleware = Box<dyn Fn(&CommandEnvelope, &mut BevyWorld) -> Result<(), EngineError> + Send + Sync + 'static>;
+pub type InitialSetupFn = std::sync::Arc<dyn Fn(&mut BevyWorld) + Send + Sync + 'static>;
 
 pub struct Session {
     pub id: SessionId,
@@ -171,7 +172,7 @@ pub struct Session {
     rules: RuleEngine,
     clock: GameClock,
     command_log: Vec<LoggedCommand>,
-    initial_setup: Option<std::sync::Arc<dyn Fn(&mut BevyWorld) + Send + Sync + 'static>>,
+    initial_setup: Option<InitialSetupFn>,
     paused: bool,
     watchers: Vec<Box<dyn ResourceWatcher + Send + Sync>>,
     middlewares: Vec<CommandMiddleware>,
