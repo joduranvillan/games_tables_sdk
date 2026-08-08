@@ -283,33 +283,27 @@ fn handle_connection(
     // Loop de lectura normal: de acá en más, todo lo que llegue por esta
     // conexión son CommandEnvelope reales del juego.
     let mut read_stream = read_stream;
-    loop {
-        match read_frame(&mut read_stream) {
-            Ok(bytes) => {
-                incoming
-                    .lock()
-                    .expect("lock de incoming envenenado")
-                    .push_back((player_id, bytes));
-            }
-            Err(_) => {
-                let mut conns = connections
-                    .lock()
-                    .expect("lock de connections envenenado");
-                if let Some((id, _)) = conns.get(&player_id) {
-                    if *id == conn_id {
-                        conns.remove(&player_id);
-                        disconnect_times
-                            .lock()
-                            .expect("lock de disconnect_times envenenado")
-                            .insert(player_id, Instant::now());
-                        events
-                            .lock()
-                            .expect("lock de connection_events envenenado")
-                            .push_back(ConnectionEvent::Disconnected { player: player_id });
-                    }
-                }
-                break;
-            }
+    while let Ok(bytes) = read_frame(&mut read_stream) {
+        incoming
+            .lock()
+            .expect("lock de incoming envenenado")
+            .push_back((player_id, bytes));
+    }
+
+    let mut conns = connections
+        .lock()
+        .expect("lock de connections envenenado");
+    if let Some((id, _)) = conns.get(&player_id) {
+        if *id == conn_id {
+            conns.remove(&player_id);
+            disconnect_times
+                .lock()
+                .expect("lock de disconnect_times envenenado")
+                .insert(player_id, Instant::now());
+            events
+                .lock()
+                .expect("lock de connection_events envenenado")
+                .push_back(ConnectionEvent::Disconnected { player: player_id });
         }
     }
 }

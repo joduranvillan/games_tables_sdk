@@ -7,7 +7,7 @@ pub fn is_legal_move(board: &BoardResource, from: (usize, usize), to: (usize, us
         _ => return false,
     };
     
-    if board.squares.get(&to).map(|p| p.owner) == Some(player) {
+    if board.squares.get(&to).is_some_and(|p| p.owner == player) {
         return false;
     }
 

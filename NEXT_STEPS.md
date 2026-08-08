@@ -4,11 +4,11 @@
 
 | Juego | Reglas Básicas | Reglas Completas | Tests Rust | Test Godot Headless | UI Godot |
 |---|:---:|:---:|:---:|:---:|:---:|
-| **Ajedrez** (`chess_game`) | ✅ | ⚠️ (sin enroque/al paso) | ✅ (100%) | ✅ (`chess_smoke.gd`) | ✅ |
-| **Damas** (`checkers_game`) | ✅ | ⚠️ (sin captura obligatoria) | ✅ (100%) | ✅ (`bridge_smoke.gd`) | ✅ |
-| **Go** (`go_game`) | ✅ | ⚠️ (sin regla de Ko) | ✅ (100%) | ✅ (`go_smoke.gd`) | ✅ |
-| **Shogi** (`shogi_game`) | ✅ | ⚠️ (falta Nifu/Uchifuzume) | ✅ (100%) | ✅ (`shogi_smoke.gd`) | ✅ |
-| **Xiangqi** (`xiangqi_game`) | ✅ | ⚠️ (falta General Volador) | ✅ (100%) | ✅ (`xiangqi_smoke.gd`) | ✅ |
+| **Ajedrez** (`chess_game`) | ✅ | ✅ (enroque, al paso, coronación) | ✅ (100%) | ✅ (`chess_smoke.gd`) | ✅ |
+| **Damas** (`checkers_game`) | ✅ | ✅ (captura obligatoria, multicaptura) | ✅ (100%) | ✅ (`bridge_smoke.gd`) | ✅ |
+| **Go** (`go_game`) | ✅ | ✅ (regla de Ko, libertades, pase) | ✅ (100%) | ✅ (`go_smoke.gd`) | ✅ |
+| **Shogi** (`shogi_game`) | ✅ | ✅ (promoción, drops, Nifu, Uchifuzume) | ✅ (100%) | ✅ (`shogi_smoke.gd`) | ✅ |
+| **Xiangqi** (`xiangqi_game`) | ✅ | ✅ (General Volador, palacio, río, cañón) | ✅ (100%) | ✅ (`xiangqi_smoke.gd`) | ✅ |
 | **Backgammon** (`backgammon_game`) | ✅ | ⚠️ (sin doubling cube) | ✅ (100%) | ✅ (`backgammon_smoke.gd`) | ✅ |
 | **Batalla Naval** (`battleship_game`) | ✅ | ⚠️ (tablero 8x8) | ✅ (100%) | ✅ (`battleship_smoke.gd`) | ✅ |
 | **Ludo** (`ludo_game`) | ✅ | ⚠️ (24 casillas) | ✅ (100%) | ✅ (`ludo_smoke.gd`) | ✅ |
@@ -41,7 +41,7 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
 
 ## 4. Próximas Prioridades (por orden de ejecución)
 
-1. **Completar Reglas Avanzadas de Shogi (`shogi_game`)**: Implementar validación de Nifu (dos peones sin promover en la misma columna) y Uchifuzume (jaque mate al rey mediante el reingreso de un peón).
+1. **Implementar Doubling Cube en Backgammon (`backgammon_game`)**: Agregar la mecánica del dado de doblar para incrementar la apuesta de puntos en partidas competitivas de Backgammon.
 2. **Tests Headless de Red para Godot**: Crear scripts de prueba headless que ejerzan el flujo de reconexión TCP y simulación de desconexión bajo pérdida de paquetes.
 3. **UI Móvil Adaptativa**: Ajustes responsivos para pantallas de smartphones y soporte de gestos táctiles en `godot_project/`.
 

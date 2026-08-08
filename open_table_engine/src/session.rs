@@ -467,7 +467,7 @@ impl Session {
             return Err(EngineError::SessionPaused);
         }
 
-        if self.world.get_resource::<GameOverResource>().map_or(false, |r| r.0) {
+        if self.world.get_resource::<GameOverResource>().is_some_and(|r| r.0) {
             return Err(EngineError::GameAlreadyOver);
         }
 

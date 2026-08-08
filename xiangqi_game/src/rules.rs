@@ -86,14 +86,10 @@ pub fn build_xiangqi_rules() -> RuleEngine {
                             if board.squares.contains_key(&(cmd.from.0, y)) { count += 1; }
                         }
                     }
-                    if !target_has_piece {
-                        if count > 0 {
-                            return Err(EngineError::InvalidCommand { reason: "Cannon cannot jump when not capturing".into() });
-                        }
-                    } else {
-                        if count != 1 {
-                            return Err(EngineError::InvalidCommand { reason: "Cannon capture requires exactly one platform piece".into() });
-                        }
+                    if !target_has_piece && count > 0 {
+                        return Err(EngineError::InvalidCommand { reason: "Cannon cannot jump when not capturing".into() });
+                    } else if target_has_piece && count != 1 {
+                        return Err(EngineError::InvalidCommand { reason: "Cannon capture requires exactly one platform piece".into() });
                     }
                 } else if piece.owner == cmd.player && piece.kind == crate::board::PieceKind::Advisor {
                     let is_red = piece.owner == board.red;
@@ -102,10 +98,7 @@ pub fn build_xiangqi_rules() -> RuleEngine {
                     if dx != 1 || dy != 1 {
                         return Err(EngineError::InvalidCommand { reason: "Advisor must move diagonally one step".into() });
                     }
-                    if cmd.to.0 < 3 || cmd.to.0 > 5 {
-                        return Err(EngineError::InvalidCommand { reason: "Advisor must stay within the palace".into() });
-                    }
-                    if (is_red && (cmd.to.1 < 7 || cmd.to.1 > 9)) || (!is_red && cmd.to.1 > 2) {
+                    if cmd.to.0 < 3 || cmd.to.0 > 5 || (is_red && (cmd.to.1 < 7 || cmd.to.1 > 9)) || (!is_red && cmd.to.1 > 2) {
                         return Err(EngineError::InvalidCommand { reason: "Advisor must stay within the palace".into() });
                     }
                 }
