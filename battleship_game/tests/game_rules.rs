@@ -351,4 +351,30 @@ fn test_barco_fuera_de_los_limites_es_rechazado() {
     );
 }
 
+#[test]
+fn test_drop_cleanup_no_afecta_estado() {
+    let mut session = new_battleship_session(SessionId(13), 1, P1, P2);
+    place_fleet(&mut session, P1, standard_fleet(0));
+    place_fleet(&mut session, P2, standard_fleet(0));
+
+    let events = session
+        .process_command(
+            P1,
+            Box::new(FireShotCommand {
+                player: P1,
+                target: pos(0, 0),
+            }),
+        )
+        .expect("el disparo de P1 debe ser procesado correctamente");
+
+    assert_eq!(events.len(), 1);
+    let shot = events[0].as_any().downcast_ref::<ShotResultEvent>().unwrap();
+    assert_eq!(shot.result, ShotResult::Hit);
+
+    let fleet = session.world().resource::<FleetResource>();
+    assert!(fleet.has_placed_fleet(P1));
+    assert!(fleet.has_placed_fleet(P2));
+    assert_eq!(fleet.hits.get(&P2), Some(&vec![pos(0, 0)]));
+}
+
 

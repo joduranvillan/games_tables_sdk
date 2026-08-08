@@ -143,7 +143,6 @@ pub fn build_battleship_rules() -> RuleEngine {
             }));
         }
 
-        drop(fleet);
         world.resource_mut::<TurnResource>().0.advance();
 
         Ok(events)
@@ -164,16 +163,13 @@ pub fn build_battleship_rules() -> RuleEngine {
             let mut fleet = world.resource_mut::<FleetResource>();
             fleet.ships.clear();
             fleet.hits.clear();
-            drop(fleet);
 
             let mut shots = world.resource_mut::<ShotsResource>();
             shots.shots.clear();
-            drop(shots);
 
             let mut turn = world.resource_mut::<TurnResource>();
             let players = turn.0.players().to_vec();
             turn.0 = TurnOrder::new(players);
-            drop(turn);
 
             if let Some(mut rng) = world.get_resource_mut::<RandomResource>() {
                 let next_seed = rng.0.next_u32() as u64;
