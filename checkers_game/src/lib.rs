@@ -13,6 +13,7 @@ pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod events;
+pub mod legal_moves;
 pub mod piece;
 pub mod position;
 pub mod rules;
@@ -21,9 +22,10 @@ pub use ai::checkers_ai_pick_move;
 pub use board::{initial_board, BoardResource, MultiCaptureResource, Sides};
 pub use commands::{MovePieceCommand, ResignCommand};
 pub use events::{GameOverEvent, PieceMovedEvent};
+pub use legal_moves::CheckersLegalMoveGenerator;
 pub use piece::Piece;
 pub use position::Position;
-pub use rules::{build_checkers_rules, CheckersLegalMoveGenerator};
+pub use rules::build_checkers_rules;
 
 use open_table_engine::prelude::*;
 
@@ -43,7 +45,7 @@ pub fn new_checkers_session(session_id: SessionId, seed: u64, player_top: Player
         world.insert_resource(board);
         world.insert_resource(sides);
         world.insert_resource(MultiCaptureResource::default());
-        world.insert_resource(LegalMoveGeneratorResource(Box::new(CheckersLegalMoveGenerator)));
+        world.insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(CheckersLegalMoveGenerator)));
     };
     setup(session.world_mut());
     session.set_initial_setup(setup);

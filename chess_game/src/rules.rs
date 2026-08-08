@@ -61,6 +61,7 @@ fn is_insufficient_material(board: &BoardResource) -> bool {
 
 pub fn build_chess_rules() -> RuleEngine {
     let mut rules = RuleEngine::new();
+    rules.set_legal_move_generator(Box::new(crate::legal_moves::ChessLegalMoveGenerator));
 
     rules.register::<MovePieceCommand, _>(|cmd, world| {
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {

@@ -9,6 +9,7 @@ pub mod board;
 pub mod commands;
 pub mod events;
 pub mod fen;
+pub mod legal_moves;
 pub mod pgn;
 pub mod position;
 pub mod rules;
@@ -17,6 +18,7 @@ pub use board::{has_any_legal_move, is_in_check, is_legal_move, piece_moves, Boa
 pub use commands::{AcceptDrawCommand, MovePieceCommand, OfferDrawCommand, ResignCommand};
 pub use events::{GameOverEvent, PieceMovedEvent};
 pub use fen::{from_fen, load_chess_position_from_fen, parse_fen_with_player};
+pub use legal_moves::ChessLegalMoveGenerator;
 pub use pgn::export_to_pgn;
 pub use position::{Piece, PieceKind, Position};
 pub use rules::build_chess_rules;
@@ -44,5 +46,8 @@ pub fn new_chess_session(session_id: SessionId, seed: u64, white: PlayerId, blac
     let mut history = PositionHistoryResource::default();
     history.history.insert(initial_hash, 1);
     session.world_mut().insert_resource(history);
+    session
+        .world_mut()
+        .insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(ChessLegalMoveGenerator)));
     session
 }

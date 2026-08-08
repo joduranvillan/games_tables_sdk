@@ -10,9 +10,12 @@
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use bevy_ecs::world::World as BevyWorld;
 use open_table_core::prelude::*;
+
+use crate::session::LegalMoveGenerator;
 
 /// Firma de un handler de regla: recibe el comando ya downcasteado (vía
 /// `Any`) y el `World` de bevy_ecs, devuelve los eventos resultantes o un
@@ -22,11 +25,20 @@ type RuleFn = Box<dyn Fn(&dyn Any, &mut BevyWorld) -> EngineResult<Vec<Box<dyn E
 #[derive(Default)]
 pub struct RuleEngine {
     handlers: HashMap<TypeId, RuleFn>,
+    legal_move_generator: Option<Arc<dyn LegalMoveGenerator>>,
 }
 
 impl RuleEngine {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn set_legal_move_generator(&mut self, generator: Box<dyn LegalMoveGenerator>) {
+        self.legal_move_generator = Some(Arc::from(generator));
+    }
+
+    pub fn legal_move_generator(&self) -> Option<&Arc<dyn LegalMoveGenerator>> {
+        self.legal_move_generator.as_ref()
     }
 
     /// Registra la regla para un tipo de comando concreto. `C` es

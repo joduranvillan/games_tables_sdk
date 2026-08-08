@@ -166,11 +166,16 @@ pub type CommandMiddleware = Box<dyn Fn(&CommandEnvelope, &mut BevyWorld) -> Res
 pub type InitialSetupFn = std::sync::Arc<dyn Fn(&mut BevyWorld) + Send + Sync + 'static>;
 
 pub trait LegalMoveGenerator: Send + Sync + 'static {
-    fn generate_candidates(&self, world: &BevyWorld, player: PlayerId) -> Vec<Box<dyn Command>>;
+    fn generate_candidates(&self, world: &BevyWorld, player: PlayerId) -> Vec<Box<dyn Command>> {
+        self.generate(world, player)
+    }
+    fn generate(&self, _world: &BevyWorld, _player: PlayerId) -> Vec<Box<dyn Command>> {
+        vec![]
+    }
 }
 
-#[derive(bevy_ecs::system::Resource)]
-pub struct LegalMoveGeneratorResource(pub Box<dyn LegalMoveGenerator>);
+#[derive(bevy_ecs::system::Resource, Clone)]
+pub struct LegalMoveGeneratorResource(pub std::sync::Arc<dyn LegalMoveGenerator>);
 
 pub struct Session {
     pub id: SessionId,

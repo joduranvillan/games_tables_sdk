@@ -17,6 +17,17 @@ fn mv(session: &mut Session, player: PlayerId, from: Position, to: Position) -> 
 }
 
 #[test]
+fn test_legal_moves_posicion_inicial_tiene_20_jugadas() {
+    let session = new_chess_session(SessionId(1), 1, WHITE, BLACK);
+    let legal_moves = session.get_legal_moves(WHITE);
+    assert_eq!(
+        legal_moves.len(),
+        20,
+        "En la posición inicial, las blancas deben tener exactamente 20 movimientos legales"
+    );
+}
+
+#[test]
 fn el_setup_inicial_tiene_16_piezas_por_jugador() {
     let session = new_chess_session(SessionId(1), 1, WHITE, BLACK);
     let board = session.world().resource::<BoardResource>();
