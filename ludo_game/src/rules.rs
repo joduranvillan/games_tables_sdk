@@ -120,7 +120,6 @@ pub fn build_ludo_rules() -> RuleEngine {
         tokens.tokens.get_mut(&cmd.player).unwrap()[cmd.token_index] = new_steps;
         let finished = new_steps == MAX_STEPS;
         let all_finished = tokens.all_finished(cmd.player);
-        drop(tokens);
 
         let mut events: Vec<Box<dyn Event>> = vec![Box::new(TokenMovedEvent {
             player: cmd.player,

@@ -946,24 +946,26 @@ impl Session {
 /// según `Visibility`. Se usa tanto para el broadcast normal (host filtra
 /// antes de mandar por `Transport`) como para el resync de un cliente
 /// reconectado (filtra el resultado de `replay_collecting_events`).
-pub fn filter_events_for_player(
-    events: &[Box<dyn Event>],
+pub fn filter_events_for_player<'a>(
+    events: &'a [Box<dyn Event>],
     player: PlayerId,
-) -> Vec<&Box<dyn Event>> {
+) -> Vec<&'a dyn Event> {
     events
         .iter()
+        .map(|event| event.as_ref())
         .filter(|event| event.visibility().includes(player))
         .collect()
 }
 
 /// Filtra una lista de eventos a los que un espectador específico puede ver,
 /// según `Visibility`.
-pub fn filter_events_for_spectator(
-    events: &[Box<dyn Event>],
+pub fn filter_events_for_spectator<'a>(
+    events: &'a [Box<dyn Event>],
     spectator: SpectatorId,
-) -> Vec<&Box<dyn Event>> {
+) -> Vec<&'a dyn Event> {
     events
         .iter()
+        .map(|event| event.as_ref())
         .filter(|event| event.visibility().includes_spectator(spectator))
         .collect()
 }

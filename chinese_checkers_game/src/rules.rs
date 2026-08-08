@@ -100,7 +100,6 @@ pub fn build_chinese_checkers_rules() -> RuleEngine {
         board.pegs.insert(cmd.to, cmd.player);
 
         let won = board.has_won(cmd.player);
-        drop(board);
 
         let mut events: Vec<Box<dyn Event>> = vec![Box::new(PegMovedEvent {
             player: cmd.player,
