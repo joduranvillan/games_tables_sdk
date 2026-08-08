@@ -165,6 +165,13 @@ impl<R: bevy_ecs::system::Resource + Clone + 'static, F: Fn(&R) + Send + Sync + 
 pub type CommandMiddleware = Box<dyn Fn(&CommandEnvelope, &mut BevyWorld) -> Result<(), EngineError> + Send + Sync + 'static>;
 pub type InitialSetupFn = std::sync::Arc<dyn Fn(&mut BevyWorld) + Send + Sync + 'static>;
 
+pub trait LegalMoveGenerator: Send + Sync + 'static {
+    fn generate_candidates(&self, world: &BevyWorld, player: PlayerId) -> Vec<Box<dyn Command>>;
+}
+
+#[derive(bevy_ecs::system::Resource)]
+pub struct LegalMoveGeneratorResource(pub Box<dyn LegalMoveGenerator>);
+
 pub struct Session {
     pub id: SessionId,
     pub mode: SessionMode,
@@ -450,6 +457,27 @@ impl Session {
 
     pub fn current_player(&self) -> PlayerId {
         self.world.resource::<TurnResource>().0.current_player()
+    }
+
+    pub fn get_legal_moves(&self, player: PlayerId) -> Vec<serde_json::Value> {
+        let generator = match self.world.get_resource::<LegalMoveGeneratorResource>() {
+            Some(g) => g,
+            None => return vec![],
+        };
+
+        let candidates = generator.0.generate_candidates(&self.world, player);
+        let mut legal_moves = Vec::new();
+
+        for cmd in candidates {
+            let mut test_world = self.world.clone();
+            if self.rules.dispatch(cmd.as_ref(), &mut test_world).is_ok() {
+                if let Ok(val) = serde_json::to_value(&cmd) {
+                    legal_moves.push(val);
+                }
+            }
+        }
+
+        legal_moves
     }
 
     /// Único punto de entrada para mutar el estado de la partida.

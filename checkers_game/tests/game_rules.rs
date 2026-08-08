@@ -13,6 +13,17 @@ fn move_cmd(player: PlayerId, from: Position, to: Position) -> Box<dyn Command> 
 }
 
 #[test]
+fn test_get_legal_moves_devuelve_solo_movimientos_validos() {
+    let session = new_checkers_session(SessionId(1), 42, P1, P2);
+    let legal_moves = session.get_legal_moves(P1);
+    assert_eq!(
+        legal_moves.len(),
+        7,
+        "En la posición inicial, P1 debe tener exactamente 7 movimientos válidos"
+    );
+}
+
+#[test]
 fn test_undo_revierte_el_estado_al_tick_anterior() {
     let mut session = new_checkers_session(SessionId(100), 1, P1, P2);
 

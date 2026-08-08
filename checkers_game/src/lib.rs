@@ -23,7 +23,7 @@ pub use commands::{MovePieceCommand, ResignCommand};
 pub use events::{GameOverEvent, PieceMovedEvent};
 pub use piece::Piece;
 pub use position::Position;
-pub use rules::build_checkers_rules;
+pub use rules::{build_checkers_rules, CheckersLegalMoveGenerator};
 
 use open_table_engine::prelude::*;
 
@@ -43,6 +43,7 @@ pub fn new_checkers_session(session_id: SessionId, seed: u64, player_top: Player
         world.insert_resource(board);
         world.insert_resource(sides);
         world.insert_resource(MultiCaptureResource::default());
+        world.insert_resource(LegalMoveGeneratorResource(Box::new(CheckersLegalMoveGenerator)));
     };
     setup(session.world_mut());
     session.set_initial_setup(setup);

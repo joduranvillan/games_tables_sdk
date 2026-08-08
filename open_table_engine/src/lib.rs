@@ -14,8 +14,9 @@ pub mod prelude {
     pub use crate::session::{
         filter_events_for_player, filter_events_for_spectator, CommandMiddleware,
         EventHandlersResource, ForfeitEvent, GameOverResource, GameVariantResource,
-        RandomResource, RateLimitResource, ReconnectionTimeoutResource, Session,
-        SessionMetadata, SessionMetadataResource, SessionMode, TimerResource, WinnerResource,
+        LegalMoveGenerator, LegalMoveGeneratorResource, RandomResource, RateLimitResource,
+        ReconnectionTimeoutResource, Session, SessionMetadata, SessionMetadataResource,
+        SessionMode, TimerResource, WinnerResource,
     };
     pub use crate::turn::{TurnOrder, TurnResource};
     pub use crate::{advance_turn, force_turn};
