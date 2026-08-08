@@ -9,7 +9,7 @@ fn pos(row: u8, col: u8) -> Position {
     Position::new(row, col)
 }
 
-fn clone_event_for_wire(event: &Box<dyn Event>) -> Box<dyn Event> {
+fn clone_event_for_wire(event: &dyn Event) -> Box<dyn Event> {
     let bytes = serde_json::to_vec(event).expect("serialize event");
     serde_json::from_slice(&bytes).expect("deserialize event")
 }
@@ -99,7 +99,7 @@ async fn test_red_caos_desconexiones_aleatorias_y_resync() {
             for evt in &events_for_alice {
                 let bytes = serde_json::to_vec(&EventEnvelope {
                     tick: host_session.current_tick(),
-                    payload: clone_event_for_wire(evt),
+                    payload: clone_event_for_wire(*evt),
                 })
                 .expect("serialize event envelope");
                 host_transport.send(alice, &bytes).expect("send resync");

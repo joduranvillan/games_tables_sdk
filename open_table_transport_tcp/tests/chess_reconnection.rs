@@ -48,7 +48,7 @@ fn wait_until<T>(mut check: impl FnMut() -> Option<T>, timeout: Duration) -> Opt
     }
 }
 
-fn clone_event_for_wire(event: &Box<dyn Event>) -> Box<dyn Event> {
+fn clone_event_for_wire(event: &dyn Event) -> Box<dyn Event> {
     let bytes = serde_json::to_vec(event).expect("serialize event");
     serde_json::from_slice(&bytes).expect("deserialize event")
 }
@@ -146,7 +146,7 @@ fn chess_reconnection_resync_delivers_piece_moved_event() {
     for event in &events_for_white {
         let bytes = serde_json::to_vec(&EventEnvelope {
             tick: host_session.current_tick(),
-            payload: clone_event_for_wire(event),
+            payload: clone_event_for_wire(*event),
         })
         .expect("serialize event envelope");
         host_transport

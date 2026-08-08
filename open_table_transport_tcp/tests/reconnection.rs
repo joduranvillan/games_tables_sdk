@@ -232,7 +232,7 @@ fn reconexion_real_dispara_resync_filtrado_por_visibilidad() {
     for event in &events_for_alice {
         let bytes = serde_json::to_vec(&EventEnvelope {
             tick: host_session.current_tick(),
-            payload: clone_event_for_wire(event),
+            payload: clone_event_for_wire(*event),
         })
         .unwrap();
         host_transport.send(alice, &bytes).expect("manda el resync a Alice");
@@ -263,7 +263,7 @@ fn reconexion_real_dispara_resync_filtrado_por_visibilidad() {
 /// ya existente en un `EventEnvelope` nuevo lo hacemos ida y vuelta por
 /// JSON. Es exactamente lo mismo que ya se hace al mandarlo por red, así
 /// que no es un costo extra en la práctica.
-fn clone_event_for_wire(event: &Box<dyn Event>) -> Box<dyn Event> {
+fn clone_event_for_wire(event: &dyn Event) -> Box<dyn Event> {
     let bytes = serde_json::to_vec(event).expect("serializa el evento");
     serde_json::from_slice(&bytes).expect("deserializa el evento")
 }
