@@ -478,11 +478,7 @@ impl Session {
     pub fn get_legal_moves(&self, player: PlayerId) -> Vec<serde_json::Value> {
         let generator = if let Some(g) = self.world.get_resource::<LegalMoveGeneratorResource>() {
             Some(g.0.clone())
-        } else if let Some(g) = self.rules.legal_move_generator() {
-            Some(g.clone())
-        } else {
-            None
-        };
+        } else { self.rules.legal_move_generator().map(|g| g.clone()) };
 
         let Some(generator) = generator else {
             return vec![];
@@ -995,10 +991,10 @@ impl Session {
 /// según `Visibility`. Se usa tanto para el broadcast normal (host filtra
 /// antes de mandar por `Transport`) como para el resync de un cliente
 /// reconectado (filtra el resultado de `replay_collecting_events`).
-pub fn filter_events_for_player<'a>(
-    events: &'a [Box<dyn Event>],
+pub fn filter_events_for_player(
+    events: &[Box<dyn Event>],
     player: PlayerId,
-) -> Vec<&'a dyn Event> {
+) -> Vec<&dyn Event> {
     events
         .iter()
         .map(|event| event.as_ref())
@@ -1008,10 +1004,10 @@ pub fn filter_events_for_player<'a>(
 
 /// Filtra una lista de eventos a los que un espectador específico puede ver,
 /// según `Visibility`.
-pub fn filter_events_for_spectator<'a>(
-    events: &'a [Box<dyn Event>],
+pub fn filter_events_for_spectator(
+    events: &[Box<dyn Event>],
     spectator: SpectatorId,
-) -> Vec<&'a dyn Event> {
+) -> Vec<&dyn Event> {
     events
         .iter()
         .map(|event| event.as_ref())
