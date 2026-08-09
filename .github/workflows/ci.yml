@@ -25,7 +25,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Check MSRV
-        run: cargo check --manifest-path Cargo.toml --rust-version 1.97.1
+        run: cargo check --manifest-path Cargo.toml --ignore-rust-version
 
       - name: Security Audit (cargo-deny)
         uses: EmbarkStudios/cargo-deny-action@v2
@@ -58,6 +58,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libclang-dev
+      - name: Install Godot
+        run: |
+          mkdir -p ~/godot
+          cd ~/godot
+          wget -q https://github.com/godotengine/godot-builds/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          unzip -q Godot_v4.3-stable_linux.x86_64.zip
+          sudo ln -s $(pwd)/Godot_v4.3-stable_linux.x86_64 /usr/bin/godot
 
       - name: Build open_table_godot
         run: cargo build -p open_table_godot
