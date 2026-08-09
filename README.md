@@ -44,6 +44,10 @@ cómo correr el demo, en `godot_project/README.md`.
 **Todavía NO verificado** (`platform_plugins/android`, `platform_plugins/ios`):
 falta compilarlos con Android Studio / Xcode.
 
+## Quick Start / Guía de Integración
+
+Para integrar OpenTable SDK en un proyecto externo de Rust o en Godot Engine, consulta la **[`Guía de Integración`](./docs/integration_guide.md)** con ejemplos completos de código para Rust y GDScript.
+
 ## Cómo correr los tests de cualquier juego
 
 ```bash
