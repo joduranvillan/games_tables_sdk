@@ -68,6 +68,8 @@ jobs:
 
       - name: Build open_table_godot
         run: cargo build -p open_table_godot
+        env: 
+          GODOT_BIN: /usr/bin/godot
 
       - name: Verify .so artifact output
         run: |
