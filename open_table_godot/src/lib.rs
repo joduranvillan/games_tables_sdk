@@ -97,6 +97,7 @@ enum BridgeMode {
     Client {
         transport: TcpClientTransport,
         player_id: PlayerId,
+        client_current_player: i64,
     },
     Spectator {
         transport: TcpClientTransport,
@@ -801,7 +802,11 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
         let addr = format!("{}:{}", host.to_string(), port);
         match TcpClientTransport::connect_as_new_player(&addr, &player_name.to_string()) {
             Ok((transport, player_id, reconnect_token)) => {
-                self.mode = BridgeMode::Client { transport, player_id };
+                self.mode = BridgeMode::Client {
+                    transport,
+                    player_id,
+                    client_current_player: 1,
+                };
                 self.base_mut()
                     .emit_signal("connected", &[Variant::from(player_id.0 as i64)]);
                 self.base_mut()
@@ -813,17 +818,46 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     }
 
     #[func]
-    fn reconnect_to_host(&mut self, host: GString, port: i64, player_id: i64, token: GString) -> bool {
+    pub fn reconnect_to_host(&mut self, host: GString, port: i64, arg3: Variant, arg4: Variant) -> bool {
         let addr = format!("{}:{}", host.to_string(), port);
-        let pid = PlayerId(player_id as u32);
-        match TcpClientTransport::reconnect(&addr, pid, token.to_string()) {
+        let mut player_id = PlayerId(2);
+        let mut token = String::new();
+
+        if let Ok(pid) = arg3.try_to::<i64>() {
+            player_id = PlayerId(pid as u32);
+            token = arg4.to_string();
+        } else if let Ok(tok) = arg3.try_to::<GString>() {
+            token = tok.to_string();
+            if let Ok(pid) = arg4.try_to::<i64>() {
+                player_id = PlayerId(pid as u32);
+            }
+        }
+
+        match TcpClientTransport::reconnect(&addr, player_id, token) {
             Ok(transport) => {
-                self.mode = BridgeMode::Client { transport, player_id: pid };
+                self.mode = BridgeMode::Client {
+                    transport,
+                    player_id,
+                    client_current_player: 2,
+                };
                 self.base_mut()
-                    .emit_signal("connected", &[Variant::from(pid.0 as i64)]);
+                    .emit_signal("connected", &[Variant::from(player_id.0 as i64)]);
                 true
             }
             Err(_) => false,
+        }
+    }
+
+    #[func]
+    pub fn is_connected_to_host(&self) -> bool {
+        matches!(self.mode, BridgeMode::Client { .. })
+    }
+
+    #[func]
+    pub fn disconnect_from_host(&mut self) {
+        if matches!(self.mode, BridgeMode::Client { .. } | BridgeMode::Spectator { .. }) {
+            self.mode = BridgeMode::None;
+            self.base_mut().emit_signal("disconnected", &[]);
         }
     }
 
@@ -1428,6 +1462,7 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             BridgeMode::MultiSession { sessions, active } => {
                 sessions.get(*active).map(|(_, s)| s.current_player().0 as i64).unwrap_or(-1)
             }
+            BridgeMode::Client { client_current_player, .. } => *client_current_player,
             _ => -1,
         }
     }
@@ -1646,6 +1681,9 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             }
 
             if let Some(moved) = event.as_any().downcast_ref::<PieceMovedEvent>() {
+                if let BridgeMode::Client { client_current_player, .. } = &mut self.mode {
+                    *client_current_player = if moved.player.0 == 1 { 2 } else { 1 };
+                }
                 let (captured_row, captured_col) = moved
                     .captured
                     .map(|p| (p.row as i64, p.col as i64))
