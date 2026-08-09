@@ -16,3 +16,10 @@ pub struct DrawCardCommand {
     #[issuer]
     pub player: PlayerId,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+pub struct InterceptCommand {
+    #[issuer]
+    pub player: PlayerId,
+    pub card_index: usize,
+}

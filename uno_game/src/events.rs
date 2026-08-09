@@ -35,3 +35,9 @@ pub struct DrewAndPlayedEvent {
     pub card: Card,
     pub new_color: CardColor,
 }
+
+#[derive(Debug, Serialize, Deserialize, GameEvent)]
+pub struct InterceptedEvent {
+    pub player: PlayerId,
+    pub card: Card,
+}

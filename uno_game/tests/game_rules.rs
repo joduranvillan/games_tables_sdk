@@ -1,5 +1,8 @@
 use open_table_engine::prelude::*;
-use uno_game::{new_uno_session, PlayCardCommand, DrawCardCommand, CardColor, CardValue, Card, UnoState, DrewAndPlayedEvent};
+use uno_game::{
+    new_uno_session, Card, CardColor, CardValue, DrawCardCommand, DrewAndPlayedEvent, InterceptCommand,
+    InterceptedEvent, PlayCardCommand, UnoState,
+};
 
 const P1: PlayerId = PlayerId(1);
 const P2: PlayerId = PlayerId(2);
@@ -232,5 +235,72 @@ fn test_mazo_y_descarte_agotados_no_produce_panic() {
 
     let result = session.process_command(P1, Box::new(DrawCardCommand { player: P1 }));
     assert!(result.is_ok(), "robar cuando el mazo y el descarte están agotados no debe producir panic");
+}
+
+#[test]
+fn test_intercepcion_valida_con_carta_identica() {
+    let mut session = new_uno_session(SessionId(30), 0, vec![P1, P2, P3]);
+
+    {
+        let mut state = session.world_mut().resource_mut::<UnoState>();
+        state.active_color = CardColor::Red;
+        state.discard_pile.push(Card::new(CardColor::Red, CardValue::Number(7)));
+
+        let hand_p3 = state.hands.get_mut(&P3).unwrap();
+        hand_p3.clear();
+        hand_p3.push(Card::new(CardColor::Red, CardValue::Number(7)));
+        hand_p3.push(Card::new(CardColor::Blue, CardValue::Number(1)));
+    }
+
+    // It is P1's turn, but P3 intercepts out of order with identical card (Red 7)
+    assert_eq!(session.current_player(), P1);
+
+    let events = session
+        .process_command(
+            P3,
+            Box::new(InterceptCommand {
+                player: P3,
+                card_index: 0,
+            }),
+        )
+        .unwrap();
+
+    let intercepted = events.iter().any(|e| e.as_any().is::<InterceptedEvent>());
+    assert!(intercepted, "InterceptedEvent debe ser emitido tras intercepción válida");
+
+    // After P3 intercepts with regular card (Red 7), turn continues from P3 in normal direction -> P1
+    assert_eq!(session.current_player(), P1);
+
+    let state = session.world().resource::<UnoState>();
+    assert_eq!(state.hands.get(&P3).unwrap().len(), 1);
+    assert_eq!(state.discard_pile.last(), Some(&Card::new(CardColor::Red, CardValue::Number(7))));
+}
+
+#[test]
+fn test_intercepcion_invalida_con_carta_similar_pero_diferente_color() {
+    let mut session = new_uno_session(SessionId(31), 0, vec![P1, P2, P3]);
+
+    {
+        let mut state = session.world_mut().resource_mut::<UnoState>();
+        state.active_color = CardColor::Red;
+        state.discard_pile.push(Card::new(CardColor::Red, CardValue::Number(7)));
+
+        let hand_p3 = state.hands.get_mut(&P3).unwrap();
+        hand_p3.clear();
+        hand_p3.push(Card::new(CardColor::Blue, CardValue::Number(7))); // Similar value, different color
+    }
+
+    let result = session.process_command(
+        P3,
+        Box::new(InterceptCommand {
+            player: P3,
+            card_index: 0,
+        }),
+    );
+
+    assert!(
+        matches!(result, Err(EngineError::InvalidCommand { .. })),
+        "Intercepción con carta de distinto color debe ser rechazada"
+    );
 }
 

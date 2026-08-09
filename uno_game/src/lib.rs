@@ -6,8 +6,8 @@ pub mod rules;
 use open_table_engine::prelude::*;
 
 pub use board::{UnoState, Card, CardColor, CardValue};
-pub use commands::{PlayCardCommand, DrawCardCommand};
-pub use events::{CardPlayedEvent, CardsDrawnEvent, TurnReversedEvent, PlayerSkippedEvent, GameOverEvent, DrewAndPlayedEvent};
+pub use commands::{PlayCardCommand, DrawCardCommand, InterceptCommand};
+pub use events::{CardPlayedEvent, CardsDrawnEvent, TurnReversedEvent, PlayerSkippedEvent, GameOverEvent, DrewAndPlayedEvent, InterceptedEvent};
 pub use rules::build_uno_rules;
 
 pub fn new_uno_session(session_id: SessionId, seed: u64, players: Vec<PlayerId>) -> Session {
