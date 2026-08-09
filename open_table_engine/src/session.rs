@@ -478,7 +478,7 @@ impl Session {
     pub fn get_legal_moves(&self, player: PlayerId) -> Vec<serde_json::Value> {
         let generator = if let Some(g) = self.world.get_resource::<LegalMoveGeneratorResource>() {
             Some(g.0.clone())
-        } else { self.rules.legal_move_generator().map(|g| g.clone()) };
+        } else { self.rules.legal_move_generator().cloned() };
 
         let Some(generator) = generator else {
             return vec![];
