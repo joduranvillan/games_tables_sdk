@@ -191,6 +191,17 @@ pub struct Session {
 }
 
 impl Session {
+    /// Calcula los deltas de ELO a aplicar externamente tras una victoria.
+    /// Devuelve (delta_winner, delta_loser).
+    pub fn compute_elo_delta(_winner: PlayerId, _loser: PlayerId, k: f64) -> (f64, f64) {
+        let (new_w, new_l) = crate::elo::update_elo(
+            crate::elo::EloRating(1200.0),
+            crate::elo::EloRating(1200.0),
+            k,
+        );
+        (new_w.0 - 1200.0, new_l.0 - 1200.0)
+    }
+
     pub fn new(id: SessionId, seed: u64, players: Vec<PlayerId>, rules: RuleEngine) -> Self {
         Self::new_with_details(id, "Unknown", GameVariant::Standard, seed, players, rules)
     }

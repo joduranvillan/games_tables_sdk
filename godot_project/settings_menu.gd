@@ -259,16 +259,17 @@ func _find_active_bridge() -> Object:
 
 func _setup_stats_tab(parent: VBoxContainer) -> void:
 	var lbl = Label.new()
-	lbl.text = "Estadísticas de Victorias y Derrotas"
+	lbl.text = "Estadísticas de Victorias, Derrotas y ELO"
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	parent.add_child(lbl)
 
 	var stats_tree = Tree.new()
-	stats_tree.columns = 4
+	stats_tree.columns = 5
 	stats_tree.set_column_title(0, "Jugador")
 	stats_tree.set_column_title(1, "Juego")
 	stats_tree.set_column_title(2, "Victorias")
 	stats_tree.set_column_title(3, "Derrotas")
+	stats_tree.set_column_title(4, "ELO")
 	stats_tree.column_titles_visible = true
 	stats_tree.hide_root = true
 	stats_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -286,6 +287,7 @@ func _setup_stats_tab(parent: VBoxContainer) -> void:
 		empty_item.set_text(1, "-")
 		empty_item.set_text(2, "0")
 		empty_item.set_text(3, "0")
+		empty_item.set_text(4, "1200")
 	else:
 		for p_name in scores_dict.keys():
 			var games = scores_dict[p_name]
@@ -298,6 +300,7 @@ func _setup_stats_tab(parent: VBoxContainer) -> void:
 						item.set_text(1, str(g_type).capitalize())
 						item.set_text(2, str(g_data.get("wins", 0)))
 						item.set_text(3, str(g_data.get("losses", 0)))
+						item.set_text(4, "%.1f" % float(g_data.get("elo", 1200.0)))
 
 func _on_lang_selected(index: int) -> void:
 	if index >= 0 and index < LANG_KEYS.size():

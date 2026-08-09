@@ -1099,6 +1099,26 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     }
 
     #[func]
+    pub fn compute_elo_delta(
+        &self,
+        _winner_id: i64,
+        _loser_id: i64,
+        winner_current: f64,
+        loser_current: f64,
+        k: f64,
+    ) -> Array<f64> {
+        let (new_winner, new_loser) = open_table_engine::elo::update_elo(
+            open_table_engine::elo::EloRating(winner_current),
+            open_table_engine::elo::EloRating(loser_current),
+            k,
+        );
+        let mut result = Array::new();
+        result.push(new_winner.0);
+        result.push(new_loser.0);
+        result
+    }
+
+    #[func]
     fn send_move(&mut self, player: i64, from_row: i64, from_col: i64, to_row: i64, to_col: i64) {
         let player_id = PlayerId(player as u32);
         let command: Box<dyn Command> = Box::new(MovePieceCommand {

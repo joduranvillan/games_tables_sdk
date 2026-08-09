@@ -1,15 +1,18 @@
 #![doc = include_str!("../README.md")]
 
+pub mod elo;
 pub mod history;
 pub mod rule_engine;
 pub mod session;
 pub mod test_helpers;
 pub mod turn;
 
+pub use elo::{update_elo, update_elo_draw, EloRating};
 pub use history::format_command;
 pub use turn::TurnResource;
 
 pub mod prelude {
+    pub use crate::elo::{update_elo, update_elo_draw, EloRating};
     pub use crate::rule_engine::RuleEngine;
     pub use crate::session::{
         filter_events_for_player, filter_events_for_spectator, CommandMiddleware,

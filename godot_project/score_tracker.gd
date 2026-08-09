@@ -2,7 +2,7 @@ extends Node
 
 const SAVE_PATH = "user://scores.json"
 
-# Schema: { "player_name": { "game_type": { "wins": 0, "losses": 0 } } }
+# Schema: { "player_name": { "game_type": { "wins": 0, "losses": 0, "elo": 1200.0 } } }
 var scores: Dictionary = {}
 var bridge_node: Node = null
 
@@ -39,6 +39,9 @@ func bind_bridge(p_bridge: Node) -> void:
 			bridge_node.connect("game_over", _on_game_over)
 
 func _on_game_over(winner_id: int) -> void:
+	if winner_id == -1:
+		return
+
 	var game_type = "chess"
 	if has_node("/root/GameManager"):
 		var gm = get_node("/root/GameManager")
@@ -53,25 +56,68 @@ func _on_game_over(winner_id: int) -> void:
 			p1_name = gm.get_player_name(1)
 			p2_name = gm.get_player_name(2)
 
-	if winner_id == 1:
-		record_match(p1_name, game_type, true)
-		record_match(p2_name, game_type, false)
-	elif winner_id == 2:
-		record_match(p1_name, game_type, false)
-		record_match(p2_name, game_type, true)
+	if winner_id == 1 or winner_id == 2:
+		var winner_name = p1_name if winner_id == 1 else p2_name
+		var loser_name = p2_name if winner_id == 1 else p1_name
+		var winner_p_id = winner_id
+		var loser_p_id = 2 if winner_id == 1 else 1
 
-func record_match(player_name: String, game_type: String, is_win: bool) -> void:
+		var winner_elo = get_elo(winner_name, game_type)
+		var loser_elo = get_elo(loser_name, game_type)
+
+		var winner_games = get_total_games(winner_name, game_type)
+		var loser_games = get_total_games(loser_name, game_type)
+
+		var k_factor = 32.0
+		if winner_games >= 30 or loser_games >= 30:
+			k_factor = 16.0
+
+		var new_winner_elo = winner_elo
+		var new_loser_elo = loser_elo
+
+		if bridge_node != null and bridge_node.has_method("compute_elo_delta"):
+			var res = bridge_node.compute_elo_delta(winner_p_id, loser_p_id, winner_elo, loser_elo, k_factor)
+			if res is Array and res.size() >= 2:
+				new_winner_elo = float(res[0])
+				new_loser_elo = float(res[1])
+		else:
+			var e_w = 1.0 / (1.0 + pow(10.0, (loser_elo - winner_elo) / 400.0))
+			var e_l = 1.0 / (1.0 + pow(10.0, (winner_elo - loser_elo) / 400.0))
+			new_winner_elo = winner_elo + k_factor * (1.0 - e_w)
+			new_loser_elo = loser_elo + k_factor * (0.0 - e_l)
+
+		record_match(winner_name, game_type, true, new_winner_elo)
+		record_match(loser_name, game_type, false, new_loser_elo)
+
+func get_elo(player_name: String, game_type: String) -> float:
+	if scores.has(player_name) and scores[player_name].has(game_type):
+		var g_dict: Dictionary = scores[player_name][game_type]
+		return float(g_dict.get("elo", 1200.0))
+	return 1200.0
+
+func get_total_games(player_name: String, game_type: String) -> int:
+	if scores.has(player_name) and scores[player_name].has(game_type):
+		var g_dict: Dictionary = scores[player_name][game_type]
+		return int(g_dict.get("wins", 0)) + int(g_dict.get("losses", 0))
+	return 0
+
+func record_match(player_name: String, game_type: String, is_win: bool, new_elo: float = -1.0) -> void:
 	if not scores.has(player_name):
 		scores[player_name] = {}
 	var p_scores: Dictionary = scores[player_name]
 	if not p_scores.has(game_type):
-		p_scores[game_type] = {"wins": 0, "losses": 0}
+		p_scores[game_type] = {"wins": 0, "losses": 0, "elo": 1200.0}
 	
 	var g_scores: Dictionary = p_scores[game_type]
 	if is_win:
 		g_scores["wins"] = int(g_scores.get("wins", 0)) + 1
 	else:
 		g_scores["losses"] = int(g_scores.get("losses", 0)) + 1
+
+	if new_elo >= 0.0:
+		g_scores["elo"] = new_elo
+	elif not g_scores.has("elo"):
+		g_scores["elo"] = 1200.0
 	
 	save_scores()
 
