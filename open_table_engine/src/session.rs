@@ -465,20 +465,24 @@ impl Session {
     }
 
     pub fn get_legal_moves(&self, player: PlayerId) -> Vec<serde_json::Value> {
-        let generator = match self.world.get_resource::<LegalMoveGeneratorResource>() {
-            Some(g) => g,
-            None => return vec![],
+        let generator = if let Some(g) = self.world.get_resource::<LegalMoveGeneratorResource>() {
+            Some(g.0.clone())
+        } else if let Some(g) = self.rules.legal_move_generator() {
+            Some(g.clone())
+        } else {
+            None
         };
 
-        let candidates = generator.0.generate_candidates(&self.world, player);
+        let Some(generator) = generator else {
+            return vec![];
+        };
+
+        let candidates = generator.generate_candidates(&self.world, player);
         let mut legal_moves = Vec::new();
 
         for cmd in candidates {
-            let mut test_world = self.world.clone();
-            if self.rules.dispatch(cmd.as_ref(), &mut test_world).is_ok() {
-                if let Ok(val) = serde_json::to_value(&cmd) {
-                    legal_moves.push(val);
-                }
+            if let Ok(val) = serde_json::to_value(&cmd) {
+                legal_moves.push(val);
             }
         }
 
