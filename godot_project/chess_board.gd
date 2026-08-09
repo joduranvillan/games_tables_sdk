@@ -52,6 +52,10 @@ func _ready() -> void:
 		if tm != null:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
+
+	var gm = get_node_or_null("/root/GameManager")
+	if gm != null and gm.has_signal("layout_changed"):
+		gm.layout_changed.connect(_on_layout_changed)
 			
 	_setup_ui()
 	_init_board_state()
@@ -69,8 +73,28 @@ func _ready() -> void:
 	bridge.start_local_match_chess(P1, P2)
 	current = bridge.current_player()
 	
+	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
 	_update_status()
 	queue_redraw()
+
+func _on_layout_changed(layout: int) -> void:
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
+
+	if layout == 2: # PHONE
+		if opening_option_button != null:
+			opening_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
+		if turn_indicator != null:
+			turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 50)
+		if status != null:
+			status.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 90)
+	else: # DESKTOP / TABLET
+		if opening_option_button != null:
+			opening_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
+		if turn_indicator != null:
+			turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 50)
+		if status != null:
+			status.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 95)
 
 func _setup_ui() -> void:
 	grid_container = GridContainer.new()
@@ -278,24 +302,67 @@ func _get_piece_symbol(kind: String, player: int) -> String:
 		"King": return "♔" if player == P1 else "♚"
 		_: return "?"
 
+var touch_down_pos: Vector2 = Vector2.ZERO
+var touch_start_cell: Vector2i = Vector2i(-1, -1)
+var is_touch_dragging: bool = false
+const DEAD_ZONE: float = 8.0
+
+func _gui_input(event: InputEvent) -> void:
+	_handle_unified_input(event)
+
 func _input(event: InputEvent) -> void:
+	_handle_unified_input(event)
+
+func _handle_unified_input(event: InputEvent) -> void:
 	if winner != -1 or animating:
 		return
-		
-	var click_pos = Vector2.ZERO
-	var handled = false
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		click_pos = event.position
-		handled = true
-	elif event is InputEventScreenTouch and event.pressed:
-		click_pos = event.position
-		handled = true
-		
-	if handled:
-		var col = int(click_pos.x / CELL_SIZE)
-		var row = int(click_pos.y / CELL_SIZE)
-		if row >= 0 and row < BOARD_SIZE and col >= 0 and col < BOARD_SIZE:
-			_handle_cell_click(row, col)
+
+	var event_pos := Vector2.ZERO
+	var is_press := false
+	var is_release := false
+	var is_drag := false
+
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			event_pos = event.position
+			is_press = event.pressed
+			is_release = not event.pressed
+	elif event is InputEventScreenTouch:
+		event_pos = event.position
+		is_press = event.pressed
+		is_release = not event.pressed
+	elif event is InputEventMouseMotion:
+		if event.button_mask & MOUSE_BUTTON_MASK_LEFT:
+			event_pos = event.position
+			is_drag = true
+	elif event is InputEventScreenDrag:
+		event_pos = event.position
+		is_drag = true
+
+	if is_press:
+		touch_down_pos = event_pos
+		touch_start_cell = Vector2i(int(event_pos.y / CELL_SIZE), int(event_pos.x / CELL_SIZE))
+		is_touch_dragging = false
+	elif is_drag:
+		if touch_down_pos.distance_to(event_pos) > DEAD_ZONE:
+			is_touch_dragging = true
+	elif is_release:
+		var dist = touch_down_pos.distance_to(event_pos)
+		var col = int(event_pos.x / CELL_SIZE)
+		var row = int(event_pos.y / CELL_SIZE)
+		if dist <= DEAD_ZONE:
+			if row >= 0 and row < BOARD_SIZE and col >= 0 and col < BOARD_SIZE:
+				_handle_cell_click(row, col)
+		else:
+			var release_cell = Vector2i(row, col)
+			if touch_start_cell != release_cell and touch_start_cell.x >= 0 and touch_start_cell.x < BOARD_SIZE and touch_start_cell.y >= 0 and touch_start_cell.y < BOARD_SIZE:
+				var piece = piece_sprites[touch_start_cell.x][touch_start_cell.y]
+				if piece != null and piece.get_meta("player") == current:
+					selected_pos = touch_start_cell
+					valid_moves = _calculate_valid_moves(touch_start_cell.x, touch_start_cell.y)
+					_handle_cell_click(row, col)
+		touch_start_cell = Vector2i(-1, -1)
+		is_touch_dragging = false
 
 func _handle_cell_click(row: int, col: int) -> void:
 	if animating:

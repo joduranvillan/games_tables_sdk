@@ -16,7 +16,7 @@ signal drag_cancelled()
 var selected_from: Vector2i = Vector2i(-1, -1)
 var is_dragging: bool = false
 var touch_down_pos: Vector2 = Vector2.ZERO
-var drag_threshold: float = 12.0
+var drag_threshold: float = 8.0 # 8px dead zone for touch gestures
 var highlight_color: Color = Color(1.0, 0.95, 0.30, 0.5)
 
 func _ready() -> void:

@@ -46,6 +46,10 @@ var player_stats_label: Label
 func _ready() -> void:
 	_setup_ui()
 	
+	var gm = get_node_or_null("/root/GameManager")
+	if gm != null and gm.has_signal("layout_changed"):
+		gm.layout_changed.connect(_on_layout_changed)
+
 	bridge = OpenTableBridge.new()
 	bridge.name = "Bridge"
 	add_child(bridge)
@@ -72,7 +76,45 @@ func _ready() -> void:
 	bridge.start_local_match_crisis(42, [1, 2])
 	current_player_id = bridge.current_player()
 	
+	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
 	_update_ui_state()
+
+func _on_layout_changed(layout: int) -> void:
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
+
+	if layout == 2: # PHONE (e.g. 375x667)
+		map_panel.position = Vector2(10, 10)
+		map_panel.custom_minimum_size = Vector2(355, 330)
+		sidebar_panel.position = Vector2(10, 350)
+		sidebar_panel.custom_minimum_size = Vector2(355, 300)
+
+		for i in range(30):
+			if territory_labels.has(i):
+				var row: int = int(float(i) / 5.0)
+				var col: int = i % 5
+				var pos_x: float = 5.0 + col * 69.0
+				var pos_y: float = 5.0 + row * 53.0
+				var lbl = territory_labels[i] as Label
+				lbl.position = Vector2(pos_x, pos_y)
+				lbl.custom_minimum_size = Vector2(66, 49)
+				lbl.add_theme_font_size_override("font_size", 9)
+	else: # DESKTOP or TABLET
+		map_panel.position = Vector2(20, 20)
+		map_panel.custom_minimum_size = Vector2(750, 680)
+		sidebar_panel.position = Vector2(790, 20)
+		sidebar_panel.custom_minimum_size = Vector2(350, 680)
+
+		for i in range(30):
+			if territory_labels.has(i):
+				var row: int = int(float(i) / 5.0)
+				var col: int = i % 5
+				var pos_x: float = 20.0 + col * 144.0
+				var pos_y: float = 20.0 + row * 105.0
+				var lbl = territory_labels[i] as Label
+				lbl.position = Vector2(pos_x, pos_y)
+				lbl.custom_minimum_size = Vector2(135, 95)
+				lbl.add_theme_font_size_override("font_size", 14)
 
 func _setup_ui() -> void:
 	map_panel = Panel.new()

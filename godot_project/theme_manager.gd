@@ -19,6 +19,39 @@ func _init() -> void:
 
 func _ready() -> void:
 	_apply_theme("wood")
+	var gm = get_node_or_null("/root/GameManager")
+	if gm != null and gm.has_signal("layout_changed"):
+		gm.layout_changed.connect(_on_layout_changed)
+
+func _on_layout_changed(_layout: int) -> void:
+	font_size_changed.emit(current_font_tier)
+
+func get_font_scale() -> float:
+	var layout = 0
+	if has_node("/root/GameManager"):
+		layout = get_node("/root/GameManager").get_layout()
+	elif Engine.has_singleton("GameManager"):
+		layout = GameManager.get_layout()
+	match layout:
+		2: return 0.75  # PHONE
+		1: return 1.0   # TABLET
+		0: return 1.25  # DESKTOP
+		_: return 1.0
+
+func apply_font_scale_to_board(board_node: Node, base_size: int = 16) -> void:
+	var scale_factor = get_font_scale()
+	var target_size = int(round(base_size * scale_factor))
+	_apply_font_scale_recursive(board_node, target_size)
+
+func _apply_font_scale_recursive(node: Node, target_size: int) -> void:
+	if node is Label:
+		node.add_theme_font_size_override("font_size", target_size)
+	elif node is Button or node is LineEdit or node is OptionButton:
+		node.add_theme_font_size_override("font_size", target_size)
+	elif node is Control and node.theme != null:
+		node.theme.set_font_size("font_size", "Label", target_size)
+	for child in node.get_children():
+		_apply_font_scale_recursive(child, target_size)
 
 func _create_presets() -> void:
 	# 1. Madera Clásica

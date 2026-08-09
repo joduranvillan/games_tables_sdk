@@ -39,11 +39,14 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
 - `test_spectator.gd`: ✅ Transmisión de eventos a espectadores sin filtrado.
 - `test_native_p2p_adapter.gd`: ✅ Simulación de reconexión y adaptador P2P.
 
-## 4. Próximas Prioridades (por orden de ejecución)
+## 4. Para publicación en crates.io
 
-1. **Implementar Doubling Cube en Backgammon (`backgammon_game`)**: Agregar la mecánica del dado de doblar para incrementar la apuesta de puntos en partidas competitivas de Backgammon.
-2. **Tests Headless de Red para Godot**: Crear scripts de prueba headless que ejerzan el flujo de reconexión TCP y simulación de desconexión bajo pérdida de paquetes.
-3. **UI Móvil Adaptativa**: Ajustes responsivos para pantallas de smartphones y soporte de gestos táctiles en `godot_project/`.
+- [ ] Doubling cube Backgammon (prompt 310)
+- [ ] Jump-in UNO (prompt 311)
+- [ ] `get_legal_moves` con `LegalMoveGenerator` para checkers y chess (prompts 306-309)
+- [ ] 0 warnings de Clippy (`cargo clippy --workspace -- -D warnings`)
+- [ ] Versión semántica 0.1.0 en todos los `Cargo.toml`
+- [ ] Documentación pública en `docs.rs` (verificar `cargo doc --workspace --no-deps`)
 
 ## 5. Deuda Técnica Conocida
 
