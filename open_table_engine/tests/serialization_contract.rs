@@ -134,6 +134,7 @@ fn test_serialization_contract_backgammon() {
         winner: P1,
         gammon: false,
         backgammon: false,
+        score: 1,
     });
 }
 
