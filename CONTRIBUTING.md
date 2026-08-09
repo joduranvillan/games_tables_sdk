@@ -136,7 +136,7 @@ redot --headless --path godot_project --script res://tests/bridge_smoke.gd
 Para preparar y publicar una nueva versión de los crates de OpenTable SDK:
 
 1. **Automatización de Release con `tools/release.sh`**:
-   Ejecuta el script de release especificando el incremento desead (por defecto `--patch`):
+   Ejecuta el script de release especificando el incremento deseado (por defecto `--patch`):
    ```bash
    ./tools/release.sh [--patch | --minor | --major]
    ```
@@ -146,19 +146,49 @@ Para preparar y publicar una nueva versión de los crates de OpenTable SDK:
    - Ejecutará la suite completa de pruebas (`cargo test --workspace --exclude open_table_godot`).
    - Commiteará los cambios de versión y creará el tag anotado en Git (`vX.Y.Z`).
 
-2. **Pasos Manuales de Publicación**:
+2. **Orden de Publicación y Dry-Run (`make publish-dry-run`)**:
+   La secuencia de publicación en crates.io está definida en `.cargo/publish.toml` y respeta las dependencias entre crates (los crates base antes que los dependientes):
+   `open_table_macros → open_table_core → open_table_engine → [juegos] → open_table_transport_tcp → open_table_transport_websocket → open_table_qr`.
+   Note que `open_table_godot` y `open_table_transport_native_bridge` se excluyen de la publicación en crates.io.
+
+   Para verificar los manifests y compilar cada crate en orden de publicación:
+   ```bash
+   make publish-dry-run
+   ```
+
+3. **Pasos Manuales de Publicación**:
    Por seguridad, el script **nunca realiza push ni publica automáticamente**. Debes completar el proceso manualmente:
    ```bash
    # Subir commit de versión y tags a GitHub
    git push origin main --tags
 
-   # Publicar en Crates.io
+   # Publicar cada crate en el orden establecido
+   cargo publish -p open_table_macros
    cargo publish -p open_table_core
+   cargo publish -p open_table_engine
+   # ...
    ```
 
 ---
 
-## 7. Mantenimiento de Dependencias con Dependabot
+## 7. Auditorías de Seguridad (`make audit`) y Gestión de Vulnerabilidades
+
+Para verificar que las dependencias no contengan vulnerabilidades conocidas (advisories) ni violaciones de licencia:
+
+```bash
+make audit
+```
+
+Este comando ejecuta `cargo deny check` (basado en `deny.toml`) y `cargo audit`. Este paso está integrado en el pipeline de CI (`ci.yml`) antes de la ejecución de pruebas.
+
+### Cómo Responder a un Advisory / Vulnerabilidad
+Si `make audit` o la CI fallan por un advisory en una dependencia:
+1. **Actualizar la dependencia**: Ejecuta `cargo update -p <nombre_crate>` para actualizar a una versión parcheada que solucione el problema.
+2. **Excepción justificada**: Si la actualización no es posible o el advisory no afecta al proyecto, añade una excepción justificada en `deny.toml` bajo `[advisories] ignore = [...]`, documentando la razón.
+
+---
+
+## 8. Mantenimiento de Dependencias con Dependabot
 
 OpenTable SDK utiliza **Dependabot** (`.github/dependabot.yml`) para mantener las dependencias de Cargo y de GitHub Actions actualizadas automáticamente.
 

@@ -1,0 +1,27 @@
+# Order of crate publication to crates.io (dependencies before dependents)
+publish_order = [
+    "open_table_macros",
+    "open_table_core",
+    "open_table_engine",
+    "checkers_game",
+    "battleship_game",
+    "ludo_game",
+    "mille_bornes_game",
+    "backgammon_game",
+    "chinese_checkers_game",
+    "monopoly_game",
+    "chess_game",
+    "shogi_game",
+    "xiangqi_game",
+    "go_game",
+    "uno_game",
+    "crisis_game",
+    "open_table_transport_tcp",
+    "open_table_transport_websocket",
+    "open_table_qr",
+]
+
+excluded = [
+    "open_table_godot",
+    "open_table_transport_native_bridge",
+]

@@ -191,8 +191,12 @@ pub struct Session {
 }
 
 impl Session {
-    /// Calcula los deltas de ELO a aplicar externamente tras una victoria.
-    /// Devuelve (delta_winner, delta_loser).
+    /// Calculates the ELO rating deltas for winner and loser players using factor `k`.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let (delta_w, delta_l) = Session::compute_elo_delta(winner, loser, 32.0);
+    /// ```
     pub fn compute_elo_delta(_winner: PlayerId, _loser: PlayerId, k: f64) -> (f64, f64) {
         let (new_w, new_l) = crate::elo::update_elo(
             crate::elo::EloRating(1200.0),
@@ -471,10 +475,22 @@ impl Session {
         self.clock.current()
     }
 
+    /// Returns the `PlayerId` whose turn it currently is.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let active_player = session.current_player();
+    /// ```
     pub fn current_player(&self) -> PlayerId {
         self.world.resource::<TurnResource>().0.current_player()
     }
 
+    /// Returns the legal moves available to `player` as a list of JSON values.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let moves = session.get_legal_moves(player_id);
+    /// ```
     pub fn get_legal_moves(&self, player: PlayerId) -> Vec<serde_json::Value> {
         let generator = if let Some(g) = self.world.get_resource::<LegalMoveGeneratorResource>() {
             Some(g.0.clone())
@@ -503,6 +519,11 @@ impl Session {
     /// dentro de `command`. Si `command.issuer()` es `Some` y no coincide
     /// con `sender`, se rechaza sin ejecutar nada — esto es lo que impide
     /// que un cliente mande comandos en nombre de otro jugador.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let events = session.process_command(player_id, command)?;
+    /// ```
     pub fn process_command(
         &mut self,
         sender: PlayerId,
@@ -719,6 +740,11 @@ impl Session {
     /// hace falta guardar para poder reproducir la partida entera más
     /// adelante: seed + orden de jugadores + este log alcanzan, porque
     /// `RandomService` es determinista.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let log_bytes = session.export_log()?;
+    /// ```
     pub fn export_log(&self) -> EngineResult<Vec<u8>> {
         serde_json::to_vec(&self.command_log)
             .map_err(|e| EngineError::Replay(format!("no se pudo exportar el log: {e}")))
