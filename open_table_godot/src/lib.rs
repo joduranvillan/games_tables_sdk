@@ -1091,7 +1091,7 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             if let Ok(json_str) = serde_json::to_string(&val) {
                 let parsed_var = godot::classes::Json::parse_string(&GString::from(&json_str));
                 if let Ok(dict) = parsed_var.try_to::<Dictionary>() {
-                    godot_array.push(dict);
+                    godot_array.push(&dict);
                 }
             }
         }
