@@ -337,70 +337,33 @@ func _handle_cell_click(row: int, col: int) -> void:
 
 func _calculate_valid_moves(r: int, c: int) -> Array:
 	var moves: Array = []
-	var piece = piece_sprites[r][c]
-	if piece == null:
+	if bridge == null or not bridge.has_method("get_legal_moves"):
 		return moves
-		
-	var kind = piece.get_meta("kind")
-	var player = piece.get_meta("player")
-	var forward = -1 if player == P1 else 1
-	
-	match kind:
-		"Pawn":
-			var nr = r + forward
-			if _is_in_bounds(nr, c) and piece_sprites[nr][c] == null:
-				moves.append(Vector2i(nr, c))
-				var start_row = 6 if player == P1 else 1
-				var nnr = r + forward * 2
-				if r == start_row and _is_in_bounds(nnr, c) and piece_sprites[nnr][c] == null:
-					moves.append(Vector2i(nnr, c))
-			for dc in [-1, 1]:
-				var tc = c + dc
-				if _is_in_bounds(nr, tc):
-					var target = piece_sprites[nr][tc]
-					if target != null and target.get_meta("player") != player:
-						moves.append(Vector2i(nr, tc))
-		"Knight":
-			var offsets = [
-				Vector2i(-2, -1), Vector2i(-2, 1), Vector2i(-1, -2), Vector2i(-1, 2),
-				Vector2i(1, -2), Vector2i(1, 2), Vector2i(2, -1), Vector2i(2, 1)
-			]
-			for off in offsets:
-				var tr = r + off.x
-				var tc = c + off.y
-				if _is_in_bounds(tr, tc):
-					var target = piece_sprites[tr][tc]
-					if target == null or target.get_meta("player") != player:
-						moves.append(Vector2i(tr, tc))
-		"King":
-			for dr in [-1, 0, 1]:
-				for dc in [-1, 0, 1]:
-					if dr == 0 and dc == 0: continue
-					var tr = r + dr
-					var tc = c + dc
-					if _is_in_bounds(tr, tc):
-						var target = piece_sprites[tr][tc]
-						if target == null or target.get_meta("player") != player:
-							moves.append(Vector2i(tr, tc))
-		"Rook", "Bishop", "Queen":
-			var dirs = []
-			if kind == "Rook" or kind == "Queen":
-				dirs.append_array([Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)])
-			if kind == "Bishop" or kind == "Queen":
-				dirs.append_array([Vector2i(1,1), Vector2i(1,-1), Vector2i(-1,1), Vector2i(-1,-1)])
-			for dir in dirs:
-				var tr = r + dir.x
-				var tc = c + dir.y
-				while _is_in_bounds(tr, tc):
-					var target = piece_sprites[tr][tc]
-					if target == null:
-						moves.append(Vector2i(tr, tc))
-					else:
-						if target.get_meta("player") != player:
-							moves.append(Vector2i(tr, tc))
-						break
-					tr += dir.x
-					tc += dir.y
+	var legal_moves = bridge.get_legal_moves(current)
+	for m in legal_moves:
+		var f_row := -1
+		var f_col := -1
+		var t_row := -1
+		var t_col := -1
+
+		if m.has("from") and m.from is Dictionary:
+			f_row = m.from.get("row", -1)
+			f_col = m.from.get("col", -1)
+		elif m.has("from_row"):
+			f_row = m.get("from_row", -1)
+			f_col = m.get("from_col", -1)
+
+		if m.has("to") and m.to is Dictionary:
+			t_row = m.to.get("row", -1)
+			t_col = m.to.get("col", -1)
+		elif m.has("to_row"):
+			t_row = m.get("to_row", -1)
+			t_col = m.get("to_col", -1)
+
+		if f_row == r and f_col == c:
+			var dest = Vector2i(t_row, t_col)
+			if not dest in moves:
+				moves.append(dest)
 	return moves
 
 func _is_in_bounds(r: int, c: int) -> bool:

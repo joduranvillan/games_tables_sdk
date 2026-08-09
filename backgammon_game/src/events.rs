@@ -30,6 +30,7 @@ pub struct GameOverEvent {
     pub winner: PlayerId,
     pub gammon: bool,
     pub backgammon: bool,
+    pub score: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, GameEvent)]

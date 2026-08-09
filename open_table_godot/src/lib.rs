@@ -1070,6 +1070,35 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     }
 
     #[func]
+    pub fn get_legal_moves(&self, player_id: i64) -> Array<Dictionary> {
+        let player = PlayerId(player_id as u32);
+        let moves_json = match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::Replay { session, .. }
+            | BridgeMode::Tournament { session, .. } => {
+                session.get_legal_moves(player)
+            }
+            BridgeMode::MultiSession { sessions, active } => {
+                sessions.get(*active).map(|(_, s)| s.get_legal_moves(player)).unwrap_or_default()
+            }
+            _ => vec![],
+        };
+
+        let mut godot_array = Array::new();
+        for val in moves_json {
+            if let Ok(json_str) = serde_json::to_string(&val) {
+                let parsed_var = godot::classes::Json::parse_string(&GString::from(&json_str));
+                if let Ok(dict) = parsed_var.try_to::<Dictionary>() {
+                    godot_array.push(dict);
+                }
+            }
+        }
+        godot_array
+    }
+
+    #[func]
     fn send_move(&mut self, player: i64, from_row: i64, from_col: i64, to_row: i64, to_col: i64) {
         let player_id = PlayerId(player as u32);
         let command: Box<dyn Command> = Box::new(MovePieceCommand {

@@ -1,5 +1,4 @@
 use open_table_engine::prelude::*;
-use open_table_macros::GameResource;
 
 use crate::board::{BoardResource, Sides, CHECKERS_PER_PLAYER, POINTS};
 use crate::commands::{
@@ -10,40 +9,7 @@ use crate::events::{
     CheckerMovedEvent, DiceRolledEvent, DoubleAcceptedEvent, DoubleOfferedEvent, DoubleRejectedEvent,
     GameOverEvent, NoValidMovesEvent,
 };
-
-#[derive(Debug, Clone, GameResource)]
-pub struct DoublingCubeResource {
-    pub value: u32,
-    pub owner: Option<PlayerId>,
-    pub offered_by: Option<PlayerId>,
-}
-
-impl Default for DoublingCubeResource {
-    fn default() -> Self {
-        Self {
-            value: 1,
-            owner: None,
-            offered_by: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, GameResource)]
-pub struct MatchStateResource {
-    pub match_points: u32,
-    pub scores: std::collections::HashMap<PlayerId, u32>,
-    pub crawford_game: bool,
-}
-
-impl Default for MatchStateResource {
-    fn default() -> Self {
-        Self {
-            match_points: 0,
-            scores: std::collections::HashMap::new(),
-            crawford_game: false,
-        }
-    }
-}
+pub use crate::resources::{DoublingCubeResource, MatchStateResource};
 
 fn invalid(reason: impl Into<String>) -> EngineError {
     EngineError::InvalidCommand {
@@ -80,11 +46,13 @@ pub fn build_backgammon_rules() -> RuleEngine {
                 return Err(invalid("no tenés la posesión del dado de doblaje"));
             }
         }
-        if cube.offered_by.is_some() {
+        if cube.offered || cube.offered_by.is_some() {
             return Err(invalid("ya hay una oferta de doblaje en curso"));
         }
 
-        world.resource_mut::<DoublingCubeResource>().offered_by = Some(cmd.player);
+        let mut cube_mut = world.resource_mut::<DoublingCubeResource>();
+        cube_mut.offered = true;
+        cube_mut.offered_by = Some(cmd.player);
 
         Ok(vec![Box::new(DoubleOfferedEvent { player: cmd.player })])
     });
@@ -103,6 +71,7 @@ pub fn build_backgammon_rules() -> RuleEngine {
         let mut cube = world.resource_mut::<DoublingCubeResource>();
         cube.value *= 2;
         cube.owner = Some(cmd.player);
+        cube.offered = false;
         cube.offered_by = None;
         let new_val = cube.value;
 
@@ -124,7 +93,9 @@ pub fn build_backgammon_rules() -> RuleEngine {
         }
 
         let current_val = world.resource::<DoublingCubeResource>().value;
-        world.resource_mut::<DoublingCubeResource>().offered_by = None;
+        let mut cube_mut = world.resource_mut::<DoublingCubeResource>();
+        cube_mut.offered = false;
+        cube_mut.offered_by = None;
         world.insert_resource(GameOverResource(true));
 
         let events: Vec<Box<dyn Event>> = vec![
@@ -136,6 +107,7 @@ pub fn build_backgammon_rules() -> RuleEngine {
                 winner: offerer,
                 gammon: false,
                 backgammon: false,
+                score: current_val,
             }),
         ];
 
@@ -322,10 +294,15 @@ pub fn build_backgammon_rules() -> RuleEngine {
         if total_borne_off == CHECKERS_PER_PLAYER {
             let gammon = opponent_borne_off == 0;
             let backgammon = gammon && (opponent_bar > 0 || opponent_in_winner_home);
+            let board_points = if backgammon { 3 } else if gammon { 2 } else { 1 };
+            let cube_val = world.resource::<DoublingCubeResource>().value;
+            let score = board_points * cube_val;
+
             events.push(Box::new(GameOverEvent {
                 winner: cmd.player,
                 gammon,
                 backgammon,
+                score,
             }));
             world.insert_resource(GameOverResource(true));
         }
@@ -354,12 +331,14 @@ pub fn build_backgammon_rules() -> RuleEngine {
             return Err(invalid("no sos un jugador de esta partida"));
         }
         let opponent = players.into_iter().find(|&p| p != cmd.player).unwrap_or(cmd.player);
+        let cube_val = world.resource::<DoublingCubeResource>().value;
         world.insert_resource(GameOverResource(true));
         world.insert_resource(WinnerResource(Some(opponent)));
         Ok(vec![Box::new(GameOverEvent {
             winner: opponent,
             gammon: false,
             backgammon: false,
+            score: cube_val,
         })])
     });
 

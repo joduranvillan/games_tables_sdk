@@ -7,6 +7,7 @@ pub mod board;
 pub mod commands;
 pub mod dice;
 pub mod events;
+pub mod resources;
 pub mod rules;
 
 pub use board::{BoardResource, Sides, CHECKERS_PER_PLAYER, POINTS};
@@ -18,7 +19,8 @@ pub use events::{
     CheckerMovedEvent, DiceRolledEvent, DoubleAcceptedEvent, DoubleOfferedEvent, DoubleRejectedEvent,
     GameOverEvent, NoValidMovesEvent,
 };
-pub use rules::{build_backgammon_rules, DoublingCubeResource, MatchStateResource};
+pub use resources::{DoublingCubeResource, MatchStateResource};
+pub use rules::build_backgammon_rules;
 
 use open_table_engine::prelude::*;
 

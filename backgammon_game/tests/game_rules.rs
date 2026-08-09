@@ -1,5 +1,5 @@
 use backgammon_game::{
-    new_backgammon_session, CheckerMovedEvent, GameOverEvent,
+    new_backgammon_session, AcceptDoubleCommand, CheckerMovedEvent, DoublingCubeResource, GameOverEvent,
     MatchStateResource, MoveCheckerCommand, OfferDoubleCommand, RejectDoubleCommand, RollDiceCommand,
     CHECKERS_PER_PLAYER,
 };
@@ -301,6 +301,49 @@ fn test_sacar_ultima_ficha_emite_game_over_inmediatamente() {
         .find_map(|e| e.as_any().downcast_ref::<GameOverEvent>())
         .expect("debería emitirse GameOverEvent inmediatamente en el mismo process_command");
     assert_eq!(game_over.winner, P1);
+}
+
+#[test]
+fn test_ofrecer_doble_antes_de_mover_es_valido() {
+    let mut session = new_backgammon_session(SessionId(101), 1, P1, P2);
+    let events = session
+        .process_command(P1, Box::new(OfferDoubleCommand { player: P1 }))
+        .expect("ofrecer doble antes de mover debe ser válido");
+    assert_eq!(events.len(), 1);
+    assert!(session.world().resource::<DoublingCubeResource>().offered);
+}
+
+#[test]
+fn test_rechazar_doble_termina_la_partida() {
+    let mut session = new_backgammon_session(SessionId(102), 1, P1, P2);
+    session
+        .process_command(P1, Box::new(OfferDoubleCommand { player: P1 }))
+        .unwrap();
+    let events = session
+        .process_command(P2, Box::new(RejectDoubleCommand { player: P2 }))
+        .expect("rechazar doble debe ser válido");
+    let game_over = events
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<GameOverEvent>())
+        .expect("al rechazar el doble debe terminar la partida");
+    assert_eq!(game_over.winner, P1);
+    assert_eq!(game_over.score, 1);
+}
+
+#[test]
+fn test_aceptar_doble_duplica_el_cubo() {
+    let mut session = new_backgammon_session(SessionId(103), 1, P1, P2);
+    session
+        .process_command(P1, Box::new(OfferDoubleCommand { player: P1 }))
+        .unwrap();
+    let events = session
+        .process_command(P2, Box::new(AcceptDoubleCommand { player: P2 }))
+        .expect("aceptar doble debe ser válido");
+    assert_eq!(events.len(), 1);
+    let cube = session.world().resource::<DoublingCubeResource>();
+    assert_eq!(cube.value, 2);
+    assert_eq!(cube.owner, Some(P2));
+    assert!(!cube.offered);
 }
 
 

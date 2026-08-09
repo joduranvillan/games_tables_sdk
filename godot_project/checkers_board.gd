@@ -224,32 +224,31 @@ func _on_piece_dropped(to_cell: Vector2i) -> void:
 
 func _calculate_valid_moves(row: int, col: int) -> Array[Vector2i]:
 	var moves: Array[Vector2i] = []
-	if row < 0 or row >= BOARD or col < 0 or col >= BOARD:
+	if bridge == null or not bridge.has_method("get_legal_moves"):
 		return moves
-	var cell = board[row][col]
-	if cell == null or cell.owner != current:
-		return moves
+	var legal_moves = bridge.get_legal_moves(current)
+	for m in legal_moves:
+		var f_row := -1
+		var f_col := -1
+		var t_row := -1
+		var t_col := -1
 
-	var directions: Array[Vector2i] = []
-	if cell.king:
-		directions = [Vector2i(-1, -1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(1, 1)]
-	elif cell.owner == P_TOP:
-		directions = [Vector2i(1, -1), Vector2i(1, 1)]
-	else:
-		directions = [Vector2i(-1, -1), Vector2i(-1, 1)]
+		if m.has("from") and m.from is Dictionary:
+			f_row = m.from.get("row", -1)
+			f_col = m.from.get("col", -1)
+		elif m.has("from_row"):
+			f_row = m.get("from_row", -1)
+			f_col = m.get("from_col", -1)
 
-	for d in directions:
-		var nr = row + d.x
-		var nc = col + d.y
-		if nr >= 0 and nr < BOARD and nc >= 0 and nc < BOARD:
-			if board[nr][nc] == null:
-				moves.append(Vector2i(nr, nc))
-			elif board[nr][nc].owner != current:
-				var jr = row + d.x * 2
-				var jc = col + d.y * 2
-				if jr >= 0 and jr < BOARD and jc >= 0 and jc < BOARD:
-					if board[jr][jc] == null:
-						moves.append(Vector2i(jr, jc))
+		if m.has("to") and m.to is Dictionary:
+			t_row = m.to.get("row", -1)
+			t_col = m.to.get("col", -1)
+		elif m.has("to_row"):
+			t_row = m.get("to_row", -1)
+			t_col = m.get("to_col", -1)
+
+		if f_row == row and f_col == col:
+			moves.append(Vector2i(t_row, t_col))
 	return moves
 
 func _init_board() -> void:
