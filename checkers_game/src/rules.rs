@@ -35,7 +35,7 @@ pub fn build_checkers_rules() -> RuleEngine {
             world.insert_resource(MultiCaptureResource::default());
         }
         if !world.contains_resource::<LegalMoveGeneratorResource>() {
-            world.insert_resource(LegalMoveGeneratorResource(Box::new(CheckersLegalMoveGenerator)));
+            world.insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(CheckersLegalMoveGenerator)));
         }
 
         // 1. Le tiene que tocar a este jugador.
