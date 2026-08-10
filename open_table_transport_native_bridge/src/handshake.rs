@@ -31,7 +31,7 @@ pub enum HandshakeResponse {
 /// `open_table_transport_tcp::host::generate_token`.
 pub fn generate_token() -> String {
     let mut bytes = [0u8; 16];
-    getrandom::getrandom(&mut bytes).expect(
+    getrandom::fill(&mut bytes).expect(
         "el sistema operativo debería poder darnos bytes aleatorios; \
          si esto falla, algo está muy mal a nivel de SO",
     );

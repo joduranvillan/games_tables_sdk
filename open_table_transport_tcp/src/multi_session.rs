@@ -197,7 +197,7 @@ impl SessionHostTransport {
 
 fn generate_token() -> String {
     let mut bytes = [0u8; 16];
-    getrandom::getrandom(&mut bytes).expect("getrandom failed");
+    getrandom::fill(&mut bytes).expect("getrandom failed");
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
