@@ -25,7 +25,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Check MSRV
-        run: cargo check --manifest-path Cargo.toml --ignore-rust-version
+        run: cargo check --workspace --exclude open_table_godot --ignore-rust-version
 
       - name: Security Audit (cargo-deny)
         uses: EmbarkStudios/cargo-deny-action@v2
@@ -58,18 +58,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libclang-dev
-      - name: Install Godot
+      - name: Install Redot
         run: |
-          mkdir -p ~/godot
-          cd ~/godot
-          wget -q https://github.com/godotengine/godot-builds/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
-          unzip -q Godot_v4.3-stable_linux.x86_64.zip
-          sudo ln -s $(pwd)/Godot_v4.3-stable_linux.x86_64 /usr/bin/godot
+          mkdir -p ~/redot
+          wget -q -P ~/redot https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip
+          unzip -q ~/redot/Redot_v26.2-stable_linux_x64.zip -d ~/redot
+          chmod +x ~/redot/Redot_v26.2-stable_linux_x64
+          sudo ln -sf ~/redot/Redot_v26.2-stable_linux_x64 /usr/bin/redot
 
       - name: Build open_table_godot
         run: cargo build -p open_table_godot
-        env: 
-          GODOT_BIN: /usr/bin/godot
+        env:
+          REDOT_BIN: /usr/bin/redot
 
       - name: Verify .so artifact output
         run: |
