@@ -8,7 +8,7 @@ description = "Implementación de Transport sobre WebSocket usando tokio-tungste
 open_table_core = { path = "../open_table_core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-getrandom = "0.2"
+getrandom = "0.4"
 tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = "0.20"
 futures-util = "0.3"
