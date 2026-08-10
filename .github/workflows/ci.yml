@@ -70,14 +70,14 @@ jobs:
           cd ~/redot
           wget -q -O redot.zip https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip || wget -q -O redot.zip https://github.com/godotengine/godot-builds/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
           unzip -q redot.zip
-          REDOT_EXEC=$(find . -maxdepth 1 -type f ! -name "*.zip" | head -n 1)
+          REDOT_EXEC=$(find ~/redot -type f ! -name "*.zip" | head -n 1)
           if [ -z "$REDOT_EXEC" ]; then
             echo "ERROR: Could not locate extracted Redot/Godot executable."
             exit 1
           fi
           chmod +x "$REDOT_EXEC"
-          sudo ln -sf "$(pwd)/${REDOT_EXEC#./}" /usr/bin/redot
-          sudo ln -sf "$(pwd)/${REDOT_EXEC#./}" /usr/bin/godot
+          sudo ln -sf "$REDOT_EXEC" /usr/bin/redot
+          sudo ln -sf "$REDOT_EXEC" /usr/bin/godot
 
       - name: Build open_table_godot
         run: cargo build -p open_table_godot
