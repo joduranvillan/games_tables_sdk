@@ -63,8 +63,9 @@ jobs:
           mkdir -p ~/redot
           wget -q -P ~/redot https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip
           unzip -q ~/redot/Redot_v26.2-stable_linux_x64.zip -d ~/redot
-          chmod +x ~/redot/Redot_v26.2-stable_linux_x64
-          sudo ln -sf ~/redot/Redot_v26.2-stable_linux_x64 /usr/bin/redot
+          REDOT_BIN=$(find ~/redot -name "redot" -type f)
+          chmod +x "$REDOT_BIN"
+          sudo ln -sf "$REDOT_BIN" /usr/bin/redot
 
       - name: Build open_table_godot
         run: cargo build -p open_table_godot
