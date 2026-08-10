@@ -35,7 +35,7 @@ pub struct WsHostTransport {
 
 fn generate_token() -> String {
     let mut bytes = [0u8; 16];
-    let _ = getrandom::getrandom(&mut bytes);
+    let _ = getrandom::fill(&mut bytes);
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
