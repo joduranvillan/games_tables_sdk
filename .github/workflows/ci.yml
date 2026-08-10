@@ -24,6 +24,9 @@ jobs:
           toolchain: ${{ matrix.rust }}
           components: rustfmt, clippy
 
+      - name: Make scripts executable
+        run: chmod +x tools/*.sh
+
       - name: Check MSRV
         run: cargo check --workspace --exclude open_table_godot --ignore-rust-version
 
@@ -54,22 +57,32 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Make scripts executable
+        run: chmod +x tools/*.sh
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libclang-dev
-      - name: Install Redot
+      - name: Install Redot / Godot
         run: |
           mkdir -p ~/redot
-          wget -q -P ~/redot https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip
-          unzip -q ~/redot/Redot_v26.2-stable_linux_x64.zip -d ~/redot
-          REDOT_BIN=$(find ~/redot -name "redot" -type f)
-          chmod +x "$REDOT_BIN"
-          sudo ln -sf "$REDOT_BIN" /usr/bin/redot
+          cd ~/redot
+          wget -q -O redot.zip https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip || wget -q -O redot.zip https://github.com/godotengine/godot-builds/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          unzip -q redot.zip
+          REDOT_EXEC=$(find . -maxdepth 1 -type f ! -name "*.zip" | head -n 1)
+          if [ -z "$REDOT_EXEC" ]; then
+            echo "ERROR: Could not locate extracted Redot/Godot executable."
+            exit 1
+          fi
+          chmod +x "$REDOT_EXEC"
+          sudo ln -sf "$(pwd)/${REDOT_EXEC#./}" /usr/bin/redot
+          sudo ln -sf "$(pwd)/${REDOT_EXEC#./}" /usr/bin/godot
 
       - name: Build open_table_godot
         run: cargo build -p open_table_godot
         env:
+          GODOT_BIN: /usr/bin/godot
           REDOT_BIN: /usr/bin/redot
 
       - name: Verify .so artifact output
