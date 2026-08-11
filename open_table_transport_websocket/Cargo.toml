@@ -3,6 +3,7 @@ name = "open_table_transport_websocket"
 version = "0.1.0"
 edition = "2021"
 description = "Implementación de Transport sobre WebSocket usando tokio-tungstenite."
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 open_table_core = { path = "../open_table_core" }

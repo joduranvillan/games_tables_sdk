@@ -3,6 +3,7 @@ name = "open_table_macros"
 version = "0.1.0"
 edition = "2021"
 description = "Proc-macros derive para reducir el boilerplate de open_table_core/open_table_engine: GameCommand, GameEvent, GameResource, GameComponent."
+license = "MIT OR Apache-2.0"
 
 [lib]
 proc-macro = true

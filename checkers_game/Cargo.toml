@@ -3,6 +3,7 @@ name = "checkers_game"
 version = "0.1.0"
 edition = "2021"
 description = "Juego de referencia del OpenTable SDK: damas (checkers). Sin vista todavía (no hay open_table_godot aún) - se juega por consola con el ejemplo local_match."
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 open_table_core = { path = "../open_table_core" }

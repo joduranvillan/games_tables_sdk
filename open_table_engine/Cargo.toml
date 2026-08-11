@@ -3,6 +3,7 @@ name = "open_table_engine"
 version = "0.1.0"
 edition = "2021"
 description = "Motor de OpenTable Engine: bevy_ecs + scheduler + rule engine sobre los contratos de open_table_core."
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 open_table_core = { path = "../open_table_core" }
