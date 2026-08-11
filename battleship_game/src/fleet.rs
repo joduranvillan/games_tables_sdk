@@ -14,7 +14,7 @@ pub type Ship = Vec<Position>;
 /// validador de flota completo.
 pub const EXPECTED_SHIP_SIZES: [usize; 3] = [4, 3, 2];
 
-#[derive(GameResource)]
+#[derive(GameResource, Default)]
 pub struct FleetResource {
     /// La flota de cada jugador. Nadie más que su dueño debería conocer
     /// estas coordenadas exactas — el `RuleEngine` nunca las incluye en

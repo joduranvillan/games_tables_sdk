@@ -67,10 +67,8 @@ fn validate_and_play_distance(
     }
 
     if let Some(h) = deck.hazard.get(&player).copied().flatten() {
-        if h != Hazard::SpeedLimit {
-            if !has_right_of_way || h == Hazard::OutOfGas {
-                return Err(invalid("estás detenido, jugá un remedio antes de avanzar"));
-            }
+        if h != Hazard::SpeedLimit && (!has_right_of_way || h == Hazard::OutOfGas) {
+            return Err(invalid("estás detenido, jugá un remedio antes de avanzar"));
         }
     }
 
@@ -275,7 +273,7 @@ pub fn build_mille_bornes_rules() -> RuleEngine {
         } else {
             Vec::new()
         };
-        drop(deck); // release mutable borrow before accessing RandomResource
+        let _ = deck; // release mutable borrow before accessing RandomResource
 
         let shuffled = if needs_reshuffle {
             let mut d = discarded_for_shuffle;
@@ -384,7 +382,7 @@ pub fn build_mille_bornes_rules() -> RuleEngine {
         let card = hand.remove(cmd.card_index);
         deck.discard_pile.push(card);
 
-        drop(deck);
+        let _ = deck;
         world.resource_mut::<TurnResource>().0.advance();
 
         Ok(vec![Box::new(CardDiscardedEvent {

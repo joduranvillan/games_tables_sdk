@@ -187,7 +187,7 @@ pub fn build_chess_rules() -> RuleEngine {
         let insufficient_material = is_insufficient_material(&board);
         let new_hash = board.compute_hash(opponent);
 
-        drop(board);
+        let _ = board;
 
         let is_threefold = if let Some(mut history) = world.get_resource_mut::<PositionHistoryResource>() {
             let count = history.history.entry(new_hash).or_insert(0);

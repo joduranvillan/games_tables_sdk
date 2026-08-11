@@ -273,7 +273,7 @@ pub fn build_backgammon_rules() -> RuleEngine {
         let opponent_in_winner_home = (0..POINTS).any(|idx| {
             sides.is_home_point(cmd.player, idx) && board.points[idx] * opponent_sign > 0
         });
-        drop(board); // release mutable borrow before accessing other resources
+        let _ = board; // release mutable borrow before accessing other resources
 
         world
             .resource_mut::<PendingDiceResource>()

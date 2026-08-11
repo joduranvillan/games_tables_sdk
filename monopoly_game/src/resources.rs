@@ -18,6 +18,12 @@ impl BoardResource {
     }
 }
 
+impl Default for BoardResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(GameResource)]
 pub struct PlayersResource {
     pub position: HashMap<PlayerId, usize>,
