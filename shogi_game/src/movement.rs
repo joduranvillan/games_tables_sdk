@@ -55,8 +55,7 @@ pub fn is_legal_move(board: &BoardResource, from: (usize, usize), to: (usize, us
         },
         PieceKind::Silver => {
             if dx <= 1 && ady <= 1 {
-                if dx == 0 && dy == -forward { false } // Cannot move orthogonally backward
-                else if dx == 1 && dy == 0 { false } // Cannot move orthogonally sideways
+                if (dx == 0 && dy == -forward) || (dx == 1 && dy == 0) { false } // Cannot move orthogonally backward or sideways
                 else { true }
             } else { false }
         },
@@ -167,10 +166,8 @@ pub fn is_in_check(board: &BoardResource, player: PlayerId) -> bool {
     let opponent = if player == board.sente { board.gote } else { board.sente };
 
     for (&pos, piece) in &board.squares {
-        if piece.owner == opponent {
-            if is_legal_move(board, pos, king_pos, opponent) {
-                return true;
-            }
+        if piece.owner == opponent && is_legal_move(board, pos, king_pos, opponent) {
+            return true;
         }
     }
 

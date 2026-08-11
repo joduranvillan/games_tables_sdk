@@ -67,7 +67,7 @@ pub fn build_shogi_rules() -> RuleEngine {
             (cmd.promote, captured_kind)
         }; // board dropped here
 
-        if is_in_check(&world.resource::<BoardResource>(), cmd.player) {
+        if is_in_check(world.resource::<BoardResource>(), cmd.player) {
             *world.resource_mut::<BoardResource>() = board_backup;
             return Err(EngineError::InvalidCommand { reason: "Move leaves king in check".into() });
         }
@@ -87,7 +87,7 @@ pub fn build_shogi_rules() -> RuleEngine {
             if cmd.player == board.sente { board.gote } else { board.sente }
         };
 
-        if is_checkmate(&world.resource::<BoardResource>(), opponent) {
+        if is_checkmate(world.resource::<BoardResource>(), opponent) {
             events.push(Box::new(GameOverEvent { winner: Some(cmd.player) }));
         }
 
@@ -135,7 +135,7 @@ pub fn build_shogi_rules() -> RuleEngine {
             return Err(EngineError::InvalidCommand { reason: "Piece not in hand".into() });
         }
 
-        if is_in_check(&world.resource::<BoardResource>(), cmd.player) {
+        if is_in_check(world.resource::<BoardResource>(), cmd.player) {
             *world.resource_mut::<BoardResource>() = board_backup;
             return Err(EngineError::InvalidCommand { reason: "Drop leaves king in check".into() });
         }
@@ -153,7 +153,7 @@ pub fn build_shogi_rules() -> RuleEngine {
             if cmd.player == board.sente { board.gote } else { board.sente }
         };
 
-        if is_checkmate(&world.resource::<BoardResource>(), opponent) {
+        if is_checkmate(world.resource::<BoardResource>(), opponent) {
             events.push(Box::new(GameOverEvent { winner: Some(cmd.player) }));
         }
 

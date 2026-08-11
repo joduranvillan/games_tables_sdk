@@ -504,7 +504,7 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     #[func]
     fn start_local_match_crisis(&mut self, seed: i64, players: Variant) -> bool {
         let player_ids = Self::parse_player_ids(&players);
-        if player_ids.len() < 2 || player_ids.len() > 6 {
+        if !(2..=6).contains(&player_ids.len()) {
             return false;
         }
         self.current_game_type = "crisis".to_string();

@@ -308,7 +308,7 @@ pub fn build_backgammon_rules() -> RuleEngine {
         }
 
         if !remaining_dice.is_empty() {
-            if !sides.has_any_valid_move(&world.resource::<BoardResource>(), cmd.player, &remaining_dice) {
+            if !sides.has_any_valid_move(world.resource::<BoardResource>(), cmd.player, &remaining_dice) {
                 world
                     .resource_mut::<PendingDiceResource>()
                     .pending

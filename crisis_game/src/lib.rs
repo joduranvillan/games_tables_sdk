@@ -39,7 +39,7 @@ pub fn new_crisis_session(
     seed: u64,
     players: &[PlayerId],
 ) -> Result<Session, EngineError> {
-    if players.len() < 2 || players.len() > 6 {
+    if !(2..=6).contains(&players.len()) {
         return Err(EngineError::InvalidCommand {
             reason: "TEG requiere entre 2 y 6 jugadores".to_string(),
         });
