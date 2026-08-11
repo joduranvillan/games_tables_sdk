@@ -3,6 +3,7 @@ name = "open_table_godot"
 version = "0.1.0"
 edition = "2021"
 description = "Puente GDExtension entre OpenTable SDK y Godot/Redot. Expone la Session del motor Rust como un nodo con señales."
+license = "MIT OR Apache-2.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

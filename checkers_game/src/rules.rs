@@ -138,7 +138,7 @@ pub fn build_checkers_rules() -> RuleEngine {
             && !board.get_available_captures_for_piece(&sides_snapshot, cmd.player, cmd.to).is_empty();
 
         let counts = board.count_pieces();
-        drop(board); // soltar el borrow antes de tocar otros resources
+        let _ = board; // soltar el borrow antes de tocar otros resources
 
         if let Some(mut multi) = world.get_resource_mut::<MultiCaptureResource>() {
             if has_further_capture {

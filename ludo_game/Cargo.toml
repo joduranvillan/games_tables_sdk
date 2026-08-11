@@ -3,6 +3,7 @@ name = "ludo_game"
 version = "0.1.0"
 edition = "2021"
 description = "Juego de referencia del OpenTable SDK: Ludo simplificado. Muestra 2-4 jugadores, movimiento por dado, y captura al pisar la ficha rival."
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 open_table_core = { path = "../open_table_core" }

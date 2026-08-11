@@ -95,7 +95,7 @@ pub fn build_crisis_rules() -> RuleEngine {
             return Err(invalid("el territorio objetivo no te pertenece"));
         }
 
-        if cmd.count < 1 || cmd.count > armies_remaining {
+        if !(1..=armies_remaining).contains(&cmd.count) {
             return Err(invalid("cantidad de ejércitos a colocar inválida"));
         }
 
@@ -161,7 +161,7 @@ pub fn build_crisis_rules() -> RuleEngine {
         }
 
         let max_dice = std::cmp::min(3, armies_from - 1) as u8;
-        if cmd.dice < 1 || cmd.dice > max_dice {
+        if !(1..=max_dice).contains(&cmd.dice) {
             return Err(invalid(format!(
                 "cantidad de dados inválida ({}, max: {})",
                 cmd.dice, max_dice

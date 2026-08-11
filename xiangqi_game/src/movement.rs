@@ -23,7 +23,7 @@ pub fn is_legal_move(board: &BoardResource, from: (usize, usize), to: (usize, us
     match piece.kind {
         PieceKind::General => {
             if dx + dy != 1 { return false; }
-            if tx < 3 || tx > 5 { return false; }
+            if !(3..=5).contains(&tx) { return false; }
             if is_red {
                 if ty < 7 { return false; }
             } else {
@@ -33,7 +33,7 @@ pub fn is_legal_move(board: &BoardResource, from: (usize, usize), to: (usize, us
         },
         PieceKind::Advisor => {
             if dx != 1 || dy != 1 { return false; }
-            if tx < 3 || tx > 5 { return false; }
+            if !(3..=5).contains(&tx) { return false; }
             if is_red {
                 if ty < 7 { return false; }
             } else {
@@ -169,10 +169,8 @@ pub fn is_in_check(board: &BoardResource, player: PlayerId) -> bool {
     let opponent = if player == board.red { board.black } else { board.red };
 
     for (&from, piece) in &board.squares {
-        if piece.owner == opponent {
-            if is_legal_move(board, from, g_pos, opponent) {
-                return true;
-            }
+        if piece.owner == opponent && is_legal_move(board, from, g_pos, opponent) {
+            return true;
         }
     }
 

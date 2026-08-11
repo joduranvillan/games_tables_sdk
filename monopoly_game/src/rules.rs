@@ -54,7 +54,7 @@ fn handle_bankruptcy(
             players.properties.remove(&space);
         }
     }
-    drop(players);
+    let _ = players;
 
     let all_players = world.resource::<TurnResource>().0.players().to_vec();
     let players_res = world.resource::<PlayersResource>();
@@ -92,7 +92,7 @@ pub fn build_monopoly_rules() -> RuleEngine {
             return Err(invalid("no tenés suficiente dinero para pagar la fianza"));
         }
         players.money.insert(cmd.player, money - 50);
-        drop(players);
+        let _ = players;
 
         world
             .resource_mut::<JailResource>()
@@ -155,7 +155,7 @@ pub fn build_monopoly_rules() -> RuleEngine {
                 let money = *players.money.get(&winner).unwrap_or(&0);
                 players.money.insert(winner, money - state.current_bid as i64);
                 players.properties.insert(state.space, winner);
-                drop(players);
+                let _ = players;
 
                 events.push(Box::new(AuctionWonEvent {
                     player: winner,
@@ -204,7 +204,7 @@ pub fn build_monopoly_rules() -> RuleEngine {
                     let mut players = world.resource_mut::<PlayersResource>();
                     let money = *players.money.get(&cmd.player).unwrap_or(&0) - 50;
                     players.money.insert(cmd.player, money);
-                    drop(players);
+                    let _ = players;
 
                     if money < 0 {
                         handle_bankruptcy(cmd.player, None, world, &mut events);
@@ -250,7 +250,7 @@ pub fn build_monopoly_rules() -> RuleEngine {
 
         players.position.insert(cmd.player, new_pos);
         players.money.insert(cmd.player, money);
-        drop(players);
+        let _ = players;
 
         if jailed {
             world.resource_mut::<JailResource>().jailed.insert(cmd.player, 3);
@@ -294,7 +294,7 @@ pub fn build_monopoly_rules() -> RuleEngine {
                             let payer_money = players.money.get(&cmd.player).copied().unwrap_or(0) - actual_rent as i64;
                             players.money.insert(cmd.player, payer_money);
                             *players.money.entry(owner).or_insert(0) += actual_rent as i64;
-                            drop(players);
+                            let _ = players;
 
                             events.push(Box::new(RentPaidEvent {
                                 payer: cmd.player,
@@ -329,7 +329,7 @@ pub fn build_monopoly_rules() -> RuleEngine {
                             let payer_money = players.money.get(&cmd.player).copied().unwrap_or(0) - actual_rent as i64;
                             players.money.insert(cmd.player, payer_money);
                             *players.money.entry(owner).or_insert(0) += actual_rent as i64;
-                            drop(players);
+                            let _ = players;
 
                             events.push(Box::new(UtilityRentPaidEvent {
                                 player: cmd.player,
@@ -369,7 +369,7 @@ pub fn build_monopoly_rules() -> RuleEngine {
                             let payer_money = players.money.get(&cmd.player).copied().unwrap_or(0) - actual_rent as i64;
                             players.money.insert(cmd.player, payer_money);
                             *players.money.entry(owner).or_insert(0) += actual_rent as i64;
-                            drop(players);
+                            let _ = players;
 
                             events.push(Box::new(RailroadRentPaidEvent {
                                 player: cmd.player,
@@ -427,7 +427,7 @@ pub fn build_monopoly_rules() -> RuleEngine {
             }
             players.money.insert(cmd.player, money - price as i64);
             players.properties.insert(space, cmd.player);
-            drop(players);
+            let _ = players;
 
             events.push(Box::new(PropertyPurchasedEvent {
                 player: cmd.player,

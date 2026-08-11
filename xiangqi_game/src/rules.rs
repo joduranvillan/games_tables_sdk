@@ -98,7 +98,7 @@ pub fn build_xiangqi_rules() -> RuleEngine {
                     if dx != 1 || dy != 1 {
                         return Err(EngineError::InvalidCommand { reason: "Advisor must move diagonally one step".into() });
                     }
-                    if cmd.to.0 < 3 || cmd.to.0 > 5 || (is_red && (cmd.to.1 < 7 || cmd.to.1 > 9)) || (!is_red && cmd.to.1 > 2) {
+                    if !(3..=5).contains(&cmd.to.0) || (is_red && !(7..=9).contains(&cmd.to.1)) || (!is_red && cmd.to.1 > 2) {
                         return Err(EngineError::InvalidCommand { reason: "Advisor must stay within the palace".into() });
                     }
                 }
