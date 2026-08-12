@@ -92,14 +92,10 @@ impl BoardResource {
     /// cero, el otro ganó.
     pub fn count_pieces(&self) -> Vec<(PlayerId, u32)> {
         let mut counts: Vec<(PlayerId, u32)> = Vec::new();
-        for row in &self.cells {
-            for cell in row {
-                if let Some(piece) = cell {
-                    match counts.iter_mut().find(|(id, _)| *id == piece.owner) {
-                        Some((_, count)) => *count += 1,
-                        None => counts.push((piece.owner, 1)),
-                    }
-                }
+        for piece in self.cells.iter().flatten().flatten() {
+            match counts.iter_mut().find(|(id, _)| *id == piece.owner) {
+                Some((_, count)) => *count += 1,
+                None => counts.push((piece.owner, 1)),
             }
         }
         counts

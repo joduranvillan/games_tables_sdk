@@ -20,19 +20,9 @@ impl Default for DoublingCubeResource {
     }
 }
 
-#[derive(Debug, Clone, GameResource)]
+#[derive(Debug, Clone, Default, GameResource)]
 pub struct MatchStateResource {
     pub match_points: u32,
     pub scores: std::collections::HashMap<PlayerId, u32>,
     pub crawford_game: bool,
-}
-
-impl Default for MatchStateResource {
-    fn default() -> Self {
-        Self {
-            match_points: 0,
-            scores: std::collections::HashMap::new(),
-            crawford_game: false,
-        }
-    }
 }

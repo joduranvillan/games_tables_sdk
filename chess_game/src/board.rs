@@ -235,43 +235,43 @@ pub fn piece_moves(board: &BoardResource, sides: &Sides, from: Position, piece: 
 
             // Enroque blanco
             if piece.owner == sides.white && from == Position::new(0, 4) {
-                if !board.white_king_moved && !board.white_rook_h_moved {
-                    if matches!(board.get(Position::new(0, 7)), Some(r) if r.owner == sides.white && r.kind == PieceKind::Rook)
-                        && board.get(Position::new(0, 5)).is_none()
-                        && board.get(Position::new(0, 6)).is_none()
-                    {
-                        moves.push(Position::new(0, 6));
-                    }
+                if !board.white_king_moved
+                    && !board.white_rook_h_moved
+                    && matches!(board.get(Position::new(0, 7)), Some(r) if r.owner == sides.white && r.kind == PieceKind::Rook)
+                    && board.get(Position::new(0, 5)).is_none()
+                    && board.get(Position::new(0, 6)).is_none()
+                {
+                    moves.push(Position::new(0, 6));
                 }
-                if !board.white_king_moved && !board.white_rook_a_moved {
-                    if matches!(board.get(Position::new(0, 0)), Some(r) if r.owner == sides.white && r.kind == PieceKind::Rook)
-                        && board.get(Position::new(0, 1)).is_none()
-                        && board.get(Position::new(0, 2)).is_none()
-                        && board.get(Position::new(0, 3)).is_none()
-                    {
-                        moves.push(Position::new(0, 2));
-                    }
+                if !board.white_king_moved
+                    && !board.white_rook_a_moved
+                    && matches!(board.get(Position::new(0, 0)), Some(r) if r.owner == sides.white && r.kind == PieceKind::Rook)
+                    && board.get(Position::new(0, 1)).is_none()
+                    && board.get(Position::new(0, 2)).is_none()
+                    && board.get(Position::new(0, 3)).is_none()
+                {
+                    moves.push(Position::new(0, 2));
                 }
             }
 
             // Enroque negro
             if piece.owner == sides.black && from == Position::new(7, 4) {
-                if !board.black_king_moved && !board.black_rook_h_moved {
-                    if matches!(board.get(Position::new(7, 7)), Some(r) if r.owner == sides.black && r.kind == PieceKind::Rook)
-                        && board.get(Position::new(7, 5)).is_none()
-                        && board.get(Position::new(7, 6)).is_none()
-                    {
-                        moves.push(Position::new(7, 6));
-                    }
+                if !board.black_king_moved
+                    && !board.black_rook_h_moved
+                    && matches!(board.get(Position::new(7, 7)), Some(r) if r.owner == sides.black && r.kind == PieceKind::Rook)
+                    && board.get(Position::new(7, 5)).is_none()
+                    && board.get(Position::new(7, 6)).is_none()
+                {
+                    moves.push(Position::new(7, 6));
                 }
-                if !board.black_king_moved && !board.black_rook_a_moved {
-                    if matches!(board.get(Position::new(7, 0)), Some(r) if r.owner == sides.black && r.kind == PieceKind::Rook)
-                        && board.get(Position::new(7, 1)).is_none()
-                        && board.get(Position::new(7, 2)).is_none()
-                        && board.get(Position::new(7, 3)).is_none()
-                    {
-                        moves.push(Position::new(7, 2));
-                    }
+                if !board.black_king_moved
+                    && !board.black_rook_a_moved
+                    && matches!(board.get(Position::new(7, 0)), Some(r) if r.owner == sides.black && r.kind == PieceKind::Rook)
+                    && board.get(Position::new(7, 1)).is_none()
+                    && board.get(Position::new(7, 2)).is_none()
+                    && board.get(Position::new(7, 3)).is_none()
+                {
+                    moves.push(Position::new(7, 2));
                 }
             }
 
@@ -377,18 +377,14 @@ pub fn is_legal_move(board: &BoardResource, sides: &Sides, player: PlayerId, fro
         if is_in_check(board, sides, player) {
             return false;
         }
-        if to.col == 6 {
-            if is_square_attacked(board, sides, Position::new(from.row, 5), opponent)
-                || is_square_attacked(board, sides, Position::new(from.row, 6), opponent)
-            {
-                return false;
-            }
-        } else if to.col == 2 {
-            if is_square_attacked(board, sides, Position::new(from.row, 3), opponent)
-                || is_square_attacked(board, sides, Position::new(from.row, 2), opponent)
-            {
-                return false;
-            }
+        if (to.col == 6
+            && (is_square_attacked(board, sides, Position::new(from.row, 5), opponent)
+                || is_square_attacked(board, sides, Position::new(from.row, 6), opponent)))
+            || (to.col == 2
+                && (is_square_attacked(board, sides, Position::new(from.row, 3), opponent)
+                    || is_square_attacked(board, sides, Position::new(from.row, 2), opponent)))
+        {
+            return false;
         }
     }
 

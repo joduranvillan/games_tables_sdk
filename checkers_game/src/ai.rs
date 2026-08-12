@@ -16,7 +16,7 @@ pub fn checkers_ai_pick_move(session: &Session, player: PlayerId) -> Option<Move
     if session
         .world()
         .get_resource::<GameOverResource>()
-        .map_or(false, |r| r.0)
+        .is_some_and(|r| r.0)
     {
         return None;
     }
