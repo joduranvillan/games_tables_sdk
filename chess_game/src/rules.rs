@@ -40,19 +40,15 @@ fn is_insufficient_material(board: &BoardResource) -> bool {
         return true;
     }
 
-    if total == 3 {
-        if bishops.len() == 1 || knights == 1 {
-            return true;
-        }
+    if total == 3 && (bishops.len() == 1 || knights == 1) {
+        return true;
     }
 
-    if total == 4 {
-        if bishops.len() == 2 {
-            let color1 = (bishops[0].row + bishops[0].col) % 2;
-            let color2 = (bishops[1].row + bishops[1].col) % 2;
-            if color1 == color2 {
-                return true;
-            }
+    if total == 4 && bishops.len() == 2 {
+        let color1 = (bishops[0].row + bishops[0].col) % 2;
+        let color2 = (bishops[1].row + bishops[1].col) % 2;
+        if color1 == color2 {
+            return true;
         }
     }
 
