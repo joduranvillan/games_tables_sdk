@@ -7,33 +7,35 @@
 //! - NativeHost: servidor P2P nativo (Nearby Connections / MultipeerConnectivity).
 //! - NativeClient: cliente P2P nativo con handshake de token automático (`start_native_client`, `reconnect_native`).
 
-use godot::prelude::*;
 use godot::classes::{INode, Node};
+use godot::prelude::*;
 
 pub use godot;
 
-use checkers_game::{new_checkers_session, GameOverEvent, MovePieceCommand, PieceMovedEvent, Position};
-use shogi_game::new_shogi_session;
-use xiangqi_game::new_xiangqi_session;
-use go_game::new_go_session;
-use uno_game::new_uno_session;
+use backgammon_game::new_backgammon_session;
+use battleship_game::{new_battleship_session, ShotResult, ShotResultEvent};
+use checkers_game::{
+    new_checkers_session, GameOverEvent, MovePieceCommand, PieceMovedEvent, Position,
+};
+use chess_game::new_chess_session;
+use chinese_checkers_game::new_chinese_checkers_session;
 use crisis_game::{
     new_crisis_session, ArmiesPlacedEvent, AttackResolvedEvent, CardsExchangedEvent,
     PhaseChangedEvent, PlayerEliminatedEvent, TegGameOverEvent, TerritoryConqueredEvent,
 };
-use chess_game::new_chess_session;
-use chinese_checkers_game::new_chinese_checkers_session;
-use mille_bornes_game::new_mille_bornes_session;
-use backgammon_game::new_backgammon_session;
-use monopoly_game::new_monopoly_session;
+use go_game::new_go_session;
 use ludo_game::new_ludo_session;
-use battleship_game::{new_battleship_session, ShotResultEvent, ShotResult};
+use mille_bornes_game::new_mille_bornes_session;
+use monopoly_game::new_monopoly_session;
+use shogi_game::new_shogi_session;
+use uno_game::new_uno_session;
+use xiangqi_game::new_xiangqi_session;
 
 use open_table_engine::prelude::*;
-use open_table_transport_tcp::{TcpHostTransport, TcpClientTransport, ConnectionEvent};
 use open_table_transport_native_bridge::{
-    RawByteLink, RawLinkEvent, NativeHostTransport, NativeClientTransport, HandshakeStatus,
+    HandshakeStatus, NativeClientTransport, NativeHostTransport, RawByteLink, RawLinkEvent,
 };
+use open_table_transport_tcp::{ConnectionEvent, TcpClientTransport, TcpHostTransport};
 use std::sync::{Arc, Mutex};
 
 struct OpenTableExtension;
@@ -56,7 +58,8 @@ pub struct GodotNearbyLink {
 impl RawByteLink for GodotNearbyLink {
     fn send_raw(&mut self, peer_tag: &str, bytes: &[u8]) -> EngineResult<()> {
         let mut q = self.queue.lock().unwrap();
-        q.outgoing_sends.push((peer_tag.to_string(), bytes.to_vec()));
+        q.outgoing_sends
+            .push((peer_tag.to_string(), bytes.to_vec()));
         Ok(())
     }
 
@@ -144,8 +147,12 @@ fn create_session_for_players(game_type: &str, p1: PlayerId, p2: PlayerId) -> Op
         "xiangqi" => Some(new_xiangqi_session(id, seed, p1, p2)),
         "go" => Some(new_go_session(id, seed, p1, p2)),
         "uno" => Some(new_uno_session(id, seed, vec![p1, p2])),
-        "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => Some(new_chinese_checkers_session(id, seed, vec![p1, p2])),
-        "mille_bornes" | "mille-bornes" | "millebornes" => Some(new_mille_bornes_session(id, seed, p1, p2)),
+        "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => {
+            Some(new_chinese_checkers_session(id, seed, vec![p1, p2]))
+        }
+        "mille_bornes" | "mille-bornes" | "millebornes" => {
+            Some(new_mille_bornes_session(id, seed, p1, p2))
+        }
         "backgammon" => Some(new_backgammon_session(id, seed, p1, p2)),
         "monopoly" => Some(new_monopoly_session(id, seed, p1, p2)),
         "ludo" => Some(new_ludo_session(id, seed, vec![p1, p2])),
@@ -167,8 +174,12 @@ fn create_initial_session(game_type: &str) -> Option<Session> {
         "go" => Some(new_go_session(id, seed, p1, p2)),
         "uno" => Some(new_uno_session(id, seed, vec![p1, p2])),
         "crisis" => new_crisis_session(id, seed, &[p1, p2]).ok(),
-        "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => Some(new_chinese_checkers_session(id, seed, vec![p1, p2])),
-        "mille_bornes" | "mille-bornes" | "millebornes" => Some(new_mille_bornes_session(id, seed, p1, p2)),
+        "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => {
+            Some(new_chinese_checkers_session(id, seed, vec![p1, p2]))
+        }
+        "mille_bornes" | "mille-bornes" | "millebornes" => {
+            Some(new_mille_bornes_session(id, seed, p1, p2))
+        }
         "backgammon" => Some(new_backgammon_session(id, seed, p1, p2)),
         "monopoly" => Some(new_monopoly_session(id, seed, p1, p2)),
         "ludo" => Some(new_ludo_session(id, seed, vec![p1, p2])),
@@ -177,7 +188,10 @@ fn create_initial_session(game_type: &str) -> Option<Session> {
     }
 }
 
-fn parse_command_json(json_str: &str, current_game_type: &str) -> Result<Box<dyn Command>, serde_json::Error> {
+fn parse_command_json(
+    json_str: &str,
+    current_game_type: &str,
+) -> Result<Box<dyn Command>, serde_json::Error> {
     if let Ok(cmd) = serde_json::from_str::<Box<dyn Command>>(json_str) {
         return Ok(cmd);
     }
@@ -279,22 +293,10 @@ impl OpenTableBridge {
     );
 
     #[signal]
-    fn token_moved(
-        player: i64,
-        token_index: i64,
-        from_steps: i64,
-        to_steps: i64,
-        finished: bool,
-    );
+    fn token_moved(player: i64, token_index: i64, from_steps: i64, to_steps: i64, finished: bool);
 
     #[signal]
-    fn checker_moved(
-        player: i64,
-        from: i64,
-        to: i64,
-        captured_opponent: bool,
-        borne_off: bool,
-    );
+    fn checker_moved(player: i64, from: i64, to: i64, captured_opponent: bool, borne_off: bool);
 
     #[signal]
     fn shot_result(player: i64, row: i64, col: i64, is_hit: bool);
@@ -339,12 +341,7 @@ impl OpenTableBridge {
     fn spectator_event_received(event_json: GString);
 
     #[signal]
-    fn territory_conquered(
-        player_id: i64,
-        territory_id: i64,
-        from_armies: i64,
-        to_armies: i64,
-    );
+    fn territory_conquered(player_id: i64, territory_id: i64, from_armies: i64, to_armies: i64);
 
     #[signal]
     fn attack_resolved(
@@ -357,12 +354,7 @@ impl OpenTableBridge {
     );
 
     #[signal]
-    fn armies_placed(
-        player_id: i64,
-        territory_id: i64,
-        count: i64,
-        remaining: i64,
-    );
+    fn armies_placed(player_id: i64, territory_id: i64, count: i64, remaining: i64);
 
     #[signal]
     fn player_eliminated(player_id: i64, by_player_id: i64);
@@ -459,7 +451,8 @@ impl OpenTableBridge {
     #[func]
     fn start_local_match_xiangqi(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "xiangqi".to_string();
-        let session = new_xiangqi_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        let session =
+            new_xiangqi_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
         self.mode = BridgeMode::Local {
             session,
             ai_player: None,
@@ -479,27 +472,31 @@ impl OpenTableBridge {
     #[func]
     fn start_local_match_uno(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "uno".to_string();
-        let session = new_uno_session(SessionId(1), 1, vec![PlayerId(p1 as u32), PlayerId(p2 as u32)]);
+        let session = new_uno_session(
+            SessionId(1),
+            1,
+            vec![PlayerId(p1 as u32), PlayerId(p2 as u32)],
+        );
         self.mode = BridgeMode::Local {
             session,
             ai_player: None,
         };
     }
 
-fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
-    if let Ok(arr) = players.try_to::<Array<i64>>() {
-        arr.iter_shared().map(|p| PlayerId(p as u32)).collect()
-    } else if let Ok(arr) = players.try_to::<VariantArray>() {
-        arr.iter_shared()
-            .filter_map(|p| p.try_to::<i64>().ok())
-            .map(|p| PlayerId(p as u32))
-            .collect()
-    } else if let Ok(arr) = players.try_to::<PackedInt64Array>() {
-        arr.as_slice().iter().map(|&p| PlayerId(p as u32)).collect()
-    } else {
-        Vec::new()
+    fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
+        if let Ok(arr) = players.try_to::<Array<i64>>() {
+            arr.iter_shared().map(|p| PlayerId(p as u32)).collect()
+        } else if let Ok(arr) = players.try_to::<VariantArray>() {
+            arr.iter_shared()
+                .filter_map(|p| p.try_to::<i64>().ok())
+                .map(|p| PlayerId(p as u32))
+                .collect()
+        } else if let Ok(arr) = players.try_to::<PackedInt64Array>() {
+            arr.as_slice().iter().map(|&p| PlayerId(p as u32)).collect()
+        } else {
+            Vec::new()
+        }
     }
-}
 
     #[func]
     fn start_local_match_crisis(&mut self, seed: i64, players: Variant) -> bool {
@@ -532,7 +529,11 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     #[func]
     fn start_local_match_chinese_checkers(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "chinese_checkers".to_string();
-        let session = new_chinese_checkers_session(SessionId(1), 1, vec![PlayerId(p1 as u32), PlayerId(p2 as u32)]);
+        let session = new_chinese_checkers_session(
+            SessionId(1),
+            1,
+            vec![PlayerId(p1 as u32), PlayerId(p2 as u32)],
+        );
         self.mode = BridgeMode::Local {
             session,
             ai_player: None,
@@ -542,7 +543,8 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     #[func]
     fn start_local_match_mille_bornes(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "mille_bornes".to_string();
-        let session = new_mille_bornes_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        let session =
+            new_mille_bornes_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
         self.mode = BridgeMode::Local {
             session,
             ai_player: None,
@@ -552,7 +554,8 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     #[func]
     fn start_local_match_backgammon(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "backgammon".to_string();
-        let session = new_backgammon_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        let session =
+            new_backgammon_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
         self.mode = BridgeMode::Local {
             session,
             ai_player: None,
@@ -562,7 +565,8 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     #[func]
     fn start_local_match_monopoly(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "monopoly".to_string();
-        let session = new_monopoly_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        let session =
+            new_monopoly_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
         self.mode = BridgeMode::Local {
             session,
             ai_player: None,
@@ -572,7 +576,11 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     #[func]
     fn start_local_match_ludo(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "ludo".to_string();
-        let session = new_ludo_session(SessionId(1), 1, vec![PlayerId(p1 as u32), PlayerId(p2 as u32)]);
+        let session = new_ludo_session(
+            SessionId(1),
+            1,
+            vec![PlayerId(p1 as u32), PlayerId(p2 as u32)],
+        );
         self.mode = BridgeMode::Local {
             session,
             ai_player: None,
@@ -582,7 +590,8 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     #[func]
     fn start_local_match_battleship(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "battleship".to_string();
-        let session = new_battleship_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        let session =
+            new_battleship_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
         self.mode = BridgeMode::Local {
             session,
             ai_player: None,
@@ -616,10 +625,11 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
         }
 
         let first_match = &matches[0];
-        let session = match create_session_for_players(&gt, first_match.player1, first_match.player2) {
-            Some(s) => s,
-            None => return false,
-        };
+        let session =
+            match create_session_for_players(&gt, first_match.player1, first_match.player2) {
+                Some(s) => s,
+                None => return false,
+            };
 
         let mut scores = std::collections::HashMap::new();
         for &p in &p_vec {
@@ -643,12 +653,14 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
 
         self.base_mut().emit_signal(
             "tournament_match_started",
-            &[Variant::from(first_p1), Variant::from(first_p2), Variant::from(first_round)],
+            &[
+                Variant::from(first_p1),
+                Variant::from(first_p2),
+                Variant::from(first_round),
+            ],
         );
-        self.base_mut().emit_signal(
-            "turn_changed",
-            &[Variant::from(first_turn)],
-        );
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(first_turn)]);
 
         true
     }
@@ -662,7 +674,13 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     }
 
     #[func]
-    fn add_multi_session(&mut self, game_id: GString, game_type: GString, p1: i64, p2: i64) -> bool {
+    fn add_multi_session(
+        &mut self,
+        game_id: GString,
+        game_type: GString,
+        p1: i64,
+        p2: i64,
+    ) -> bool {
         let gid = game_id.to_string();
         let gtype = game_type.to_string();
         let p1_id = PlayerId(p1 as u32);
@@ -739,12 +757,10 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             BridgeMode::Local { session, .. }
             | BridgeMode::Host { session, .. }
             | BridgeMode::NativeHost { session, .. }
-            | BridgeMode::Tournament { session, .. } => {
-                session.export_chess_pgn()
-            }
-            BridgeMode::MultiSession { sessions, active } => {
-                sessions.get(*active).and_then(|(_, s)| s.export_chess_pgn())
-            }
+            | BridgeMode::Tournament { session, .. } => session.export_chess_pgn(),
+            BridgeMode::MultiSession { sessions, active } => sessions
+                .get(*active)
+                .and_then(|(_, s)| s.export_chess_pgn()),
             _ => None,
         };
         GString::from(pgn_opt.unwrap_or_default())
@@ -764,14 +780,20 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
         let socket_addr: std::net::SocketAddr = format!("0.0.0.0:{}", port)
             .parse()
             .expect("puerto inválido");
-        let transport = TcpHostTransport::bind_with_timeout(socket_addr, std::time::Duration::from_secs(60))
-            .expect("no pude crear host");
+        let transport =
+            TcpHostTransport::bind_with_timeout(socket_addr, std::time::Duration::from_secs(60))
+                .expect("no pude crear host");
         self.mode = BridgeMode::Host { session, transport };
         godot_print!("✅ Host escuchando en puerto {}", port);
     }
 
     #[func]
-    fn get_join_qr_svg(&self, join_code: GString, host_name: GString, game_type: GString) -> GString {
+    fn get_join_qr_svg(
+        &self,
+        join_code: GString,
+        host_name: GString,
+        game_type: GString,
+    ) -> GString {
         let payload = open_table_qr::JoinPayload {
             session_id: open_table_core::ids::SessionId(1),
             join_code: join_code.to_string(),
@@ -785,7 +807,12 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     }
 
     #[func]
-    fn generate_join_qr_svg(&self, join_code: GString, host_name: GString, game_type: GString) -> GString {
+    fn generate_join_qr_svg(
+        &self,
+        join_code: GString,
+        host_name: GString,
+        game_type: GString,
+    ) -> GString {
         self.get_join_qr_svg(join_code, host_name, game_type)
     }
 
@@ -809,8 +836,13 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
                 };
                 self.base_mut()
                     .emit_signal("connected", &[Variant::from(player_id.0 as i64)]);
-                self.base_mut()
-                    .emit_signal("native_handshake_established", &[Variant::from(player_id.0 as i64), Variant::from(reconnect_token)]);
+                self.base_mut().emit_signal(
+                    "native_handshake_established",
+                    &[
+                        Variant::from(player_id.0 as i64),
+                        Variant::from(reconnect_token),
+                    ],
+                );
                 true
             }
             Err(_) => false,
@@ -818,7 +850,13 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     }
 
     #[func]
-    pub fn reconnect_to_host(&mut self, host: GString, port: i64, arg3: Variant, arg4: Variant) -> bool {
+    pub fn reconnect_to_host(
+        &mut self,
+        host: GString,
+        port: i64,
+        arg3: Variant,
+        arg4: Variant,
+    ) -> bool {
         let addr = format!("{}:{}", host.to_string(), port);
         let mut player_id = PlayerId(2);
         let mut token = String::new();
@@ -855,7 +893,10 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
 
     #[func]
     pub fn disconnect_from_host(&mut self) {
-        if matches!(self.mode, BridgeMode::Client { .. } | BridgeMode::Spectator { .. }) {
+        if matches!(
+            self.mode,
+            BridgeMode::Client { .. } | BridgeMode::Spectator { .. }
+        ) {
             self.mode = BridgeMode::None;
             self.base_mut().emit_signal("disconnected", &[]);
         }
@@ -885,7 +926,9 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     #[func]
     fn is_native_connected(&self) -> bool {
         match &self.mode {
-            BridgeMode::NativeClient { handshake_complete, .. } => *handshake_complete,
+            BridgeMode::NativeClient {
+                handshake_complete, ..
+            } => *handshake_complete,
             BridgeMode::NativeHost { .. } => true,
             _ => false,
         }
@@ -895,7 +938,11 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     fn send_move_client(&mut self, from_row: i64, from_col: i64, to_row: i64, to_col: i64) {
         let command_parts = match &self.mode {
             BridgeMode::Client { player_id, .. } => Some(*player_id),
-            BridgeMode::NativeClient { player_id, handshake_complete, .. } if *handshake_complete => Some(*player_id),
+            BridgeMode::NativeClient {
+                player_id,
+                handshake_complete,
+                ..
+            } if *handshake_complete => Some(*player_id),
             _ => None,
         };
         let Some(player_id) = command_parts else {
@@ -914,7 +961,10 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
                     let _ = transport.send(open_table_transport_tcp::HOST_PLAYER_ID, &serialized);
                 }
                 BridgeMode::NativeClient { transport, .. } => {
-                    let _ = transport.send(open_table_transport_native_bridge::HOST_PLAYER_ID, &serialized);
+                    let _ = transport.send(
+                        open_table_transport_native_bridge::HOST_PLAYER_ID,
+                        &serialized,
+                    );
                 }
                 _ => {}
             }
@@ -933,16 +983,24 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             PlayerId(player_bottom_id as u32),
         );
         let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
-        let link = GodotNearbyLink { queue: queue.clone() };
+        let link = GodotNearbyLink {
+            queue: queue.clone(),
+        };
         let transport = NativeHostTransport::new(link);
-        self.mode = BridgeMode::NativeHost { session, transport, queue };
+        self.mode = BridgeMode::NativeHost {
+            session,
+            transport,
+            queue,
+        };
         godot_print!("✅ Native Host iniciado");
     }
 
     #[func]
     fn start_native_client(&mut self, player_name: GString) {
         let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
-        let link = GodotNearbyLink { queue: queue.clone() };
+        let link = GodotNearbyLink {
+            queue: queue.clone(),
+        };
         let transport = NativeClientTransport::begin_join(link, &player_name.to_string())
             .expect("no pude iniciar handshake nativo");
         self.mode = BridgeMode::NativeClient {
@@ -957,7 +1015,9 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     #[func]
     fn reconnect_native(&mut self, player_id: i64, token: GString) {
         let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
-        let link = GodotNearbyLink { queue: queue.clone() };
+        let link = GodotNearbyLink {
+            queue: queue.clone(),
+        };
         let pid = PlayerId(player_id as u32);
         let transport = NativeClientTransport::begin_reconnect(link, pid, token.to_string())
             .expect("no pude iniciar reconexión nativa");
@@ -987,7 +1047,8 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
         match &self.mode {
             BridgeMode::NativeHost { queue, .. } | BridgeMode::NativeClient { queue, .. } => {
                 let mut q = queue.lock().unwrap();
-                q.events.push(RawLinkEvent::Disconnected(peer_tag.to_string()));
+                q.events
+                    .push(RawLinkEvent::Disconnected(peer_tag.to_string()));
             }
             _ => {}
         }
@@ -1005,7 +1066,11 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
         self.base_mut().emit_signal(signal_name, args);
     }
 
-    fn process_and_emit(&mut self, sender: PlayerId, command: Box<dyn Command>) -> EngineResult<Vec<Box<dyn Event>>> {
+    fn process_and_emit(
+        &mut self,
+        sender: PlayerId,
+        command: Box<dyn Command>,
+    ) -> EngineResult<Vec<Box<dyn Event>>> {
         let (prev_player, result) = match &mut self.mode {
             BridgeMode::Local { session, .. } => {
                 let prev = session.current_player();
@@ -1038,10 +1103,16 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
                     let res = session.process_command(sender, command);
                     (prev, res)
                 } else {
-                    return Err(EngineError::InvalidCommand { reason: "No active session in MultiSession".into() });
+                    return Err(EngineError::InvalidCommand {
+                        reason: "No active session in MultiSession".into(),
+                    });
                 }
             }
-            _ => return Err(EngineError::InvalidCommand { reason: "El modo no soporta comandos".into() }),
+            _ => {
+                return Err(EngineError::InvalidCommand {
+                    reason: "El modo no soporta comandos".into(),
+                })
+            }
         };
 
         match &result {
@@ -1053,9 +1124,10 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
                     BridgeMode::NativeHost { session, .. } => session.current_player(),
                     BridgeMode::Replay { session, .. } => session.current_player(),
                     BridgeMode::Tournament { session, .. } => session.current_player(),
-                    BridgeMode::MultiSession { sessions, active } => {
-                        sessions.get(*active).map(|(_, s)| s.current_player()).unwrap_or(prev_player)
-                    }
+                    BridgeMode::MultiSession { sessions, active } => sessions
+                        .get(*active)
+                        .map(|(_, s)| s.current_player())
+                        .unwrap_or(prev_player),
                     _ => prev_player,
                 };
                 if new_player != prev_player {
@@ -1077,15 +1149,16 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     #[func]
     pub fn send_command_json(&mut self, player: i64, json_str: GString) {
         let player_id = PlayerId(player as u32);
-        let command: Box<dyn Command> = match parse_command_json(&json_str.to_string(), &self.current_game_type) {
-            Ok(cmd) => cmd,
-            Err(e) => {
-                let msg = format!("Error parsing command JSON: {e}");
-                godot_error!("[EngineError] {}", msg);
-                self.emit_bridge_signal("move_rejected", &[Variant::from(msg)]);
-                return;
-            }
-        };
+        let command: Box<dyn Command> =
+            match parse_command_json(&json_str.to_string(), &self.current_game_type) {
+                Ok(cmd) => cmd,
+                Err(e) => {
+                    let msg = format!("Error parsing command JSON: {e}");
+                    godot_error!("[EngineError] {}", msg);
+                    self.emit_bridge_signal("move_rejected", &[Variant::from(msg)]);
+                    return;
+                }
+            };
 
         if let Ok(events) = self.process_and_emit(player_id, command) {
             match &mut self.mode {
@@ -1111,12 +1184,11 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             | BridgeMode::Host { session, .. }
             | BridgeMode::NativeHost { session, .. }
             | BridgeMode::Replay { session, .. }
-            | BridgeMode::Tournament { session, .. } => {
-                session.get_legal_moves(player)
-            }
-            BridgeMode::MultiSession { sessions, active } => {
-                sessions.get(*active).map(|(_, s)| s.get_legal_moves(player)).unwrap_or_default()
-            }
+            | BridgeMode::Tournament { session, .. } => session.get_legal_moves(player),
+            BridgeMode::MultiSession { sessions, active } => sessions
+                .get(*active)
+                .map(|(_, s)| s.get_legal_moves(player))
+                .unwrap_or_default(),
             _ => vec![],
         };
 
@@ -1181,7 +1253,9 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     pub fn save_game(&self, filename: GString) -> bool {
         let mut path = filename.to_string();
         if path.starts_with("user://") {
-            let user_dir = godot::classes::Os::singleton().get_user_data_dir().to_string();
+            let user_dir = godot::classes::Os::singleton()
+                .get_user_data_dir()
+                .to_string();
             let fname = path.trim_start_matches("user://");
             path = format!("{}/{}", user_dir, fname);
         }
@@ -1189,9 +1263,7 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             BridgeMode::Local { session, .. }
             | BridgeMode::Host { session, .. }
             | BridgeMode::NativeHost { session, .. }
-            | BridgeMode::Tournament { session, .. } => {
-                session.save_to_file(&path).is_ok()
-            }
+            | BridgeMode::Tournament { session, .. } => session.save_to_file(&path).is_ok(),
             BridgeMode::MultiSession { sessions, active } => {
                 if let Some((_, s)) = sessions.get(*active) {
                     s.save_to_file(&path).is_ok()
@@ -1207,7 +1279,9 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     pub fn load_game(&mut self, filename: GString) -> bool {
         let mut path = filename.to_string();
         if path.starts_with("user://") {
-            let user_dir = godot::classes::Os::singleton().get_user_data_dir().to_string();
+            let user_dir = godot::classes::Os::singleton()
+                .get_user_data_dir()
+                .to_string();
             let fname = path.trim_start_matches("user://");
             path = format!("{}/{}", user_dir, fname);
         }
@@ -1221,20 +1295,75 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
         let p1 = PlayerId(1);
         let p2 = PlayerId(2);
         let (id, seed, players, rules) = match game_type.to_lowercase().as_str() {
-            "checkers" => (SessionId(1), 1, vec![p1, p2], checkers_game::build_checkers_rules()),
-            "chess" => (SessionId(1), 1, vec![p1, p2], chess_game::build_chess_rules()),
-            "shogi" => (SessionId(1), 1, vec![p1, p2], shogi_game::build_shogi_rules()),
-            "xiangqi" => (SessionId(1), 1, vec![p1, p2], xiangqi_game::build_xiangqi_rules()),
+            "checkers" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                checkers_game::build_checkers_rules(),
+            ),
+            "chess" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                chess_game::build_chess_rules(),
+            ),
+            "shogi" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                shogi_game::build_shogi_rules(),
+            ),
+            "xiangqi" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                xiangqi_game::build_xiangqi_rules(),
+            ),
             "go" => (SessionId(1), 1, vec![p1, p2], go_game::build_go_rules()),
             "uno" => (SessionId(1), 1, vec![p1, p2], uno_game::build_uno_rules()),
-            "crisis" => (SessionId(1), 1, vec![p1, p2], crisis_game::build_crisis_rules()),
-            "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => (SessionId(1), 1, vec![p1, p2], chinese_checkers_game::build_chinese_checkers_rules()),
-            "mille_bornes" | "mille-bornes" | "millebornes" => (SessionId(1), 1, vec![p1, p2], mille_bornes_game::build_mille_bornes_rules()),
-            "backgammon" => (SessionId(1), 1, vec![p1, p2], backgammon_game::build_backgammon_rules()),
-            "monopoly" => (SessionId(1), 1, vec![p1, p2], monopoly_game::build_monopoly_rules()),
+            "crisis" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                crisis_game::build_crisis_rules(),
+            ),
+            "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                chinese_checkers_game::build_chinese_checkers_rules(),
+            ),
+            "mille_bornes" | "mille-bornes" | "millebornes" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                mille_bornes_game::build_mille_bornes_rules(),
+            ),
+            "backgammon" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                backgammon_game::build_backgammon_rules(),
+            ),
+            "monopoly" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                monopoly_game::build_monopoly_rules(),
+            ),
             "ludo" => (SessionId(1), 1, vec![p1, p2], ludo_game::build_ludo_rules()),
-            "battleship" => (SessionId(1), 1, vec![p1, p2], battleship_game::build_battleship_rules()),
-            _ => (SessionId(1), 1, vec![p1, p2], checkers_game::build_checkers_rules()),
+            "battleship" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                battleship_game::build_battleship_rules(),
+            ),
+            _ => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                checkers_game::build_checkers_rules(),
+            ),
         };
 
         let log_bytes = match std::fs::read(&path) {
@@ -1250,7 +1379,8 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
                     ai_player: None,
                 };
                 self.emit_game_events(&events);
-                self.base_mut().emit_signal("turn_changed", &[Variant::from(current_p)]);
+                self.base_mut()
+                    .emit_signal("turn_changed", &[Variant::from(current_p)]);
                 true
             }
             Err(_) => false,
@@ -1264,9 +1394,10 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             BridgeMode::Host { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::NativeHost { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::Replay { session, .. } => session.export_log().unwrap_or_default(),
-            BridgeMode::MultiSession { sessions, active } => {
-                sessions.get(*active).and_then(|(_, s)| s.export_log().ok()).unwrap_or_default()
-            }
+            BridgeMode::MultiSession { sessions, active } => sessions
+                .get(*active)
+                .and_then(|(_, s)| s.export_log().ok())
+                .unwrap_or_default(),
             _ => vec![],
         };
         let mut packed = PackedByteArray::new();
@@ -1279,10 +1410,11 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     #[func]
     pub fn load_replay(&mut self, log_bytes: PackedByteArray, game_type: GString) -> bool {
         let bytes = log_bytes.to_vec();
-        let log: Vec<open_table_engine::session::LoggedCommand> = match serde_json::from_slice(&bytes) {
-            Ok(l) => l,
-            Err(_) => return false,
-        };
+        let log: Vec<open_table_engine::session::LoggedCommand> =
+            match serde_json::from_slice(&bytes) {
+                Ok(l) => l,
+                Err(_) => return false,
+            };
 
         let initial_session = match create_initial_session(&game_type.to_string()) {
             Some(s) => s,
@@ -1309,7 +1441,11 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     #[func]
     pub fn step_replay(&mut self) -> bool {
         let (sender, command) = {
-            let BridgeMode::Replay { session, pending_commands } = &mut self.mode else {
+            let BridgeMode::Replay {
+                session,
+                pending_commands,
+            } = &mut self.mode
+            else {
                 return false;
             };
 
@@ -1367,7 +1503,10 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             return false;
         }
 
-        let BridgeMode::Local { ref mut session, .. } = self.mode else {
+        let BridgeMode::Local {
+            ref mut session, ..
+        } = self.mode
+        else {
             return false;
         };
 
@@ -1376,7 +1515,10 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             _ => return false,
         };
 
-        let logged: Vec<open_table_engine::session::LoggedCommand> = match serde_json::from_slice::<Vec<open_table_engine::session::LoggedCommand>>(&log_bytes) {
+        let logged: Vec<open_table_engine::session::LoggedCommand> = match serde_json::from_slice::<
+            Vec<open_table_engine::session::LoggedCommand>,
+        >(&log_bytes)
+        {
             Ok(l) if !l.is_empty() => l,
             _ => return false,
         };
@@ -1399,23 +1541,80 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
         let p1 = PlayerId(1);
         let p2 = PlayerId(2);
         let (id, seed, players, rules) = match game_type.to_lowercase().as_str() {
-            "checkers" => (SessionId(1), 1, vec![p1, p2], checkers_game::build_checkers_rules()),
-            "chess" => (SessionId(1), 1, vec![p1, p2], chess_game::build_chess_rules()),
-            "shogi" => (SessionId(1), 1, vec![p1, p2], shogi_game::build_shogi_rules()),
-            "xiangqi" => (SessionId(1), 1, vec![p1, p2], xiangqi_game::build_xiangqi_rules()),
+            "checkers" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                checkers_game::build_checkers_rules(),
+            ),
+            "chess" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                chess_game::build_chess_rules(),
+            ),
+            "shogi" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                shogi_game::build_shogi_rules(),
+            ),
+            "xiangqi" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                xiangqi_game::build_xiangqi_rules(),
+            ),
             "go" => (SessionId(1), 1, vec![p1, p2], go_game::build_go_rules()),
             "uno" => (SessionId(1), 1, vec![p1, p2], uno_game::build_uno_rules()),
-            "crisis" => (SessionId(1), 1, vec![p1, p2], crisis_game::build_crisis_rules()),
-            "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => (SessionId(1), 1, vec![p1, p2], chinese_checkers_game::build_chinese_checkers_rules()),
-            "mille_bornes" | "mille-bornes" | "millebornes" => (SessionId(1), 1, vec![p1, p2], mille_bornes_game::build_mille_bornes_rules()),
-            "backgammon" => (SessionId(1), 1, vec![p1, p2], backgammon_game::build_backgammon_rules()),
-            "monopoly" => (SessionId(1), 1, vec![p1, p2], monopoly_game::build_monopoly_rules()),
+            "crisis" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                crisis_game::build_crisis_rules(),
+            ),
+            "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                chinese_checkers_game::build_chinese_checkers_rules(),
+            ),
+            "mille_bornes" | "mille-bornes" | "millebornes" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                mille_bornes_game::build_mille_bornes_rules(),
+            ),
+            "backgammon" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                backgammon_game::build_backgammon_rules(),
+            ),
+            "monopoly" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                monopoly_game::build_monopoly_rules(),
+            ),
             "ludo" => (SessionId(1), 1, vec![p1, p2], ludo_game::build_ludo_rules()),
-            "battleship" => (SessionId(1), 1, vec![p1, p2], battleship_game::build_battleship_rules()),
-            _ => (SessionId(1), 1, vec![p1, p2], checkers_game::build_checkers_rules()),
+            "battleship" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                battleship_game::build_battleship_rules(),
+            ),
+            _ => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                checkers_game::build_checkers_rules(),
+            ),
         };
 
-        if let Ok((_, events)) = Session::replay_collecting_events(id, seed, players, rules, &new_log_bytes) {
+        if let Ok((_, events)) =
+            Session::replay_collecting_events(id, seed, players, rules, &new_log_bytes)
+        {
             self.emit_game_events(&events);
         }
 
@@ -1423,7 +1622,8 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             BridgeMode::Local { session, .. } => session.current_player().0 as i64,
             _ => 1,
         };
-        self.base_mut().emit_signal("turn_changed", &[Variant::from(current_p)]);
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
 
         true
     }
@@ -1459,10 +1659,14 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             BridgeMode::NativeHost { session, .. } => session.current_player().0 as i64,
             BridgeMode::Replay { session, .. } => session.current_player().0 as i64,
             BridgeMode::Tournament { session, .. } => session.current_player().0 as i64,
-            BridgeMode::MultiSession { sessions, active } => {
-                sessions.get(*active).map(|(_, s)| s.current_player().0 as i64).unwrap_or(-1)
-            }
-            BridgeMode::Client { client_current_player, .. } => *client_current_player,
+            BridgeMode::MultiSession { sessions, active } => sessions
+                .get(*active)
+                .map(|(_, s)| s.current_player().0 as i64)
+                .unwrap_or(-1),
+            BridgeMode::Client {
+                client_current_player,
+                ..
+            } => *client_current_player,
             _ => -1,
         }
     }
@@ -1487,7 +1691,10 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             BridgeMode::NativeHost { .. } => self.poll_native_host_events(),
             BridgeMode::NativeClient { .. } => self.poll_native_client_events(),
             BridgeMode::Local { .. } => self.process_ai_turn_if_needed(),
-            BridgeMode::None | BridgeMode::Replay { .. } | BridgeMode::Tournament { .. } | BridgeMode::MultiSession { .. } => {}
+            BridgeMode::None
+            | BridgeMode::Replay { .. }
+            | BridgeMode::Tournament { .. }
+            | BridgeMode::MultiSession { .. } => {}
         }
         self.flush_native_outgoing();
     }
@@ -1603,24 +1810,34 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
     }
 
     fn poll_native_client_events(&mut self) {
-        let BridgeMode::NativeClient { transport, player_id, handshake_complete, .. } = &mut self.mode else {
+        let BridgeMode::NativeClient {
+            transport,
+            player_id,
+            handshake_complete,
+            ..
+        } = &mut self.mode
+        else {
             return;
         };
 
         if !*handshake_complete {
             match transport.poll_handshake() {
                 HandshakeStatus::Pending => {}
-                HandshakeStatus::Established { player_id: pid, reconnect_token } => {
+                HandshakeStatus::Established {
+                    player_id: pid,
+                    reconnect_token,
+                } => {
                     *player_id = pid;
                     *handshake_complete = true;
                     self.base_mut()
                         .emit_signal("connected", &[Variant::from(pid.0 as i64)]);
-                    self.base_mut()
-                        .emit_signal("native_handshake_established", &[Variant::from(pid.0 as i64), Variant::from(reconnect_token)]);
+                    self.base_mut().emit_signal(
+                        "native_handshake_established",
+                        &[Variant::from(pid.0 as i64), Variant::from(reconnect_token)],
+                    );
                 }
                 HandshakeStatus::Rejected { .. } => {
-                    self.base_mut()
-                        .emit_signal("disconnected", &[]);
+                    self.base_mut().emit_signal("disconnected", &[]);
                 }
             }
         }
@@ -1653,8 +1870,10 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             for b in bytes {
                 packed.push(b);
             }
-            self.base_mut()
-                .emit_signal("native_send_requested", &[Variant::from(peer_tag), Variant::from(packed)]);
+            self.base_mut().emit_signal(
+                "native_send_requested",
+                &[Variant::from(peer_tag), Variant::from(packed)],
+            );
         }
 
         for bytes in broadcasts {
@@ -1681,7 +1900,11 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
             }
 
             if let Some(moved) = event.as_any().downcast_ref::<PieceMovedEvent>() {
-                if let BridgeMode::Client { client_current_player, .. } = &mut self.mode {
+                if let BridgeMode::Client {
+                    client_current_player,
+                    ..
+                } = &mut self.mode
+                {
                     *client_current_player = if moved.player.0 == 1 { 2 } else { 1 };
                 }
                 let (captured_row, captured_col) = moved
@@ -1741,7 +1964,10 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
                 );
             }
 
-            if let Some(c_moved) = event.as_any().downcast_ref::<backgammon_game::CheckerMovedEvent>() {
+            if let Some(c_moved) = event
+                .as_any()
+                .downcast_ref::<backgammon_game::CheckerMovedEvent>()
+            {
                 let from_val = c_moved.from.map(|v| v as i64).unwrap_or(-1);
                 let to_val = c_moved.to.map(|v| v as i64).unwrap_or(-1);
                 self.emit_bridge_signal(
@@ -1868,7 +2094,9 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
 
                 if *current_match_idx < matches.len() {
                     let next_m = &matches[*current_match_idx];
-                    if let Some(new_sess) = create_session_for_players(game_type, next_m.player1, next_m.player2) {
+                    if let Some(new_sess) =
+                        create_session_for_players(game_type, next_m.player1, next_m.player2)
+                    {
                         *session = new_sess;
                     }
                     let p1 = next_m.player1.0 as i64;
@@ -1897,15 +2125,11 @@ fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
                 "tournament_match_started",
                 &[Variant::from(p1), Variant::from(p2), Variant::from(r)],
             );
-            self.base_mut().emit_signal(
-                "turn_changed",
-                &[Variant::from(turn)],
-            );
+            self.base_mut()
+                .emit_signal("turn_changed", &[Variant::from(turn)]);
         } else if is_over {
-            self.base_mut().emit_signal(
-                "tournament_over",
-                &[Variant::from(standings)],
-            );
+            self.base_mut()
+                .emit_signal("tournament_over", &[Variant::from(standings)]);
         }
     }
 

@@ -31,7 +31,12 @@ impl LegalMoveGenerator for ChessLegalMoveGenerator {
             for to in moves {
                 if is_legal_move(board, sides, player, from, to) {
                     if piece.kind == PieceKind::Pawn && to.row == sides.promotion_row(player) {
-                        for kind in [PieceKind::Queen, PieceKind::Rook, PieceKind::Bishop, PieceKind::Knight] {
+                        for kind in [
+                            PieceKind::Queen,
+                            PieceKind::Rook,
+                            PieceKind::Bishop,
+                            PieceKind::Knight,
+                        ] {
                             candidates.push(Box::new(MovePieceCommand {
                                 player,
                                 from,

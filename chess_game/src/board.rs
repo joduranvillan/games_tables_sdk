@@ -46,12 +46,36 @@ impl BoardResource {
             PieceKind::Rook,
         ];
         for (col, kind) in back_rank.iter().enumerate() {
-            pieces.insert(Position::new(0, col as u8), Piece { owner: white, kind: *kind });
-            pieces.insert(Position::new(7, col as u8), Piece { owner: black, kind: *kind });
+            pieces.insert(
+                Position::new(0, col as u8),
+                Piece {
+                    owner: white,
+                    kind: *kind,
+                },
+            );
+            pieces.insert(
+                Position::new(7, col as u8),
+                Piece {
+                    owner: black,
+                    kind: *kind,
+                },
+            );
         }
         for col in 0..8u8 {
-            pieces.insert(Position::new(1, col), Piece { owner: white, kind: PieceKind::Pawn });
-            pieces.insert(Position::new(6, col), Piece { owner: black, kind: PieceKind::Pawn });
+            pieces.insert(
+                Position::new(1, col),
+                Piece {
+                    owner: white,
+                    kind: PieceKind::Pawn,
+                },
+            );
+            pieces.insert(
+                Position::new(6, col),
+                Piece {
+                    owner: black,
+                    kind: PieceKind::Pawn,
+                },
+            );
         }
         Self {
             pieces,
@@ -89,7 +113,9 @@ impl BoardResource {
 
         current_player.hash(&mut hasher);
 
-        self.en_passant_target.map(|p| (p.row, p.col)).hash(&mut hasher);
+        self.en_passant_target
+            .map(|p| (p.row, p.col))
+            .hash(&mut hasher);
 
         self.white_king_moved.hash(&mut hasher);
         self.white_rook_a_moved.hash(&mut hasher);
@@ -146,7 +172,12 @@ fn in_bounds(row: i32, col: i32) -> bool {
     (0..8).contains(&row) && (0..8).contains(&col)
 }
 
-fn sliding_moves(board: &BoardResource, from: Position, piece: Piece, directions: &[(i32, i32)]) -> Vec<Position> {
+fn sliding_moves(
+    board: &BoardResource,
+    from: Position,
+    piece: Piece,
+    directions: &[(i32, i32)],
+) -> Vec<Position> {
     let mut moves = Vec::new();
     for &(dr, dc) in directions {
         let mut row = from.row as i32 + dr;
@@ -169,7 +200,12 @@ fn sliding_moves(board: &BoardResource, from: Position, piece: Piece, directions
     moves
 }
 
-fn stepping_moves(board: &BoardResource, from: Position, piece: Piece, deltas: &[(i32, i32)]) -> Vec<Position> {
+fn stepping_moves(
+    board: &BoardResource,
+    from: Position,
+    piece: Piece,
+    deltas: &[(i32, i32)],
+) -> Vec<Position> {
     deltas
         .iter()
         .filter_map(|&(dr, dc)| {
@@ -224,7 +260,12 @@ const KING_DELTAS: [(i32, i32); 8] = [
 /// Movimientos pseudo-legales de una pieza: respetan el tablero y no
 /// pisan piezas propias, pero NO validan si dejan al propio rey en
 /// jaque — eso se chequea aparte (`is_legal_move`), simulando la jugada.
-pub fn piece_moves(board: &BoardResource, sides: &Sides, from: Position, piece: Piece) -> Vec<Position> {
+pub fn piece_moves(
+    board: &BoardResource,
+    sides: &Sides,
+    from: Position,
+    piece: Piece,
+) -> Vec<Position> {
     match piece.kind {
         PieceKind::Rook => sliding_moves(board, from, piece, &ROOK_DIRS),
         PieceKind::Bishop => sliding_moves(board, from, piece, &BISHOP_DIRS),
@@ -332,7 +373,12 @@ fn pawn_attack_squares(sides: &Sides, from: Position, piece: Piece) -> Vec<Posit
     squares
 }
 
-pub fn is_square_attacked(board: &BoardResource, sides: &Sides, target: Position, by_player: PlayerId) -> bool {
+pub fn is_square_attacked(
+    board: &BoardResource,
+    sides: &Sides,
+    target: Position,
+    by_player: PlayerId,
+) -> bool {
     for (&pos, &piece) in board.pieces.iter() {
         if piece.owner != by_player {
             continue;
@@ -359,7 +405,13 @@ pub fn is_in_check(board: &BoardResource, sides: &Sides, player: PlayerId) -> bo
 /// Simula `from -> to` en una COPIA del tablero (nunca muta el real) y
 /// dice si esa jugada deja al propio rey en jaque — la regla que separa
 /// "movimiento pseudo-legal" de "movimiento legal de verdad".
-pub fn is_legal_move(board: &BoardResource, sides: &Sides, player: PlayerId, from: Position, to: Position) -> bool {
+pub fn is_legal_move(
+    board: &BoardResource,
+    sides: &Sides,
+    player: PlayerId,
+    from: Position,
+    to: Position,
+) -> bool {
     let Some(piece) = board.get(from) else {
         return false;
     };
@@ -390,7 +442,11 @@ pub fn is_legal_move(board: &BoardResource, sides: &Sides, player: PlayerId, fro
 
     let mut simulated = board.clone();
 
-    if piece.kind == PieceKind::Pawn && board.en_passant_target == Some(to) && from.col != to.col && board.get(to).is_none() {
+    if piece.kind == PieceKind::Pawn
+        && board.en_passant_target == Some(to)
+        && from.col != to.col
+        && board.get(to).is_none()
+    {
         simulated.pieces.remove(&from);
         simulated.pieces.insert(to, piece);
         simulated.pieces.remove(&Position::new(from.row, to.col));

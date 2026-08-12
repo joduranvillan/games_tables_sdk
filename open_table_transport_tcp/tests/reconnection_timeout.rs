@@ -46,7 +46,9 @@ fn un_jugador_que_no_vuelve_a_tiempo_pierde_su_sesion() {
         Duration::from_secs(1),
     );
 
-    alice_transport.disconnect().expect("cierra la conexión de Alice");
+    alice_transport
+        .disconnect()
+        .expect("cierra la conexión de Alice");
     drop(alice_transport);
 
     let disconnected = wait_until(
@@ -58,7 +60,10 @@ fn un_jugador_que_no_vuelve_a_tiempo_pierde_su_sesion() {
         },
         Duration::from_secs(1),
     );
-    assert_eq!(disconnected, Some(ConnectionEvent::Disconnected { player: alice }));
+    assert_eq!(
+        disconnected,
+        Some(ConnectionEvent::Disconnected { player: alice })
+    );
 
     // Esperamos más que el timeout configurado, SIN que Alice se
     // reconecte, para forzar que expire.
@@ -115,8 +120,8 @@ fn reconectar_a_tiempo_cancela_el_timeout() {
     );
 
     // Reconecta ANTES de que expire el timeout.
-    let _reconnected_transport =
-        TcpClientTransport::reconnect(addr, alice, alice_token.clone()).expect("reconecta a tiempo");
+    let _reconnected_transport = TcpClientTransport::reconnect(addr, alice, alice_token.clone())
+        .expect("reconecta a tiempo");
 
     let reconnected = wait_until(
         || {
@@ -127,7 +132,10 @@ fn reconectar_a_tiempo_cancela_el_timeout() {
         },
         Duration::from_secs(1),
     );
-    assert_eq!(reconnected, Some(ConnectionEvent::Reconnected { player: alice }));
+    assert_eq!(
+        reconnected,
+        Some(ConnectionEvent::Reconnected { player: alice })
+    );
 
     // Esperamos más que el timeout original: como ya se reconectó, NO
     // debería aparecer ningún TimedOut para Alice.
@@ -136,5 +144,8 @@ fn reconectar_a_tiempo_cancela_el_timeout() {
         .poll_connection_events()
         .into_iter()
         .find(|e| matches!(e, ConnectionEvent::TimedOut { player } if *player == alice));
-    assert_eq!(spurious_timeout, None, "no debería expirar una sesión que ya se reconectó");
+    assert_eq!(
+        spurious_timeout, None,
+        "no debería expirar una sesión que ya se reconectó"
+    );
 }

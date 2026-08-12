@@ -1,9 +1,10 @@
 use crisis_game::{
-    check_objective, new_crisis_session, AttackResolvedEvent, BoardResource,
-    DeclareAttackCommand, EliminatedPlayersResource, EndPhaseCommand, FortifyCommand, ObjectiveCard,
-    PendingAttack, PendingAttackResource, PlaceArmiesCommand, PlayerEliminatedEvent, PlayerObjectivesResource,
-    RollAttackCommand, TegGameOverEvent, TerritoryConqueredEvent, TerritoryId, TerritoryMapResource,
-    TerritoryStateResource, TurnPhase, TurnStateResource, CONTINENT_SOUTH_AMERICA,
+    check_objective, new_crisis_session, AttackResolvedEvent, BoardResource, DeclareAttackCommand,
+    EliminatedPlayersResource, EndPhaseCommand, FortifyCommand, ObjectiveCard, PendingAttack,
+    PendingAttackResource, PlaceArmiesCommand, PlayerEliminatedEvent, PlayerObjectivesResource,
+    RollAttackCommand, TegGameOverEvent, TerritoryConqueredEvent, TerritoryId,
+    TerritoryMapResource, TerritoryStateResource, TurnPhase, TurnStateResource,
+    CONTINENT_SOUTH_AMERICA,
 };
 use open_table_engine::prelude::*;
 
@@ -34,7 +35,10 @@ fn test_setup_distribuye_todos_los_territorios() {
             *owner == P1 || *owner == P2,
             "el dueño debe ser uno de los jugadores"
         );
-        assert!(*armies >= 1, "cada territorio debe tener al menos 1 ejército");
+        assert!(
+            *armies >= 1,
+            "cada territorio debe tener al menos 1 ejército"
+        );
     }
 }
 
@@ -200,11 +204,12 @@ fn test_game_over_por_objetivo_conquistar_continente() {
         let mut session = new_crisis_session(SessionId(1), seed, &[P1, P2]).unwrap();
 
         {
-            let mut player_objs = session.world_mut().resource_mut::<PlayerObjectivesResource>();
-            player_objs.objectives.insert(
-                P1,
-                ObjectiveCard::ConquerContinent(CONTINENT_SOUTH_AMERICA),
-            );
+            let mut player_objs = session
+                .world_mut()
+                .resource_mut::<PlayerObjectivesResource>();
+            player_objs
+                .objectives
+                .insert(P1, ObjectiveCard::ConquerContinent(CONTINENT_SOUTH_AMERICA));
 
             let mut turn_state = session.world_mut().resource_mut::<TurnStateResource>();
             turn_state.phase = TurnPhase::Attack;
@@ -291,7 +296,13 @@ fn test_bonus_de_continente_se_aplica_al_inicio_del_turno() {
     // Asignar los 5 territorios de América del Sur (0, 1, 2, 3, 4) a P1
     {
         let mut map = session.world_mut().resource_mut::<TerritoryStateResource>();
-        for &t_id in &[TerritoryId(0), TerritoryId(1), TerritoryId(2), TerritoryId(3), TerritoryId(4)] {
+        for &t_id in &[
+            TerritoryId(0),
+            TerritoryId(1),
+            TerritoryId(2),
+            TerritoryId(3),
+            TerritoryId(4),
+        ] {
             map.owners.insert(t_id, P1);
         }
         for t_id in 5u8..30 {
@@ -334,7 +345,8 @@ fn test_serializar_y_deserializar_declare_attack_command_roundtrip() {
         dice: 3,
     };
     let json = serde_json::to_string(&cmd).expect("serialización a JSON falló");
-    let deserialized: DeclareAttackCommand = serde_json::from_str(&json).expect("deserialización de JSON falló");
+    let deserialized: DeclareAttackCommand =
+        serde_json::from_str(&json).expect("deserialización de JSON falló");
     assert_eq!(cmd, deserialized);
 }
 
@@ -439,8 +451,14 @@ fn test_crisis_error_paths_cobertura_de_ramas() {
 
     // 5. Atacar territorios no adyacentes
     // Forzar ejércitos
-    session.world_mut().resource_mut::<TerritoryStateResource>().set_owner_and_armies(TerritoryId(0), P1, 5);
-    session.world_mut().resource_mut::<TerritoryStateResource>().set_owner_and_armies(TerritoryId(29), P2, 1);
+    session
+        .world_mut()
+        .resource_mut::<TerritoryStateResource>()
+        .set_owner_and_armies(TerritoryId(0), P1, 5);
+    session
+        .world_mut()
+        .resource_mut::<TerritoryStateResource>()
+        .set_owner_and_armies(TerritoryId(29), P2, 1);
 
     let err = session
         .process_command(
@@ -456,7 +474,10 @@ fn test_crisis_error_paths_cobertura_de_ramas() {
     assert!(format!("{err:?}").contains("no es adyacente"));
 
     // 6. Atacar con dados inválidos (e.g. 0 o mas de max)
-    session.world_mut().resource_mut::<TerritoryStateResource>().set_owner_and_armies(TerritoryId(1), P2, 1);
+    session
+        .world_mut()
+        .resource_mut::<TerritoryStateResource>()
+        .set_owner_and_armies(TerritoryId(1), P2, 1);
     let err = session
         .process_command(
             P1,

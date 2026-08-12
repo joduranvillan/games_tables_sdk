@@ -1,7 +1,7 @@
 use open_table_engine::prelude::*;
 use open_table_macros::GameResource;
-use std::collections::HashSet;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -80,10 +80,18 @@ impl BoardResource {
 
     pub fn get_neighbors(&self, x: usize, y: usize) -> Vec<(usize, usize)> {
         let mut neighbors = Vec::new();
-        if x > 0 { neighbors.push((x - 1, y)); }
-        if x + 1 < self.size { neighbors.push((x + 1, y)); }
-        if y > 0 { neighbors.push((x, y - 1)); }
-        if y + 1 < self.size { neighbors.push((x, y + 1)); }
+        if x > 0 {
+            neighbors.push((x - 1, y));
+        }
+        if x + 1 < self.size {
+            neighbors.push((x + 1, y));
+        }
+        if y > 0 {
+            neighbors.push((x, y - 1));
+        }
+        if y + 1 < self.size {
+            neighbors.push((x, y + 1));
+        }
         neighbors
     }
 

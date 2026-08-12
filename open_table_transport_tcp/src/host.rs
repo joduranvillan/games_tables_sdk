@@ -58,13 +58,21 @@ const DEFAULT_RECONNECT_TIMEOUT: Duration = Duration::from_secs(60);
 /// disparar un resync o dar por perdido a un jugador.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectionEvent {
-    Joined { player: PlayerId },
-    Reconnected { player: PlayerId },
-    Disconnected { player: PlayerId },
+    Joined {
+        player: PlayerId,
+    },
+    Reconnected {
+        player: PlayerId,
+    },
+    Disconnected {
+        player: PlayerId,
+    },
     /// El jugador se desconectó y no volvió dentro de `reconnect_timeout`.
     /// Su `reconnect_token` ya fue invalidado: un intento de reconexión
     /// posterior con ese token va a ser rechazado.
-    TimedOut { player: PlayerId },
+    TimedOut {
+        player: PlayerId,
+    },
 }
 
 pub struct TcpHostTransport {
@@ -87,7 +95,10 @@ impl TcpHostTransport {
     /// Igual que `bind`, pero con un `reconnect_timeout` explícito —
     /// útil para tests (timeouts cortos) o para juegos que quieran dar
     /// más o menos margen antes de dar por perdido a un jugador caído.
-    pub fn bind_with_timeout(addr: impl ToSocketAddrs, reconnect_timeout: Duration) -> io::Result<Self> {
+    pub fn bind_with_timeout(
+        addr: impl ToSocketAddrs,
+        reconnect_timeout: Duration,
+    ) -> io::Result<Self> {
         let listener = TcpListener::bind(addr)?;
         let local_addr = listener.local_addr()?;
 
@@ -124,7 +135,16 @@ impl TcpHostTransport {
                 // propio thread para no bloquear el accept-loop mientras
                 // se negocia con un cliente lento.
                 thread::spawn(move || {
-                    handle_connection(stream, incoming, connections, sessions, player_names, events, disconnect_times, next_id);
+                    handle_connection(
+                        stream,
+                        incoming,
+                        connections,
+                        sessions,
+                        player_names,
+                        events,
+                        disconnect_times,
+                        next_id,
+                    );
                 });
             }
         });
@@ -179,7 +199,10 @@ impl TcpHostTransport {
     /// `ConnectionEvent::TimedOut`.
     fn check_timeouts(&self) {
         let now = Instant::now();
-        let mut disconnect_times = self.disconnect_times.lock().expect("lock de disconnect_times envenenado");
+        let mut disconnect_times = self
+            .disconnect_times
+            .lock()
+            .expect("lock de disconnect_times envenenado");
         let expired: Vec<PlayerId> = disconnect_times
             .iter()
             .filter(|(_, since)| now.duration_since(**since) >= self.reconnect_timeout)
@@ -290,9 +313,7 @@ fn handle_connection(
             .push_back((player_id, bytes));
     }
 
-    let mut conns = connections
-        .lock()
-        .expect("lock de connections envenenado");
+    let mut conns = connections.lock().expect("lock de connections envenenado");
     if let Some((id, _)) = conns.get(&player_id) {
         if *id == conn_id {
             conns.remove(&player_id);
@@ -336,7 +357,11 @@ fn resolve_handshake(
                 .lock()
                 .expect("lock de player_names envenenado")
                 .insert(player_id, player_name);
-            Ok((player_id, token, ConnectionEvent::Joined { player: player_id }))
+            Ok((
+                player_id,
+                token,
+                ConnectionEvent::Joined { player: player_id },
+            ))
         }
         HandshakeRequest::Reconnect {
             player_id,
@@ -372,7 +397,10 @@ fn generate_token() -> String {
 
 impl Transport for TcpHostTransport {
     fn send(&mut self, peer: PlayerId, bytes: &[u8]) -> EngineResult<()> {
-        let mut conns = self.connections.lock().expect("lock de connections envenenado");
+        let mut conns = self
+            .connections
+            .lock()
+            .expect("lock de connections envenenado");
         let (_id, stream) = conns
             .get_mut(&peer)
             .ok_or_else(|| EngineError::Network(format!("jugador {peer:?} no está conectado")))?;
@@ -380,7 +408,10 @@ impl Transport for TcpHostTransport {
     }
 
     fn broadcast(&mut self, bytes: &[u8]) -> EngineResult<()> {
-        let mut conns = self.connections.lock().expect("lock de connections envenenado");
+        let mut conns = self
+            .connections
+            .lock()
+            .expect("lock de connections envenenado");
         for (_id, stream) in conns.values_mut() {
             write_frame(stream, bytes).map_err(|e| EngineError::Network(e.to_string()))?;
         }

@@ -147,12 +147,17 @@ pub trait ResourceWatcher: Send + Sync {
     fn check_and_notify(&mut self, world: &BevyWorld);
 }
 
-struct TypedResourceWatcher<R: bevy_ecs::system::Resource + Clone + 'static, F: Fn(&R) + Send + Sync + 'static> {
+struct TypedResourceWatcher<
+    R: bevy_ecs::system::Resource + Clone + 'static,
+    F: Fn(&R) + Send + Sync + 'static,
+> {
     handler: F,
     _phantom: std::marker::PhantomData<R>,
 }
 
-impl<R: bevy_ecs::system::Resource + Clone + 'static, F: Fn(&R) + Send + Sync + 'static> ResourceWatcher for TypedResourceWatcher<R, F> {
+impl<R: bevy_ecs::system::Resource + Clone + 'static, F: Fn(&R) + Send + Sync + 'static>
+    ResourceWatcher for TypedResourceWatcher<R, F>
+{
     fn check_and_notify(&mut self, world: &BevyWorld) {
         if world.is_resource_changed::<R>() {
             if let Some(res) = world.get_resource::<R>() {
@@ -162,7 +167,9 @@ impl<R: bevy_ecs::system::Resource + Clone + 'static, F: Fn(&R) + Send + Sync + 
     }
 }
 
-pub type CommandMiddleware = Box<dyn Fn(&CommandEnvelope, &mut BevyWorld) -> Result<(), EngineError> + Send + Sync + 'static>;
+pub type CommandMiddleware = Box<
+    dyn Fn(&CommandEnvelope, &mut BevyWorld) -> Result<(), EngineError> + Send + Sync + 'static,
+>;
 pub type InitialSetupFn = std::sync::Arc<dyn Fn(&mut BevyWorld) + Send + Sync + 'static>;
 
 pub trait LegalMoveGenerator: Send + Sync + 'static {
@@ -339,12 +346,31 @@ impl Session {
 
         for (_tick, _elapsed, cmd) in &self.command_log {
             if let Ok(val) = serde_json::to_value(cmd.as_ref()) {
-                let ct = val.get("command_type").and_then(|v| v.as_str()).unwrap_or("");
+                let ct = val
+                    .get("command_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 if ct.contains("MovePieceCommand") {
-                    let from_r = val.get("from").and_then(|f| f.get("row")).and_then(|r| r.as_u64()).unwrap_or(0) as u8;
-                    let from_c = val.get("from").and_then(|f| f.get("col")).and_then(|c| c.as_u64()).unwrap_or(0) as u8;
-                    let to_r = val.get("to").and_then(|t| t.get("row")).and_then(|r| r.as_u64()).unwrap_or(0) as u8;
-                    let to_c = val.get("to").and_then(|t| t.get("col")).and_then(|c| c.as_u64()).unwrap_or(0) as u8;
+                    let from_r = val
+                        .get("from")
+                        .and_then(|f| f.get("row"))
+                        .and_then(|r| r.as_u64())
+                        .unwrap_or(0) as u8;
+                    let from_c = val
+                        .get("from")
+                        .and_then(|f| f.get("col"))
+                        .and_then(|c| c.as_u64())
+                        .unwrap_or(0) as u8;
+                    let to_r = val
+                        .get("to")
+                        .and_then(|t| t.get("row"))
+                        .and_then(|r| r.as_u64())
+                        .unwrap_or(0) as u8;
+                    let to_c = val
+                        .get("to")
+                        .and_then(|t| t.get("col"))
+                        .and_then(|c| c.as_u64())
+                        .unwrap_or(0) as u8;
 
                     let piece_info = piece_positions.remove(&(from_r, from_c));
                     let (kind, _is_white) = piece_info.unwrap_or(('P', is_white_turn));
@@ -437,7 +463,10 @@ impl Session {
     }
 
     pub fn set_reconnection_timeout(&mut self, player: PlayerId, duration: Duration) {
-        if !self.world.contains_resource::<ReconnectionTimeoutResource>() {
+        if !self
+            .world
+            .contains_resource::<ReconnectionTimeoutResource>()
+        {
             self.world.insert_resource(ReconnectionTimeoutResource {
                 timeouts: std::collections::HashMap::new(),
             });
@@ -494,7 +523,9 @@ impl Session {
     pub fn get_legal_moves(&self, player: PlayerId) -> Vec<serde_json::Value> {
         let generator = if let Some(g) = self.world.get_resource::<LegalMoveGeneratorResource>() {
             Some(g.0.clone())
-        } else { self.rules.legal_move_generator().cloned() };
+        } else {
+            self.rules.legal_move_generator().cloned()
+        };
 
         let Some(generator) = generator else {
             return vec![];
@@ -533,7 +564,11 @@ impl Session {
             return Err(EngineError::SessionPaused);
         }
 
-        if self.world.get_resource::<GameOverResource>().is_some_and(|r| r.0) {
+        if self
+            .world
+            .get_resource::<GameOverResource>()
+            .is_some_and(|r| r.0)
+        {
             return Err(EngineError::GameAlreadyOver);
         }
 
@@ -595,13 +630,17 @@ impl Session {
     pub fn check_timeout(&mut self) -> Option<PlayerId> {
         if let Some(mut rec_res) = self.world.get_resource_mut::<ReconnectionTimeoutResource>() {
             let now = Instant::now();
-            let timed_out_player = rec_res.timeouts.iter().find_map(|(&player, &(start, duration))| {
-                if now.duration_since(start) >= duration {
-                    Some(player)
-                } else {
-                    None
-                }
-            });
+            let timed_out_player =
+                rec_res
+                    .timeouts
+                    .iter()
+                    .find_map(|(&player, &(start, duration))| {
+                        if now.duration_since(start) >= duration {
+                            Some(player)
+                        } else {
+                            None
+                        }
+                    });
 
             if let Some(player) = timed_out_player {
                 rec_res.timeouts.remove(&player);
@@ -646,7 +685,8 @@ impl Session {
         }
 
         self.command_log.pop();
-        let remaining_commands: Vec<_> = self.command_log.drain(..).map(|(_, _, cmd)| cmd).collect();
+        let remaining_commands: Vec<_> =
+            self.command_log.drain(..).map(|(_, _, cmd)| cmd).collect();
 
         let seed = self
             .world
@@ -753,8 +793,9 @@ impl Session {
     /// Guarda el log de comandos de la sesión en un archivo en el disco.
     pub fn save_to_file(&self, path: &str) -> EngineResult<()> {
         let bytes = self.export_log()?;
-        std::fs::write(path, bytes)
-            .map_err(|e| EngineError::IoError(format!("no se pudo guardar la sesión en {path}: {e}")))
+        std::fs::write(path, bytes).map_err(|e| {
+            EngineError::IoError(format!("no se pudo guardar la sesión en {path}: {e}"))
+        })
     }
 
     /// Carga un log de comandos desde un archivo y reconstruye la sesión.
@@ -765,8 +806,9 @@ impl Session {
         rules: RuleEngine,
         path: &str,
     ) -> EngineResult<Session> {
-        let log_bytes = std::fs::read(path)
-            .map_err(|e| EngineError::IoError(format!("no se pudo cargar la sesión desde {path}: {e}")))?;
+        let log_bytes = std::fs::read(path).map_err(|e| {
+            EngineError::IoError(format!("no se pudo cargar la sesión desde {path}: {e}"))
+        })?;
         Self::replay(id, seed, players, rules, &log_bytes)
     }
 
@@ -781,7 +823,8 @@ impl Session {
         rules: RuleEngine,
         log_bytes: &[u8],
     ) -> EngineResult<Session> {
-        let (session, _events) = Self::replay_collecting_events(id, seed, players, rules, log_bytes)?;
+        let (session, _events) =
+            Self::replay_collecting_events(id, seed, players, rules, log_bytes)?;
         Ok(session)
     }
 
@@ -873,7 +916,10 @@ impl Session {
             random_resource: self.world.get_resource::<RandomResource>().cloned(),
             game_over_resource: self.world.get_resource::<GameOverResource>().cloned(),
             game_variant_resource: self.world.get_resource::<GameVariantResource>().cloned(),
-            metadata_resource: self.world.get_resource::<SessionMetadataResource>().cloned(),
+            metadata_resource: self
+                .world
+                .get_resource::<SessionMetadataResource>()
+                .cloned(),
         };
         serde_json::to_vec(&snapshot)
             .map_err(|e| EngineError::Replay(format!("no se pudo crear el snapshot: {e}")))
@@ -1017,10 +1063,7 @@ impl Session {
 /// según `Visibility`. Se usa tanto para el broadcast normal (host filtra
 /// antes de mandar por `Transport`) como para el resync de un cliente
 /// reconectado (filtra el resultado de `replay_collecting_events`).
-pub fn filter_events_for_player(
-    events: &[Box<dyn Event>],
-    player: PlayerId,
-) -> Vec<&dyn Event> {
+pub fn filter_events_for_player(events: &[Box<dyn Event>], player: PlayerId) -> Vec<&dyn Event> {
     events
         .iter()
         .map(|event| event.as_ref())

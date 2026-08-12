@@ -2,12 +2,13 @@ use open_table_engine::prelude::*;
 
 use crate::board::{BoardResource, Sides, CHECKERS_PER_PLAYER, POINTS};
 use crate::commands::{
-    AcceptDoubleCommand, MoveCheckerCommand, OfferDoubleCommand, RejectDoubleCommand, ResignCommand, RollDiceCommand,
+    AcceptDoubleCommand, MoveCheckerCommand, OfferDoubleCommand, RejectDoubleCommand,
+    ResignCommand, RollDiceCommand,
 };
 use crate::dice::PendingDiceResource;
 use crate::events::{
-    CheckerMovedEvent, DiceRolledEvent, DoubleAcceptedEvent, DoubleOfferedEvent, DoubleRejectedEvent,
-    GameOverEvent, NoValidMovesEvent,
+    CheckerMovedEvent, DiceRolledEvent, DoubleAcceptedEvent, DoubleOfferedEvent,
+    DoubleRejectedEvent, GameOverEvent, NoValidMovesEvent,
 };
 pub use crate::resources::{DoublingCubeResource, MatchStateResource};
 
@@ -35,7 +36,12 @@ pub fn build_backgammon_rules() -> RuleEngine {
 
         {
             let pending = world.resource::<PendingDiceResource>();
-            if pending.pending.get(&cmd.player).map(|d| !d.is_empty()).unwrap_or(false) {
+            if pending
+                .pending
+                .get(&cmd.player)
+                .map(|d| !d.is_empty())
+                .unwrap_or(false)
+            {
                 return Err(invalid("no podés doblar si ya tiraste los dados"));
             }
         }
@@ -60,7 +66,8 @@ pub fn build_backgammon_rules() -> RuleEngine {
     rules.register::<AcceptDoubleCommand, _>(|cmd, world| {
         let offerer = {
             let cube = world.resource::<DoublingCubeResource>();
-            cube.offered_by.ok_or_else(|| invalid("no hay ninguna oferta de doblaje pendiente"))?
+            cube.offered_by
+                .ok_or_else(|| invalid("no hay ninguna oferta de doblaje pendiente"))?
         };
 
         let opponent = world.resource::<Sides>().opponent_of(offerer);
@@ -84,7 +91,8 @@ pub fn build_backgammon_rules() -> RuleEngine {
     rules.register::<RejectDoubleCommand, _>(|cmd, world| {
         let offerer = {
             let cube = world.resource::<DoublingCubeResource>();
-            cube.offered_by.ok_or_else(|| invalid("no hay ninguna oferta de doblaje pendiente"))?
+            cube.offered_by
+                .ok_or_else(|| invalid("no hay ninguna oferta de doblaje pendiente"))?
         };
 
         let opponent = world.resource::<Sides>().opponent_of(offerer);
@@ -118,13 +126,26 @@ pub fn build_backgammon_rules() -> RuleEngine {
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
             return Err(invalid("no es tu turno"));
         }
-        if world.resource::<DoublingCubeResource>().offered_by.is_some() {
-            return Err(invalid("hay una propuesta de doblaje pendiente; debe aceptarse o rechazarse primero"));
+        if world
+            .resource::<DoublingCubeResource>()
+            .offered_by
+            .is_some()
+        {
+            return Err(invalid(
+                "hay una propuesta de doblaje pendiente; debe aceptarse o rechazarse primero",
+            ));
         }
         {
             let pending = world.resource::<PendingDiceResource>();
-            if pending.pending.get(&cmd.player).map(|d| !d.is_empty()).unwrap_or(false) {
-                return Err(invalid("todavía tenés dados sin usar de la tirada anterior"));
+            if pending
+                .pending
+                .get(&cmd.player)
+                .map(|d| !d.is_empty())
+                .unwrap_or(false)
+            {
+                return Err(invalid(
+                    "todavía tenés dados sin usar de la tirada anterior",
+                ));
             }
         }
 
@@ -330,7 +351,10 @@ pub fn build_backgammon_rules() -> RuleEngine {
         if !players.contains(&cmd.player) {
             return Err(invalid("no sos un jugador de esta partida"));
         }
-        let opponent = players.into_iter().find(|&p| p != cmd.player).unwrap_or(cmd.player);
+        let opponent = players
+            .into_iter()
+            .find(|&p| p != cmd.player)
+            .unwrap_or(cmd.player);
         let cube_val = world.resource::<DoublingCubeResource>().value;
         world.insert_resource(GameOverResource(true));
         world.insert_resource(WinnerResource(Some(opponent)));

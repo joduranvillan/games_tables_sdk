@@ -1,9 +1,9 @@
-use std::time::Duration;
 use checkers_game::{new_checkers_session, MovePieceCommand, Position};
 use open_table_engine::prelude::*;
 use open_table_transport_tcp::{
     ConnectionEvent, TcpClientTransport, TcpHostTransport, HOST_PLAYER_ID,
 };
+use std::time::Duration;
 
 fn pos(row: u8, col: u8) -> Position {
     Position::new(row, col)
@@ -14,7 +14,10 @@ fn clone_event_for_wire(event: &dyn Event) -> Box<dyn Event> {
     serde_json::from_slice(&bytes).expect("deserialize event")
 }
 
-fn wait_for_received(transport: &mut TcpHostTransport, timeout: Duration) -> Vec<(PlayerId, Vec<u8>)> {
+fn wait_for_received(
+    transport: &mut TcpHostTransport,
+    timeout: Duration,
+) -> Vec<(PlayerId, Vec<u8>)> {
     let start = std::time::Instant::now();
     loop {
         let items = transport.poll_received();
@@ -73,19 +76,25 @@ async fn test_red_caos_desconexiones_aleatorias_y_resync() {
             alice_transport.disconnect().expect("disconnect Alice");
             drop(alice_transport);
 
-            let conn_events = wait_for_connection_events(&mut host_transport, Duration::from_millis(500));
+            let conn_events =
+                wait_for_connection_events(&mut host_transport, Duration::from_millis(500));
             assert!(
-                conn_events.iter().any(|e| matches!(e, ConnectionEvent::Disconnected { player: p } if *p == alice)),
+                conn_events.iter().any(
+                    |e| matches!(e, ConnectionEvent::Disconnected { player: p } if *p == alice)
+                ),
                 "El host debe haber detectado la desconexión de Alice"
             );
 
             // Alice se reconecta con su token
-            let reconnected_alice =
-                TcpClientTransport::reconnect(addr, alice, alice_token.clone()).expect("Alice se reconecta");
+            let reconnected_alice = TcpClientTransport::reconnect(addr, alice, alice_token.clone())
+                .expect("Alice se reconecta");
 
-            let reconn_events = wait_for_connection_events(&mut host_transport, Duration::from_millis(500));
+            let reconn_events =
+                wait_for_connection_events(&mut host_transport, Duration::from_millis(500));
             assert!(
-                reconn_events.iter().any(|e| matches!(e, ConnectionEvent::Reconnected { player: p } if *p == alice)),
+                reconn_events.iter().any(
+                    |e| matches!(e, ConnectionEvent::Reconnected { player: p } if *p == alice)
+                ),
                 "El host debe haber detectado la reconexión de Alice"
             );
 
@@ -116,13 +125,20 @@ async fn test_red_caos_desconexiones_aleatorias_y_resync() {
         let bytes = serde_json::to_vec(&env).expect("serialize command");
 
         if player == alice {
-            alice_transport.send(HOST_PLAYER_ID, &bytes).expect("send cmd Alice");
+            alice_transport
+                .send(HOST_PLAYER_ID, &bytes)
+                .expect("send cmd Alice");
         } else {
-            bob_transport.send(HOST_PLAYER_ID, &bytes).expect("send cmd Bob");
+            bob_transport
+                .send(HOST_PLAYER_ID, &bytes)
+                .expect("send cmd Bob");
         }
 
         let received = wait_for_received(&mut host_transport, Duration::from_millis(500));
-        assert!(!received.is_empty(), "El host debe haber recibido el comando de movimiento");
+        assert!(
+            !received.is_empty(),
+            "El host debe haber recibido el comando de movimiento"
+        );
         for (sender, raw) in received {
             let decoded: CommandEnvelope = serde_json::from_slice(&raw).expect("decode envelope");
             let events = host_session
@@ -134,6 +150,13 @@ async fn test_red_caos_desconexiones_aleatorias_y_resync() {
         move_count += 1;
     }
 
-    assert_eq!(move_count, 5, "Se deben haber jugado los 5 movimientos exitosamente");
-    assert_eq!(host_session.tick_timestamps().len(), 5, "La sesión debe registrar 5 ticks en el log");
+    assert_eq!(
+        move_count, 5,
+        "Se deben haber jugado los 5 movimientos exitosamente"
+    );
+    assert_eq!(
+        host_session.tick_timestamps().len(),
+        5,
+        "La sesión debe registrar 5 ticks en el log"
+    );
 }

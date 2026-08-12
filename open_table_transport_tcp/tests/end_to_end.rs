@@ -95,9 +95,16 @@ fn ciclo_completo_command_red_ruleengine_events_red_por_tcp_real() {
 
     // --- Host recibe por la red real (sender viene de la conexión, no del payload) ---
     let received = wait_for_data(|| host_transport.poll_received(), Duration::from_secs(2));
-    assert_eq!(received.len(), 1, "el host debería haber recibido exactamente un mensaje");
+    assert_eq!(
+        received.len(),
+        1,
+        "el host debería haber recibido exactamente un mensaje"
+    );
     let (sender, raw_command) = &received[0];
-    assert_eq!(*sender, alice, "el sender viene de qué conexión TCP trajo los bytes");
+    assert_eq!(
+        *sender, alice,
+        "el sender viene de qué conexión TCP trajo los bytes"
+    );
 
     let decoded_envelope: CommandEnvelope =
         serde_json::from_slice(raw_command).expect("deserializa el comando recibido");
@@ -115,12 +122,19 @@ fn ciclo_completo_command_red_ruleengine_events_red_por_tcp_real() {
             payload: event,
         };
         let bytes = serde_json::to_vec(&envelope).expect("serializa el evento");
-        host_transport.broadcast(&bytes).expect("manda el evento por TCP");
+        host_transport
+            .broadcast(&bytes)
+            .expect("manda el evento por TCP");
     }
 
     // --- Cliente recibe el evento por la red real y lo downcastea tipado ---
-    let client_received = wait_for_data(|| client_transport.poll_received(), Duration::from_secs(2));
-    assert_eq!(client_received.len(), 1, "el cliente debería haber recibido exactamente un evento");
+    let client_received =
+        wait_for_data(|| client_transport.poll_received(), Duration::from_secs(2));
+    assert_eq!(
+        client_received.len(),
+        1,
+        "el cliente debería haber recibido exactamente un evento"
+    );
 
     let (_, raw_event) = &client_received[0];
     let decoded_event_envelope: EventEnvelope =
@@ -148,7 +162,9 @@ fn el_host_rechaza_un_comando_con_issuer_falsificado_aunque_llegue_por_red_real(
     // El cliente (que la red identifica como PlayerId(1) = alice) manda
     // un comando que dice ser de OTRO jugador.
     let impostor_claim = PlayerId(77);
-    let forged: Box<dyn Command> = Box::new(RollDiceCommand { player: impostor_claim });
+    let forged: Box<dyn Command> = Box::new(RollDiceCommand {
+        player: impostor_claim,
+    });
     let envelope = CommandEnvelope {
         tick: Tick(0),
         payload: forged,
@@ -179,7 +195,10 @@ fn health_check_devuelve_ok_despues_de_conectar() {
     assert_eq!(host_ping.unwrap(), Duration::ZERO);
 
     let client_ping = client_transport.health_check();
-    assert!(client_ping.is_ok(), "health_check del cliente debe devolver Ok");
+    assert!(
+        client_ping.is_ok(),
+        "health_check del cliente debe devolver Ok"
+    );
     assert_eq!(client_ping.unwrap(), Duration::ZERO);
 }
 
@@ -189,7 +208,10 @@ fn negociacion_de_version_de_protocolo_exitosa() {
     let addr = host_transport.local_addr();
 
     let result = TcpClientTransport::connect_as_new_player(addr, "Alice");
-    assert!(result.is_ok(), "el cliente negocia correctamente la versión de protocolo 1.0");
+    assert!(
+        result.is_ok(),
+        "el cliente negocia correctamente la versión de protocolo 1.0"
+    );
 }
 
 #[test]
@@ -213,12 +235,17 @@ fn multi_session_server_eventos_no_cruzan_sesiones() {
     thread::sleep(Duration::from_millis(50));
 
     let msg1 = b"evento_session_1";
-    session1_transport.broadcast(msg1).expect("broadcast en sesion 1");
+    session1_transport
+        .broadcast(msg1)
+        .expect("broadcast en sesion 1");
 
     let recv1 = wait_for_data(|| client1.poll_received(), Duration::from_secs(1));
     assert_eq!(recv1.len(), 1);
     assert_eq!(recv1[0].1, msg1);
 
     let recv2 = client2.poll_received();
-    assert!(recv2.is_empty(), "los eventos de la sesión 1 no deben llegar a la sesión 2");
+    assert!(
+        recv2.is_empty(),
+        "los eventos de la sesión 1 no deben llegar a la sesión 2"
+    );
 }

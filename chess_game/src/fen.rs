@@ -1,14 +1,17 @@
-use std::collections::HashMap;
-use open_table_core::ids::PlayerId;
-use open_table_core::error::EngineError;
-use open_table_engine::session::Session;
 use crate::board::BoardResource;
 use crate::position::{Piece, PieceKind, Position};
+use open_table_core::error::EngineError;
+use open_table_core::ids::PlayerId;
+use open_table_engine::session::Session;
+use std::collections::HashMap;
 
 pub fn load_chess_position_from_fen(session: &mut Session, fen: &str) -> Result<(), EngineError> {
     let (board, active_player) = parse_fen_with_player(fen)?;
     session.world_mut().insert_resource(board);
-    if let Some(mut turn) = session.world_mut().get_resource_mut::<open_table_engine::turn::TurnResource>() {
+    if let Some(mut turn) = session
+        .world_mut()
+        .get_resource_mut::<open_table_engine::turn::TurnResource>()
+    {
         turn.0.set_current_player(active_player);
     }
     Ok(())
@@ -140,14 +143,44 @@ mod tests {
         let (board_init, active_init) = parse_fen_with_player(initial_fen).unwrap();
         assert_eq!(board_init.pieces.len(), 32);
         assert_eq!(active_init, PlayerId(1));
-        assert_eq!(board_init.get(Position::new(1, 4)), Some(Piece { owner: PlayerId(1), kind: PieceKind::Pawn }));
-        assert_eq!(board_init.get(Position::new(7, 4)), Some(Piece { owner: PlayerId(2), kind: PieceKind::King }));
+        assert_eq!(
+            board_init.get(Position::new(1, 4)),
+            Some(Piece {
+                owner: PlayerId(1),
+                kind: PieceKind::Pawn
+            })
+        );
+        assert_eq!(
+            board_init.get(Position::new(7, 4)),
+            Some(Piece {
+                owner: PlayerId(2),
+                kind: PieceKind::King
+            })
+        );
 
         let middlegame_fen = "r1bqk2r/pp1pppbp/2n2np1/8/3NP3/2N1B3/PPP2PPP/R2QKB1R w KQkq - 3 7";
         let (board_mid, active_mid) = parse_fen_with_player(middlegame_fen).unwrap();
         assert_eq!(active_mid, PlayerId(1));
-        assert_eq!(board_mid.get(Position::new(3, 3)), Some(Piece { owner: PlayerId(1), kind: PieceKind::Knight }));
-        assert_eq!(board_mid.get(Position::new(5, 2)), Some(Piece { owner: PlayerId(2), kind: PieceKind::Knight }));
-        assert_eq!(board_mid.get(Position::new(2, 4)), Some(Piece { owner: PlayerId(1), kind: PieceKind::Bishop }));
+        assert_eq!(
+            board_mid.get(Position::new(3, 3)),
+            Some(Piece {
+                owner: PlayerId(1),
+                kind: PieceKind::Knight
+            })
+        );
+        assert_eq!(
+            board_mid.get(Position::new(5, 2)),
+            Some(Piece {
+                owner: PlayerId(2),
+                kind: PieceKind::Knight
+            })
+        );
+        assert_eq!(
+            board_mid.get(Position::new(2, 4)),
+            Some(Piece {
+                owner: PlayerId(1),
+                kind: PieceKind::Bishop
+            })
+        );
     }
 }

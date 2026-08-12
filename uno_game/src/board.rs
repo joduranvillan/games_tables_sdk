@@ -5,7 +5,11 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CardColor {
-    Red, Yellow, Green, Blue, WildColor
+    Red,
+    Yellow,
+    Green,
+    Blue,
+    WildColor,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -43,7 +47,12 @@ pub struct UnoState {
 impl UnoState {
     pub fn new(players: &[PlayerId], rng: &mut open_table_core::random::RandomService) -> Self {
         let mut deck = Vec::new();
-        let colors = [CardColor::Red, CardColor::Yellow, CardColor::Green, CardColor::Blue];
+        let colors = [
+            CardColor::Red,
+            CardColor::Yellow,
+            CardColor::Green,
+            CardColor::Blue,
+        ];
 
         for &c in &colors {
             deck.push(Card::new(c, CardValue::Number(0)));
@@ -97,7 +106,12 @@ impl UnoState {
         }
     }
 
-    pub fn draw_cards(&mut self, player: PlayerId, count: usize, rng: &mut open_table_core::random::RandomService) -> Vec<Card> {
+    pub fn draw_cards(
+        &mut self,
+        player: PlayerId,
+        count: usize,
+        rng: &mut open_table_core::random::RandomService,
+    ) -> Vec<Card> {
         let mut drawn = Vec::new();
         for _ in 0..count {
             if self.deck.is_empty() {
@@ -114,11 +128,11 @@ impl UnoState {
                 drawn.push(c);
             }
         }
-        
+
         if let Some(hand) = self.hands.get_mut(&player) {
             hand.extend(drawn.clone());
         }
-        
+
         drawn
     }
 
@@ -126,7 +140,8 @@ impl UnoState {
         if self.draw_penalty > 0 {
             if let Some(top) = self.discard_pile.last() {
                 if top.value == CardValue::DrawTwo {
-                    return card.value == CardValue::DrawTwo || card.value == CardValue::WildDrawFour;
+                    return card.value == CardValue::DrawTwo
+                        || card.value == CardValue::WildDrawFour;
                 } else if top.value == CardValue::WildDrawFour {
                     return card.value == CardValue::WildDrawFour;
                 }

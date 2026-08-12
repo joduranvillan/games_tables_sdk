@@ -10,10 +10,10 @@ pub mod rules;
 pub use i18n::territory_name;
 
 pub use board::{
-    are_adjacent, check_continent_bonus, check_objective, Continent, ContinentId, ObjectiveCard, Territory,
-    TerritoryId, ADJACENCIES, CONTINENTS, TERRITORIES, TERRITORY_CENTERS,
-    CONTINENT_AFRICA, CONTINENT_ASIA, CONTINENT_EUROPE, CONTINENT_NORTH_AMERICA,
-    CONTINENT_OCEANIA, CONTINENT_SOUTH_AMERICA,
+    are_adjacent, check_continent_bonus, check_objective, Continent, ContinentId, ObjectiveCard,
+    Territory, TerritoryId, ADJACENCIES, CONTINENTS, CONTINENT_AFRICA, CONTINENT_ASIA,
+    CONTINENT_EUROPE, CONTINENT_NORTH_AMERICA, CONTINENT_OCEANIA, CONTINENT_SOUTH_AMERICA,
+    TERRITORIES, TERRITORY_CENTERS,
 };
 pub use commands::{
     DeclareAttackCommand, EndPhaseCommand, ExchangeCardsCommand, FortifyCommand,
@@ -75,7 +75,9 @@ pub fn new_crisis_session(
     };
 
     session.world_mut().insert_resource(BoardResource::new());
-    session.world_mut().insert_resource(PlayersResource::new(players));
+    session
+        .world_mut()
+        .insert_resource(PlayersResource::new(players));
     session.world_mut().insert_resource(territory_state);
     session.world_mut().insert_resource(TurnStateResource {
         phase: TurnPhase::PlaceArmies {
@@ -83,11 +85,21 @@ pub fn new_crisis_session(
         },
         fortified: false,
     });
-    session.world_mut().insert_resource(PendingAttackResource::default());
-    session.world_mut().insert_resource(EliminatedPlayersResource::default());
-    session.world_mut().insert_resource(ExchangeCountResource::default());
-    session.world_mut().insert_resource(PlayerCardsResource::default());
-    session.world_mut().insert_resource(PlayerObjectivesResource::default());
+    session
+        .world_mut()
+        .insert_resource(PendingAttackResource::default());
+    session
+        .world_mut()
+        .insert_resource(EliminatedPlayersResource::default());
+    session
+        .world_mut()
+        .insert_resource(ExchangeCountResource::default());
+    session
+        .world_mut()
+        .insert_resource(PlayerCardsResource::default());
+    session
+        .world_mut()
+        .insert_resource(PlayerObjectivesResource::default());
 
     Ok(session)
 }

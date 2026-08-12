@@ -1,6 +1,6 @@
 use chinese_checkers_game::{
-    home_cells_a, home_cells_b, new_chinese_checkers_session, BoardResource, GameOverEvent, MovePegCommand,
-    PegMovedEvent, Position,
+    home_cells_a, home_cells_b, new_chinese_checkers_session, BoardResource, GameOverEvent,
+    MovePegCommand, PegMovedEvent, Position,
 };
 use open_table_engine::prelude::*;
 
@@ -83,7 +83,11 @@ fn saltar_sobre_cualquier_ficha_no_la_captura_solo_permite_pasar() {
     assert!(moved.was_jump);
 
     let board = session.world().resource::<BoardResource>();
-    assert_eq!(board.pegs.get(&Position::new(1, 0)), Some(&P2), "la ficha saltada NO se captura");
+    assert_eq!(
+        board.pegs.get(&Position::new(1, 0)),
+        Some(&P2),
+        "la ficha saltada NO se captura"
+    );
     assert_eq!(board.pegs.get(&Position::new(2, 0)), Some(&P1));
 }
 
@@ -94,8 +98,17 @@ fn test_seis_jugadores_ciclan_correctamente() {
 
     for i in 0..6 {
         let current_p = players[i];
-        let current_turn = session.world().resource::<TurnResource>().0.current_player();
-        assert_eq!(current_turn, current_p, "El turno actual debería ser P{}", i + 1);
+        let current_turn = session
+            .world()
+            .resource::<TurnResource>()
+            .0
+            .current_player();
+        assert_eq!(
+            current_turn,
+            current_p,
+            "El turno actual debería ser P{}",
+            i + 1
+        );
 
         let board = session.world().resource::<BoardResource>();
         let corner_idx = i;
@@ -128,8 +141,15 @@ fn test_seis_jugadores_ciclan_correctamente() {
             .unwrap();
     }
 
-    let final_turn = session.world().resource::<TurnResource>().0.current_player();
-    assert_eq!(final_turn, P1, "Después de 6 movimientos, el turno debe volver a P1");
+    let final_turn = session
+        .world()
+        .resource::<TurnResource>()
+        .0
+        .current_player();
+    assert_eq!(
+        final_turn, P1,
+        "Después de 6 movimientos, el turno debe volver a P1"
+    );
 }
 
 #[test]

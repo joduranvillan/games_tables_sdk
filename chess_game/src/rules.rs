@@ -1,6 +1,9 @@
 use open_table_engine::prelude::*;
 
-use crate::board::{has_any_legal_move, is_in_check, is_legal_move, BoardResource, DrawOfferedResource, HalfMoveClockResource, PositionHistoryResource, Sides};
+use crate::board::{
+    has_any_legal_move, is_in_check, is_legal_move, BoardResource, DrawOfferedResource,
+    HalfMoveClockResource, PositionHistoryResource, Sides,
+};
 use crate::commands::{AcceptDrawCommand, MovePieceCommand, OfferDrawCommand, ResignCommand};
 use crate::events::{GameOverEvent, PieceMovedEvent};
 use crate::position::{PieceKind, Position};
@@ -95,13 +98,16 @@ pub fn build_chess_rules() -> RuleEngine {
             && board.get(cmd.to).is_none();
 
         // Detectar si es enroque
-        let castled = piece.kind == PieceKind::King && (cmd.from.col as i32 - cmd.to.col as i32).abs() == 2;
+        let castled =
+            piece.kind == PieceKind::King && (cmd.from.col as i32 - cmd.to.col as i32).abs() == 2;
 
         let mut captured = board.get(cmd.to).map(|p| p.kind);
 
         if is_en_passant {
             captured = Some(PieceKind::Pawn);
-            board.pieces.remove(&Position::new(cmd.from.row, cmd.to.col));
+            board
+                .pieces
+                .remove(&Position::new(cmd.from.row, cmd.to.col));
         } else if castled {
             if cmd.to.col == 6 {
                 if let Some(rook) = board.pieces.remove(&Position::new(cmd.from.row, 7)) {
@@ -117,12 +123,16 @@ pub fn build_chess_rules() -> RuleEngine {
         board.pieces.remove(&cmd.from);
 
         let mut moved_piece = piece;
-        let promoted = piece.kind == PieceKind::Pawn && cmd.to.row == sides.promotion_row(cmd.player);
+        let promoted =
+            piece.kind == PieceKind::Pawn && cmd.to.row == sides.promotion_row(cmd.player);
         let mut promoted_to = None;
 
         if promoted {
             let target_kind = match cmd.promote_to {
-                Some(k @ (PieceKind::Queen | PieceKind::Rook | PieceKind::Bishop | PieceKind::Knight)) => k,
+                Some(
+                    k
+                    @ (PieceKind::Queen | PieceKind::Rook | PieceKind::Bishop | PieceKind::Knight),
+                ) => k,
                 Some(_) => {
                     return Err(invalid(
                         "la coronación debe ser a dama, torre, alfil o caballo",
@@ -185,30 +195,36 @@ pub fn build_chess_rules() -> RuleEngine {
 
         let _ = board;
 
-        let is_threefold = if let Some(mut history) = world.get_resource_mut::<PositionHistoryResource>() {
-            let count = history.history.entry(new_hash).or_insert(0);
-            *count += 1;
-            *count >= 3
-        } else {
-            let mut history = PositionHistoryResource::default();
-            history.history.insert(new_hash, 1);
-            world.insert_resource(history);
-            false
-        };
-
-        let is_fifty_moves = if let Some(mut clock) = world.get_resource_mut::<HalfMoveClockResource>() {
-            if captured.is_some() || piece.kind == PieceKind::Pawn {
-                clock.0 = 0;
-                false
+        let is_threefold =
+            if let Some(mut history) = world.get_resource_mut::<PositionHistoryResource>() {
+                let count = history.history.entry(new_hash).or_insert(0);
+                *count += 1;
+                *count >= 3
             } else {
-                clock.0 += 1;
-                clock.0 >= 100
-            }
-        } else {
-            let new_val = if captured.is_some() || piece.kind == PieceKind::Pawn { 0 } else { 1 };
-            world.insert_resource(HalfMoveClockResource(new_val));
-            new_val >= 100
-        };
+                let mut history = PositionHistoryResource::default();
+                history.history.insert(new_hash, 1);
+                world.insert_resource(history);
+                false
+            };
+
+        let is_fifty_moves =
+            if let Some(mut clock) = world.get_resource_mut::<HalfMoveClockResource>() {
+                if captured.is_some() || piece.kind == PieceKind::Pawn {
+                    clock.0 = 0;
+                    false
+                } else {
+                    clock.0 += 1;
+                    clock.0 >= 100
+                }
+            } else {
+                let new_val = if captured.is_some() || piece.kind == PieceKind::Pawn {
+                    0
+                } else {
+                    1
+                };
+                world.insert_resource(HalfMoveClockResource(new_val));
+                new_val >= 100
+            };
 
         // Cualquier movimiento (comando que no es oferta/aceptación de tablas) limpia la oferta pendiente
         if let Some(mut draw_offered) = world.get_resource_mut::<DrawOfferedResource>() {
@@ -227,7 +243,11 @@ pub fn build_chess_rules() -> RuleEngine {
         })];
 
         if !opponent_has_moves {
-            let winner = if opponent_in_check { Some(cmd.player) } else { None };
+            let winner = if opponent_in_check {
+                Some(cmd.player)
+            } else {
+                None
+            };
             events.push(Box::new(GameOverEvent { winner }));
             world.insert_resource(GameOverResource(true));
         } else if is_threefold || is_fifty_moves || insufficient_material {
@@ -285,10 +305,15 @@ pub fn build_chess_rules() -> RuleEngine {
         if !players.contains(&cmd.player) {
             return Err(invalid("no eres un jugador de esta partida"));
         }
-        let opponent = players.into_iter().find(|&p| p != cmd.player).unwrap_or(cmd.player);
+        let opponent = players
+            .into_iter()
+            .find(|&p| p != cmd.player)
+            .unwrap_or(cmd.player);
         world.insert_resource(GameOverResource(true));
         world.insert_resource(WinnerResource(Some(opponent)));
-        Ok(vec![Box::new(GameOverEvent { winner: Some(opponent) })])
+        Ok(vec![Box::new(GameOverEvent {
+            winner: Some(opponent),
+        })])
     });
 
     rules

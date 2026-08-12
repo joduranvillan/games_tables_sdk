@@ -1,13 +1,12 @@
 use backgammon_game::{
-    new_backgammon_session, BoardResource as BgBoardResource, MoveCheckerCommand, CHECKERS_PER_PLAYER,
+    new_backgammon_session, BoardResource as BgBoardResource, MoveCheckerCommand,
+    CHECKERS_PER_PLAYER,
 };
 use checkers_game::{
     new_checkers_session, BoardResource as CheckersBoardResource, MovePieceCommand, Piece, Position,
 };
 use open_table_engine::prelude::*;
-use uno_game::{
-    new_uno_session, Card, CardColor, CardValue, PlayCardCommand, UnoState,
-};
+use uno_game::{new_uno_session, Card, CardColor, CardValue, PlayCardCommand, UnoState};
 
 const P1: PlayerId = PlayerId(1);
 const P2: PlayerId = PlayerId(2);
@@ -21,17 +20,33 @@ fn test_regresion_checkers_captura_multiple_mantiene_turno() {
     let mut session = new_checkers_session(SessionId(1), 1, P1, P2);
 
     {
-        let mut board = session
-            .world_mut()
-            .resource_mut::<CheckersBoardResource>();
+        let mut board = session.world_mut().resource_mut::<CheckersBoardResource>();
         for r in 0..8u8 {
             for c in 0..8u8 {
                 board.set(pos(r, c), None);
             }
         }
-        board.set(pos(0, 1), Some(Piece { owner: P1, is_king: false }));
-        board.set(pos(1, 2), Some(Piece { owner: P2, is_king: false }));
-        board.set(pos(3, 4), Some(Piece { owner: P2, is_king: false }));
+        board.set(
+            pos(0, 1),
+            Some(Piece {
+                owner: P1,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(1, 2),
+            Some(Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(3, 4),
+            Some(Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
     }
 
     // Primer salto de captura
@@ -78,9 +93,7 @@ fn test_regresion_backgammon_bearing_off_dado_mayor() {
     let mut session = new_backgammon_session(SessionId(2), 1, P1, P2);
 
     {
-        let mut board = session
-            .world_mut()
-            .resource_mut::<BgBoardResource>();
+        let mut board = session.world_mut().resource_mut::<BgBoardResource>();
         board.points = [0; backgammon_game::POINTS];
         board.points[20] = 1; // Ficha de P1 en el punto 20
         board.borne_off.insert(P1, CHECKERS_PER_PLAYER - 1);

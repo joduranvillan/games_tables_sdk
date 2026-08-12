@@ -69,7 +69,9 @@ impl FleetResource {
 
     pub fn all_ships_sunk(&self, player: PlayerId) -> bool {
         match self.ships.get(&player) {
-            Some(ships) => !ships.is_empty() && ships.iter().all(|ship| self.is_ship_sunk(player, ship)),
+            Some(ships) => {
+                !ships.is_empty() && ships.iter().all(|ship| self.is_ship_sunk(player, ship))
+            }
             None => false,
         }
     }
@@ -114,4 +116,3 @@ impl RematchResource {
         }
     }
 }
-

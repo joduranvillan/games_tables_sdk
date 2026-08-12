@@ -20,8 +20,9 @@ pub mod rules;
 pub use board::{Space, GO_BONUS, GO_TO_JAIL_SPACE, JAIL_SPACE, STARTING_MONEY};
 pub use commands::{AuctionBidCommand, BuyPropertyCommand, PayJailFeeCommand, RollAndMoveCommand};
 pub use events::{
-    AuctionStartedEvent, AuctionWonEvent, BankruptcyEvent, GameOverEvent, JailedEvent, PlayerMovedEvent,
-    PropertyPurchasedEvent, RailroadRentPaidEvent, RentPaidEvent, UtilityRentPaidEvent,
+    AuctionStartedEvent, AuctionWonEvent, BankruptcyEvent, GameOverEvent, JailedEvent,
+    PlayerMovedEvent, PropertyPurchasedEvent, RailroadRentPaidEvent, RentPaidEvent,
+    UtilityRentPaidEvent,
 };
 pub use resources::{
     AuctionResource, BoardResource, JailResource, PendingPurchaseResource, PlayersResource,
@@ -30,7 +31,12 @@ pub use rules::build_monopoly_rules;
 
 use open_table_engine::prelude::*;
 
-pub fn new_monopoly_session(session_id: SessionId, seed: u64, player_a: PlayerId, player_b: PlayerId) -> Session {
+pub fn new_monopoly_session(
+    session_id: SessionId,
+    seed: u64,
+    player_a: PlayerId,
+    player_b: PlayerId,
+) -> Session {
     let players = vec![player_a, player_b];
     let mut session = Session::new_with_metadata(
         session_id,
@@ -40,11 +46,15 @@ pub fn new_monopoly_session(session_id: SessionId, seed: u64, player_a: PlayerId
         build_monopoly_rules(),
     );
     session.world_mut().insert_resource(BoardResource::new());
-    session.world_mut().insert_resource(PlayersResource::new(&players));
+    session
+        .world_mut()
+        .insert_resource(PlayersResource::new(&players));
     session
         .world_mut()
         .insert_resource(PendingPurchaseResource::default());
     session.world_mut().insert_resource(JailResource::default());
-    session.world_mut().insert_resource(AuctionResource::default());
+    session
+        .world_mut()
+        .insert_resource(AuctionResource::default());
     session
 }

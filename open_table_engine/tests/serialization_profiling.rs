@@ -51,10 +51,22 @@ fn test_profile_1000_commands_serialization() {
     let json_pct = (total_serde_json_ns as f64 / total_time_json_ns as f64) * 100.0;
 
     println!("=== Benchmark Profiling (1000 Comandos) ===");
-    println!("Tiempo de Ejecución Session::process_command: {:.2} ms", total_process_ns as f64 / 1_000_000.0);
-    println!("Tiempo de Serialización serde_json:         {:.2} ms", total_serde_json_ns as f64 / 1_000_000.0);
-    println!("Tiempo de Serialización bincode:            {:.2} ms", total_bincode_ns as f64 / 1_000_000.0);
-    println!("Porcentaje de Serialización JSON:            {:.2}%", json_pct);
+    println!(
+        "Tiempo de Ejecución Session::process_command: {:.2} ms",
+        total_process_ns as f64 / 1_000_000.0
+    );
+    println!(
+        "Tiempo de Serialización serde_json:         {:.2} ms",
+        total_serde_json_ns as f64 / 1_000_000.0
+    );
+    println!(
+        "Tiempo de Serialización bincode:            {:.2} ms",
+        total_bincode_ns as f64 / 1_000_000.0
+    );
+    println!(
+        "Porcentaje de Serialización JSON:            {:.2}%",
+        json_pct
+    );
 
     assert!(total_process_ns > 0);
 }

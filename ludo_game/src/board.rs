@@ -36,7 +36,10 @@ impl TokensResource {
             tokens.insert(*player, [0; TOKENS_PER_PLAYER]);
             start_offset.insert(*player, i as u32 * spacing);
         }
-        Self { tokens, start_offset }
+        Self {
+            tokens,
+            start_offset,
+        }
     }
 
     /// Posición absoluta en el tramo compartido, o `None` si la ficha
@@ -56,7 +59,9 @@ impl TokensResource {
 
     /// Las casillas de salida de cada jugador actúan como casillas seguras donde no se puede capturar.
     pub fn is_safe_square(&self, board_pos: u32) -> bool {
-        self.start_offset.values().any(|&offset| offset == board_pos)
+        self.start_offset
+            .values()
+            .any(|&offset| offset == board_pos)
     }
 
     /// Comprueba si algún rival del jugador tiene 2 o más fichas en `board_pos` (formando un bloqueo).

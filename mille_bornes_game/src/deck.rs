@@ -56,7 +56,12 @@ pub fn build_deck() -> Vec<Card> {
     for _ in 0..4 {
         deck.push(Card::Distance(200));
     }
-    for hazard in [Hazard::FlatTire, Hazard::OutOfGas, Hazard::Accident, Hazard::SpeedLimit] {
+    for hazard in [
+        Hazard::FlatTire,
+        Hazard::OutOfGas,
+        Hazard::Accident,
+        Hazard::SpeedLimit,
+    ] {
         for _ in 0..3 {
             deck.push(Card::Hazard(hazard));
         }

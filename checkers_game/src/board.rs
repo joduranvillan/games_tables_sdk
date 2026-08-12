@@ -27,7 +27,12 @@ impl BoardResource {
         self.cells[pos.row as usize][pos.col as usize] = piece;
     }
 
-    pub fn get_available_captures_for_piece(&self, sides: &Sides, player: PlayerId, from: Position) -> Vec<Position> {
+    pub fn get_available_captures_for_piece(
+        &self,
+        sides: &Sides,
+        player: PlayerId,
+        from: Position,
+    ) -> Vec<Position> {
         let Some(piece) = self.get(from) else {
             return Vec::new();
         };
@@ -70,7 +75,11 @@ impl BoardResource {
         captures
     }
 
-    pub fn get_all_available_captures(&self, sides: &Sides, player: PlayerId) -> Vec<(Position, Position)> {
+    pub fn get_all_available_captures(
+        &self,
+        sides: &Sides,
+        player: PlayerId,
+    ) -> Vec<(Position, Position)> {
         let mut all_captures = Vec::new();
         for row in 0..8u8 {
             for col in 0..8u8 {

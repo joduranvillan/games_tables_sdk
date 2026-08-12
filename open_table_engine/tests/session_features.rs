@@ -43,10 +43,7 @@ struct StateResource {
 fn build_dummy_rules(version: u32) -> RuleEngine {
     let mut rules = RuleEngine::new();
     rules.register::<DummyCommand, _>(move |cmd, world| {
-        let mut state = world.get_resource_or_insert_with(|| StateResource {
-            value: 0,
-            version,
-        });
+        let mut state = world.get_resource_or_insert_with(|| StateResource { value: 0, version });
         state.value += cmd.counter;
         state.version = version;
         Ok(vec![Box::new(DummyEvent {
@@ -118,10 +115,7 @@ fn test_replay_desde_log_comprimido_produce_estado_correcto() {
         .expect("replay_from_compressed falló");
 
     assert_eq!(new_session.current_tick(), session.current_tick());
-    assert_eq!(
-        new_session.command_log().len(),
-        session.command_log().len()
-    );
+    assert_eq!(new_session.command_log().len(), session.command_log().len());
 
     let state_orig = session.world().get_resource::<StateResource>().unwrap();
     let state_new = new_session.world().get_resource::<StateResource>().unwrap();
@@ -129,11 +123,20 @@ fn test_replay_desde_log_comprimido_produce_estado_correcto() {
 
     // Replay usando el método estático replay_compressed
     let rules_for_static_replay = build_dummy_rules(1);
-    let reconstructed = Session::replay_compressed(SessionId(103), 42, players, rules_for_static_replay, &compressed)
-        .expect("replay_compressed estático falló");
+    let reconstructed = Session::replay_compressed(
+        SessionId(103),
+        42,
+        players,
+        rules_for_static_replay,
+        &compressed,
+    )
+    .expect("replay_compressed estático falló");
 
     assert_eq!(reconstructed.current_tick(), session.current_tick());
-    let state_recon = reconstructed.world().get_resource::<StateResource>().unwrap();
+    let state_recon = reconstructed
+        .world()
+        .get_resource::<StateResource>()
+        .unwrap();
     assert_eq!(state_orig, state_recon);
 }
 

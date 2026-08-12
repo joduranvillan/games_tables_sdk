@@ -35,7 +35,9 @@ pub fn build_checkers_rules() -> RuleEngine {
             world.insert_resource(MultiCaptureResource::default());
         }
         if !world.contains_resource::<LegalMoveGeneratorResource>() {
-            world.insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(CheckersLegalMoveGenerator)));
+            world.insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(
+                CheckersLegalMoveGenerator,
+            )));
         }
 
         // 1. Le tiene que tocar a este jugador.
@@ -86,7 +88,9 @@ pub fn build_checkers_rules() -> RuleEngine {
         }
 
         if captures_available && row_diff.abs() != 2 {
-            return Err(invalid("hay capturas disponibles: la captura es obligatoria"));
+            return Err(invalid(
+                "hay capturas disponibles: la captura es obligatoria",
+            ));
         }
 
         let mut captured_pos: Option<Position> = None;
@@ -135,7 +139,9 @@ pub fn build_checkers_rules() -> RuleEngine {
         // Si es así, se mantiene el turno del jugador y se registra la posición requerida (must_use_piece).
         let has_further_capture = captured_pos.is_some()
             && !promoted
-            && !board.get_available_captures_for_piece(&sides_snapshot, cmd.player, cmd.to).is_empty();
+            && !board
+                .get_available_captures_for_piece(&sides_snapshot, cmd.player, cmd.to)
+                .is_empty();
 
         let counts = board.count_pieces();
         let _ = board; // soltar el borrow antes de tocar otros resources
@@ -182,7 +188,10 @@ pub fn build_checkers_rules() -> RuleEngine {
         if !players.contains(&cmd.player) {
             return Err(invalid("no eres un jugador de esta partida"));
         }
-        let opponent = players.into_iter().find(|&p| p != cmd.player).unwrap_or(cmd.player);
+        let opponent = players
+            .into_iter()
+            .find(|&p| p != cmd.player)
+            .unwrap_or(cmd.player);
         world.insert_resource(GameOverResource(true));
         world.insert_resource(WinnerResource(Some(opponent)));
         Ok(vec![Box::new(GameOverEvent { winner: opponent })])

@@ -67,7 +67,9 @@ impl PlayersResource {
             .iter()
             .enumerate()
             .filter(|(idx, s)| match s {
-                Space::Property { group: g, .. } => g == group && self.properties.get(idx) == Some(&player),
+                Space::Property { group: g, .. } => {
+                    g == group && self.properties.get(idx) == Some(&player)
+                }
                 _ => false,
             })
             .count();
@@ -79,7 +81,9 @@ impl PlayersResource {
         board_spaces
             .iter()
             .enumerate()
-            .filter(|(idx, s)| matches!(s, Space::Utility { .. }) && self.properties.get(idx) == Some(&owner))
+            .filter(|(idx, s)| {
+                matches!(s, Space::Utility { .. }) && self.properties.get(idx) == Some(&owner)
+            })
             .count() as u32
     }
 
@@ -87,7 +91,9 @@ impl PlayersResource {
         board_spaces
             .iter()
             .enumerate()
-            .filter(|(idx, s)| matches!(s, Space::Railroad { .. }) && self.properties.get(idx) == Some(&owner))
+            .filter(|(idx, s)| {
+                matches!(s, Space::Railroad { .. }) && self.properties.get(idx) == Some(&owner)
+            })
             .count() as u32
     }
 }
@@ -123,4 +129,3 @@ pub struct AuctionState {
 pub struct AuctionResource {
     pub state: Option<AuctionState>,
 }
-

@@ -1,6 +1,6 @@
 use crisis_game::{
-    new_crisis_session, DeclareAttackCommand, EndPhaseCommand, FortifyCommand,
-    PlaceArmiesCommand, RollAttackCommand, TerritoryId,
+    new_crisis_session, DeclareAttackCommand, EndPhaseCommand, FortifyCommand, PlaceArmiesCommand,
+    RollAttackCommand, TerritoryId,
 };
 use open_table_core::ids::{PlayerId, SessionId};
 use open_table_engine::prelude::Command;

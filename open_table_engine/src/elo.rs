@@ -61,7 +61,10 @@ mod tests {
         let high = EloRating(1400.0);
         let low = EloRating(1000.0);
         let (new_high, new_low) = update_elo_draw(high, low, 32.0);
-        assert!(new_high.0 < high.0, "El de mayor ELO debe bajar en un empate");
+        assert!(
+            new_high.0 < high.0,
+            "El de mayor ELO debe bajar en un empate"
+        );
         assert!(new_low.0 > low.0, "El de menor ELO debe subir en un empate");
     }
 

@@ -203,7 +203,10 @@ fn generate_token() -> String {
 
 impl Transport for SessionHostTransport {
     fn send(&mut self, peer: PlayerId, bytes: &[u8]) -> EngineResult<()> {
-        let mut conns = self.connections.lock().expect("lock de connections envenenado");
+        let mut conns = self
+            .connections
+            .lock()
+            .expect("lock de connections envenenado");
         let stream = conns
             .get_mut(&peer)
             .ok_or_else(|| EngineError::Network(format!("jugador {peer:?} no está conectado")))?;
@@ -211,7 +214,10 @@ impl Transport for SessionHostTransport {
     }
 
     fn broadcast(&mut self, bytes: &[u8]) -> EngineResult<()> {
-        let mut conns = self.connections.lock().expect("lock de connections envenenado");
+        let mut conns = self
+            .connections
+            .lock()
+            .expect("lock de connections envenenado");
         for stream in conns.values_mut() {
             write_frame(stream, bytes).map_err(|e| EngineError::Network(e.to_string()))?;
         }

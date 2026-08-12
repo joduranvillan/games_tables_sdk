@@ -1,5 +1,5 @@
-use std::time::Instant;
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 
 use crate::ids::Tick;
 

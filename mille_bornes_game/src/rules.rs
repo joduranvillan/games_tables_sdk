@@ -57,8 +57,8 @@ fn validate_and_play_distance(
         .contains(&player);
 
     let mut deck = world.resource_mut::<DeckResource>();
-    let is_speed_limited = speed_limited
-        || deck.hazard.get(&player).copied().flatten() == Some(Hazard::SpeedLimit);
+    let is_speed_limited =
+        speed_limited || deck.hazard.get(&player).copied().flatten() == Some(Hazard::SpeedLimit);
 
     if is_speed_limited && !has_right_of_way && value > 50 {
         return Err(invalid(
@@ -141,7 +141,10 @@ fn validate_and_play_hazard(
         if limited {
             return Err(invalid("el rival ya tiene un límite de velocidad activo"));
         }
-        world.resource_mut::<SpeedLimitResource>().limited.insert(target);
+        world
+            .resource_mut::<SpeedLimitResource>()
+            .limited
+            .insert(target);
         let mut deck = world.resource_mut::<DeckResource>();
         deck.hazard.insert(target, Some(Hazard::SpeedLimit));
     } else {

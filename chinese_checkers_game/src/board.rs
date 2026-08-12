@@ -44,8 +44,6 @@ impl BoardResource {
             Some(t) => t,
             None => return false,
         };
-        target
-            .iter()
-            .all(|pos| self.pegs.get(pos) == Some(&player))
+        target.iter().all(|pos| self.pegs.get(pos) == Some(&player))
     }
 }

@@ -1,11 +1,9 @@
-use std::collections::HashMap;
+use crate::board::{Continent, ObjectiveCard, Territory, TerritoryId, CONTINENTS, TERRITORIES};
+use crate::events::TerritoryCard;
 use open_table_core::ids::PlayerId;
 use open_table_macros::GameResource;
 use serde::{Deserialize, Serialize};
-use crate::board::{
-    Continent, ObjectiveCard, Territory, TerritoryId, CONTINENTS, TERRITORIES,
-};
-use crate::events::TerritoryCard;
+use std::collections::HashMap;
 
 pub type TerritoryMapResource = TerritoryStateResource;
 pub type PlayerHandResource = PlayerCardsResource;
@@ -86,7 +84,9 @@ pub struct TurnStateResource {
 impl Default for TurnStateResource {
     fn default() -> Self {
         Self {
-            phase: TurnPhase::PlaceArmies { armies_remaining: 5 },
+            phase: TurnPhase::PlaceArmies {
+                armies_remaining: 5,
+            },
             fortified: false,
         }
     }

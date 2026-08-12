@@ -1,6 +1,4 @@
-use backgammon_game::{
-    new_backgammon_session, MoveCheckerCommand, PendingDiceResource,
-};
+use backgammon_game::{new_backgammon_session, MoveCheckerCommand, PendingDiceResource};
 use open_table_engine::prelude::*;
 use proptest::prelude::*;
 

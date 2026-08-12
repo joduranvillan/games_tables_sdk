@@ -70,7 +70,11 @@ fn main() {
         print_board(&session);
 
         let current = session.current_player();
-        let label = if current == P1 { "Jugador 1 (x)" } else { "Jugador 2 (o)" };
+        let label = if current == P1 {
+            "Jugador 1 (x)"
+        } else {
+            "Jugador 2 (o)"
+        };
         print!("{label}, tu movimiento: ");
         io::stdout().flush().ok();
 
@@ -97,7 +101,10 @@ fn main() {
         match session.process_command(current, command) {
             Ok(events) => {
                 for event in &events {
-                    if let Some(moved) = event.as_any().downcast_ref::<checkers_game::PieceMovedEvent>() {
+                    if let Some(moved) = event
+                        .as_any()
+                        .downcast_ref::<checkers_game::PieceMovedEvent>()
+                    {
                         if let Some(captured) = moved.captured {
                             println!("¡Captura en {captured:?}!");
                         }
@@ -105,9 +112,15 @@ fn main() {
                             println!("¡La ficha se coronó!");
                         }
                     }
-                    if let Some(game_over) = event.as_any().downcast_ref::<checkers_game::GameOverEvent>() {
+                    if let Some(game_over) = event
+                        .as_any()
+                        .downcast_ref::<checkers_game::GameOverEvent>()
+                    {
                         print_board(&session);
-                        println!("Ganó el jugador {:?}. ¡Fin de la partida!", game_over.winner);
+                        println!(
+                            "Ganó el jugador {:?}. ¡Fin de la partida!",
+                            game_over.winner
+                        );
                         return;
                     }
                 }

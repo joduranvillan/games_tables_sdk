@@ -1,8 +1,9 @@
 use crisis_game::{
     new_crisis_session, CardType, CardsExchangedEvent, DeclareAttackCommand, EndPhaseCommand,
-    ExchangeCardsCommand, ObjectiveCard, PlaceArmiesCommand, PlayerCardsResource, PlayerEliminatedEvent,
-    PlayerObjectivesResource, RollAttackCommand, TegGameOverEvent, TerritoryCard, TerritoryId,
-    TerritoryStateResource, TurnPhase, TurnStateResource, CONTINENT_SOUTH_AMERICA,
+    ExchangeCardsCommand, ObjectiveCard, PlaceArmiesCommand, PlayerCardsResource,
+    PlayerEliminatedEvent, PlayerObjectivesResource, RollAttackCommand, TegGameOverEvent,
+    TerritoryCard, TerritoryId, TerritoryStateResource, TurnPhase, TurnStateResource,
+    CONTINENT_SOUTH_AMERICA,
 };
 use open_table_engine::prelude::*;
 
@@ -18,11 +19,12 @@ fn test_partida_teg_de_dos_jugadores_hasta_victoria_por_objetivo() {
         let mut session = new_crisis_session(SessionId(1), seed, &[P1, P2]).unwrap();
 
         {
-            let mut player_objs = session.world_mut().resource_mut::<PlayerObjectivesResource>();
-            player_objs.objectives.insert(
-                P1,
-                ObjectiveCard::ConquerContinent(CONTINENT_SOUTH_AMERICA),
-            );
+            let mut player_objs = session
+                .world_mut()
+                .resource_mut::<PlayerObjectivesResource>();
+            player_objs
+                .objectives
+                .insert(P1, ObjectiveCard::ConquerContinent(CONTINENT_SOUTH_AMERICA));
 
             let mut turn_state = session.world_mut().resource_mut::<TurnStateResource>();
             turn_state.phase = TurnPhase::Attack;

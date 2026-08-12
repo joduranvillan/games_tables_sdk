@@ -3,9 +3,20 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Space {
     Go,
-    Property { name: String, group: String, price: u32, rent: u32 },
-    Utility { name: String, price: u32 },
-    Railroad { name: String, price: u32 },
+    Property {
+        name: String,
+        group: String,
+        price: u32,
+        rent: u32,
+    },
+    Utility {
+        name: String,
+        price: u32,
+    },
+    Railroad {
+        name: String,
+        price: u32,
+    },
     Empty,
     GoToJail,
     Jail,
@@ -60,4 +71,3 @@ pub const STARTING_MONEY: i64 = 1500;
 pub const GO_BONUS: i64 = 200;
 pub const JAIL_SPACE: usize = 4;
 pub const GO_TO_JAIL_SPACE: usize = 8;
-

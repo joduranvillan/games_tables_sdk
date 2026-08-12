@@ -53,7 +53,13 @@ fn comando_con_issuer_declarativo_funciona() {
 
     // El derive generó issuer() a partir de #[issuer], no lo escribimos.
     assert_eq!(cmd.issuer(), Some(alice));
-    assert_eq!(cmd.as_any().downcast_ref::<RollDiceCommand>().unwrap().player, alice);
+    assert_eq!(
+        cmd.as_any()
+            .downcast_ref::<RollDiceCommand>()
+            .unwrap()
+            .player,
+        alice
+    );
 }
 
 #[test]

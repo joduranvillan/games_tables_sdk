@@ -63,7 +63,11 @@ impl TcpLobby {
     /// Transiciona el lobby hacia una partida activa, devolviendo el `TcpHostTransport`
     /// junto con la lista ordenada de `PlayerId`s de los jugadores participantes.
     pub fn start_game(self) -> (TcpHostTransport, Vec<PlayerId>) {
-        let player_ids = self.joined_players().into_iter().map(|p| p.player_id).collect();
+        let player_ids = self
+            .joined_players()
+            .into_iter()
+            .map(|p| p.player_id)
+            .collect();
         (self.host, player_ids)
     }
 }

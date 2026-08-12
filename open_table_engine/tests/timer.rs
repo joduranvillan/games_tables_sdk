@@ -10,12 +10,7 @@ const P2: PlayerId = PlayerId(2);
 
 #[test]
 fn turn_timer_times_out_after_duration_and_returns_correct_player() {
-    let mut session = Session::new(
-        SessionId(1),
-        42,
-        vec![P1, P2],
-        RuleEngine::new(),
-    );
+    let mut session = Session::new(SessionId(1), 42, vec![P1, P2], RuleEngine::new());
 
     // Configurar temporizador de turno con 50 ms
     session
@@ -34,12 +29,7 @@ fn turn_timer_times_out_after_duration_and_returns_correct_player() {
 
 #[test]
 fn test_timeout_de_reconexion_emite_forfeit() {
-    let mut session = Session::new(
-        SessionId(2),
-        42,
-        vec![P1, P2],
-        RuleEngine::new(),
-    );
+    let mut session = Session::new(SessionId(2), 42, vec![P1, P2], RuleEngine::new());
 
     let forfeit_received = Arc::new(AtomicU32::new(0));
     let forfeit_clone = Arc::clone(&forfeit_received);
@@ -101,4 +91,3 @@ fn test_reanudar_permite_comandos_nuevamente() {
     // El comando dummy no tiene handler registrado, pero NO debe fallar con SessionPaused
     assert!(!matches!(result, Err(EngineError::SessionPaused)));
 }
-

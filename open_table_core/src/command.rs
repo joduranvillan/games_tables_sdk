@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::ids::Tick;
 use crate::ids::PlayerId;
+use crate::ids::Tick;
 
 /// Un `Command` es la intención de un jugador ("quiero tirar el dado",
 /// "quiero jugar esta carta"). Es solo datos: nunca contiene lógica.
