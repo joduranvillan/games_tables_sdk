@@ -162,9 +162,9 @@ impl Sides {
                         } else {
                             from as i32 + 1
                         };
-                        if d as i32 == distance {
-                            return true;
-                        } else if d as i32 > distance && !self.has_checkers_behind_die_exit(board, player, from, d) {
+                        if d as i32 == distance
+                            || (d as i32 > distance && !self.has_checkers_behind_die_exit(board, player, from, d))
+                        {
                             return true;
                         }
                     }

@@ -377,14 +377,12 @@ pub fn is_legal_move(board: &BoardResource, sides: &Sides, player: PlayerId, fro
         if is_in_check(board, sides, player) {
             return false;
         }
-        if to.col == 6
+        if (to.col == 6
             && (is_square_attacked(board, sides, Position::new(from.row, 5), opponent)
-                || is_square_attacked(board, sides, Position::new(from.row, 6), opponent))
-        {
-            return false;
-        } else if to.col == 2
-            && (is_square_attacked(board, sides, Position::new(from.row, 3), opponent)
-                || is_square_attacked(board, sides, Position::new(from.row, 2), opponent))
+                || is_square_attacked(board, sides, Position::new(from.row, 6), opponent)))
+            || (to.col == 2
+                && (is_square_attacked(board, sides, Position::new(from.row, 3), opponent)
+                    || is_square_attacked(board, sides, Position::new(from.row, 2), opponent)))
         {
             return false;
         }

@@ -210,7 +210,7 @@ pub fn build_backgammon_rules() -> RuleEngine {
                 }
                 let raw = from as i32 + direction * cmd.die as i32;
                 if raw < 0 || raw >= POINTS as i32 {
-                    if !sides.all_checkers_home(&board, cmd.player) {
+                    if !sides.all_checkers_home(board, cmd.player) {
                         return Err(invalid(
                             "no podés sacar fichas todavía: no están todas en tu cuadrante final",
                         ));
@@ -220,7 +220,7 @@ pub fn build_backgammon_rules() -> RuleEngine {
                     } else {
                         from as i32 + 1
                     };
-                    if cmd.die as i32 > distance && sides.has_checkers_behind_die_exit(&board, cmd.player, from, cmd.die) {
+                    if cmd.die as i32 > distance && sides.has_checkers_behind_die_exit(board, cmd.player, from, cmd.die) {
                         return Err(invalid(
                             "no podés sacar esta ficha con un dado mayor porque tenés fichas más atrás",
                         ));
