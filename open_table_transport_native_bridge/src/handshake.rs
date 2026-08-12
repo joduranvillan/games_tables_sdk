@@ -9,7 +9,9 @@ use open_table_core::ids::PlayerId;
 /// extraerlo a un `open_table_handshake` común.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum HandshakeRequest {
-    Join { player_name: String },
+    Join {
+        player_name: String,
+    },
     Reconnect {
         player_id: PlayerId,
         reconnect_token: String,

@@ -19,8 +19,18 @@ fn roll(session: &mut Session, player: PlayerId) -> u32 {
         .value
 }
 
-fn move_token(session: &mut Session, player: PlayerId, token_index: usize) -> Result<Vec<Box<dyn Event>>, EngineError> {
-    session.process_command(player, Box::new(MoveTokenCommand { player, token_index }))
+fn move_token(
+    session: &mut Session,
+    player: PlayerId,
+    token_index: usize,
+) -> Result<Vec<Box<dyn Event>>, EngineError> {
+    session.process_command(
+        player,
+        Box::new(MoveTokenCommand {
+            player,
+            token_index,
+        }),
+    )
 }
 
 #[test]
@@ -77,7 +87,9 @@ fn pisar_una_ficha_rival_la_manda_de_vuelta_a_la_base() {
     // (12+steps-1)%24 == 11, que se cumple con steps=24 ((12+24-1)%24=35%24=11).
     let mut session = new_ludo_session(SessionId(5), 1, vec![P1, P2]);
     {
-        let mut tokens = session.world_mut().resource_mut::<ludo_game::TokensResource>();
+        let mut tokens = session
+            .world_mut()
+            .resource_mut::<ludo_game::TokensResource>();
         tokens.tokens.get_mut(&P1).unwrap()[0] = 11; // a un paso de la colisión
         tokens.tokens.get_mut(&P2).unwrap()[0] = 24; // en la misma celda absoluta que P1 tras +1
     }
@@ -89,18 +101,26 @@ fn pisar_una_ficha_rival_la_manda_de_vuelta_a_la_base() {
     }
 
     let events = move_token(&mut session, P1, 0).expect("mueve y captura");
-    let moved = events[0].as_any().downcast_ref::<TokenMovedEvent>().unwrap();
+    let moved = events[0]
+        .as_any()
+        .downcast_ref::<TokenMovedEvent>()
+        .unwrap();
     assert_eq!(moved.captured, Some((P2, 0)));
 
     let tokens = session.world().resource::<ludo_game::TokensResource>();
-    assert_eq!(tokens.tokens[&P2][0], 0, "la ficha capturada vuelve a la base");
+    assert_eq!(
+        tokens.tokens[&P2][0], 0,
+        "la ficha capturada vuelve a la base"
+    );
 }
 
 #[test]
 fn llegar_con_las_4_fichas_a_destino_termina_la_partida() {
     let mut session = new_ludo_session(SessionId(6), 1, vec![P1, P2]);
     {
-        let mut tokens = session.world_mut().resource_mut::<ludo_game::TokensResource>();
+        let mut tokens = session
+            .world_mut()
+            .resource_mut::<ludo_game::TokensResource>();
         // 3 fichas ya en la meta, la 4ta a un paso.
         tokens.tokens.get_mut(&P1).unwrap()[0] = MAX_STEPS;
         tokens.tokens.get_mut(&P1).unwrap()[1] = MAX_STEPS;
@@ -115,9 +135,11 @@ fn llegar_con_las_4_fichas_a_destino_termina_la_partida() {
     }
 
     let events = move_token(&mut session, P1, 3).expect("mueve la última ficha a destino");
-    assert!(events
-        .iter()
-        .any(|e| e.as_any().downcast_ref::<GameOverEvent>().map(|go| go.winner) == Some(P1)));
+    assert!(events.iter().any(|e| e
+        .as_any()
+        .downcast_ref::<GameOverEvent>()
+        .map(|go| go.winner)
+        == Some(P1)));
 }
 
 #[test]
@@ -150,7 +172,9 @@ fn sin_movimientos_validos_limpia_tirada_y_pasa_turno() {
 fn casilla_segura_de_salida_evita_captura() {
     let mut session = new_ludo_session(SessionId(8), 1, vec![P1, P2]);
     {
-        let mut tokens = session.world_mut().resource_mut::<ludo_game::TokensResource>();
+        let mut tokens = session
+            .world_mut()
+            .resource_mut::<ludo_game::TokensResource>();
         // P2 está en su casilla de salida (steps=1). start_offset[P2]=12. board_position(P2, 1) = 12.
         tokens.tokens.get_mut(&P2).unwrap()[0] = 1;
         // P1 aterriza en la misma casilla 12 (con start_offset[P1]=0, necesita steps=13 para board_position=12).
@@ -164,18 +188,29 @@ fn casilla_segura_de_salida_evita_captura() {
     }
 
     let events = move_token(&mut session, P1, 0).expect("mueve a casilla de salida de P2");
-    let moved = events[0].as_any().downcast_ref::<TokenMovedEvent>().unwrap();
-    assert_eq!(moved.captured, None, "en casilla de salida segura no se captura");
+    let moved = events[0]
+        .as_any()
+        .downcast_ref::<TokenMovedEvent>()
+        .unwrap();
+    assert_eq!(
+        moved.captured, None,
+        "en casilla de salida segura no se captura"
+    );
 
     let tokens = session.world().resource::<ludo_game::TokensResource>();
-    assert_eq!(tokens.tokens[&P2][0], 1, "la ficha de P2 no fue enviada a la base");
+    assert_eq!(
+        tokens.tokens[&P2][0], 1,
+        "la ficha de P2 no fue enviada a la base"
+    );
 }
 
 #[test]
 fn test_token_no_puede_entrar_en_columna_de_casa_rival() {
     let mut session = new_ludo_session(SessionId(9), 1, vec![P1, P2]);
     {
-        let mut tokens = session.world_mut().resource_mut::<ludo_game::TokensResource>();
+        let mut tokens = session
+            .world_mut()
+            .resource_mut::<ludo_game::TokensResource>();
         // P1 tiene una ficha en su columna de casa (steps = 25).
         tokens.tokens.get_mut(&P1).unwrap()[0] = 25;
         // P2 está en la casilla compartida 23 (steps = 12 para P2 ya que start_offset[P2]=12).
@@ -194,19 +229,27 @@ fn test_token_no_puede_entrar_en_columna_de_casa_rival() {
     }
 
     let events = move_token(&mut session, P2, 0).expect("mueve en el tramo compartido");
-    let moved = events[0].as_any().downcast_ref::<TokenMovedEvent>().unwrap();
+    let moved = events[0]
+        .as_any()
+        .downcast_ref::<TokenMovedEvent>()
+        .unwrap();
     // La ficha de P2 pasa a steps = 13 (posición absoluta 0 del tramo compartido), NO a la columna de casa de P1
     assert_eq!(moved.to_steps, 13);
     let tokens = session.world().resource::<ludo_game::TokensResource>();
     assert_eq!(tokens.board_position(P2, 13), Some(0));
-    assert_eq!(tokens.tokens[&P1][0], 25, "la ficha de P1 en su columna de casa permanece intacta");
+    assert_eq!(
+        tokens.tokens[&P1][0], 25,
+        "la ficha de P1 en su columna de casa permanece intacta"
+    );
 }
 
 #[test]
 fn test_dado_mayor_que_casillas_restantes_en_meta_es_invalido() {
     let mut session = new_ludo_session(SessionId(10), 1, vec![P1, P2]);
     {
-        let mut tokens = session.world_mut().resource_mut::<ludo_game::TokensResource>();
+        let mut tokens = session
+            .world_mut()
+            .resource_mut::<ludo_game::TokensResource>();
         // Colocar ficha a 2 casillas de la meta: MAX_STEPS = 29, así que steps = 27 (faltan 2)
         tokens.tokens.get_mut(&P1).unwrap()[0] = MAX_STEPS - 2;
     }
@@ -228,7 +271,9 @@ fn test_dado_mayor_que_casillas_restantes_en_meta_es_invalido() {
 fn test_bloqueo_impide_que_rival_aterrice_en_casilla() {
     let mut session = new_ludo_session(SessionId(11), 1, vec![P1, P2]);
     {
-        let mut tokens = session.world_mut().resource_mut::<ludo_game::TokensResource>();
+        let mut tokens = session
+            .world_mut()
+            .resource_mut::<ludo_game::TokensResource>();
         // P1 tiene dos fichas en la casilla de posición absoluta 10 (steps = 11 para P1).
         tokens.tokens.get_mut(&P1).unwrap()[0] = 11;
         tokens.tokens.get_mut(&P1).unwrap()[1] = 11;
@@ -258,7 +303,9 @@ fn test_bloqueo_impide_que_rival_aterrice_en_casilla() {
 fn test_seleccion_de_token_invalido_es_rechazada() {
     let mut session = new_ludo_session(SessionId(12), 1, vec![P1, P2]);
     {
-        let mut tokens = session.world_mut().resource_mut::<ludo_game::TokensResource>();
+        let mut tokens = session
+            .world_mut()
+            .resource_mut::<ludo_game::TokensResource>();
         // P1 tiene la ficha 0 en el tablero (steps = 1) y la ficha 1 en la base (steps = 0).
         tokens.tokens.get_mut(&P1).unwrap()[0] = 1;
         tokens.tokens.get_mut(&P1).unwrap()[1] = 0;
@@ -289,7 +336,9 @@ fn ludo_de_4_jugadores_hasta_victoria() {
 
     // Posicionar las fichas de P1 a pocos pasos de la meta (MAX_STEPS = 29)
     {
-        let mut tokens = session.world_mut().resource_mut::<ludo_game::TokensResource>();
+        let mut tokens = session
+            .world_mut()
+            .resource_mut::<ludo_game::TokensResource>();
         tokens.tokens.get_mut(&p1).unwrap()[0] = MAX_STEPS - 2;
         tokens.tokens.get_mut(&p1).unwrap()[1] = MAX_STEPS - 2;
         tokens.tokens.get_mut(&p1).unwrap()[2] = MAX_STEPS - 2;
@@ -312,7 +361,10 @@ fn ludo_de_4_jugadores_hasta_victoria() {
             .process_command(current, Box::new(RollDiceCommand { player: current }))
             .expect("tirada de dado");
 
-        if roll_events.iter().any(|e| e.as_any().is::<NoValidMovesEvent>()) {
+        if roll_events
+            .iter()
+            .any(|e| e.as_any().is::<NoValidMovesEvent>())
+        {
             continue;
         }
 
@@ -339,7 +391,10 @@ fn ludo_de_4_jugadores_hasta_victoria() {
         }
     }
 
-    assert!(game_over_emitted, "La partida debe terminar con la victoria de P1");
+    assert!(
+        game_over_emitted,
+        "La partida debe terminar con la victoria de P1"
+    );
 
     // Verificar que el ciclo de turnos respetó la secuencia (P1 -> P2 -> P3 -> P4 -> P1...)
     for window in turn_sequence.windows(2) {
@@ -394,5 +449,3 @@ fn test_esquinas_segun_numero_de_jugadores() {
     assert_eq!(t4.start_offset[&P3], 12);
     assert_eq!(t4.start_offset[&p4], 18);
 }
-
-

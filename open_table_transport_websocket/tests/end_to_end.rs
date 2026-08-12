@@ -68,7 +68,8 @@ fn ciclo_completo_command_red_ruleengine_events_red_por_websocket() {
     let addr = host_transport.local_addr();
 
     let (mut client_transport, alice, _token) =
-        WsClientTransport::connect_as_new_player(addr, "Alice").expect("conexión cliente websocket");
+        WsClientTransport::connect_as_new_player(addr, "Alice")
+            .expect("conexión cliente websocket");
 
     let mut host_session = Session::new(SessionId(1), 42, vec![alice], dice_rules());
 
@@ -86,10 +87,17 @@ fn ciclo_completo_command_red_ruleengine_events_red_por_websocket() {
 
     // Host receives command using poll_events
     let received = wait_for_data(|| host_transport.poll_events(), Duration::from_secs(2));
-    assert_eq!(received.len(), 1, "el host debería haber recibido exactamente un mensaje");
+    assert_eq!(
+        received.len(),
+        1,
+        "el host debería haber recibido exactamente un mensaje"
+    );
 
     let (sender, raw_command) = &received[0];
-    assert_eq!(*sender, alice, "el sender proviene de la conexión websocket");
+    assert_eq!(
+        *sender, alice,
+        "el sender proviene de la conexión websocket"
+    );
 
     let decoded_envelope: CommandEnvelope =
         serde_json::from_slice(raw_command).expect("deserializa el comando recibido");
@@ -105,12 +113,18 @@ fn ciclo_completo_command_red_ruleengine_events_red_por_websocket() {
             payload: event,
         };
         let bytes = serde_json::to_vec(&envelope).expect("serializa el evento");
-        host_transport.broadcast(&bytes).expect("manda el evento por websocket");
+        host_transport
+            .broadcast(&bytes)
+            .expect("manda el evento por websocket");
     }
 
     // Client receives events using poll_events
     let client_received = wait_for_data(|| client_transport.poll_events(), Duration::from_secs(2));
-    assert_eq!(client_received.len(), 1, "el cliente debería recibir exactamente un evento");
+    assert_eq!(
+        client_received.len(),
+        1,
+        "el cliente debería recibir exactamente un evento"
+    );
 
     let (_, raw_event) = &client_received[0];
     let decoded_event_envelope: EventEnvelope =

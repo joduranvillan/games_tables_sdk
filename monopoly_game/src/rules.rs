@@ -3,14 +3,17 @@ use std::collections::HashSet;
 use open_table_engine::prelude::*;
 
 use crate::board::{Space, GO_BONUS, GO_TO_JAIL_SPACE, JAIL_SPACE};
-use crate::commands::{AuctionBidCommand, BuyPropertyCommand, PayJailFeeCommand, RollAndMoveCommand};
+use crate::commands::{
+    AuctionBidCommand, BuyPropertyCommand, PayJailFeeCommand, RollAndMoveCommand,
+};
 use crate::events::{
-    AuctionStartedEvent, AuctionWonEvent, BankruptcyEvent, GameOverEvent, JailedEvent, PlayerMovedEvent,
-    PropertyPurchasedEvent, RailroadRentPaidEvent, RentPaidEvent, UtilityRentPaidEvent,
+    AuctionStartedEvent, AuctionWonEvent, BankruptcyEvent, GameOverEvent, JailedEvent,
+    PlayerMovedEvent, PropertyPurchasedEvent, RailroadRentPaidEvent, RentPaidEvent,
+    UtilityRentPaidEvent,
 };
 use crate::resources::{
-    AuctionResource, AuctionState, BoardResource, JailResource, PendingDecision, PendingPurchaseResource,
-    PlayersResource,
+    AuctionResource, AuctionState, BoardResource, JailResource, PendingDecision,
+    PendingPurchaseResource, PlayersResource,
 };
 
 fn invalid(reason: impl Into<String>) -> EngineError {
@@ -116,7 +119,9 @@ pub fn build_monopoly_rules() -> RuleEngine {
                 .copied()
                 .unwrap_or(0);
             if player_money < cmd.amount as i64 {
-                return Err(invalid("no tenés suficiente dinero para realizar esta puja"));
+                return Err(invalid(
+                    "no tenés suficiente dinero para realizar esta puja",
+                ));
             }
 
             let mut auction = world.resource_mut::<AuctionResource>();
@@ -149,11 +154,17 @@ pub fn build_monopoly_rules() -> RuleEngine {
         let mut events: Vec<Box<dyn Event>> = Vec::new();
 
         if active_bidders.len() <= 1 {
-            let state = world.resource_mut::<AuctionResource>().state.take().unwrap();
+            let state = world
+                .resource_mut::<AuctionResource>()
+                .state
+                .take()
+                .unwrap();
             if let Some(winner) = state.highest_bidder {
                 let mut players = world.resource_mut::<PlayersResource>();
                 let money = *players.money.get(&winner).unwrap_or(&0);
-                players.money.insert(winner, money - state.current_bid as i64);
+                players
+                    .money
+                    .insert(winner, money - state.current_bid as i64);
                 players.properties.insert(state.space, winner);
                 let _ = players;
 
@@ -173,11 +184,21 @@ pub fn build_monopoly_rules() -> RuleEngine {
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
             return Err(invalid("no es tu turno"));
         }
-        if world.resource::<PlayersResource>().bankrupt.contains(&cmd.player) {
+        if world
+            .resource::<PlayersResource>()
+            .bankrupt
+            .contains(&cmd.player)
+        {
             return Err(invalid("estás en quiebra y no podés jugar"));
         }
-        if world.resource::<PendingPurchaseResource>().pending.contains_key(&cmd.player) {
-            return Err(invalid("tenés una decisión de compra pendiente, resolvela antes de tirar"));
+        if world
+            .resource::<PendingPurchaseResource>()
+            .pending
+            .contains_key(&cmd.player)
+        {
+            return Err(invalid(
+                "tenés una decisión de compra pendiente, resolvela antes de tirar",
+            ));
         }
         if world.resource::<AuctionResource>().state.is_some() {
             return Err(invalid("hay una subasta activa en curso"));
@@ -190,17 +211,30 @@ pub fn build_monopoly_rules() -> RuleEngine {
         let roll = d1 + d2;
         let is_doubles = d1 == d2;
 
-        let is_jailed = world.resource::<JailResource>().jailed.contains_key(&cmd.player);
+        let is_jailed = world
+            .resource::<JailResource>()
+            .jailed
+            .contains_key(&cmd.player);
 
         let mut events: Vec<Box<dyn Event>> = Vec::new();
 
         if is_jailed {
             if is_doubles {
-                world.resource_mut::<JailResource>().jailed.remove(&cmd.player);
+                world
+                    .resource_mut::<JailResource>()
+                    .jailed
+                    .remove(&cmd.player);
             } else {
-                let attempts = *world.resource::<JailResource>().jailed.get(&cmd.player).unwrap();
+                let attempts = *world
+                    .resource::<JailResource>()
+                    .jailed
+                    .get(&cmd.player)
+                    .unwrap();
                 if attempts <= 1 {
-                    world.resource_mut::<JailResource>().jailed.remove(&cmd.player);
+                    world
+                        .resource_mut::<JailResource>()
+                        .jailed
+                        .remove(&cmd.player);
                     let mut players = world.resource_mut::<PlayersResource>();
                     let money = *players.money.get(&cmd.player).unwrap_or(&0) - 50;
                     players.money.insert(cmd.player, money);
@@ -212,7 +246,10 @@ pub fn build_monopoly_rules() -> RuleEngine {
                         return Ok(events);
                     }
                 } else {
-                    world.resource_mut::<JailResource>().jailed.insert(cmd.player, attempts - 1);
+                    world
+                        .resource_mut::<JailResource>()
+                        .jailed
+                        .insert(cmd.player, attempts - 1);
                     events.push(Box::new(PlayerMovedEvent {
                         player: cmd.player,
                         roll,
@@ -253,7 +290,10 @@ pub fn build_monopoly_rules() -> RuleEngine {
         let _ = players;
 
         if jailed {
-            world.resource_mut::<JailResource>().jailed.insert(cmd.player, 3);
+            world
+                .resource_mut::<JailResource>()
+                .jailed
+                .insert(cmd.player, 3);
         }
 
         events.push(Box::new(PlayerMovedEvent {
@@ -275,23 +315,37 @@ pub fn build_monopoly_rules() -> RuleEngine {
         if !jailed {
             let space = board_spaces[new_pos].clone();
             match space {
-                Space::Property { ref group, rent, .. } => {
-                    let owner = world.resource::<PlayersResource>().properties.get(&new_pos).copied();
+                Space::Property {
+                    ref group, rent, ..
+                } => {
+                    let owner = world
+                        .resource::<PlayersResource>()
+                        .properties
+                        .get(&new_pos)
+                        .copied();
                     match owner {
                         None => {
                             awaiting_decision = true;
-                            world.resource_mut::<PendingPurchaseResource>().pending.insert(
-                                cmd.player,
-                                PendingDecision { space: new_pos, is_doubles },
-                            );
+                            world
+                                .resource_mut::<PendingPurchaseResource>()
+                                .pending
+                                .insert(
+                                    cmd.player,
+                                    PendingDecision {
+                                        space: new_pos,
+                                        is_doubles,
+                                    },
+                                );
                         }
                         Some(owner) if owner == cmd.player => {}
                         Some(owner) => {
                             let mut players = world.resource_mut::<PlayersResource>();
-                            let is_full_group = players.owns_full_group(&board_spaces, owner, group);
+                            let is_full_group =
+                                players.owns_full_group(&board_spaces, owner, group);
                             let actual_rent = if is_full_group { rent * 2 } else { rent };
 
-                            let payer_money = players.money.get(&cmd.player).copied().unwrap_or(0) - actual_rent as i64;
+                            let payer_money = players.money.get(&cmd.player).copied().unwrap_or(0)
+                                - actual_rent as i64;
                             players.money.insert(cmd.player, payer_money);
                             *players.money.entry(owner).or_insert(0) += actual_rent as i64;
                             let _ = players;
@@ -310,23 +364,36 @@ pub fn build_monopoly_rules() -> RuleEngine {
                     }
                 }
                 Space::Utility { .. } => {
-                    let owner = world.resource::<PlayersResource>().properties.get(&new_pos).copied();
+                    let owner = world
+                        .resource::<PlayersResource>()
+                        .properties
+                        .get(&new_pos)
+                        .copied();
                     match owner {
                         None => {
                             awaiting_decision = true;
-                            world.resource_mut::<PendingPurchaseResource>().pending.insert(
-                                cmd.player,
-                                PendingDecision { space: new_pos, is_doubles },
-                            );
+                            world
+                                .resource_mut::<PendingPurchaseResource>()
+                                .pending
+                                .insert(
+                                    cmd.player,
+                                    PendingDecision {
+                                        space: new_pos,
+                                        is_doubles,
+                                    },
+                                );
                         }
                         Some(owner) if owner == cmd.player => {}
                         Some(owner) => {
-                            let count = world.resource::<PlayersResource>().count_utilities(&board_spaces, owner);
+                            let count = world
+                                .resource::<PlayersResource>()
+                                .count_utilities(&board_spaces, owner);
                             let multiplier = if count >= 2 { 10 } else { 4 };
                             let actual_rent = multiplier * roll;
 
                             let mut players = world.resource_mut::<PlayersResource>();
-                            let payer_money = players.money.get(&cmd.player).copied().unwrap_or(0) - actual_rent as i64;
+                            let payer_money = players.money.get(&cmd.player).copied().unwrap_or(0)
+                                - actual_rent as i64;
                             players.money.insert(cmd.player, payer_money);
                             *players.money.entry(owner).or_insert(0) += actual_rent as i64;
                             let _ = players;
@@ -346,18 +413,30 @@ pub fn build_monopoly_rules() -> RuleEngine {
                     }
                 }
                 Space::Railroad { .. } => {
-                    let owner = world.resource::<PlayersResource>().properties.get(&new_pos).copied();
+                    let owner = world
+                        .resource::<PlayersResource>()
+                        .properties
+                        .get(&new_pos)
+                        .copied();
                     match owner {
                         None => {
                             awaiting_decision = true;
-                            world.resource_mut::<PendingPurchaseResource>().pending.insert(
-                                cmd.player,
-                                PendingDecision { space: new_pos, is_doubles },
-                            );
+                            world
+                                .resource_mut::<PendingPurchaseResource>()
+                                .pending
+                                .insert(
+                                    cmd.player,
+                                    PendingDecision {
+                                        space: new_pos,
+                                        is_doubles,
+                                    },
+                                );
                         }
                         Some(owner) if owner == cmd.player => {}
                         Some(owner) => {
-                            let count = world.resource::<PlayersResource>().count_railroads(&board_spaces, owner);
+                            let count = world
+                                .resource::<PlayersResource>()
+                                .count_railroads(&board_spaces, owner);
                             let actual_rent = match count {
                                 1 => 25,
                                 2 => 50,
@@ -366,7 +445,8 @@ pub fn build_monopoly_rules() -> RuleEngine {
                             };
 
                             let mut players = world.resource_mut::<PlayersResource>();
-                            let payer_money = players.money.get(&cmd.player).copied().unwrap_or(0) - actual_rent as i64;
+                            let payer_money = players.money.get(&cmd.player).copied().unwrap_or(0)
+                                - actual_rent as i64;
                             players.money.insert(cmd.player, payer_money);
                             *players.money.entry(owner).or_insert(0) += actual_rent as i64;
                             let _ = players;
@@ -388,7 +468,10 @@ pub fn build_monopoly_rules() -> RuleEngine {
             }
         }
 
-        let is_bankrupt = world.resource::<PlayersResource>().bankrupt.contains(&cmd.player);
+        let is_bankrupt = world
+            .resource::<PlayersResource>()
+            .bankrupt
+            .contains(&cmd.player);
         if !awaiting_decision && (!is_doubles || is_bankrupt) {
             advance_turn_skip_bankrupt(world);
         }
@@ -423,7 +506,9 @@ pub fn build_monopoly_rules() -> RuleEngine {
             let mut players = world.resource_mut::<PlayersResource>();
             let money = *players.money.get(&cmd.player).unwrap_or(&0);
             if money < price as i64 {
-                return Err(invalid("no tenés suficiente dinero para comprar esa propiedad"));
+                return Err(invalid(
+                    "no tenés suficiente dinero para comprar esa propiedad",
+                ));
             }
             players.money.insert(cmd.player, money - price as i64);
             players.properties.insert(space, cmd.player);

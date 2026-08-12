@@ -1,6 +1,6 @@
 use battleship_game::{
-    new_battleship_session, FleetResource, FireShotCommand, GameOverEvent, PlaceFleetCommand, Position, RematchCommand, Ship,
-    ShotResult, ShotResultEvent, SunkenShipEvent,
+    new_battleship_session, FireShotCommand, FleetResource, GameOverEvent, PlaceFleetCommand,
+    Position, RematchCommand, Ship, ShotResult, ShotResultEvent, SunkenShipEvent,
 };
 use open_table_engine::prelude::*;
 
@@ -14,15 +14,26 @@ fn pos(row: u8, col: u8) -> Position {
 /// Flota estándar del MVP: barcos de 4, 3 y 2 casillas, separados para no ser adyacentes.
 fn standard_fleet(row_offset: u8) -> Vec<Ship> {
     vec![
-        vec![pos(row_offset, 0), pos(row_offset, 1), pos(row_offset, 2), pos(row_offset, 3)],
-        vec![pos(row_offset + 2, 0), pos(row_offset + 2, 1), pos(row_offset + 2, 2)],
+        vec![
+            pos(row_offset, 0),
+            pos(row_offset, 1),
+            pos(row_offset, 2),
+            pos(row_offset, 3),
+        ],
+        vec![
+            pos(row_offset + 2, 0),
+            pos(row_offset + 2, 1),
+            pos(row_offset + 2, 2),
+        ],
         vec![pos(row_offset + 4, 0), pos(row_offset + 4, 1)],
     ]
 }
 
 fn place_fleet(session: &mut Session, player: PlayerId, ships: Vec<Ship>) {
     let cmd: Box<dyn Command> = Box::new(PlaceFleetCommand { player, ships });
-    session.process_command(player, cmd).expect("la flota debería ser válida");
+    session
+        .process_command(player, cmd)
+        .expect("la flota debería ser válida");
 }
 
 #[test]
@@ -87,7 +98,10 @@ fn un_disparo_certero_se_reporta_como_hit_y_uno_al_agua_como_miss() {
             }),
         )
         .expect("el disparo debería ser válido");
-    let shot = events[0].as_any().downcast_ref::<ShotResultEvent>().unwrap();
+    let shot = events[0]
+        .as_any()
+        .downcast_ref::<ShotResultEvent>()
+        .unwrap();
     assert_eq!(shot.result, ShotResult::Hit);
 
     // P2 dispara a una casilla vacía.
@@ -100,7 +114,10 @@ fn un_disparo_certero_se_reporta_como_hit_y_uno_al_agua_como_miss() {
             }),
         )
         .expect("el disparo debería ser válido");
-    let shot = events[0].as_any().downcast_ref::<ShotResultEvent>().unwrap();
+    let shot = events[0]
+        .as_any()
+        .downcast_ref::<ShotResultEvent>()
+        .unwrap();
     assert_eq!(shot.result, ShotResult::Miss);
 }
 
@@ -110,27 +127,62 @@ fn hundir_todos_los_barcos_rivales_termina_la_partida() {
     place_fleet(&mut session, P1, standard_fleet(0));
     place_fleet(&mut session, P2, standard_fleet(0));
 
-    let shots_p1 = [pos(0, 0), pos(0, 1), pos(0, 2), pos(0, 3), pos(2, 0), pos(2, 1), pos(2, 2), pos(4, 0)];
-    let filler_targets = [pos(7, 0), pos(7, 1), pos(7, 2), pos(7, 3), pos(7, 4), pos(7, 5), pos(7, 6), pos(7, 7)];
+    let shots_p1 = [
+        pos(0, 0),
+        pos(0, 1),
+        pos(0, 2),
+        pos(0, 3),
+        pos(2, 0),
+        pos(2, 1),
+        pos(2, 2),
+        pos(4, 0),
+    ];
+    let filler_targets = [
+        pos(7, 0),
+        pos(7, 1),
+        pos(7, 2),
+        pos(7, 3),
+        pos(7, 4),
+        pos(7, 5),
+        pos(7, 6),
+        pos(7, 7),
+    ];
     let mut last_events;
     for (i, target) in shots_p1.into_iter().enumerate() {
         last_events = session
             .process_command(P1, Box::new(FireShotCommand { player: P1, target }))
             .expect("disparo válido");
-        if !last_events.iter().any(|e| e.as_any().downcast_ref::<GameOverEvent>().is_some()) {
+        if !last_events
+            .iter()
+            .any(|e| e.as_any().downcast_ref::<GameOverEvent>().is_some())
+        {
             session
-                .process_command(P2, Box::new(FireShotCommand { player: P2, target: filler_targets[i] }))
+                .process_command(
+                    P2,
+                    Box::new(FireShotCommand {
+                        player: P2,
+                        target: filler_targets[i],
+                    }),
+                )
                 .expect("disparo válido de relleno");
         }
     }
 
     let final_shot = session
-        .process_command(P1, Box::new(FireShotCommand { player: P1, target: pos(4, 1) }))
+        .process_command(
+            P1,
+            Box::new(FireShotCommand {
+                player: P1,
+                target: pos(4, 1),
+            }),
+        )
         .expect("el último disparo debería hundir el último barco");
 
-    assert!(final_shot
-        .iter()
-        .any(|e| e.as_any().downcast_ref::<GameOverEvent>().map(|go| go.winner) == Some(Some(P1))));
+    assert!(final_shot.iter().any(|e| e
+        .as_any()
+        .downcast_ref::<GameOverEvent>()
+        .map(|go| go.winner)
+        == Some(Some(P1))));
 }
 
 #[test]
@@ -140,15 +192,36 @@ fn disparar_dos_veces_a_la_misma_casilla_es_rechazado() {
     place_fleet(&mut session, P2, standard_fleet(0));
 
     session
-        .process_command(P1, Box::new(FireShotCommand { player: P1, target: pos(5, 5) }))
+        .process_command(
+            P1,
+            Box::new(FireShotCommand {
+                player: P1,
+                target: pos(5, 5),
+            }),
+        )
         .unwrap();
 
     session
-        .process_command(P2, Box::new(FireShotCommand { player: P2, target: pos(5, 5) }))
+        .process_command(
+            P2,
+            Box::new(FireShotCommand {
+                player: P2,
+                target: pos(5, 5),
+            }),
+        )
         .unwrap();
 
-    let res = session.process_command(P1, Box::new(FireShotCommand { player: P1, target: pos(5, 5) }));
-    assert!(res.is_err(), "no se puede repetir un disparo a la misma casilla");
+    let res = session.process_command(
+        P1,
+        Box::new(FireShotCommand {
+            player: P1,
+            target: pos(5, 5),
+        }),
+    );
+    assert!(
+        res.is_err(),
+        "no se puede repetir un disparo a la misma casilla"
+    );
 }
 
 #[test]
@@ -160,7 +233,13 @@ fn barcos_superpuestos_o_diagonales_son_rechazados() {
         vec![pos(0, 0), pos(1, 0), pos(2, 0)],
         vec![pos(2, 2), pos(2, 3)],
     ];
-    let res = session.process_command(P1, Box::new(PlaceFleetCommand { player: P1, ships: overlapping }));
+    let res = session.process_command(
+        P1,
+        Box::new(PlaceFleetCommand {
+            player: P1,
+            ships: overlapping,
+        }),
+    );
     assert!(res.is_err(), "barcos superpuestos deben rechazarse");
 
     let diagonal = vec![
@@ -168,7 +247,13 @@ fn barcos_superpuestos_o_diagonales_son_rechazados() {
         vec![pos(5, 0), pos(5, 1), pos(5, 2)],
         vec![pos(6, 0), pos(6, 1)],
     ];
-    let res = session.process_command(P1, Box::new(PlaceFleetCommand { player: P1, ships: diagonal }));
+    let res = session.process_command(
+        P1,
+        Box::new(PlaceFleetCommand {
+            player: P1,
+            ships: diagonal,
+        }),
+    );
     assert!(res.is_err(), "barcos diagonales deben rechazarse");
 }
 
@@ -204,7 +289,10 @@ fn test_barco_adyacente_a_otro_es_rechazado() {
             ships: diagonal_touching,
         }),
     );
-    assert!(res.is_err(), "barcos tocándose en diagonal deben ser rechazados");
+    assert!(
+        res.is_err(),
+        "barcos tocándose en diagonal deben ser rechazados"
+    );
 }
 
 #[test]
@@ -215,17 +303,38 @@ fn test_disparo_a_celda_ya_disparada_es_rechazado() {
 
     // P1 dispara a agua (7, 7)
     session
-        .process_command(P1, Box::new(FireShotCommand { player: P1, target: pos(7, 7) }))
+        .process_command(
+            P1,
+            Box::new(FireShotCommand {
+                player: P1,
+                target: pos(7, 7),
+            }),
+        )
         .unwrap();
 
     // P2 dispara a agua (7, 7)
     session
-        .process_command(P2, Box::new(FireShotCommand { player: P2, target: pos(7, 7) }))
+        .process_command(
+            P2,
+            Box::new(FireShotCommand {
+                player: P2,
+                target: pos(7, 7),
+            }),
+        )
         .unwrap();
 
     // P1 intenta disparar otra vez a (7, 7)
-    let res = session.process_command(P1, Box::new(FireShotCommand { player: P1, target: pos(7, 7) }));
-    assert!(res.is_err(), "disparar dos veces a una celda de agua debe ser rechazado");
+    let res = session.process_command(
+        P1,
+        Box::new(FireShotCommand {
+            player: P1,
+            target: pos(7, 7),
+        }),
+    );
+    assert!(
+        res.is_err(),
+        "disparar dos veces a una celda de agua debe ser rechazado"
+    );
 }
 
 #[test]
@@ -237,35 +346,79 @@ fn test_impactar_todos_los_segmentos_hunde_el_barco_y_emite_evento() {
     // El barco de 3 celdas de P2 está en fila 2: pos(2, 0), pos(2, 1), pos(2, 2)
     // Disparo 1: pos(2, 0)
     let ev1 = session
-        .process_command(P1, Box::new(FireShotCommand { player: P1, target: pos(2, 0) }))
+        .process_command(
+            P1,
+            Box::new(FireShotCommand {
+                player: P1,
+                target: pos(2, 0),
+            }),
+        )
         .unwrap();
-    assert!(!ev1.iter().any(|e| e.as_any().is::<SunkenShipEvent>()), "el barco no debe estar hundido al primer disparo");
+    assert!(
+        !ev1.iter().any(|e| e.as_any().is::<SunkenShipEvent>()),
+        "el barco no debe estar hundido al primer disparo"
+    );
 
     // P2 responde
     session
-        .process_command(P2, Box::new(FireShotCommand { player: P2, target: pos(7, 0) }))
+        .process_command(
+            P2,
+            Box::new(FireShotCommand {
+                player: P2,
+                target: pos(7, 0),
+            }),
+        )
         .unwrap();
 
     // Disparo 2: pos(2, 1)
     let ev2 = session
-        .process_command(P1, Box::new(FireShotCommand { player: P1, target: pos(2, 1) }))
+        .process_command(
+            P1,
+            Box::new(FireShotCommand {
+                player: P1,
+                target: pos(2, 1),
+            }),
+        )
         .unwrap();
-    assert!(!ev2.iter().any(|e| e.as_any().is::<SunkenShipEvent>()), "el barco no debe estar hundido al segundo disparo");
+    assert!(
+        !ev2.iter().any(|e| e.as_any().is::<SunkenShipEvent>()),
+        "el barco no debe estar hundido al segundo disparo"
+    );
 
     // P2 responde
     session
-        .process_command(P2, Box::new(FireShotCommand { player: P2, target: pos(7, 1) }))
+        .process_command(
+            P2,
+            Box::new(FireShotCommand {
+                player: P2,
+                target: pos(7, 1),
+            }),
+        )
         .unwrap();
 
     // Disparo 3: pos(2, 2) - último segmento
     let ev3 = session
-        .process_command(P1, Box::new(FireShotCommand { player: P1, target: pos(2, 2) }))
+        .process_command(
+            P1,
+            Box::new(FireShotCommand {
+                player: P1,
+                target: pos(2, 2),
+            }),
+        )
         .unwrap();
-    let sunken = ev3.iter().find_map(|e| e.as_any().downcast_ref::<SunkenShipEvent>());
-    assert!(sunken.is_some(), "al tercer disparo debe emitirse SunkenShipEvent");
+    let sunken = ev3
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<SunkenShipEvent>());
+    assert!(
+        sunken.is_some(),
+        "al tercer disparo debe emitirse SunkenShipEvent"
+    );
     let sunken_event = sunken.unwrap();
     assert_eq!(sunken_event.ship_type, 3);
-    assert_eq!(sunken_event.positions, vec![pos(2, 0), pos(2, 1), pos(2, 2)]);
+    assert_eq!(
+        sunken_event.positions,
+        vec![pos(2, 0), pos(2, 1), pos(2, 2)]
+    );
 }
 
 #[test]
@@ -278,11 +431,22 @@ fn test_hundir_toda_la_flota_termina_la_partida() {
     }
 
     let events = session
-        .process_command(P1, Box::new(FireShotCommand { player: P1, target: pos(0, 0) }))
+        .process_command(
+            P1,
+            Box::new(FireShotCommand {
+                player: P1,
+                target: pos(0, 0),
+            }),
+        )
         .expect("disparo válido");
 
-    let game_over = events.iter().find_map(|e| e.as_any().downcast_ref::<GameOverEvent>());
-    assert!(game_over.is_some(), "al hundir la flota debe emitirse GameOverEvent");
+    let game_over = events
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<GameOverEvent>());
+    assert!(
+        game_over.is_some(),
+        "al hundir la flota debe emitirse GameOverEvent"
+    );
     assert_eq!(game_over.unwrap().winner, Some(P1));
 }
 
@@ -338,13 +502,7 @@ fn test_barco_fuera_de_los_limites_es_rechazado() {
         vec![pos(0, 6), pos(0, 7), pos(0, 8)],
         vec![pos(4, 0), pos(4, 1)],
     ];
-    let result = session.process_command(
-        P1,
-        Box::new(PlaceFleetCommand {
-            player: P1,
-            ships,
-        }),
-    );
+    let result = session.process_command(P1, Box::new(PlaceFleetCommand { player: P1, ships }));
     assert!(
         matches!(result, Err(EngineError::InvalidCommand { .. })),
         "colocar un barco fuera de los límites debe ser rechazado"
@@ -368,7 +526,10 @@ fn test_drop_cleanup_no_afecta_estado() {
         .expect("el disparo de P1 debe ser procesado correctamente");
 
     assert_eq!(events.len(), 1);
-    let shot = events[0].as_any().downcast_ref::<ShotResultEvent>().unwrap();
+    let shot = events[0]
+        .as_any()
+        .downcast_ref::<ShotResultEvent>()
+        .unwrap();
     assert_eq!(shot.result, ShotResult::Hit);
 
     let fleet = session.world().resource::<FleetResource>();
@@ -376,5 +537,3 @@ fn test_drop_cleanup_no_afecta_estado() {
     assert!(fleet.has_placed_fleet(P2));
     assert_eq!(fleet.hits.get(&P2), Some(&vec![pos(0, 0)]));
 }
-
-

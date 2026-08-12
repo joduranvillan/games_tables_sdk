@@ -5,8 +5,20 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PieceKind {
-    King, Rook, Bishop, Gold, Silver, Knight, Lance, Pawn,
-    PromotedRook, PromotedBishop, PromotedSilver, PromotedKnight, PromotedLance, PromotedPawn
+    King,
+    Rook,
+    Bishop,
+    Gold,
+    Silver,
+    Knight,
+    Lance,
+    Pawn,
+    PromotedRook,
+    PromotedBishop,
+    PromotedSilver,
+    PromotedKnight,
+    PromotedLance,
+    PromotedPawn,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,13 +49,37 @@ impl BoardResource {
         let mut board = Self::new(sente, gote);
         board.hands.insert(sente, vec![]);
         board.hands.insert(gote, vec![]);
-        
+
         // Very simplified setup just for demonstration
-        board.squares.insert((4, 8), Piece { kind: PieceKind::King, owner: sente });
-        board.squares.insert((4, 0), Piece { kind: PieceKind::King, owner: gote });
-        
-        board.squares.insert((4, 6), Piece { kind: PieceKind::Pawn, owner: sente });
-        board.squares.insert((4, 2), Piece { kind: PieceKind::Pawn, owner: gote });
+        board.squares.insert(
+            (4, 8),
+            Piece {
+                kind: PieceKind::King,
+                owner: sente,
+            },
+        );
+        board.squares.insert(
+            (4, 0),
+            Piece {
+                kind: PieceKind::King,
+                owner: gote,
+            },
+        );
+
+        board.squares.insert(
+            (4, 6),
+            Piece {
+                kind: PieceKind::Pawn,
+                owner: sente,
+            },
+        );
+        board.squares.insert(
+            (4, 2),
+            Piece {
+                kind: PieceKind::Pawn,
+                owner: gote,
+            },
+        );
 
         board
     }

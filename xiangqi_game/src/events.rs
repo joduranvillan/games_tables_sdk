@@ -1,6 +1,6 @@
+use crate::board::PieceKind;
 use open_table_engine::prelude::*;
 use open_table_macros::GameEvent;
-use crate::board::PieceKind;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, GameEvent)]

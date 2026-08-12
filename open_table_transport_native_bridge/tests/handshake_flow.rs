@@ -13,7 +13,8 @@ use open_table_core::error::EngineResult;
 use open_table_core::ids::PlayerId;
 use open_table_core::transport::Transport;
 use open_table_transport_native_bridge::{
-    ConnectionEvent, HandshakeStatus, NativeClientTransport, NativeHostTransport, RawByteLink, RawLinkEvent,
+    ConnectionEvent, HandshakeStatus, NativeClientTransport, NativeHostTransport, RawByteLink,
+    RawLinkEvent,
 };
 
 pub struct FakeHostLink {
@@ -56,7 +57,8 @@ impl FakeHostLink {
     /// Simula que la plataforma nativa avisó que un peer se cayó.
     pub fn simulate_disconnect(&mut self, tag: &str) {
         self.outboxes.remove(tag);
-        self.pending_link_events.push(RawLinkEvent::Disconnected(tag.to_string()));
+        self.pending_link_events
+            .push(RawLinkEvent::Disconnected(tag.to_string()));
     }
 }
 
@@ -115,7 +117,10 @@ impl RawByteLink for FakeClientLink {
 fn wait_for_established(client: &mut NativeClientTransport<FakeClientLink>) -> (PlayerId, String) {
     for _ in 0..100 {
         match client.poll_handshake() {
-            HandshakeStatus::Established { player_id, reconnect_token } => return (player_id, reconnect_token),
+            HandshakeStatus::Established {
+                player_id,
+                reconnect_token,
+            } => return (player_id, reconnect_token),
             HandshakeStatus::Rejected { reason } => panic!("handshake rechazado: {reason}"),
             HandshakeStatus::Pending => std::thread::sleep(Duration::from_millis(1)),
         }
@@ -128,7 +133,8 @@ fn join_asigna_un_player_id_y_un_token() {
     let mut host_link = FakeHostLink::new();
     let client_link = host_link.connect("device-a");
     let mut host = NativeHostTransport::new(host_link);
-    let mut client = NativeClientTransport::begin_join(client_link, "Alice").expect("arranca el join");
+    let mut client =
+        NativeClientTransport::begin_join(client_link, "Alice").expect("arranca el join");
 
     // El host tiene que procesar el handshake para que el cliente vea la respuesta.
     host.poll_received();
@@ -138,7 +144,9 @@ fn join_asigna_un_player_id_y_un_token() {
     assert!(!token.is_empty());
 
     let events = host.poll_connection_events();
-    assert!(events.contains(&ConnectionEvent::Joined { player: PlayerId(1) }));
+    assert!(events.contains(&ConnectionEvent::Joined {
+        player: PlayerId(1)
+    }));
 }
 
 #[test]
@@ -146,14 +154,18 @@ fn los_datos_viajan_en_los_dos_sentidos_despues_del_handshake() {
     let mut host_link = FakeHostLink::new();
     let client_link = host_link.connect("device-a");
     let mut host = NativeHostTransport::new(host_link);
-    let mut client = NativeClientTransport::begin_join(client_link, "Alice").expect("arranca el join");
+    let mut client =
+        NativeClientTransport::begin_join(client_link, "Alice").expect("arranca el join");
 
     host.poll_received();
     let (player_id, _token) = wait_for_established(&mut client);
 
     client.send(player_id, b"hola desde el cliente").unwrap();
     let received = host.poll_received();
-    assert_eq!(received, vec![(player_id, b"hola desde el cliente".to_vec())]);
+    assert_eq!(
+        received,
+        vec![(player_id, b"hola desde el cliente".to_vec())]
+    );
 
     host.broadcast(b"hola desde el host").unwrap();
     let received_by_client = client.poll_received();
@@ -166,7 +178,8 @@ fn reconectar_con_el_token_correcto_recupera_el_mismo_player_id() {
     let mut host_link = FakeHostLink::new();
     let client_link = host_link.connect("device-a");
     let mut host = NativeHostTransport::new(host_link);
-    let mut client = NativeClientTransport::begin_join(client_link, "Alice").expect("arranca el join");
+    let mut client =
+        NativeClientTransport::begin_join(client_link, "Alice").expect("arranca el join");
 
     host.poll_received();
     let (player_id, token) = wait_for_established(&mut client);
@@ -179,7 +192,8 @@ fn reconectar_con_el_token_correcto_recupera_el_mismo_player_id() {
     // Reconecta con una conexión nueva ("device-a-2"), probando el token.
     let new_client_link = host.link_mut().connect("device-a-2");
     let mut reconnecting_client =
-        NativeClientTransport::begin_reconnect(new_client_link, player_id, token).expect("arranca la reconexión");
+        NativeClientTransport::begin_reconnect(new_client_link, player_id, token)
+            .expect("arranca la reconexión");
 
     host.poll_received();
     let (reconnected_id, _) = wait_for_established(&mut reconnecting_client);
@@ -194,7 +208,8 @@ fn reconectar_con_un_token_incorrecto_es_rechazado() {
     let mut host_link = FakeHostLink::new();
     let client_link = host_link.connect("device-a");
     let mut host = NativeHostTransport::new(host_link);
-    let mut client = NativeClientTransport::begin_join(client_link, "Alice").expect("arranca el join");
+    let mut client =
+        NativeClientTransport::begin_join(client_link, "Alice").expect("arranca el join");
 
     host.poll_received();
     let (player_id, _real_token) = wait_for_established(&mut client);
@@ -203,14 +218,20 @@ fn reconectar_con_un_token_incorrecto_es_rechazado() {
     host.poll_connection_events();
 
     let new_client_link = host.link_mut().connect("device-a-2");
-    let mut impostor = NativeClientTransport::begin_reconnect(new_client_link, player_id, "token-falso".to_string())
-        .expect("arranca la reconexión (el rechazo pasa después, no acá)");
+    let mut impostor = NativeClientTransport::begin_reconnect(
+        new_client_link,
+        player_id,
+        "token-falso".to_string(),
+    )
+    .expect("arranca la reconexión (el rechazo pasa después, no acá)");
 
     host.poll_received();
     for _ in 0..100 {
         match impostor.poll_handshake() {
             HandshakeStatus::Rejected { .. } => return, // esperado
-            HandshakeStatus::Established { .. } => panic!("no debería haberse aceptado un token falso"),
+            HandshakeStatus::Established { .. } => {
+                panic!("no debería haberse aceptado un token falso")
+            }
             HandshakeStatus::Pending => std::thread::sleep(Duration::from_millis(1)),
         }
     }
@@ -222,7 +243,8 @@ fn un_jugador_que_no_vuelve_a_tiempo_pierde_su_sesion() {
     let mut host_link = FakeHostLink::new();
     let client_link = host_link.connect("device-a");
     let mut host = NativeHostTransport::with_timeout(host_link, Duration::from_millis(100));
-    let mut client = NativeClientTransport::begin_join(client_link, "Alice").expect("arranca el join");
+    let mut client =
+        NativeClientTransport::begin_join(client_link, "Alice").expect("arranca el join");
 
     host.poll_received();
     let (player_id, token) = wait_for_established(&mut client);
@@ -235,12 +257,15 @@ fn un_jugador_que_no_vuelve_a_tiempo_pierde_su_sesion() {
     assert!(events.contains(&ConnectionEvent::TimedOut { player: player_id }));
 
     let new_client_link = host.link_mut().connect("device-a-2");
-    let mut too_late = NativeClientTransport::begin_reconnect(new_client_link, player_id, token).unwrap();
+    let mut too_late =
+        NativeClientTransport::begin_reconnect(new_client_link, player_id, token).unwrap();
     host.poll_received();
     for _ in 0..100 {
         match too_late.poll_handshake() {
             HandshakeStatus::Rejected { .. } => return,
-            HandshakeStatus::Established { .. } => panic!("no debería poder reconectar después del timeout"),
+            HandshakeStatus::Established { .. } => {
+                panic!("no debería poder reconectar después del timeout")
+            }
             HandshakeStatus::Pending => std::thread::sleep(Duration::from_millis(1)),
         }
     }

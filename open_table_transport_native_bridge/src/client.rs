@@ -31,7 +31,10 @@ pub enum HandshakeStatus {
 
 enum InternalStatus {
     Pending,
-    Established { player_id: PlayerId, reconnect_token: String },
+    Established {
+        player_id: PlayerId,
+        reconnect_token: String,
+    },
     Rejected,
 }
 
@@ -48,8 +51,8 @@ impl<L: RawByteLink> NativeClientTransport<L> {
         let request = HandshakeRequest::Join {
             player_name: player_name.to_string(),
         };
-        let bytes = serde_json::to_vec(&request)
-            .map_err(|e| EngineError::Serialization(e.to_string()))?;
+        let bytes =
+            serde_json::to_vec(&request).map_err(|e| EngineError::Serialization(e.to_string()))?;
         link.broadcast_raw(&bytes)?;
 
         Ok(Self {
@@ -60,13 +63,17 @@ impl<L: RawByteLink> NativeClientTransport<L> {
     }
 
     /// Reconexión: prueba identidad con el token que el host dio antes.
-    pub fn begin_reconnect(mut link: L, player_id: PlayerId, reconnect_token: String) -> EngineResult<Self> {
+    pub fn begin_reconnect(
+        mut link: L,
+        player_id: PlayerId,
+        reconnect_token: String,
+    ) -> EngineResult<Self> {
         let request = HandshakeRequest::Reconnect {
             player_id,
             reconnect_token,
         };
-        let bytes = serde_json::to_vec(&request)
-            .map_err(|e| EngineError::Serialization(e.to_string()))?;
+        let bytes =
+            serde_json::to_vec(&request).map_err(|e| EngineError::Serialization(e.to_string()))?;
         link.broadcast_raw(&bytes)?;
 
         Ok(Self {
@@ -87,7 +94,10 @@ impl<L: RawByteLink> NativeClientTransport<L> {
         self.drain_link();
         match &self.status {
             InternalStatus::Pending => HandshakeStatus::Pending,
-            InternalStatus::Established { player_id, reconnect_token } => HandshakeStatus::Established {
+            InternalStatus::Established {
+                player_id,
+                reconnect_token,
+            } => HandshakeStatus::Established {
                 player_id: *player_id,
                 reconnect_token: reconnect_token.clone(),
             },
@@ -102,8 +112,14 @@ impl<L: RawByteLink> NativeClientTransport<L> {
             if matches!(self.status, InternalStatus::Pending) {
                 if let Ok(response) = serde_json::from_slice::<HandshakeResponse>(&bytes) {
                     match response {
-                        HandshakeResponse::Welcome { player_id, reconnect_token } => {
-                            self.status = InternalStatus::Established { player_id, reconnect_token };
+                        HandshakeResponse::Welcome {
+                            player_id,
+                            reconnect_token,
+                        } => {
+                            self.status = InternalStatus::Established {
+                                player_id,
+                                reconnect_token,
+                            };
                         }
                         HandshakeResponse::Rejected { .. } => {
                             self.status = InternalStatus::Rejected;

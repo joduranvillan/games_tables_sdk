@@ -1,7 +1,7 @@
+use crate::board::{Card, CardColor};
 use open_table_engine::prelude::*;
 use open_table_macros::GameEvent;
 use serde::{Deserialize, Serialize};
-use crate::board::{Card, CardColor};
 
 #[derive(Debug, Serialize, Deserialize, GameEvent)]
 pub struct CardPlayedEvent {

@@ -41,4 +41,3 @@ pub struct SunkenShipEvent {
 pub struct GameOverEvent {
     pub winner: Option<PlayerId>,
 }
-

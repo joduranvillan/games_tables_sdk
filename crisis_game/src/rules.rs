@@ -1,9 +1,7 @@
 use open_table_engine::prelude::*;
 use std::collections::VecDeque;
 
-use crate::board::{
-    are_adjacent, check_continent_bonus, check_objective, TerritoryId, CONTINENTS,
-};
+use crate::board::{are_adjacent, check_continent_bonus, check_objective, TerritoryId, CONTINENTS};
 use crate::commands::{
     DeclareAttackCommand, EndPhaseCommand, ExchangeCardsCommand, FortifyCommand,
     PlaceArmiesCommand, RollAttackCommand,
@@ -14,9 +12,9 @@ use crate::events::{
     TerritoryConqueredEvent,
 };
 use crate::resources::{
-    EliminatedPlayersResource, ExchangeCountResource, PendingAttack,
-    PendingAttackResource, PlayerCardsResource, PlayerObjectivesResource, PlayersResource,
-    TerritoryStateResource, TurnPhase, TurnStateResource,
+    EliminatedPlayersResource, ExchangeCountResource, PendingAttack, PendingAttackResource,
+    PlayerCardsResource, PlayerObjectivesResource, PlayersResource, TerritoryStateResource,
+    TurnPhase, TurnStateResource,
 };
 
 fn invalid(reason: impl Into<String>) -> EngineError {
@@ -79,9 +77,15 @@ pub fn build_crisis_rules() -> RuleEngine {
         }
 
         let player_cards = world.resource::<PlayerCardsResource>();
-        let card_count = player_cards.cards.get(&cmd.player).map(|c| c.len()).unwrap_or(0);
+        let card_count = player_cards
+            .cards
+            .get(&cmd.player)
+            .map(|c| c.len())
+            .unwrap_or(0);
         if card_count >= 5 {
-            return Err(invalid("debés canjear tarjetas antes de colocar ejércitos (tenés 5 o más tarjetas)"));
+            return Err(invalid(
+                "debés canjear tarjetas antes de colocar ejércitos (tenés 5 o más tarjetas)",
+            ));
         }
 
         let armies_remaining = match world.resource::<TurnStateResource>().phase {
@@ -147,7 +151,9 @@ pub fn build_crisis_rules() -> RuleEngine {
         }
 
         if !are_adjacent(cmd.from, cmd.to) {
-            return Err(invalid("el territorio de destino no es adyacente al de origen"));
+            return Err(invalid(
+                "el territorio de destino no es adyacente al de origen",
+            ));
         }
 
         let to_owner = territory_state.owners.get(&cmd.to).copied();
@@ -374,7 +380,10 @@ pub fn build_crisis_rules() -> RuleEngine {
             }
             TurnPhase::Fortify | TurnPhase::EndTurn => {
                 let next_player = {
-                    let eliminated = world.resource::<EliminatedPlayersResource>().eliminated.clone();
+                    let eliminated = world
+                        .resource::<EliminatedPlayersResource>()
+                        .eliminated
+                        .clone();
                     let mut turn_res = world.resource_mut::<TurnResource>();
                     let mut next_p = turn_res.0.advance();
                     while eliminated.contains(&next_p) {
@@ -392,7 +401,8 @@ pub fn build_crisis_rules() -> RuleEngine {
                     .count() as u32;
                 let base_refuerzos = std::cmp::max(3, count_territories / 3);
 
-                let continent_bonus = check_continent_bonus(territory_state, next_player, CONTINENTS);
+                let continent_bonus =
+                    check_continent_bonus(territory_state, next_player, CONTINENTS);
 
                 let refuerzos = base_refuerzos + continent_bonus;
 
@@ -437,7 +447,9 @@ pub fn build_crisis_rules() -> RuleEngine {
         }
 
         if !are_connected_by_owner(cmd.from, cmd.to, cmd.player, territory_state) {
-            return Err(invalid("los territorios no están conectados por territorios propios"));
+            return Err(invalid(
+                "los territorios no están conectados por territorios propios",
+            ));
         }
 
         let armies_from = territory_state.armies.get(&cmd.from).copied().unwrap_or(0);
@@ -446,8 +458,14 @@ pub fn build_crisis_rules() -> RuleEngine {
         }
 
         let mut territory_state = world.resource_mut::<TerritoryStateResource>();
-        territory_state.armies.entry(cmd.from).and_modify(|a| *a -= cmd.armies);
-        territory_state.armies.entry(cmd.to).and_modify(|a| *a += cmd.armies);
+        territory_state
+            .armies
+            .entry(cmd.from)
+            .and_modify(|a| *a -= cmd.armies);
+        territory_state
+            .armies
+            .entry(cmd.to)
+            .and_modify(|a| *a += cmd.armies);
 
         let mut turn_state = world.resource_mut::<TurnStateResource>();
         turn_state.fortified = true;
@@ -468,7 +486,11 @@ pub fn build_crisis_rules() -> RuleEngine {
         let turn_state = world.resource::<TurnStateResource>();
         let armies_remaining = match turn_state.phase {
             TurnPhase::PlaceArmies { armies_remaining } => armies_remaining,
-            _ => return Err(invalid("solo podés canjear tarjetas en la fase de colocación de ejércitos")),
+            _ => {
+                return Err(invalid(
+                    "solo podés canjear tarjetas en la fase de colocación de ejércitos",
+                ))
+            }
         };
 
         let mut idxs = cmd.card_indices;

@@ -6,8 +6,8 @@
 //! enum y lo registre con `#[derive(GameResource)]` de `open_table_macros`
 //! (ya tenés ese mecanismo, no hace falta nada nuevo en el core para eso).
 
-use serde::{Deserialize, Serialize};
 use open_table_core::ids::PlayerId;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TurnOrder {
@@ -19,7 +19,10 @@ pub struct TurnOrder {
 
 impl TurnOrder {
     pub fn new(players: Vec<PlayerId>) -> Self {
-        assert!(!players.is_empty(), "TurnOrder necesita al menos un jugador");
+        assert!(
+            !players.is_empty(),
+            "TurnOrder necesita al menos un jugador"
+        );
         Self {
             players,
             current: 0,
@@ -52,7 +55,7 @@ impl TurnOrder {
         let next = (self.current as i32 + self.direction).rem_euclid(n);
         self.players[next as usize]
     }
-    
+
     pub fn peek_next_n(&self, steps: i32) -> PlayerId {
         let n = self.players.len() as i32;
         let next = (self.current as i32 + self.direction * steps).rem_euclid(n);

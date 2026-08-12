@@ -12,7 +12,11 @@ pub use rules::build_chinese_checkers_rules;
 
 use open_table_engine::prelude::*;
 
-pub fn new_chinese_checkers_session(session_id: SessionId, seed: u64, players: Vec<PlayerId>) -> Session {
+pub fn new_chinese_checkers_session(
+    session_id: SessionId,
+    seed: u64,
+    players: Vec<PlayerId>,
+) -> Session {
     let mut session = Session::new_with_metadata(
         session_id,
         "Chinese Checkers",

@@ -94,7 +94,11 @@ impl WsHostTransport {
                         };
 
                         let assigned_player = match handshake_req {
-                            Some(HandshakeRequest::Join { player_name: _, protocol_version, .. }) => {
+                            Some(HandshakeRequest::Join {
+                                player_name: _,
+                                protocol_version,
+                                ..
+                            }) => {
                                 if protocol_version != PROTOCOL_VERSION {
                                     let resp = HandshakeResponse::UnsupportedProtocolVersion {
                                         expected: PROTOCOL_VERSION.to_string(),
@@ -117,7 +121,12 @@ impl WsHostTransport {
                                 }
                                 player_id
                             }
-                            Some(HandshakeRequest::Reconnect { player_id: recon_id, reconnect_token, protocol_version, .. }) => {
+                            Some(HandshakeRequest::Reconnect {
+                                player_id: recon_id,
+                                reconnect_token,
+                                protocol_version,
+                                ..
+                            }) => {
                                 if protocol_version != PROTOCOL_VERSION {
                                     let resp = HandshakeResponse::UnsupportedProtocolVersion {
                                         expected: PROTOCOL_VERSION.to_string(),
@@ -169,7 +178,10 @@ impl WsHostTransport {
                             match msg {
                                 Ok(msg) => {
                                     if let Some(bytes) = extract_bytes(&msg) {
-                                        incoming.lock().unwrap().push_back((assigned_player, bytes));
+                                        incoming
+                                            .lock()
+                                            .unwrap()
+                                            .push_back((assigned_player, bytes));
                                     }
                                 }
                                 Err(_) => break,
@@ -212,7 +224,9 @@ impl Transport for WsHostTransport {
                 .map_err(|e| EngineError::Network(e.to_string()))?;
             Ok(())
         } else {
-            Err(EngineError::Network(format!("Jugador {peer:?} no conectado")))
+            Err(EngineError::Network(format!(
+                "Jugador {peer:?} no conectado"
+            )))
         }
     }
 

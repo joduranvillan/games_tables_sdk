@@ -1,7 +1,9 @@
 use open_table_engine::prelude::*;
 
 use crate::commands::{FireShotCommand, PlaceFleetCommand, RematchCommand};
-use crate::events::{FleetPlacedEvent, GameOverEvent, ShotResult, ShotResultEvent, SunkenShipEvent};
+use crate::events::{
+    FleetPlacedEvent, GameOverEvent, ShotResult, ShotResultEvent, SunkenShipEvent,
+};
 use crate::fleet::{FleetResource, RematchResource, Ship, ShotsResource, EXPECTED_SHIP_SIZES};
 use crate::position::Position;
 
@@ -182,4 +184,3 @@ pub fn build_battleship_rules() -> RuleEngine {
 
     rules
 }
-

@@ -32,7 +32,12 @@ use open_table_engine::prelude::*;
 /// Arma una `Session` de damas lista para jugar: tablero inicial,
 /// jugadores, reglas registradas. Es el punto de entrada que tanto los
 /// tests como `examples/local_match.rs` usan para no repetir el setup.
-pub fn new_checkers_session(session_id: SessionId, seed: u64, player_top: PlayerId, player_bottom: PlayerId) -> Session {
+pub fn new_checkers_session(
+    session_id: SessionId,
+    seed: u64,
+    player_top: PlayerId,
+    player_bottom: PlayerId,
+) -> Session {
     let mut session = Session::new_with_metadata(
         session_id,
         "Checkers",
@@ -45,7 +50,9 @@ pub fn new_checkers_session(session_id: SessionId, seed: u64, player_top: Player
         world.insert_resource(board);
         world.insert_resource(sides);
         world.insert_resource(MultiCaptureResource::default());
-        world.insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(CheckersLegalMoveGenerator)));
+        world.insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(
+            CheckersLegalMoveGenerator,
+        )));
     };
     setup(session.world_mut());
     session.set_initial_setup(setup);

@@ -1,5 +1,5 @@
-use open_table_macros::GameCommand;
 use open_table_core::ids::PlayerId;
+use open_table_macros::GameCommand;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]

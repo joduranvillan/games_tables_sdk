@@ -6,5 +6,8 @@ pub fn format_command(envelope: &CommandEnvelope) -> String {
         Some(p) => format!("Player {}", p.0),
         None => "System".to_string(),
     };
-    format!("Tick {} | {} | {:?}", envelope.tick.0, player_str, envelope.payload)
+    format!(
+        "Tick {} | {} | {:?}",
+        envelope.tick.0, player_str, envelope.payload
+    )
 }

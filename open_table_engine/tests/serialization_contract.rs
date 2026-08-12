@@ -1,6 +1,6 @@
-use std::fmt::Debug;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::fmt::Debug;
 
 use open_table_core::ids::PlayerId;
 
@@ -11,7 +11,10 @@ fn assert_roundtrip<T: Serialize + DeserializeOwned + Debug>(value: T) {
     let json = serde_json::to_string(&value).expect("Error al serializar a JSON");
     let deserialized: T = serde_json::from_str(&json).expect("Error al deserializar de JSON");
     let json2 = serde_json::to_string(&deserialized).expect("Error al re-serializar a JSON");
-    assert_eq!(json, json2, "El JSON deserializado y re-serializado debe ser idéntico al original");
+    assert_eq!(
+        json, json2,
+        "El JSON deserializado y re-serializado debe ser idéntico al original"
+    );
 }
 
 #[test]
@@ -38,8 +41,8 @@ fn test_serialization_contract_checkers() {
 #[test]
 fn test_serialization_contract_chess() {
     use chess_game::{
-        AcceptDrawCommand, GameOverEvent, MovePieceCommand, OfferDrawCommand,
-        PieceMovedEvent, Position, ResignCommand,
+        AcceptDrawCommand, GameOverEvent, MovePieceCommand, OfferDrawCommand, PieceMovedEvent,
+        Position, ResignCommand,
     };
 
     assert_roundtrip(MovePieceCommand {
@@ -64,9 +67,7 @@ fn test_serialization_contract_chess() {
         castled: false,
     });
 
-    assert_roundtrip(GameOverEvent {
-        winner: Some(P1),
-    });
+    assert_roundtrip(GameOverEvent { winner: Some(P1) });
 }
 
 #[test]
@@ -142,9 +143,10 @@ fn test_serialization_contract_backgammon() {
 fn test_serialization_contract_crisis() {
     use crisis_game::{
         ArmiesPlacedEvent, AttackDeclaredEvent, AttackResolvedEvent, CardsExchangedEvent,
-        DeclareAttackCommand, EndPhaseCommand, ExchangeCardsCommand, FortifiedEvent, FortifyCommand,
-        PhaseChangedEvent, PlaceArmiesCommand, PlayerEliminatedEvent, RollAttackCommand,
-        TegGameOverEvent, TerritoryClaimedEvent, TerritoryConqueredEvent, TerritoryId,
+        DeclareAttackCommand, EndPhaseCommand, ExchangeCardsCommand, FortifiedEvent,
+        FortifyCommand, PhaseChangedEvent, PlaceArmiesCommand, PlayerEliminatedEvent,
+        RollAttackCommand, TegGameOverEvent, TerritoryClaimedEvent, TerritoryConqueredEvent,
+        TerritoryId,
     };
 
     assert_roundtrip(PlaceArmiesCommand {
@@ -207,10 +209,7 @@ fn test_serialization_contract_crisis() {
         to_armies: 3,
         card_drawn: None,
     });
-    assert_roundtrip(PlayerEliminatedEvent {
-        player: P2,
-        by: P1,
-    });
+    assert_roundtrip(PlayerEliminatedEvent { player: P2, by: P1 });
     assert_roundtrip(FortifiedEvent {
         player: P1,
         from: TerritoryId(0),
@@ -335,9 +334,7 @@ fn test_serialization_contract_mille_bornes() {
         player: P1,
         safety: Safety::RightOfWay,
     });
-    assert_roundtrip(CoupFourreCommand {
-        player: P1,
-    });
+    assert_roundtrip(CoupFourreCommand { player: P1 });
 
     assert_roundtrip(CardDiscardedEvent {
         player: P1,
@@ -366,17 +363,16 @@ fn test_serialization_contract_mille_bornes() {
         safety: Safety::RightOfWay,
     });
     assert_roundtrip(TripExtendedEvent { new_target: 1000 });
-    assert_roundtrip(GameOverEvent {
-        winner: P1,
-    });
+    assert_roundtrip(GameOverEvent { winner: P1 });
 }
 
 #[test]
 fn test_serialization_contract_monopoly() {
     use monopoly_game::{
-        AuctionBidCommand, AuctionStartedEvent, AuctionWonEvent, BankruptcyEvent, BuyPropertyCommand,
-        GameOverEvent, JailedEvent, PayJailFeeCommand, PlayerMovedEvent, PropertyPurchasedEvent,
-        RailroadRentPaidEvent, RentPaidEvent, RollAndMoveCommand, UtilityRentPaidEvent,
+        AuctionBidCommand, AuctionStartedEvent, AuctionWonEvent, BankruptcyEvent,
+        BuyPropertyCommand, GameOverEvent, JailedEvent, PayJailFeeCommand, PlayerMovedEvent,
+        PropertyPurchasedEvent, RailroadRentPaidEvent, RentPaidEvent, RollAndMoveCommand,
+        UtilityRentPaidEvent,
     };
 
     assert_roundtrip(RollAndMoveCommand { player: P1 });
@@ -466,9 +462,7 @@ fn test_serialization_contract_shogi() {
         piece: PieceKind::Pawn,
         to: (4, 4),
     });
-    assert_roundtrip(GameOverEvent {
-        winner: Some(P1),
-    });
+    assert_roundtrip(GameOverEvent { winner: Some(P1) });
 }
 
 #[test]
@@ -521,7 +515,5 @@ fn test_serialization_contract_xiangqi() {
         to: (8, 0),
         captured: None,
     });
-    assert_roundtrip(GameOverEvent {
-        winner: Some(P1),
-    });
+    assert_roundtrip(GameOverEvent { winner: Some(P1) });
 }

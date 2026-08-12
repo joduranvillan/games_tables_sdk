@@ -10,14 +10,7 @@ pub struct Position {
 pub const BOARD_RADIUS: i32 = 4;
 
 /// Las 6 direcciones de un paso en un tablero hexagonal axial.
-pub const DIRECTIONS: [(i32, i32); 6] = [
-    (1, 0),
-    (1, -1),
-    (0, -1),
-    (-1, 0),
-    (-1, 1),
-    (0, 1),
-];
+pub const DIRECTIONS: [(i32, i32); 6] = [(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)];
 
 impl Position {
     pub fn new(q: i32, r: i32) -> Self {

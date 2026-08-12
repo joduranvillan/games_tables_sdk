@@ -1,7 +1,10 @@
+use crate::board::{CardColor, CardValue, UnoState};
+use crate::commands::{DrawCardCommand, InterceptCommand, PlayCardCommand};
+use crate::events::{
+    CardPlayedEvent, CardsDrawnEvent, DrewAndPlayedEvent, GameOverEvent, InterceptedEvent,
+    PlayerSkippedEvent, TurnReversedEvent,
+};
 use open_table_engine::prelude::*;
-use crate::board::{UnoState, CardColor, CardValue};
-use crate::commands::{PlayCardCommand, DrawCardCommand, InterceptCommand};
-use crate::events::{CardPlayedEvent, CardsDrawnEvent, TurnReversedEvent, PlayerSkippedEvent, GameOverEvent, DrewAndPlayedEvent, InterceptedEvent};
 
 pub fn build_uno_rules() -> RuleEngine {
     let mut rules = RuleEngine::new();
@@ -9,7 +12,9 @@ pub fn build_uno_rules() -> RuleEngine {
     rules.register::<PlayCardCommand, _>(|cmd, world| {
         let players_count = world.resource::<TurnResource>().0.players().len();
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
-            return Err(EngineError::InvalidCommand { reason: "Not your turn".into() });
+            return Err(EngineError::InvalidCommand {
+                reason: "Not your turn".into(),
+            });
         }
 
         let mut events: Vec<Box<dyn Event>> = vec![];
@@ -21,18 +26,24 @@ pub fn build_uno_rules() -> RuleEngine {
             let mut state = world.resource_mut::<UnoState>();
             let hand = state.hands.get(&cmd.player).unwrap();
             if cmd.card_index >= hand.len() {
-                return Err(EngineError::InvalidCommand { reason: "Invalid card index".into() });
+                return Err(EngineError::InvalidCommand {
+                    reason: "Invalid card index".into(),
+                });
             }
 
             let card = hand[cmd.card_index];
             if !state.is_playable(&card) {
-                return Err(EngineError::InvalidCommand { reason: "Card is not playable".into() });
+                return Err(EngineError::InvalidCommand {
+                    reason: "Card is not playable".into(),
+                });
             }
 
             if card.value == CardValue::WildDrawFour {
                 if hand.iter().any(|c| c.color == state.active_color) {
                     return Err(EngineError::InvalidCommand {
-                        reason: "Cannot play Wild Draw Four when holding a card matching active color".into(),
+                        reason:
+                            "Cannot play Wild Draw Four when holding a card matching active color"
+                                .into(),
                     });
                 }
                 state.wild_draw_four_illegal = false;
@@ -40,13 +51,21 @@ pub fn build_uno_rules() -> RuleEngine {
 
             let is_wild = card.color == CardColor::WildColor;
             if is_wild && cmd.chosen_color.is_none() {
-                return Err(EngineError::InvalidCommand { reason: "Must choose a color for wild card".into() });
+                return Err(EngineError::InvalidCommand {
+                    reason: "Must choose a color for wild card".into(),
+                });
             }
             if !is_wild && cmd.chosen_color.is_some() {
-                return Err(EngineError::InvalidCommand { reason: "Cannot choose color for non-wild card".into() });
+                return Err(EngineError::InvalidCommand {
+                    reason: "Cannot choose color for non-wild card".into(),
+                });
             }
 
-            let new_color = if is_wild { cmd.chosen_color.unwrap() } else { card.color };
+            let new_color = if is_wild {
+                cmd.chosen_color.unwrap()
+            } else {
+                card.color
+            };
             state.active_color = new_color;
 
             if card.value == CardValue::DrawTwo {
@@ -91,7 +110,9 @@ pub fn build_uno_rules() -> RuleEngine {
 
         if skips > 0 {
             let next_player = world.resource::<TurnResource>().0.peek_next();
-            events.push(Box::new(PlayerSkippedEvent { skipped_player: next_player }));
+            events.push(Box::new(PlayerSkippedEvent {
+                skipped_player: next_player,
+            }));
             world.resource_mut::<TurnResource>().0.advance_n(skips + 1);
         } else {
             world.resource_mut::<TurnResource>().0.advance();
@@ -103,7 +124,9 @@ pub fn build_uno_rules() -> RuleEngine {
     rules.register::<DrawCardCommand, _>(|cmd, world| {
         let players_count = world.resource::<TurnResource>().0.players().len();
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
-            return Err(EngineError::InvalidCommand { reason: "Not your turn".into() });
+            return Err(EngineError::InvalidCommand {
+                reason: "Not your turn".into(),
+            });
         }
 
         let penalty = world.resource::<UnoState>().draw_penalty;
@@ -130,11 +153,15 @@ pub fn build_uno_rules() -> RuleEngine {
                         s.discard_pile.push(top);
                         deck
                     };
-                    world.resource_mut::<RandomResource>().0.shuffle(&mut deck_for_shuffle);
+                    world
+                        .resource_mut::<RandomResource>()
+                        .0
+                        .shuffle(&mut deck_for_shuffle);
                     world.resource_mut::<UnoState>().deck = deck_for_shuffle;
                 }
                 if let Some(card) = world.resource_mut::<UnoState>().deck.pop() {
-                    world.resource_mut::<UnoState>()
+                    world
+                        .resource_mut::<UnoState>()
                         .hands
                         .entry(cmd.player)
                         .or_default()
@@ -142,9 +169,10 @@ pub fn build_uno_rules() -> RuleEngine {
                 }
             }
 
-            let events: Vec<Box<dyn Event>> = vec![
-                Box::new(CardsDrawnEvent { player: cmd.player, count: count_to_draw }),
-            ];
+            let events: Vec<Box<dyn Event>> = vec![Box::new(CardsDrawnEvent {
+                player: cmd.player,
+                count: count_to_draw,
+            })];
             world.resource_mut::<TurnResource>().0.advance();
             return Ok(events);
         }
@@ -163,7 +191,10 @@ pub fn build_uno_rules() -> RuleEngine {
                 s.discard_pile.push(top);
                 deck
             };
-            world.resource_mut::<RandomResource>().0.shuffle(&mut deck_for_shuffle);
+            world
+                .resource_mut::<RandomResource>()
+                .0
+                .shuffle(&mut deck_for_shuffle);
             world.resource_mut::<UnoState>().deck = deck_for_shuffle;
         }
 
@@ -234,7 +265,9 @@ pub fn build_uno_rules() -> RuleEngine {
 
             if skips > 0 {
                 let next_player = world.resource::<TurnResource>().0.peek_next();
-                events.push(Box::new(PlayerSkippedEvent { skipped_player: next_player }));
+                events.push(Box::new(PlayerSkippedEvent {
+                    skipped_player: next_player,
+                }));
                 world.resource_mut::<TurnResource>().0.advance_n(skips + 1);
             } else {
                 world.resource_mut::<TurnResource>().0.advance();
@@ -247,9 +280,10 @@ pub fn build_uno_rules() -> RuleEngine {
                 state.hands.entry(cmd.player).or_default().push(drawn_card);
             }
 
-            let events: Vec<Box<dyn Event>> = vec![
-                Box::new(CardsDrawnEvent { player: cmd.player, count: 1 }),
-            ];
+            let events: Vec<Box<dyn Event>> = vec![Box::new(CardsDrawnEvent {
+                player: cmd.player,
+                count: 1,
+            })];
             world.resource_mut::<TurnResource>().0.advance();
             Ok(events)
         }
@@ -266,26 +300,43 @@ pub fn build_uno_rules() -> RuleEngine {
             let mut state = world.resource_mut::<UnoState>();
             let top_discard = match state.discard_pile.last() {
                 Some(&c) => c,
-                None => return Err(EngineError::InvalidCommand { reason: "Discard pile is empty".into() }),
+                None => {
+                    return Err(EngineError::InvalidCommand {
+                        reason: "Discard pile is empty".into(),
+                    })
+                }
             };
 
             let hand = match state.hands.get(&cmd.player) {
                 Some(h) => h,
-                None => return Err(EngineError::InvalidCommand { reason: "Player not in game".into() }),
+                None => {
+                    return Err(EngineError::InvalidCommand {
+                        reason: "Player not in game".into(),
+                    })
+                }
             };
 
             if cmd.card_index >= hand.len() {
-                return Err(EngineError::InvalidCommand { reason: "Invalid card index".into() });
+                return Err(EngineError::InvalidCommand {
+                    reason: "Invalid card index".into(),
+                });
             }
 
             let card = hand[cmd.card_index];
 
-            if card.color == CardColor::WildColor || card.value == CardValue::Wild || card.value == CardValue::WildDrawFour {
-                return Err(EngineError::InvalidCommand { reason: "Cannot intercept with wild card".into() });
+            if card.color == CardColor::WildColor
+                || card.value == CardValue::Wild
+                || card.value == CardValue::WildDrawFour
+            {
+                return Err(EngineError::InvalidCommand {
+                    reason: "Cannot intercept with wild card".into(),
+                });
             }
 
             if card.color != top_discard.color || card.value != top_discard.value {
-                return Err(EngineError::InvalidCommand { reason: "Card is not identical to discard pile top card".into() });
+                return Err(EngineError::InvalidCommand {
+                    reason: "Card is not identical to discard pile top card".into(),
+                });
             }
 
             let hand_mut = state.hands.get_mut(&cmd.player).unwrap();
@@ -311,7 +362,10 @@ pub fn build_uno_rules() -> RuleEngine {
             return Ok(events);
         }
 
-        world.resource_mut::<TurnResource>().0.set_current_player(cmd.player);
+        world
+            .resource_mut::<TurnResource>()
+            .0
+            .set_current_player(cmd.player);
 
         match intercepted_card.value {
             CardValue::Reverse => {
@@ -330,7 +384,9 @@ pub fn build_uno_rules() -> RuleEngine {
 
         if skips > 0 {
             let next_player = world.resource::<TurnResource>().0.peek_next();
-            events.push(Box::new(PlayerSkippedEvent { skipped_player: next_player }));
+            events.push(Box::new(PlayerSkippedEvent {
+                skipped_player: next_player,
+            }));
             world.resource_mut::<TurnResource>().0.advance_n(skips + 1);
         } else {
             world.resource_mut::<TurnResource>().0.advance();

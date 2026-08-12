@@ -5,7 +5,13 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PieceKind {
-    General, Advisor, Elephant, Horse, Chariot, Cannon, Soldier
+    General,
+    Advisor,
+    Elephant,
+    Horse,
+    Chariot,
+    Cannon,
+    Soldier,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -32,13 +38,37 @@ impl BoardResource {
 
     pub fn standard_setup(red: PlayerId, black: PlayerId) -> Self {
         let mut board = Self::new(red, black);
-        
+
         // Simplified setup just for testing
-        board.squares.insert((4, 9), Piece { kind: PieceKind::General, owner: red });
-        board.squares.insert((4, 0), Piece { kind: PieceKind::General, owner: black });
-        
-        board.squares.insert((4, 6), Piece { kind: PieceKind::Soldier, owner: red });
-        board.squares.insert((4, 3), Piece { kind: PieceKind::Soldier, owner: black });
+        board.squares.insert(
+            (4, 9),
+            Piece {
+                kind: PieceKind::General,
+                owner: red,
+            },
+        );
+        board.squares.insert(
+            (4, 0),
+            Piece {
+                kind: PieceKind::General,
+                owner: black,
+            },
+        );
+
+        board.squares.insert(
+            (4, 6),
+            Piece {
+                kind: PieceKind::Soldier,
+                owner: red,
+            },
+        );
+        board.squares.insert(
+            (4, 3),
+            Piece {
+                kind: PieceKind::Soldier,
+                owner: black,
+            },
+        );
 
         board
     }

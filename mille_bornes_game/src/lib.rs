@@ -25,7 +25,12 @@ use open_table_engine::prelude::*;
 
 /// Arma la Session y la deja lista para jugar: ya corrió el
 /// `SetupDeckCommand` (mazo barajado, manos iniciales repartidas).
-pub fn new_mille_bornes_session(session_id: SessionId, seed: u64, player_a: PlayerId, player_b: PlayerId) -> Session {
+pub fn new_mille_bornes_session(
+    session_id: SessionId,
+    seed: u64,
+    player_a: PlayerId,
+    player_b: PlayerId,
+) -> Session {
     let mut session = Session::new_with_metadata(
         session_id,
         "Mille Bornes",
@@ -34,8 +39,12 @@ pub fn new_mille_bornes_session(session_id: SessionId, seed: u64, player_a: Play
         build_mille_bornes_rules(),
     );
     session.world_mut().insert_resource(DeckResource::default());
-    session.world_mut().insert_resource(SpeedLimitResource::default());
-    session.world_mut().insert_resource(RightOfWayResource::default());
+    session
+        .world_mut()
+        .insert_resource(SpeedLimitResource::default());
+    session
+        .world_mut()
+        .insert_resource(RightOfWayResource::default());
 
     // El comando de setup no tiene issuer, así que cualquier "sender" es
     // válido para la validación de identidad — usamos el primer jugador

@@ -105,7 +105,11 @@ impl TcpClientTransport {
         session_id: open_table_core::ids::SessionId,
         player_name: &str,
     ) -> io::Result<(Self, PlayerId, String)> {
-        Self::connect_as_new_player_with_route(addr, player_name, Some(format!("/session/{}", session_id.0)))
+        Self::connect_as_new_player_with_route(
+            addr,
+            player_name,
+            Some(format!("/session/{}", session_id.0)),
+        )
     }
 
     pub fn connect_as_new_player_with_route(
@@ -142,7 +146,9 @@ impl TcpClientTransport {
             }
             HandshakeResponse::UnsupportedProtocolVersion { expected, got } => Err(io::Error::new(
                 ErrorKind::InvalidData,
-                format!("versión de protocolo no soportada: se esperaba {expected}, se recibió {got}"),
+                format!(
+                    "versión de protocolo no soportada: se esperaba {expected}, se recibió {got}"
+                ),
             )),
             HandshakeResponse::Rejected { reason } => {
                 Err(io::Error::new(ErrorKind::PermissionDenied, reason))
@@ -170,7 +176,9 @@ impl TcpClientTransport {
         perform_handshake(&mut stream, &request)?;
 
         match read_handshake_response(&mut stream)? {
-            HandshakeResponse::Welcome { protocol_version, .. } => {
+            HandshakeResponse::Welcome {
+                protocol_version, ..
+            } => {
                 if protocol_version != crate::handshake::PROTOCOL_VERSION {
                     return Err(io::Error::new(
                         ErrorKind::InvalidData,
@@ -185,7 +193,9 @@ impl TcpClientTransport {
             }
             HandshakeResponse::UnsupportedProtocolVersion { expected, got } => Err(io::Error::new(
                 ErrorKind::InvalidData,
-                format!("versión de protocolo no soportada: se esperaba {expected}, se recibió {got}"),
+                format!(
+                    "versión de protocolo no soportada: se esperaba {expected}, se recibió {got}"
+                ),
             )),
             HandshakeResponse::Rejected { reason } => {
                 Err(io::Error::new(ErrorKind::PermissionDenied, reason))
@@ -243,7 +253,8 @@ fn perform_handshake(stream: &mut TcpStream, request: &HandshakeRequest) -> io::
 
 fn read_handshake_response(stream: &mut TcpStream) -> io::Result<HandshakeResponse> {
     let bytes = read_frame(stream)?;
-    serde_json::from_slice(&bytes).map_err(|e| io::Error::new(ErrorKind::InvalidData, e.to_string()))
+    serde_json::from_slice(&bytes)
+        .map_err(|e| io::Error::new(ErrorKind::InvalidData, e.to_string()))
 }
 
 impl Transport for TcpClientTransport {

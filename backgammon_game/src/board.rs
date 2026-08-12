@@ -41,7 +41,11 @@ impl BoardResource {
         borne_off.insert(increasing, 0);
         borne_off.insert(decreasing, 0);
 
-        Self { points, bar, borne_off }
+        Self {
+            points,
+            bar,
+            borne_off,
+        }
     }
 }
 
@@ -106,7 +110,12 @@ impl Sides {
     }
 
     /// Verifica si hay fichas del jugador en posiciones más lejanas de la meta dentro de su cuadrante final.
-    pub fn has_checkers_further_back(&self, board: &BoardResource, player: PlayerId, from: usize) -> bool {
+    pub fn has_checkers_further_back(
+        &self,
+        board: &BoardResource,
+        player: PlayerId,
+        from: usize,
+    ) -> bool {
         let sign = self.owner_sign(player);
         if player == self.increasing {
             (0..from).any(|idx| board.points[idx] * sign > 0)
@@ -116,7 +125,13 @@ impl Sides {
     }
 
     /// Verifica si hay fichas más atrás del punto o del punto de salida correspondientes al dado.
-    pub fn has_checkers_behind_die_exit(&self, board: &BoardResource, player: PlayerId, from: usize, die: u32) -> bool {
+    pub fn has_checkers_behind_die_exit(
+        &self,
+        board: &BoardResource,
+        player: PlayerId,
+        from: usize,
+        die: u32,
+    ) -> bool {
         let sign = self.owner_sign(player);
         if player == self.increasing {
             let exit_point = (24 - die as i32).max(0) as usize;
@@ -130,7 +145,12 @@ impl Sides {
     }
 
     /// Comprueba si el jugador tiene al menos un movimiento válido con los dados disponibles.
-    pub fn has_any_valid_move(&self, board: &BoardResource, player: PlayerId, dice: &[u32]) -> bool {
+    pub fn has_any_valid_move(
+        &self,
+        board: &BoardResource,
+        player: PlayerId,
+        dice: &[u32],
+    ) -> bool {
         let owner_sign = self.owner_sign(player);
         let opponent_sign = -owner_sign;
         let on_bar = *board.bar.get(&player).unwrap_or(&0);
@@ -163,7 +183,8 @@ impl Sides {
                             from as i32 + 1
                         };
                         if d as i32 == distance
-                            || (d as i32 > distance && !self.has_checkers_behind_die_exit(board, player, from, d))
+                            || (d as i32 > distance
+                                && !self.has_checkers_behind_die_exit(board, player, from, d))
                         {
                             return true;
                         }

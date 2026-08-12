@@ -51,8 +51,13 @@ impl Visibility {
         match self {
             Visibility::Public => true,
             Visibility::Spectators(SpectatorVisibility::AllSpectators) => true,
-            Visibility::Spectators(SpectatorVisibility::Spectators(list)) => list.contains(&spectator),
-            Visibility::Players(_) | Visibility::PrivateToGroup(_) | Visibility::Owner(_) | Visibility::HostOnly => false,
+            Visibility::Spectators(SpectatorVisibility::Spectators(list)) => {
+                list.contains(&spectator)
+            }
+            Visibility::Players(_)
+            | Visibility::PrivateToGroup(_)
+            | Visibility::Owner(_)
+            | Visibility::HostOnly => false,
         }
     }
 }

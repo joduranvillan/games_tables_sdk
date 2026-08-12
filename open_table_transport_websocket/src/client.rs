@@ -37,7 +37,8 @@ impl WsClientTransport {
 
         let url = format!("ws://{sock_addr}");
         let (tx_to_ws, mut rx_from_client) = mpsc::unbounded_channel::<Vec<u8>>();
-        let (tx_handshake, mut rx_handshake) = mpsc::unbounded_channel::<io::Result<(PlayerId, String)>>();
+        let (tx_handshake, mut rx_handshake) =
+            mpsc::unbounded_channel::<io::Result<(PlayerId, String)>>();
 
         let incoming: IncomingQueue = Arc::new(Mutex::new(VecDeque::new()));
         let incoming_clone = Arc::clone(&incoming);
@@ -53,7 +54,8 @@ impl WsClientTransport {
                 let ws_stream = match connect_async(&url).await {
                     Ok((ws, _)) => ws,
                     Err(e) => {
-                        let _ = tx_handshake.send(Err(io::Error::new(ErrorKind::ConnectionRefused, e)));
+                        let _ =
+                            tx_handshake.send(Err(io::Error::new(ErrorKind::ConnectionRefused, e)));
                         return;
                     }
                 };
@@ -68,7 +70,10 @@ impl WsClientTransport {
                 };
                 let req_bytes = serde_json::to_vec(&req).unwrap();
                 if ws_sender.send(wrap_binary(&req_bytes)).await.is_err() {
-                    let _ = tx_handshake.send(Err(io::Error::new(ErrorKind::ConnectionReset, "Send error")));
+                    let _ = tx_handshake.send(Err(io::Error::new(
+                        ErrorKind::ConnectionReset,
+                        "Send error",
+                    )));
                     return;
                 }
 
@@ -80,20 +85,29 @@ impl WsClientTransport {
 
                 let (player_id, token) = match resp_msg {
                     Some(bytes) => match serde_json::from_slice::<HandshakeResponse>(&bytes) {
-                        Ok(HandshakeResponse::Welcome { player_id, reconnect_token, .. }) => {
-                            (player_id, reconnect_token)
-                        }
+                        Ok(HandshakeResponse::Welcome {
+                            player_id,
+                            reconnect_token,
+                            ..
+                        }) => (player_id, reconnect_token),
                         Ok(HandshakeResponse::Rejected { reason }) => {
-                            let _ = tx_handshake.send(Err(io::Error::new(ErrorKind::PermissionDenied, reason)));
+                            let _ = tx_handshake
+                                .send(Err(io::Error::new(ErrorKind::PermissionDenied, reason)));
                             return;
                         }
                         _ => {
-                            let _ = tx_handshake.send(Err(io::Error::new(ErrorKind::InvalidData, "Respuesta inválida")));
+                            let _ = tx_handshake.send(Err(io::Error::new(
+                                ErrorKind::InvalidData,
+                                "Respuesta inválida",
+                            )));
                             return;
                         }
                     },
                     None => {
-                        let _ = tx_handshake.send(Err(io::Error::new(ErrorKind::UnexpectedEof, "EOF handshake")));
+                        let _ = tx_handshake.send(Err(io::Error::new(
+                            ErrorKind::UnexpectedEof,
+                            "EOF handshake",
+                        )));
                         return;
                     }
                 };
@@ -112,7 +126,10 @@ impl WsClientTransport {
                     match msg {
                         Ok(m) => {
                             if let Some(bytes) = extract_bytes(&m) {
-                                incoming_clone.lock().unwrap().push_back((HOST_PLAYER_ID, bytes));
+                                incoming_clone
+                                    .lock()
+                                    .unwrap()
+                                    .push_back((HOST_PLAYER_ID, bytes));
                             }
                         }
                         Err(_) => break,
@@ -134,7 +151,10 @@ impl WsClientTransport {
                 token,
             )),
             Some(Err(err)) => Err(err),
-            None => Err(io::Error::new(ErrorKind::ConnectionAborted, "Canal cerrado")),
+            None => Err(io::Error::new(
+                ErrorKind::ConnectionAborted,
+                "Canal cerrado",
+            )),
         }
     }
 

@@ -14,7 +14,6 @@ pub struct PlayerMovedEvent {
     pub passed_go: bool,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, GameEvent)]
 pub struct RentPaidEvent {
     pub payer: PlayerId,

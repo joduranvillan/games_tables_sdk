@@ -14,7 +14,10 @@ pub mod pgn;
 pub mod position;
 pub mod rules;
 
-pub use board::{has_any_legal_move, is_in_check, is_legal_move, piece_moves, BoardResource, DrawOfferedResource, HalfMoveClockResource, PositionHistoryResource, Sides};
+pub use board::{
+    has_any_legal_move, is_in_check, is_legal_move, piece_moves, BoardResource,
+    DrawOfferedResource, HalfMoveClockResource, PositionHistoryResource, Sides,
+};
 pub use commands::{AcceptDrawCommand, MovePieceCommand, OfferDrawCommand, ResignCommand};
 pub use events::{GameOverEvent, PieceMovedEvent};
 pub use fen::{from_fen, load_chess_position_from_fen, parse_fen_with_player};
@@ -25,7 +28,12 @@ pub use rules::build_chess_rules;
 
 use open_table_engine::prelude::*;
 
-pub fn new_chess_session(session_id: SessionId, seed: u64, white: PlayerId, black: PlayerId) -> Session {
+pub fn new_chess_session(
+    session_id: SessionId,
+    seed: u64,
+    white: PlayerId,
+    black: PlayerId,
+) -> Session {
     let mut session = Session::new_with_metadata(
         session_id,
         "Chess",
@@ -48,6 +56,8 @@ pub fn new_chess_session(session_id: SessionId, seed: u64, white: PlayerId, blac
     session.world_mut().insert_resource(history);
     session
         .world_mut()
-        .insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(ChessLegalMoveGenerator)));
+        .insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(
+            ChessLegalMoveGenerator,
+        )));
     session
 }

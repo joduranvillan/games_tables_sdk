@@ -12,19 +12,25 @@ pub mod rules;
 
 pub use board::{BoardResource, Sides, CHECKERS_PER_PLAYER, POINTS};
 pub use commands::{
-    AcceptDoubleCommand, MoveCheckerCommand, OfferDoubleCommand, RejectDoubleCommand, ResignCommand, RollDiceCommand,
+    AcceptDoubleCommand, MoveCheckerCommand, OfferDoubleCommand, RejectDoubleCommand,
+    ResignCommand, RollDiceCommand,
 };
 pub use dice::PendingDiceResource;
 pub use events::{
-    CheckerMovedEvent, DiceRolledEvent, DoubleAcceptedEvent, DoubleOfferedEvent, DoubleRejectedEvent,
-    GameOverEvent, NoValidMovesEvent,
+    CheckerMovedEvent, DiceRolledEvent, DoubleAcceptedEvent, DoubleOfferedEvent,
+    DoubleRejectedEvent, GameOverEvent, NoValidMovesEvent,
 };
 pub use resources::{DoublingCubeResource, MatchStateResource};
 pub use rules::build_backgammon_rules;
 
 use open_table_engine::prelude::*;
 
-pub fn new_backgammon_session(session_id: SessionId, seed: u64, increasing: PlayerId, decreasing: PlayerId) -> Session {
+pub fn new_backgammon_session(
+    session_id: SessionId,
+    seed: u64,
+    increasing: PlayerId,
+    decreasing: PlayerId,
+) -> Session {
     let mut session = Session::new_with_metadata(
         session_id,
         "Backgammon",
@@ -35,7 +41,10 @@ pub fn new_backgammon_session(session_id: SessionId, seed: u64, increasing: Play
     session
         .world_mut()
         .insert_resource(BoardResource::standard_setup(increasing, decreasing));
-    session.world_mut().insert_resource(Sides { increasing, decreasing });
+    session.world_mut().insert_resource(Sides {
+        increasing,
+        decreasing,
+    });
     session
         .world_mut()
         .insert_resource(PendingDiceResource::default());

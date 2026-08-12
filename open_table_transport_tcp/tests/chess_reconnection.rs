@@ -64,7 +64,10 @@ fn chess_reconnection_resync_delivers_piece_moved_event() {
         TcpClientTransport::connect_as_new_player(addr, "Black").expect("Black connects");
 
     // Clear connection events
-    let _ = wait_for_data(|| host_transport.poll_connection_events(), Duration::from_secs(1));
+    let _ = wait_for_data(
+        || host_transport.poll_connection_events(),
+        Duration::from_secs(1),
+    );
 
     let seed = 42;
     let mut host_session = new_chess_session(SessionId(1), seed, white, black);

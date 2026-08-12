@@ -1,5 +1,8 @@
+use go_game::{
+    new_go_session, BoardResource, ConfirmDeadCommand, GameOverEvent, MarkDeadCommand, PassCommand,
+    PlaceHandicapCommand, PlaceStoneCommand, Stone, StonesCapturedEvent,
+};
 use open_table_engine::prelude::*;
-use go_game::{new_go_session, PlaceStoneCommand, PassCommand, PlaceHandicapCommand, MarkDeadCommand, ConfirmDeadCommand, StonesCapturedEvent, GameOverEvent, BoardResource, Stone};
 
 const P1: PlayerId = PlayerId(1);
 const P2: PlayerId = PlayerId(2);
@@ -7,16 +10,48 @@ const P2: PlayerId = PlayerId(2);
 #[test]
 fn test_place_stone_and_capture() {
     let mut session = new_go_session(SessionId(1), 0, P1, P2);
-    
+
     // P1 places at 1,0
-    session.process_command(P1, Box::new(PlaceStoneCommand { player: P1, x: 1, y: 0 })).unwrap();
+    session
+        .process_command(
+            P1,
+            Box::new(PlaceStoneCommand {
+                player: P1,
+                x: 1,
+                y: 0,
+            }),
+        )
+        .unwrap();
     // P2 places at 0,0
-    session.process_command(P2, Box::new(PlaceStoneCommand { player: P2, x: 0, y: 0 })).unwrap();
+    session
+        .process_command(
+            P2,
+            Box::new(PlaceStoneCommand {
+                player: P2,
+                x: 0,
+                y: 0,
+            }),
+        )
+        .unwrap();
     // P1 places at 0,1, capturing P2 at 0,0
-    let events = session.process_command(P1, Box::new(PlaceStoneCommand { player: P1, x: 0, y: 1 })).unwrap();
-    
-    assert!(events.iter().any(|e| e.as_any().is::<StonesCapturedEvent>()));
-    let capture_event = events.iter().find_map(|e| e.as_any().downcast_ref::<StonesCapturedEvent>()).unwrap();
+    let events = session
+        .process_command(
+            P1,
+            Box::new(PlaceStoneCommand {
+                player: P1,
+                x: 0,
+                y: 1,
+            }),
+        )
+        .unwrap();
+
+    assert!(events
+        .iter()
+        .any(|e| e.as_any().is::<StonesCapturedEvent>()));
+    let capture_event = events
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<StonesCapturedEvent>())
+        .unwrap();
     assert_eq!(capture_event.count, 1);
 }
 
@@ -30,14 +65,25 @@ fn test_pass_ends_game() {
         board.set_stone(0, 1, Some(Stone::Black));
     }
 
-    session.process_command(P1, Box::new(PassCommand { player: P1 })).unwrap();
-    session.process_command(P2, Box::new(PassCommand { player: P2 })).unwrap();
+    session
+        .process_command(P1, Box::new(PassCommand { player: P1 }))
+        .unwrap();
+    session
+        .process_command(P2, Box::new(PassCommand { player: P2 }))
+        .unwrap();
 
-    session.process_command(P1, Box::new(ConfirmDeadCommand { player: P1 })).unwrap();
-    let events = session.process_command(P2, Box::new(ConfirmDeadCommand { player: P2 })).unwrap();
-    
+    session
+        .process_command(P1, Box::new(ConfirmDeadCommand { player: P1 }))
+        .unwrap();
+    let events = session
+        .process_command(P2, Box::new(ConfirmDeadCommand { player: P2 }))
+        .unwrap();
+
     assert!(events.iter().any(|e| e.as_any().is::<GameOverEvent>()));
-    let game_over_event = events.iter().find_map(|e| e.as_any().downcast_ref::<GameOverEvent>()).unwrap();
+    let game_over_event = events
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<GameOverEvent>())
+        .unwrap();
     assert_eq!(game_over_event.winner, Some(P1));
 }
 
@@ -53,9 +99,19 @@ fn test_suicidio_es_rechazado() {
     }
 
     // P1 (Black) tries to place at (0,0) which would have 0 liberties and capture no stones
-    let res = session.process_command(P1, Box::new(PlaceStoneCommand { player: P1, x: 0, y: 0 }));
+    let res = session.process_command(
+        P1,
+        Box::new(PlaceStoneCommand {
+            player: P1,
+            x: 0,
+            y: 0,
+        }),
+    );
 
-    assert!(res.is_err(), "Colocar una piedra sin libertades (suicidio) debe ser rechazado");
+    assert!(
+        res.is_err(),
+        "Colocar una piedra sin libertades (suicidio) debe ser rechazado"
+    );
 }
 
 #[test]
@@ -80,11 +136,20 @@ fn test_captura_de_grupo_de_tres_piedras() {
     }
 
     // P1 passes turn to P2
-    session.process_command(P1, Box::new(PassCommand { player: P1 })).unwrap();
+    session
+        .process_command(P1, Box::new(PassCommand { player: P1 }))
+        .unwrap();
 
     // P2 places stone at (1, 4), closing the last liberty of the 3 Black stones
     let events = session
-        .process_command(P2, Box::new(PlaceStoneCommand { player: P2, x: 1, y: 4 }))
+        .process_command(
+            P2,
+            Box::new(PlaceStoneCommand {
+                player: P2,
+                x: 1,
+                y: 4,
+            }),
+        )
         .unwrap();
 
     // Verify StonesCapturedEvent count is 3
@@ -92,14 +157,29 @@ fn test_captura_de_grupo_de_tres_piedras() {
         .iter()
         .find_map(|e| e.as_any().downcast_ref::<StonesCapturedEvent>())
         .expect("Debe emitirse un StonesCapturedEvent");
-    assert_eq!(capture_event.count, 3, "El conteo de piedras capturadas debe ser 3");
+    assert_eq!(
+        capture_event.count, 3,
+        "El conteo de piedras capturadas debe ser 3"
+    );
     assert_eq!(capture_event.player, P2);
 
     // Verify the board has no stones at (1,1), (1,2), (1,3)
     let board = session.world().resource::<BoardResource>();
-    assert_eq!(board.get_stone(1, 1), None, "(1,1) debe estar libre tras la captura");
-    assert_eq!(board.get_stone(1, 2), None, "(1,2) debe estar libre tras la captura");
-    assert_eq!(board.get_stone(1, 3), None, "(1,3) debe estar libre tras la captura");
+    assert_eq!(
+        board.get_stone(1, 1),
+        None,
+        "(1,1) debe estar libre tras la captura"
+    );
+    assert_eq!(
+        board.get_stone(1, 2),
+        None,
+        "(1,2) debe estar libre tras la captura"
+    );
+    assert_eq!(
+        board.get_stone(1, 3),
+        None,
+        "(1,3) debe estar libre tras la captura"
+    );
 }
 
 #[test]
@@ -122,16 +202,37 @@ fn test_superko_previene_repeticion_de_posicion() {
     }
 
     // P1 passes turn to P2
-    session.process_command(P1, Box::new(PassCommand { player: P1 })).unwrap();
+    session
+        .process_command(P1, Box::new(PassCommand { player: P1 }))
+        .unwrap();
 
     // P2 plays at (1,2), capturing Black stone at (1,1)
-    session.process_command(P2, Box::new(PlaceStoneCommand { player: P2, x: 1, y: 2 })).unwrap();
+    session
+        .process_command(
+            P2,
+            Box::new(PlaceStoneCommand {
+                player: P2,
+                x: 1,
+                y: 2,
+            }),
+        )
+        .unwrap();
 
     // P1 tries to play at (1,1), which would capture White stone at (1,2)
     // and recreate the exact previous board position (S0)
-    let res = session.process_command(P1, Box::new(PlaceStoneCommand { player: P1, x: 1, y: 1 }));
+    let res = session.process_command(
+        P1,
+        Box::new(PlaceStoneCommand {
+            player: P1,
+            x: 1,
+            y: 1,
+        }),
+    );
 
-    assert!(res.is_err(), "Superko debe prohibir volver a una posición de tablero previa");
+    assert!(
+        res.is_err(),
+        "Superko debe prohibir volver a una posición de tablero previa"
+    );
 }
 
 #[test]
@@ -179,8 +280,12 @@ fn test_marcado_y_confirmacion_de_muertas() {
         board.set_stone(0, 0, Some(Stone::White));
     }
 
-    session.process_command(P1, Box::new(PassCommand { player: P1 })).unwrap();
-    session.process_command(P2, Box::new(PassCommand { player: P2 })).unwrap();
+    session
+        .process_command(P1, Box::new(PassCommand { player: P1 }))
+        .unwrap();
+    session
+        .process_command(P2, Box::new(PassCommand { player: P2 }))
+        .unwrap();
 
     // Mark White stone at (0, 0) as dead
     session
@@ -193,7 +298,9 @@ fn test_marcado_y_confirmacion_de_muertas() {
         )
         .unwrap();
 
-    session.process_command(P1, Box::new(ConfirmDeadCommand { player: P1 })).unwrap();
+    session
+        .process_command(P1, Box::new(ConfirmDeadCommand { player: P1 }))
+        .unwrap();
     let events = session
         .process_command(P2, Box::new(ConfirmDeadCommand { player: P2 }))
         .unwrap();
@@ -206,7 +313,11 @@ fn test_marcado_y_confirmacion_de_muertas() {
     assert_eq!(game_over_event.winner, Some(P1));
 
     let board = session.world().resource::<BoardResource>();
-    assert_eq!(board.get_stone(0, 0), None, "(0,0) debe quedar libre tras ser eliminada la piedra muerta");
+    assert_eq!(
+        board.get_stone(0, 0),
+        None,
+        "(0,0) debe quedar libre tras ser eliminada la piedra muerta"
+    );
 }
 
 #[test]
@@ -228,8 +339,12 @@ fn go_partida_completa_hasta_scoring_de_territorio() {
     }
 
     // Doble pass para iniciar la fase de marcaje de muertas
-    session.process_command(P1, Box::new(PassCommand { player: P1 })).unwrap();
-    session.process_command(P2, Box::new(PassCommand { player: P2 })).unwrap();
+    session
+        .process_command(P1, Box::new(PassCommand { player: P1 }))
+        .unwrap();
+    session
+        .process_command(P2, Box::new(PassCommand { player: P2 }))
+        .unwrap();
 
     // Marcar la piedra muerta en (1, 1)
     session
@@ -243,7 +358,9 @@ fn go_partida_completa_hasta_scoring_de_territorio() {
         .unwrap();
 
     // Confirmación de ambos jugadores
-    session.process_command(P1, Box::new(ConfirmDeadCommand { player: P1 })).unwrap();
+    session
+        .process_command(P1, Box::new(ConfirmDeadCommand { player: P1 }))
+        .unwrap();
     let events = session
         .process_command(P2, Box::new(ConfirmDeadCommand { player: P2 }))
         .unwrap();
@@ -270,5 +387,3 @@ fn test_pasar_fuera_de_turno_es_rechazado() {
         "pasar fuera de turno debe ser rechazado"
     );
 }
-
-

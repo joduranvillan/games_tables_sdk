@@ -1,36 +1,57 @@
+use crate::board::{BoardHistoryResource, BoardResource, DeadMarkingResource, Stone};
+use crate::commands::{
+    ConfirmDeadCommand, MarkDeadCommand, PassCommand, PlaceHandicapCommand, PlaceStoneCommand,
+    ResignCommand,
+};
+use crate::events::{GameOverEvent, PassedEvent, StonePlacedEvent, StonesCapturedEvent};
 use open_table_engine::prelude::*;
-use crate::board::{BoardResource, BoardHistoryResource, DeadMarkingResource, Stone};
-use crate::commands::{PlaceStoneCommand, PassCommand, PlaceHandicapCommand, MarkDeadCommand, ConfirmDeadCommand, ResignCommand};
-use crate::events::{StonePlacedEvent, StonesCapturedEvent, PassedEvent, GameOverEvent};
 
 pub fn build_go_rules() -> RuleEngine {
     let mut rules = RuleEngine::new();
 
     rules.register::<PlaceStoneCommand, _>(|cmd, world| {
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
-            return Err(EngineError::InvalidCommand { reason: "Not your turn".into() });
+            return Err(EngineError::InvalidCommand {
+                reason: "Not your turn".into(),
+            });
         }
 
         if let Some(dead_marking) = world.get_resource::<DeadMarkingResource>() {
             if dead_marking.active {
-                return Err(EngineError::InvalidCommand { reason: "Game is in dead marking phase".into() });
+                return Err(EngineError::InvalidCommand {
+                    reason: "Game is in dead marking phase".into(),
+                });
             }
         }
 
         let (captured_count, new_hash) = {
             let (stone_color, enemy_color, current_hash, test_board_initial) = {
                 let board = world.resource::<BoardResource>();
-                let stone_color = if cmd.player == board.black_player { Stone::Black } else { Stone::White };
-                let enemy_color = if stone_color == Stone::Black { Stone::White } else { Stone::Black };
+                let stone_color = if cmd.player == board.black_player {
+                    Stone::Black
+                } else {
+                    Stone::White
+                };
+                let enemy_color = if stone_color == Stone::Black {
+                    Stone::White
+                } else {
+                    Stone::Black
+                };
 
                 if cmd.x >= board.size || cmd.y >= board.size {
-                    return Err(EngineError::InvalidCommand { reason: "Out of bounds".into() });
+                    return Err(EngineError::InvalidCommand {
+                        reason: "Out of bounds".into(),
+                    });
                 }
                 if board.get_stone(cmd.x, cmd.y).is_some() {
-                    return Err(EngineError::InvalidCommand { reason: "Space occupied".into() });
+                    return Err(EngineError::InvalidCommand {
+                        reason: "Space occupied".into(),
+                    });
                 }
                 if board.ko_point == Some((cmd.x, cmd.y)) {
-                    return Err(EngineError::InvalidCommand { reason: "Ko rule violation".into() });
+                    return Err(EngineError::InvalidCommand {
+                        reason: "Ko rule violation".into(),
+                    });
                 }
 
                 let current_hash = board.compute_hash();
@@ -63,13 +84,17 @@ pub fn build_go_rules() -> RuleEngine {
 
             let (_, liberties) = test_board.get_group_and_liberties(cmd.x, cmd.y);
             if liberties == 0 {
-                return Err(EngineError::InvalidCommand { reason: "Suicide is not allowed".into() });
+                return Err(EngineError::InvalidCommand {
+                    reason: "Suicide is not allowed".into(),
+                });
             }
 
             let test_hash = test_board.compute_hash();
             if let Some(history) = world.get_resource::<BoardHistoryResource>() {
                 if history.history.contains(&test_hash) {
-                    return Err(EngineError::InvalidCommand { reason: "Superko rule violation".into() });
+                    return Err(EngineError::InvalidCommand {
+                        reason: "Superko rule violation".into(),
+                    });
                 }
             }
 
@@ -90,11 +115,16 @@ pub fn build_go_rules() -> RuleEngine {
             history.history.insert(new_hash);
         }
 
-        let mut events: Vec<Box<dyn Event>> = vec![
-            Box::new(StonePlacedEvent { player: cmd.player, x: cmd.x, y: cmd.y }),
-        ];
+        let mut events: Vec<Box<dyn Event>> = vec![Box::new(StonePlacedEvent {
+            player: cmd.player,
+            x: cmd.x,
+            y: cmd.y,
+        })];
         if captured_count > 0 {
-            events.push(Box::new(StonesCapturedEvent { player: cmd.player, count: captured_count }));
+            events.push(Box::new(StonesCapturedEvent {
+                player: cmd.player,
+                count: captured_count,
+            }));
         }
 
         world.resource_mut::<TurnResource>().0.advance();
@@ -103,34 +133,46 @@ pub fn build_go_rules() -> RuleEngine {
 
     rules.register::<PlaceHandicapCommand, _>(|cmd, world| {
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
-            return Err(EngineError::InvalidCommand { reason: "Not your turn".into() });
+            return Err(EngineError::InvalidCommand {
+                reason: "Not your turn".into(),
+            });
         }
 
         if let Some(dead_marking) = world.get_resource::<DeadMarkingResource>() {
             if dead_marking.active {
-                return Err(EngineError::InvalidCommand { reason: "Game is in dead marking phase".into() });
+                return Err(EngineError::InvalidCommand {
+                    reason: "Game is in dead marking phase".into(),
+                });
             }
         }
 
         if world.resource::<TurnResource>().0.turn_number() != 0 {
-            return Err(EngineError::InvalidCommand { reason: "Handicap stones can only be placed before game start".into() });
+            return Err(EngineError::InvalidCommand {
+                reason: "Handicap stones can only be placed before game start".into(),
+            });
         }
 
         let mut events: Vec<Box<dyn Event>> = Vec::new();
         let new_hash = {
             let mut board = world.resource_mut::<BoardResource>();
             if cmd.player != board.black_player {
-                return Err(EngineError::InvalidCommand { reason: "Only Black player can place handicap stones".into() });
+                return Err(EngineError::InvalidCommand {
+                    reason: "Only Black player can place handicap stones".into(),
+                });
             }
 
             for &(x, y) in &cmd.positions {
                 let x_usize = x as usize;
                 let y_usize = y as usize;
                 if x_usize >= board.size || y_usize >= board.size {
-                    return Err(EngineError::InvalidCommand { reason: "Out of bounds".into() });
+                    return Err(EngineError::InvalidCommand {
+                        reason: "Out of bounds".into(),
+                    });
                 }
                 if board.get_stone(x_usize, y_usize).is_some() {
-                    return Err(EngineError::InvalidCommand { reason: "Space occupied".into() });
+                    return Err(EngineError::InvalidCommand {
+                        reason: "Space occupied".into(),
+                    });
                 }
                 board.set_stone(x_usize, y_usize, Some(Stone::Black));
                 events.push(Box::new(StonePlacedEvent {
@@ -152,12 +194,16 @@ pub fn build_go_rules() -> RuleEngine {
 
     rules.register::<PassCommand, _>(|cmd, world| {
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
-            return Err(EngineError::InvalidCommand { reason: "Not your turn".into() });
+            return Err(EngineError::InvalidCommand {
+                reason: "Not your turn".into(),
+            });
         }
 
         if let Some(dead_marking) = world.get_resource::<DeadMarkingResource>() {
             if dead_marking.active {
-                return Err(EngineError::InvalidCommand { reason: "Game is in dead marking phase".into() });
+                return Err(EngineError::InvalidCommand {
+                    reason: "Game is in dead marking phase".into(),
+                });
             }
         }
 
@@ -190,23 +236,31 @@ pub fn build_go_rules() -> RuleEngine {
             .unwrap_or(false);
 
         if !is_active {
-            return Err(EngineError::InvalidCommand { reason: "Not in dead marking phase".into() });
+            return Err(EngineError::InvalidCommand {
+                reason: "Not in dead marking phase".into(),
+            });
         }
 
         {
             let board = world.resource::<BoardResource>();
             if cmd.player != board.black_player && cmd.player != board.white_player {
-                return Err(EngineError::InvalidCommand { reason: "Invalid player".into() });
+                return Err(EngineError::InvalidCommand {
+                    reason: "Invalid player".into(),
+                });
             }
 
             for &(x, y) in &cmd.positions {
                 let x_u = x as usize;
                 let y_u = y as usize;
                 if x_u >= board.size || y_u >= board.size {
-                    return Err(EngineError::InvalidCommand { reason: "Out of bounds".into() });
+                    return Err(EngineError::InvalidCommand {
+                        reason: "Out of bounds".into(),
+                    });
                 }
                 if board.get_stone(x_u, y_u).is_none() {
-                    return Err(EngineError::InvalidCommand { reason: "No stone at position".into() });
+                    return Err(EngineError::InvalidCommand {
+                        reason: "No stone at position".into(),
+                    });
                 }
             }
         }
@@ -231,7 +285,9 @@ pub fn build_go_rules() -> RuleEngine {
             .unwrap_or(false);
 
         if !is_active {
-            return Err(EngineError::InvalidCommand { reason: "Not in dead marking phase".into() });
+            return Err(EngineError::InvalidCommand {
+                reason: "Not in dead marking phase".into(),
+            });
         }
 
         let (black_p, white_p) = {
@@ -240,7 +296,9 @@ pub fn build_go_rules() -> RuleEngine {
         };
 
         if cmd.player != black_p && cmd.player != white_p {
-            return Err(EngineError::InvalidCommand { reason: "Invalid player".into() });
+            return Err(EngineError::InvalidCommand {
+                reason: "Invalid player".into(),
+            });
         }
 
         let mut both_confirmed = false;
@@ -291,9 +349,14 @@ pub fn build_go_rules() -> RuleEngine {
     rules.register::<ResignCommand, _>(|cmd, world| {
         let players = world.resource::<TurnResource>().0.players().to_vec();
         if !players.contains(&cmd.player) {
-            return Err(EngineError::InvalidCommand { reason: "Not a player in this session".into() });
+            return Err(EngineError::InvalidCommand {
+                reason: "Not a player in this session".into(),
+            });
         }
-        let opponent = players.into_iter().find(|&p| p != cmd.player).unwrap_or(cmd.player);
+        let opponent = players
+            .into_iter()
+            .find(|&p| p != cmd.player)
+            .unwrap_or(cmd.player);
         world.insert_resource(GameOverResource(true));
         world.insert_resource(WinnerResource(Some(opponent)));
         Ok(vec![Box::new(GameOverEvent {

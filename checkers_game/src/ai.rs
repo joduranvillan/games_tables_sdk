@@ -59,8 +59,14 @@ pub fn checkers_ai_pick_move(session: &Session, player: PlayerId) -> Option<Move
 
                 // Generar posiciones de destino candidatas (diagonales 1 y 2)
                 let offsets: &[(i8, i8)] = &[
-                    (-1, -1), (-1, 1), (1, -1), (1, 1),
-                    (-2, -2), (-2, 2), (2, -2), (2, 2),
+                    (-1, -1),
+                    (-1, 1),
+                    (1, -1),
+                    (1, 1),
+                    (-2, -2),
+                    (-2, 2),
+                    (2, -2),
+                    (2, 2),
                 ];
 
                 for &(dr, dc) in offsets {
@@ -77,7 +83,9 @@ pub fn checkers_ai_pick_move(session: &Session, player: PlayerId) -> Option<Move
                         // Probar el comando sobre una copia de base_trial
                         let mut test_session = crate::new_checkers_session(session.id, 0, p1, p2);
                         for (_tick, _elapsed, cmd) in base_trial.command_log() {
-                            let sender = cmd.issuer().unwrap_or_else(|| test_session.current_player());
+                            let sender = cmd
+                                .issuer()
+                                .unwrap_or_else(|| test_session.current_player());
                             let _ = test_session.process_command(sender, cmd.clone());
                         }
 
@@ -147,7 +155,10 @@ mod tests {
 
         // Comprobamos que el movimiento seleccionado por la IA es realmente aplicable en la sesión
         let res = session.process_command(current_player, Box::new(chosen_move));
-        assert!(res.is_ok(), "El movimiento retornado por la IA debe ser válido");
+        assert!(
+            res.is_ok(),
+            "El movimiento retornado por la IA debe ser válido"
+        );
     }
 
     #[test]
@@ -156,7 +167,10 @@ mod tests {
         session.world_mut().insert_resource(GameOverResource(true));
 
         let mv = checkers_ai_pick_move(&session, P1);
-        assert!(mv.is_none(), "La IA debe retornar None cuando la partida terminó");
+        assert!(
+            mv.is_none(),
+            "La IA debe retornar None cuando la partida terminó"
+        );
     }
 
     #[test]
@@ -165,6 +179,9 @@ mod tests {
         assert_eq!(session.current_player(), P1);
 
         let mv = checkers_ai_pick_move(&session, P2);
-        assert!(mv.is_none(), "La IA debe retornar None si no es el turno del jugador");
+        assert!(
+            mv.is_none(),
+            "La IA debe retornar None si no es el turno del jugador"
+        );
     }
 }

@@ -83,13 +83,20 @@ fn un_movimiento_simple_hacia_adelante_es_valido() {
         .expect("el movimiento debería ser válido");
 
     assert_eq!(events.len(), 1);
-    let moved = events[0].as_any().downcast_ref::<checkers_game::PieceMovedEvent>().unwrap();
+    let moved = events[0]
+        .as_any()
+        .downcast_ref::<checkers_game::PieceMovedEvent>()
+        .unwrap();
     assert_eq!(moved.from, pos(2, 1));
     assert_eq!(moved.to, pos(3, 2));
     assert!(moved.captured.is_none());
     assert!(!moved.promoted);
 
-    assert_eq!(session.current_player(), P2, "el turno pasa al otro jugador");
+    assert_eq!(
+        session.current_player(),
+        P2,
+        "el turno pasa al otro jugador"
+    );
 }
 
 #[test]
@@ -124,26 +131,49 @@ fn una_captura_remueve_la_ficha_saltada() {
 
     // Set up capture scenario directly: P1 at (3,4), P2 at (4,3), P1 jumps to (5,2)
     {
-        let mut board = session.world_mut().resource_mut::<checkers_game::BoardResource>();
+        let mut board = session
+            .world_mut()
+            .resource_mut::<checkers_game::BoardResource>();
         for row in 0..8u8 {
             for col in 0..8u8 {
                 board.set(pos(row, col), None);
             }
         }
-        board.set(pos(3, 4), Some(checkers_game::Piece { owner: P1, is_king: false }));
-        board.set(pos(4, 3), Some(checkers_game::Piece { owner: P2, is_king: false }));
+        board.set(
+            pos(3, 4),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(4, 3),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
     }
 
     let events = session
         .process_command(P1, move_cmd(P1, pos(3, 4), pos(5, 2)))
         .expect("la captura debería ser válida");
 
-    let moved = events[0].as_any().downcast_ref::<checkers_game::PieceMovedEvent>().unwrap();
+    let moved = events[0]
+        .as_any()
+        .downcast_ref::<checkers_game::PieceMovedEvent>()
+        .unwrap();
     assert_eq!(moved.captured, Some(pos(4, 3)));
 
     let board = session.world().resource::<checkers_game::BoardResource>();
-    assert!(board.get(pos(4, 3)).is_none(), "la ficha capturada debe desaparecer del tablero");
-    assert!(board.get(pos(5, 2)).is_some(), "la ficha que capturó debe estar en el destino");
+    assert!(
+        board.get(pos(4, 3)).is_none(),
+        "la ficha capturada debe desaparecer del tablero"
+    );
+    assert!(
+        board.get(pos(5, 2)).is_some(),
+        "la ficha que capturó debe estar en el destino"
+    );
 }
 
 #[test]
@@ -173,7 +203,10 @@ fn una_ficha_se_corona_al_llegar_a_la_ultima_fila() {
         .process_command(P1, move_cmd(P1, pos(6, 1), pos(7, 0)))
         .expect("mover a la última fila debería coronar");
 
-    let moved = events[0].as_any().downcast_ref::<checkers_game::PieceMovedEvent>().unwrap();
+    let moved = events[0]
+        .as_any()
+        .downcast_ref::<checkers_game::PieceMovedEvent>()
+        .unwrap();
     assert!(moved.promoted, "debería coronarse al llegar a la fila 7");
 
     let board = session.world().resource::<checkers_game::BoardResource>();
@@ -218,13 +251,18 @@ fn el_juego_termina_cuando_un_jugador_pierde_todas_sus_fichas() {
         .process_command(P1, move_cmd(P1, pos(2, 1), pos(4, 3)))
         .expect("la captura final debería ser válida");
 
-    let moved = events[0].as_any().downcast_ref::<checkers_game::PieceMovedEvent>().unwrap();
+    let moved = events[0]
+        .as_any()
+        .downcast_ref::<checkers_game::PieceMovedEvent>()
+        .unwrap();
     assert_eq!(moved.captured, Some(pos(3, 2)));
 
     assert!(
-        events
-            .iter()
-            .any(|e| e.as_any().downcast_ref::<checkers_game::GameOverEvent>().map(|go| go.winner) == Some(P1)),
+        events.iter().any(|e| e
+            .as_any()
+            .downcast_ref::<checkers_game::GameOverEvent>()
+            .map(|go| go.winner)
+            == Some(P1)),
         "debería haber un GameOverEvent con P1 como ganador"
     );
 }
@@ -240,11 +278,17 @@ fn captura_obligatoria_rechaza_movimientos_simples_si_hay_captura() {
             .resource_mut::<checkers_game::BoardResource>();
         board.set(
             pos(2, 1),
-            Some(checkers_game::Piece { owner: P1, is_king: false }),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
         );
         board.set(
             pos(3, 2),
-            Some(checkers_game::Piece { owner: P2, is_king: false }),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
         );
         board.set(pos(4, 3), None);
     }
@@ -277,10 +321,34 @@ fn captura_multiple_mantiene_el_turno_y_obliga_a_usar_la_misma_ficha() {
                 board.set(pos(r, c), None);
             }
         }
-        board.set(pos(0, 1), Some(checkers_game::Piece { owner: P1, is_king: false }));
-        board.set(pos(2, 1), Some(checkers_game::Piece { owner: P1, is_king: false }));
-        board.set(pos(1, 2), Some(checkers_game::Piece { owner: P2, is_king: false }));
-        board.set(pos(3, 4), Some(checkers_game::Piece { owner: P2, is_king: false }));
+        board.set(
+            pos(0, 1),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(2, 1),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(1, 2),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(3, 4),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
     }
 
     // Primer salto
@@ -319,18 +387,52 @@ fn captura_triple_mantiene_el_turno_durante_tres_saltos() {
                 board.set(pos(r, c), None);
             }
         }
-        board.set(pos(0, 1), Some(checkers_game::Piece { owner: P1, is_king: false }));
-        board.set(pos(2, 1), Some(checkers_game::Piece { owner: P1, is_king: false }));
-        board.set(pos(1, 2), Some(checkers_game::Piece { owner: P2, is_king: false }));
-        board.set(pos(3, 4), Some(checkers_game::Piece { owner: P2, is_king: false }));
-        board.set(pos(5, 6), Some(checkers_game::Piece { owner: P2, is_king: false }));
+        board.set(
+            pos(0, 1),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(2, 1),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(1, 2),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(3, 4),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(5, 6),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
     }
 
     // Primer salto
     session
         .process_command(P1, move_cmd(P1, pos(0, 1), pos(2, 3)))
         .expect("primer salto válido");
-    assert_eq!(session.current_player(), P1, "mantiene el turno de P1 tras el primer salto");
+    assert_eq!(
+        session.current_player(),
+        P1,
+        "mantiene el turno de P1 tras el primer salto"
+    );
 
     // Intentar mover otra ficha debe ser rechazado
     let err1 = session.process_command(P1, move_cmd(P1, pos(2, 1), pos(3, 2)));
@@ -340,7 +442,11 @@ fn captura_triple_mantiene_el_turno_durante_tres_saltos() {
     session
         .process_command(P1, move_cmd(P1, pos(2, 3), pos(4, 5)))
         .expect("segundo salto válido");
-    assert_eq!(session.current_player(), P1, "mantiene el turno de P1 tras el segundo salto");
+    assert_eq!(
+        session.current_player(),
+        P1,
+        "mantiene el turno de P1 tras el segundo salto"
+    );
 
     // Intentar mover otra ficha debe seguir siendo rechazado
     let err2 = session.process_command(P1, move_cmd(P1, pos(2, 1), pos(3, 2)));
@@ -352,7 +458,11 @@ fn captura_triple_mantiene_el_turno_durante_tres_saltos() {
         .expect("tercer salto válido");
 
     // Cadena terminada, turno pasa a P2
-    assert_eq!(session.current_player(), P2, "turno pasa a P2 tras completar la triple captura");
+    assert_eq!(
+        session.current_player(),
+        P2,
+        "turno pasa a P2 tras completar la triple captura"
+    );
 
     // Las tres fichas capturadas deben haber desaparecido
     let board = session.world().resource::<checkers_game::BoardResource>();
@@ -386,7 +496,9 @@ fn persistencia_de_partida_save_and_load_from_file() {
     let path_str = file_path.to_str().expect("ruta temporal válida");
 
     // Guardar a archivo
-    session.save_to_file(path_str).expect("guardar en archivo debe ser exitoso");
+    session
+        .save_to_file(path_str)
+        .expect("guardar en archivo debe ser exitoso");
 
     // Cargar desde archivo
     let reloaded = Session::load_from_file(
@@ -416,16 +528,25 @@ fn test_captura_obligatoria_rechaza_movimiento_simple_si_hay_captura_disponible(
             .resource_mut::<checkers_game::BoardResource>();
         board.set(
             pos(2, 1),
-            Some(checkers_game::Piece { owner: P1, is_king: false }),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
         );
         board.set(
             pos(3, 2),
-            Some(checkers_game::Piece { owner: P2, is_king: false }),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
         );
         board.set(pos(4, 3), None);
         board.set(
             pos(2, 3),
-            Some(checkers_game::Piece { owner: P1, is_king: false }),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
         );
     }
 
@@ -478,7 +599,10 @@ fn test_dama_puede_capturar_hacia_atras() {
     assert_eq!(moved.captured, Some(pos(4, 3)));
 
     let board = session.world().resource::<checkers_game::BoardResource>();
-    assert!(board.get(pos(4, 3)).is_none(), "la pieza capturada debe ser removida");
+    assert!(
+        board.get(pos(4, 3)).is_none(),
+        "la pieza capturada debe ser removida"
+    );
     assert_eq!(board.get(pos(3, 2)).unwrap().owner, P1);
     assert!(board.get(pos(3, 2)).unwrap().is_king, "sigue siendo dama");
 }
@@ -500,28 +624,63 @@ fn test_cadena_de_tres_saltos_consecutivos() {
                 board.set(pos(r, c), None);
             }
         }
-        board.set(pos(0, 1), Some(checkers_game::Piece { owner: P1, is_king: false }));
-        board.set(pos(1, 2), Some(checkers_game::Piece { owner: P2, is_king: false }));
-        board.set(pos(3, 4), Some(checkers_game::Piece { owner: P2, is_king: false }));
-        board.set(pos(5, 6), Some(checkers_game::Piece { owner: P2, is_king: false }));
+        board.set(
+            pos(0, 1),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(1, 2),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(3, 4),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(5, 6),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
     }
 
     // Primer salto
     session
         .process_command(P1, move_cmd(P1, pos(0, 1), pos(2, 3)))
         .expect("primer salto válido");
-    assert_eq!(session.current_player(), P1, "mantiene el turno de P1 tras el primer salto");
+    assert_eq!(
+        session.current_player(),
+        P1,
+        "mantiene el turno de P1 tras el primer salto"
+    );
 
     // Segundo salto (captura en cadena)
     session
         .process_command(P1, move_cmd(P1, pos(2, 3), pos(4, 5)))
         .expect("segundo salto válido");
-    assert_eq!(session.current_player(), P1, "después del segundo salto el current_player() sigue siendo el mismo jugador");
+    assert_eq!(
+        session.current_player(),
+        P1,
+        "después del segundo salto el current_player() sigue siendo el mismo jugador"
+    );
 
     // Tercer salto
     session
         .process_command(P1, move_cmd(P1, pos(4, 5), pos(6, 7)))
         .expect("tercer salto válido");
-    assert_eq!(session.current_player(), P2, "solo cambia de turno a P2 tras agotar los saltos");
+    assert_eq!(
+        session.current_player(),
+        P2,
+        "solo cambia de turno a P2 tras agotar los saltos"
+    );
 }
-

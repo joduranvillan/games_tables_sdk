@@ -20,7 +20,8 @@ use crate::session::LegalMoveGenerator;
 /// Firma de un handler de regla: recibe el comando ya downcasteado (vía
 /// `Any`) y el `World` de bevy_ecs, devuelve los eventos resultantes o un
 /// error de validación.
-type RuleFn = Box<dyn Fn(&dyn Any, &mut BevyWorld) -> EngineResult<Vec<Box<dyn Event>>> + Send + Sync>;
+type RuleFn =
+    Box<dyn Fn(&dyn Any, &mut BevyWorld) -> EngineResult<Vec<Box<dyn Event>>> + Send + Sync>;
 
 #[derive(Default)]
 pub struct RuleEngine {
@@ -50,9 +51,9 @@ impl RuleEngine {
         F: Fn(&C, &mut BevyWorld) -> EngineResult<Vec<Box<dyn Event>>> + Send + Sync + 'static,
     {
         let boxed: RuleFn = Box::new(move |any_cmd, world| {
-            let cmd = any_cmd.downcast_ref::<C>().expect(
-                "type id coincide pero el downcast falló: bug interno del RuleEngine",
-            );
+            let cmd = any_cmd
+                .downcast_ref::<C>()
+                .expect("type id coincide pero el downcast falló: bug interno del RuleEngine");
             handler(cmd, world)
         });
         self.handlers.insert(TypeId::of::<C>(), boxed);

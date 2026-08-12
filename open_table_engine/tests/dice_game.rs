@@ -96,7 +96,11 @@ fn pipeline_completo_comando_a_evento_con_seed_determinista() {
         .process_command(alice, Box::new(RollDiceCommand { player: alice }))
         .expect("procesa");
 
-    assert_eq!(format!("{events_a:?}"), format!("{events_b:?}"), "misma seed debe dar el mismo resultado");
+    assert_eq!(
+        format!("{events_a:?}"),
+        format!("{events_b:?}"),
+        "misma seed debe dar el mismo resultado"
+    );
     assert_eq!(session_a.current_tick(), Tick(1));
 }
 
@@ -179,8 +183,14 @@ fn replay_reproduce_exactamente_los_mismos_eventos() {
 
     let log_bytes = original.export_log().expect("exporta el log");
 
-    let replayed = Session::replay(SessionId(5), 123, players, build_dice_game_rules(), &log_bytes)
-        .expect("reproduce la partida");
+    let replayed = Session::replay(
+        SessionId(5),
+        123,
+        players,
+        build_dice_game_rules(),
+        &log_bytes,
+    )
+    .expect("reproduce la partida");
 
     assert_eq!(replayed.current_tick(), original.current_tick());
     assert_eq!(replayed.current_player(), original.current_player());
@@ -204,15 +214,23 @@ fn resync_solo_manda_al_jugador_los_eventos_que_puede_ver() {
 
     let log_bytes = original.export_log().unwrap();
 
-    let (_replayed, all_events) =
-        Session::replay_collecting_events(SessionId(6), 555, players, build_dice_game_rules(), &log_bytes)
-            .expect("reproduce y junta eventos");
+    let (_replayed, all_events) = Session::replay_collecting_events(
+        SessionId(6),
+        555,
+        players,
+        build_dice_game_rules(),
+        &log_bytes,
+    )
+    .expect("reproduce y junta eventos");
 
     // Alice reconectándose: nunca debe recibir la nota secreta de Bob.
     let alice_view = filter_events_for_player(&all_events, alice);
     for event in &alice_view {
         if let Some(note) = event.as_any().downcast_ref::<SecretNoteEvent>() {
-            assert_eq!(note.owner, alice, "Alice no puede ver una nota secreta de otro jugador");
+            assert_eq!(
+                note.owner, alice,
+                "Alice no puede ver una nota secreta de otro jugador"
+            );
         }
     }
 }
@@ -229,11 +247,17 @@ fn spectator_recibe_eventos_publicos() {
 
     let spectator_events = filter_events_for_spectator(&events, spectator);
 
-    assert!(!spectator_events.is_empty(), "los eventos públicos deben llegar al espectador");
+    assert!(
+        !spectator_events.is_empty(),
+        "los eventos públicos deben llegar al espectador"
+    );
     let has_dice_rolled = spectator_events
         .iter()
         .any(|e| e.as_any().downcast_ref::<DiceRolledEvent>().is_some());
-    assert!(has_dice_rolled, "DiceRolledEvent público debe llegar al espectador");
+    assert!(
+        has_dice_rolled,
+        "DiceRolledEvent público debe llegar al espectador"
+    );
 }
 
 #[test]
@@ -252,15 +276,23 @@ fn spectator_no_recibe_eventos_privados() {
     }
 
     let log_bytes = original.export_log().unwrap();
-    let (_replayed, all_events) =
-        Session::replay_collecting_events(SessionId(11), 555, players, build_dice_game_rules(), &log_bytes)
-            .expect("reproduce y junta eventos");
+    let (_replayed, all_events) = Session::replay_collecting_events(
+        SessionId(11),
+        555,
+        players,
+        build_dice_game_rules(),
+        &log_bytes,
+    )
+    .expect("reproduce y junta eventos");
 
     // Verificar que existen eventos SecretNoteEvent en la partida
     let has_secret_notes = all_events
         .iter()
         .any(|e| e.as_any().downcast_ref::<SecretNoteEvent>().is_some());
-    assert!(has_secret_notes, "debe haber eventos privados SecretNoteEvent en la partida");
+    assert!(
+        has_secret_notes,
+        "debe haber eventos privados SecretNoteEvent en la partida"
+    );
 
     let spectator_view = filter_events_for_spectator(&all_events, spectator);
 
@@ -369,7 +401,10 @@ fn comando_extra_despues_de_game_over_es_rechazado_con_game_already_over() {
 
     // Primer comando termina la partida
     let result = session.process_command(alice, Box::new(EndGameCommand { player: alice }));
-    assert!(result.is_ok(), "el primer comando debe procesarse correctamente");
+    assert!(
+        result.is_ok(),
+        "el primer comando debe procesarse correctamente"
+    );
 
     // Segundo comando debe ser rechazado
     let extra_result = session.process_command(alice, Box::new(EndGameCommand { player: alice }));
@@ -491,7 +526,8 @@ fn test_replay_parcial_desde_tick_3_produce_estado_correcto() {
     assert_eq!(original.current_tick(), Tick(5));
     let log_bytes = original.export_log().unwrap();
 
-    let mut replay_session = Session::new(SessionId(105), 100, vec![alice], build_dice_game_rules());
+    let mut replay_session =
+        Session::new(SessionId(105), 100, vec![alice], build_dice_game_rules());
     // Reproducimos los primeros 3 comandos para dejar la sesión en tick 3
     for _ in 0..3 {
         replay_session
@@ -518,7 +554,9 @@ fn test_into_result_contiene_datos_correctos_de_partida() {
         build_dice_game_rules(),
     );
 
-    session.world_mut().insert_resource(WinnerResource(Some(alice)));
+    session
+        .world_mut()
+        .insert_resource(WinnerResource(Some(alice)));
 
     session
         .process_command(alice, Box::new(RollDiceCommand { player: alice }))
@@ -565,8 +603,19 @@ fn test_private_to_group_llega_solo_a_los_jugadores_del_grupo() {
     let p2_events = filter_events_for_player(&events, p2);
     let p3_events = filter_events_for_player(&events, p3);
 
-    assert_eq!(p1_events.len(), 1, "P1 está en el grupo y debe recibir el evento");
-    assert_eq!(p2_events.len(), 1, "P2 está en el grupo y debe recibir el evento");
-    assert_eq!(p3_events.len(), 0, "P3 NO está en el grupo y NO debe recibir el evento");
+    assert_eq!(
+        p1_events.len(),
+        1,
+        "P1 está en el grupo y debe recibir el evento"
+    );
+    assert_eq!(
+        p2_events.len(),
+        1,
+        "P2 está en el grupo y debe recibir el evento"
+    );
+    assert_eq!(
+        p3_events.len(),
+        0,
+        "P3 NO está en el grupo y NO debe recibir el evento"
+    );
 }
-

@@ -150,7 +150,10 @@ fn reconexion_real_dispara_resync_filtrado_por_visibilidad() {
 
     // Consumir los eventos de Joined para que no interfieran con los
     // asserts de reconexión más abajo.
-    let _ = wait_for_data(|| host_transport.poll_connection_events(), Duration::from_secs(1));
+    let _ = wait_for_data(
+        || host_transport.poll_connection_events(),
+        Duration::from_secs(1),
+    );
 
     let players = vec![alice, bob];
     let seed = 2024;
@@ -180,7 +183,9 @@ fn reconexion_real_dispara_resync_filtrado_por_visibilidad() {
         assert_eq!(received.len(), 1);
         let (sender, raw) = &received[0];
         let decoded: CommandEnvelope = serde_json::from_slice(raw).unwrap();
-        host_session.process_command(*sender, decoded.payload).unwrap();
+        host_session
+            .process_command(*sender, decoded.payload)
+            .unwrap();
         // No hace falta mandar los eventos por la red para este test: lo
         // que importa es que queden en el log de la Session para el
         // resync posterior.
@@ -189,7 +194,9 @@ fn reconexion_real_dispara_resync_filtrado_por_visibilidad() {
     // --- Alice se cae: cerramos su socket activamente. Un simple
     // `drop()` no alcanza porque el thread de lectura tiene su propio
     // clon del socket todavía abierto (ver doc de `disconnect()`). ---
-    alice_transport.disconnect().expect("cierra la conexión de Alice");
+    alice_transport
+        .disconnect()
+        .expect("cierra la conexión de Alice");
     drop(alice_transport);
 
     let disconnect_event = wait_until(
@@ -201,7 +208,10 @@ fn reconexion_real_dispara_resync_filtrado_por_visibilidad() {
         },
         Duration::from_secs(2),
     );
-    assert_eq!(disconnect_event, Some(ConnectionEvent::Disconnected { player: alice }));
+    assert_eq!(
+        disconnect_event,
+        Some(ConnectionEvent::Disconnected { player: alice })
+    );
 
     // --- Alice reconecta con su player_id + token guardados. ---
     let mut alice_transport =
@@ -216,18 +226,29 @@ fn reconexion_real_dispara_resync_filtrado_por_visibilidad() {
         },
         Duration::from_secs(2),
     );
-    assert_eq!(reconnect_event, Some(ConnectionEvent::Reconnected { player: alice }));
+    assert_eq!(
+        reconnect_event,
+        Some(ConnectionEvent::Reconnected { player: alice })
+    );
 
     // --- El host dispara el resync: exporta el log vivo, lo reproduce en
     // una Session temporal para juntar todos los eventos, y filtra por
     // Visibility para Alice. ---
     let log_bytes = host_session.export_log().expect("exporta el log");
-    let (_temp_session, all_events) =
-        Session::replay_collecting_events(SessionId(1), seed, players.clone(), dice_rules(), &log_bytes)
-            .expect("reproduce el log para el resync");
+    let (_temp_session, all_events) = Session::replay_collecting_events(
+        SessionId(1),
+        seed,
+        players.clone(),
+        dice_rules(),
+        &log_bytes,
+    )
+    .expect("reproduce el log para el resync");
 
     let events_for_alice = filter_events_for_player(&all_events, alice);
-    assert!(!events_for_alice.is_empty(), "Alice debería recibir al menos un evento en el resync");
+    assert!(
+        !events_for_alice.is_empty(),
+        "Alice debería recibir al menos un evento en el resync"
+    );
 
     for event in &events_for_alice {
         let bytes = serde_json::to_vec(&EventEnvelope {
@@ -235,7 +256,9 @@ fn reconexion_real_dispara_resync_filtrado_por_visibilidad() {
             payload: clone_event_for_wire(*event),
         })
         .unwrap();
-        host_transport.send(alice, &bytes).expect("manda el resync a Alice");
+        host_transport
+            .send(alice, &bytes)
+            .expect("manda el resync a Alice");
     }
 
     // --- Alice recibe el resync por su conexión NUEVA y nunca ve una
@@ -250,7 +273,10 @@ fn reconexion_real_dispara_resync_filtrado_por_visibilidad() {
     for (_, raw) in &received_by_alice {
         let envelope: EventEnvelope = serde_json::from_slice(raw).unwrap();
         if let Some(note) = envelope.payload.as_any().downcast_ref::<SecretNoteEvent>() {
-            assert_eq!(note.owner, alice, "Alice no debe recibir la nota secreta de otro jugador en el resync");
+            assert_eq!(
+                note.owner, alice,
+                "Alice no debe recibir la nota secreta de otro jugador en el resync"
+            );
         }
     }
 

@@ -16,7 +16,12 @@ pub use rules::build_battleship_rules;
 
 use open_table_engine::prelude::*;
 
-pub fn new_battleship_session(session_id: SessionId, seed: u64, player_a: PlayerId, player_b: PlayerId) -> Session {
+pub fn new_battleship_session(
+    session_id: SessionId,
+    seed: u64,
+    player_a: PlayerId,
+    player_b: PlayerId,
+) -> Session {
     let mut session = Session::new_with_metadata(
         session_id,
         "Battleship",
@@ -29,4 +34,3 @@ pub fn new_battleship_session(session_id: SessionId, seed: u64, player_a: Player
     session.world_mut().insert_resource(RematchResource::new());
     session
 }
-

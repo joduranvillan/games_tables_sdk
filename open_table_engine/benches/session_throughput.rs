@@ -1,5 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use checkers_game::{new_checkers_session, MovePieceCommand, Position};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use open_table_engine::prelude::*;
 
 fn pos(row: u8, col: u8) -> Position {

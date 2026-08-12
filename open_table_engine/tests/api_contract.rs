@@ -7,18 +7,51 @@ const P2: PlayerId = PlayerId(2);
 fn contrato_cross_crate_de_constructores_de_sesion() {
     let players = vec![P1, P2];
     let sessions: Vec<(&str, Session)> = vec![
-        ("checkers", checkers_game::new_checkers_session(SessionId(1), 42, P1, P2)),
-        ("chess", chess_game::new_chess_session(SessionId(2), 42, P1, P2)),
-        ("shogi", shogi_game::new_shogi_session(SessionId(3), 42, P1, P2)),
-        ("xiangqi", xiangqi_game::new_xiangqi_session(SessionId(4), 42, P1, P2)),
+        (
+            "checkers",
+            checkers_game::new_checkers_session(SessionId(1), 42, P1, P2),
+        ),
+        (
+            "chess",
+            chess_game::new_chess_session(SessionId(2), 42, P1, P2),
+        ),
+        (
+            "shogi",
+            shogi_game::new_shogi_session(SessionId(3), 42, P1, P2),
+        ),
+        (
+            "xiangqi",
+            xiangqi_game::new_xiangqi_session(SessionId(4), 42, P1, P2),
+        ),
         ("go", go_game::new_go_session(SessionId(5), 42, P1, P2)),
-        ("uno", uno_game::new_uno_session(SessionId(6), 42, vec![P1, P2])),
-        ("crisis", crisis_game::new_crisis_session(SessionId(7), 42, &[P1, P2]).unwrap()),
-        ("chinese_checkers", chinese_checkers_game::new_chinese_checkers_session(SessionId(8), 42, vec![P1, P2])),
-        ("mille_bornes", mille_bornes_game::new_mille_bornes_session(SessionId(9), 42, P1, P2)),
-        ("backgammon", backgammon_game::new_backgammon_session(SessionId(10), 42, P1, P2)),
-        ("monopoly", monopoly_game::new_monopoly_session(SessionId(11), 42, P1, P2)),
-        ("ludo", ludo_game::new_ludo_session(SessionId(12), 42, vec![P1, P2])),
+        (
+            "uno",
+            uno_game::new_uno_session(SessionId(6), 42, vec![P1, P2]),
+        ),
+        (
+            "crisis",
+            crisis_game::new_crisis_session(SessionId(7), 42, &[P1, P2]).unwrap(),
+        ),
+        (
+            "chinese_checkers",
+            chinese_checkers_game::new_chinese_checkers_session(SessionId(8), 42, vec![P1, P2]),
+        ),
+        (
+            "mille_bornes",
+            mille_bornes_game::new_mille_bornes_session(SessionId(9), 42, P1, P2),
+        ),
+        (
+            "backgammon",
+            backgammon_game::new_backgammon_session(SessionId(10), 42, P1, P2),
+        ),
+        (
+            "monopoly",
+            monopoly_game::new_monopoly_session(SessionId(11), 42, P1, P2),
+        ),
+        (
+            "ludo",
+            ludo_game::new_ludo_session(SessionId(12), 42, vec![P1, P2]),
+        ),
     ];
 
     for (name, session) in sessions {
@@ -88,7 +121,9 @@ fn test_middleware_puede_rechazar_comandos_antes_del_despacho() {
     let mut session = checkers_game::new_checkers_session(SessionId(1), 42, P1, P2);
 
     session.add_middleware(|_envelope, _world| {
-        Err(EngineError::Internal("Rechazado por middleware".to_string()))
+        Err(EngineError::Internal(
+            "Rechazado por middleware".to_string(),
+        ))
     });
 
     let cmd = Box::new(checkers_game::MovePieceCommand {
@@ -105,4 +140,3 @@ fn test_middleware_puede_rechazar_comandos_antes_del_despacho() {
         panic!("Debería devolver un EngineError::Internal");
     }
 }
-

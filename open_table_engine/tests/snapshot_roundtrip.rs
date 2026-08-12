@@ -355,7 +355,10 @@ fn test_backgammon_snapshot_roundtrip() {
                     .get(&p)
                     .map_or(false, |d| !d.is_empty());
                 if has_dice {
-                    let die = s.world().resource::<backgammon_game::PendingDiceResource>().pending[&p][0];
+                    let die = s
+                        .world()
+                        .resource::<backgammon_game::PendingDiceResource>()
+                        .pending[&p][0];
                     let board = s.world().resource::<backgammon_game::BoardResource>();
                     let sides = s.world().resource::<backgammon_game::Sides>();
                     let sign = sides.owner_sign(p);
@@ -370,11 +373,8 @@ fn test_backgammon_snapshot_roundtrip() {
                     )
                     .unwrap();
                 } else {
-                    s.process_command(
-                        p,
-                        Box::new(backgammon_game::RollDiceCommand { player: p }),
-                    )
-                    .unwrap();
+                    s.process_command(p, Box::new(backgammon_game::RollDiceCommand { player: p }))
+                        .unwrap();
                 }
             }
         },
@@ -454,11 +454,8 @@ fn test_ludo_snapshot_roundtrip() {
                     )
                     .unwrap();
                 } else {
-                    s.process_command(
-                        p,
-                        Box::new(ludo_game::RollDiceCommand { player: p }),
-                    )
-                    .unwrap();
+                    s.process_command(p, Box::new(ludo_game::RollDiceCommand { player: p }))
+                        .unwrap();
                 }
             }
         },

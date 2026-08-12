@@ -47,8 +47,12 @@ pub enum HandshakeRequest {
 impl HandshakeRequest {
     pub fn protocol_version(&self) -> &str {
         match self {
-            HandshakeRequest::Join { protocol_version, .. } => protocol_version,
-            HandshakeRequest::Reconnect { protocol_version, .. } => protocol_version,
+            HandshakeRequest::Join {
+                protocol_version, ..
+            } => protocol_version,
+            HandshakeRequest::Reconnect {
+                protocol_version, ..
+            } => protocol_version,
         }
     }
 

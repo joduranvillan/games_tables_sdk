@@ -8,7 +8,9 @@ pub mod commands;
 pub mod events;
 pub mod rules;
 
-pub use board::{PendingRollResource, TokensResource, HOME_STRETCH_LEN, MAX_STEPS, TOKENS_PER_PLAYER, TRACK_LEN};
+pub use board::{
+    PendingRollResource, TokensResource, HOME_STRETCH_LEN, MAX_STEPS, TOKENS_PER_PLAYER, TRACK_LEN,
+};
 pub use commands::{MoveTokenCommand, RollDiceCommand};
 pub use events::{DiceRolledEvent, GameOverEvent, NoValidMovesEvent, TokenMovedEvent};
 pub use rules::build_ludo_rules;
@@ -27,7 +29,9 @@ pub fn new_ludo_session(session_id: SessionId, seed: u64, players: Vec<PlayerId>
         players.clone(),
         build_ludo_rules(),
     );
-    session.world_mut().insert_resource(TokensResource::new(&players));
+    session
+        .world_mut()
+        .insert_resource(TokensResource::new(&players));
     session
         .world_mut()
         .insert_resource(PendingRollResource::default());

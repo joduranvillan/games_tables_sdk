@@ -1,12 +1,17 @@
-use open_table_engine::prelude::*;
 use crate::board::{BoardResource, Piece, PieceKind};
+use open_table_engine::prelude::*;
 
-pub fn is_legal_move(board: &BoardResource, from: (usize, usize), to: (usize, usize), player: PlayerId) -> bool {
+pub fn is_legal_move(
+    board: &BoardResource,
+    from: (usize, usize),
+    to: (usize, usize),
+    player: PlayerId,
+) -> bool {
     let piece = match board.squares.get(&from) {
         Some(p) if p.owner == player => p,
         _ => return false,
     };
-    
+
     if board.squares.get(&to).map(|p| p.owner) == Some(player) {
         return false;
     }
@@ -15,12 +20,14 @@ pub fn is_legal_move(board: &BoardResource, from: (usize, usize), to: (usize, us
     let (tx, ty) = to;
     let dx = (tx as isize - fx as isize).abs();
     let dy = ty as isize - fy as isize; // Directional!
-    
-    if tx > 8 || ty > 8 { return false; }
+
+    if tx > 8 || ty > 8 {
+        return false;
+    }
 
     let is_sente = player == board.sente;
     let forward = if is_sente { -1 } else { 1 };
-    
+
     // Check if path is clear for sliding pieces
     let check_slide = |dx: isize, dy: isize| -> bool {
         let step_x = dx.signum();
@@ -41,50 +48,73 @@ pub fn is_legal_move(board: &BoardResource, from: (usize, usize), to: (usize, us
 
     match piece.kind {
         PieceKind::King => dx <= 1 && ady <= 1,
-        PieceKind::Rook => {
-            (dx == 0 || ady == 0) && check_slide(tx as isize - fx as isize, dy)
-        },
-        PieceKind::Bishop => {
-            dx == ady && check_slide(tx as isize - fx as isize, dy)
-        },
-        PieceKind::Gold | PieceKind::PromotedSilver | PieceKind::PromotedKnight | PieceKind::PromotedLance | PieceKind::PromotedPawn => {
+        PieceKind::Rook => (dx == 0 || ady == 0) && check_slide(tx as isize - fx as isize, dy),
+        PieceKind::Bishop => dx == ady && check_slide(tx as isize - fx as isize, dy),
+        PieceKind::Gold
+        | PieceKind::PromotedSilver
+        | PieceKind::PromotedKnight
+        | PieceKind::PromotedLance
+        | PieceKind::PromotedPawn => {
             if dx <= 1 && ady <= 1 {
-                if dx == 1 && dy == -forward { false } // Cannot move diagonally backward
-                else { true }
-            } else { false }
-        },
+                if dx == 1 && dy == -forward {
+                    false
+                }
+                // Cannot move diagonally backward
+                else {
+                    true
+                }
+            } else {
+                false
+            }
+        }
         PieceKind::Silver => {
             if dx <= 1 && ady <= 1 {
-                if (dx == 0 && dy == -forward) || (dx == 1 && dy == 0) { false } // Cannot move orthogonally backward or sideways
-                else { true }
-            } else { false }
-        },
-        PieceKind::Knight => {
-            dx == 1 && dy == forward * 2
-        },
-        PieceKind::Lance => {
-            dx == 0 && dy.signum() == forward && check_slide(0, dy)
-        },
-        PieceKind::Pawn => {
-            dx == 0 && dy == forward
-        },
+                if (dx == 0 && dy == -forward) || (dx == 1 && dy == 0) {
+                    false
+                }
+                // Cannot move orthogonally backward or sideways
+                else {
+                    true
+                }
+            } else {
+                false
+            }
+        }
+        PieceKind::Knight => dx == 1 && dy == forward * 2,
+        PieceKind::Lance => dx == 0 && dy.signum() == forward && check_slide(0, dy),
+        PieceKind::Pawn => dx == 0 && dy == forward,
         PieceKind::PromotedRook => {
-            if dx <= 1 && ady <= 1 { true }
-            else { (dx == 0 || ady == 0) && check_slide(tx as isize - fx as isize, dy) }
-        },
+            if dx <= 1 && ady <= 1 {
+                true
+            } else {
+                (dx == 0 || ady == 0) && check_slide(tx as isize - fx as isize, dy)
+            }
+        }
         PieceKind::PromotedBishop => {
-            if dx <= 1 && ady <= 1 { true }
-            else { dx == ady && check_slide(tx as isize - fx as isize, dy) }
+            if dx <= 1 && ady <= 1 {
+                true
+            } else {
+                dx == ady && check_slide(tx as isize - fx as isize, dy)
+            }
         }
     }
 }
 
-pub fn is_legal_drop(board: &BoardResource, piece_kind: PieceKind, to: (usize, usize), player: PlayerId) -> bool {
-    if board.squares.contains_key(&to) { return false; }
-    if to.0 > 8 || to.1 > 8 { return false; }
+pub fn is_legal_drop(
+    board: &BoardResource,
+    piece_kind: PieceKind,
+    to: (usize, usize),
+    player: PlayerId,
+) -> bool {
+    if board.squares.contains_key(&to) {
+        return false;
+    }
+    if to.0 > 8 || to.1 > 8 {
+        return false;
+    }
 
     let is_sente = player == board.sente;
-    
+
     // Nifu (Two pawns)
     if piece_kind == PieceKind::Pawn {
         for y in 0..=8 {
@@ -99,14 +129,22 @@ pub fn is_legal_drop(board: &BoardResource, piece_kind: PieceKind, to: (usize, u
     // Dropping where piece has no legal moves
     let rank = to.1;
     if is_sente {
-        if rank == 0 && (piece_kind == PieceKind::Pawn || piece_kind == PieceKind::Lance || piece_kind == PieceKind::Knight) {
+        if rank == 0
+            && (piece_kind == PieceKind::Pawn
+                || piece_kind == PieceKind::Lance
+                || piece_kind == PieceKind::Knight)
+        {
             return false;
         }
         if rank == 1 && piece_kind == PieceKind::Knight {
             return false;
         }
     } else {
-        if rank == 8 && (piece_kind == PieceKind::Pawn || piece_kind == PieceKind::Lance || piece_kind == PieceKind::Knight) {
+        if rank == 8
+            && (piece_kind == PieceKind::Pawn
+                || piece_kind == PieceKind::Lance
+                || piece_kind == PieceKind::Knight)
+        {
             return false;
         }
         if rank == 7 && piece_kind == PieceKind::Knight {
@@ -117,30 +155,57 @@ pub fn is_legal_drop(board: &BoardResource, piece_kind: PieceKind, to: (usize, u
     true
 }
 
-pub fn can_promote(board: &BoardResource, piece_kind: PieceKind, from: (usize, usize), to: (usize, usize), player: PlayerId) -> bool {
+pub fn can_promote(
+    board: &BoardResource,
+    piece_kind: PieceKind,
+    from: (usize, usize),
+    to: (usize, usize),
+    player: PlayerId,
+) -> bool {
     let is_sente = player == board.sente;
     let promo_zone = if is_sente {
         from.1 <= 2 || to.1 <= 2
     } else {
         from.1 >= 6 || to.1 >= 6
     };
-    
-    if !promo_zone { return false; }
-    
-    matches!(piece_kind, PieceKind::Rook | PieceKind::Bishop | PieceKind::Silver | PieceKind::Knight | PieceKind::Lance | PieceKind::Pawn)
+
+    if !promo_zone {
+        return false;
+    }
+
+    matches!(
+        piece_kind,
+        PieceKind::Rook
+            | PieceKind::Bishop
+            | PieceKind::Silver
+            | PieceKind::Knight
+            | PieceKind::Lance
+            | PieceKind::Pawn
+    )
 }
 
-pub fn must_promote(board: &BoardResource, piece_kind: PieceKind, to: (usize, usize), player: PlayerId) -> bool {
+pub fn must_promote(
+    board: &BoardResource,
+    piece_kind: PieceKind,
+    to: (usize, usize),
+    player: PlayerId,
+) -> bool {
     let is_sente = player == board.sente;
     let rank = to.1;
-    
-    let in_promo_zone = if is_sente {
-        rank <= 2
-    } else {
-        rank >= 6
-    };
 
-    if in_promo_zone && matches!(piece_kind, PieceKind::Rook | PieceKind::Bishop | PieceKind::Silver | PieceKind::Knight | PieceKind::Lance | PieceKind::Pawn) {
+    let in_promo_zone = if is_sente { rank <= 2 } else { rank >= 6 };
+
+    if in_promo_zone
+        && matches!(
+            piece_kind,
+            PieceKind::Rook
+                | PieceKind::Bishop
+                | PieceKind::Silver
+                | PieceKind::Knight
+                | PieceKind::Lance
+                | PieceKind::Pawn
+        )
+    {
         return true;
     }
 
@@ -163,7 +228,11 @@ pub fn is_in_check(board: &BoardResource, player: PlayerId) -> bool {
         None => return false,
     };
 
-    let opponent = if player == board.sente { board.gote } else { board.sente };
+    let opponent = if player == board.sente {
+        board.gote
+    } else {
+        board.sente
+    };
 
     for (&pos, piece) in &board.squares {
         if piece.owner == opponent && is_legal_move(board, pos, king_pos, opponent) {
@@ -204,7 +273,13 @@ pub fn has_any_legal_move(board: &BoardResource, player: PlayerId) -> bool {
                     let to = (tx, ty);
                     if is_legal_drop(board, piece_kind, to, player) {
                         let mut test_board = board.clone();
-                        test_board.squares.insert(to, Piece { kind: piece_kind, owner: player });
+                        test_board.squares.insert(
+                            to,
+                            Piece {
+                                kind: piece_kind,
+                                owner: player,
+                            },
+                        );
                         if !is_in_check(&test_board, player) {
                             return true;
                         }

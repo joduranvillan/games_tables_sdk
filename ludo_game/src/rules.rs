@@ -74,10 +74,11 @@ pub fn build_ludo_rules() -> RuleEngine {
             .copied()
             .ok_or_else(|| invalid("todavía no tiraste el dado este turno"))?;
 
-        if !world
-            .resource::<TokensResource>()
-            .is_valid_move_for_token(cmd.player, cmd.token_index, roll)
-        {
+        if !world.resource::<TokensResource>().is_valid_move_for_token(
+            cmd.player,
+            cmd.token_index,
+            roll,
+        ) {
             return Err(invalid("movimiento inválido para la ficha seleccionada"));
         }
 
