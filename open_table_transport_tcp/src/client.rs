@@ -200,16 +200,11 @@ impl TcpClientTransport {
 
         thread::spawn(move || {
             let mut read_stream = read_stream;
-            loop {
-                match read_frame(&mut read_stream) {
-                    Ok(bytes) => {
-                        incoming_for_reader
-                            .lock()
-                            .expect("lock de incoming envenenado")
-                            .push_back((HOST_PLAYER_ID, bytes));
-                    }
-                    Err(_) => break, // el host cerró la conexión
-                }
+            while let Ok(bytes) = read_frame(&mut read_stream) {
+                incoming_for_reader
+                    .lock()
+                    .expect("lock de incoming envenenado")
+                    .push_back((HOST_PLAYER_ID, bytes));
             }
         });
 

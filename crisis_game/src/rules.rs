@@ -26,7 +26,7 @@ fn invalid(reason: impl Into<String>) -> EngineError {
 }
 
 pub fn is_valid_card_set(types: [CardType; 3]) -> bool {
-    let has_wild = types.iter().any(|&t| t == CardType::Wild);
+    let has_wild = types.contains(&CardType::Wild);
     if has_wild {
         return true;
     }
@@ -222,11 +222,11 @@ pub fn build_crisis_rules() -> RuleEngine {
             let mut random_res = world.resource_mut::<RandomResource>();
             let mut att_rolls = Vec::new();
             for _ in 0..attack.dice {
-                att_rolls.push(random_res.0.roll_die(6) as u32);
+                att_rolls.push(random_res.0.roll_die(6));
             }
             let mut def_rolls = Vec::new();
             for _ in 0..defender_dice_count {
-                def_rolls.push(random_res.0.roll_die(6) as u32);
+                def_rolls.push(random_res.0.roll_die(6));
             }
 
             att_rolls.sort_unstable_by(|a, b| b.cmp(a));
@@ -321,7 +321,7 @@ pub fn build_crisis_rules() -> RuleEngine {
                 let players = world.resource::<PlayersResource>().players.clone();
                 let eliminated = world.resource::<EliminatedPlayersResource>();
 
-                if check_objective(&obj, &territory_state, &players, &eliminated, cmd.player) {
+                if check_objective(&obj, territory_state, &players, eliminated, cmd.player) {
                     let mut game_over = world.resource_mut::<GameOverResource>();
                     game_over.0 = true;
 

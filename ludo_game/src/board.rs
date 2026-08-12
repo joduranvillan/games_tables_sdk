@@ -61,7 +61,7 @@ impl TokensResource {
 
     /// Comprueba si algún rival del jugador tiene 2 o más fichas en `board_pos` (formando un bloqueo).
     pub fn has_rival_blockade_at(&self, board_pos: u32, player: PlayerId) -> bool {
-        for (&other, _) in &self.tokens {
+        for &other in self.tokens.keys() {
             if other == player {
                 continue;
             }
