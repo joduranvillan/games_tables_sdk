@@ -5,6 +5,7 @@
 //! de verdad), y jaque mate / ahogado por enumeración completa de
 //! movimientos legales del rival.
 
+pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod events;
@@ -14,6 +15,7 @@ pub mod pgn;
 pub mod position;
 pub mod rules;
 
+pub use ai::chess_ai_pick_move;
 pub use board::{
     has_any_legal_move, is_in_check, is_legal_move, piece_moves, BoardResource,
     DrawOfferedResource, HalfMoveClockResource, PositionHistoryResource, Sides,

@@ -36,6 +36,7 @@ var roll_btn: Button
 var dice_label: Label
 var dice_widget: DiceWidget
 var rules_popup: RulesPopup
+var mode_option_button: OptionButton
 
 var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
@@ -92,6 +93,16 @@ func _init_board_state() -> void:
 	borne_off_checkers = {1: 0, 2: 0}
 
 func _setup_ui() -> void:
+	# Mode Option Button
+	mode_option_button = OptionButton.new()
+	mode_option_button.name = "ModeOptionButton"
+	mode_option_button.position = Vector2(610, 215)
+	mode_option_button.custom_minimum_size = Vector2(140, 34)
+	mode_option_button.add_item("Hotseat")
+	mode_option_button.add_item("vs IA")
+	mode_option_button.item_selected.connect(_on_mode_selected)
+	add_child(mode_option_button)
+
 	roll_btn = Button.new()
 	roll_btn.position = Vector2(620, 260)
 	roll_btn.custom_minimum_size = Vector2(130, 45)
@@ -149,6 +160,24 @@ func _get_point_base_pos(pt_idx: int) -> Vector2:
 		return Vector2(right_start + (17 - pt_idx) * col_width + col_width / 2.0, 60)
 	else: # Top left (18..23)
 		return Vector2(left_start + (23 - pt_idx) * col_width + col_width / 2.0, 60)
+
+func _on_mode_selected(index: int) -> void:
+	if bridge != null:
+		if index == 1:
+			bridge.start_local_match_backgammon_vs_ai(P1, P2)
+		else:
+			bridge.start_local_match_backgammon(P1, P2)
+
+	_init_board_state()
+	current = bridge.current_player() if bridge else P1
+	selected_from = -2
+	rolled_dice.clear()
+	if dice_label != null:
+		dice_label.text = "Dados: -"
+	winner = -1
+	_update_checker_positions()
+	_update_status()
+	queue_redraw()
 
 func _on_roll_pressed() -> void:
 	if winner != -1:

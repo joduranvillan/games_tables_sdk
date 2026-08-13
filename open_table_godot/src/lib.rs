@@ -262,6 +262,7 @@ pub struct OpenTableBridge {
     current_game_type: String,
     undone_commands: Vec<(PlayerId, String)>,
     recent_events: Vec<Dictionary>,
+    chess_ai_depth: u8,
 }
 
 #[godot_api]
@@ -273,6 +274,7 @@ impl INode for OpenTableBridge {
             current_game_type: String::from("checkers"),
             undone_commands: Vec::new(),
             recent_events: Vec::new(),
+            chess_ai_depth: 3,
         }
     }
 }
@@ -527,6 +529,48 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn set_chess_ai_depth(&mut self, depth: i64) {
+        self.chess_ai_depth = depth.clamp(1, 10) as u8;
+    }
+
+    #[func]
+    fn start_local_match_chess_vs_ai(
+        &mut self,
+        human_player: i64,
+        ai_player: i64,
+        depth: i64,
+    ) -> bool {
+        if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "chess".to_string();
+        self.chess_ai_depth = depth.clamp(1, 10) as u8;
+        let p_human = PlayerId(human_player as u32);
+        let p_ai = PlayerId(ai_player as u32);
+
+        let (p1, p2) = if human_player < ai_player {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let session = new_chess_session(SessionId(1), 1, p1, p2);
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
+    }
+
+    #[func]
     fn start_local_match_chinese_checkers(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "chinese_checkers".to_string();
         let session = new_chinese_checkers_session(
@@ -560,6 +604,41 @@ impl OpenTableBridge {
             session,
             ai_player: None,
         };
+    }
+
+    #[func]
+    fn start_local_match_backgammon_vs_ai(
+        &mut self,
+        human_player: i64,
+        ai_player: i64,
+    ) -> bool {
+        if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "backgammon".to_string();
+        let p_human = PlayerId(human_player as u32);
+        let p_ai = PlayerId(ai_player as u32);
+
+        let (p1, p2) = if human_player < ai_player {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let session = new_backgammon_session(SessionId(1), 1, p1, p2);
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
     }
 
     #[func]
@@ -1683,6 +1762,17 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn chess_ai_pick_move(&mut self, player_id: i64) -> bool {
+        let p_id = PlayerId(player_id as u32);
+        if let BridgeMode::Local { session, .. } = &mut self.mode {
+            if let Some(cmd) = chess_game::chess_ai_pick_move(session, p_id, self.chess_ai_depth) {
+                return self.process_and_emit(p_id, Box::new(cmd)).is_ok();
+            }
+        }
+        false
+    }
+
+    #[func]
     fn poll_events(&mut self) {
         match &mut self.mode {
             BridgeMode::Host { .. } => self.poll_host_events(),
@@ -2135,13 +2225,32 @@ impl OpenTableBridge {
 
     fn process_ai_turn_if_needed(&mut self) {
         loop {
-            let (ai_p, cmd_opt) = match &self.mode {
+            let (ai_p, cmd_opt): (PlayerId, Option<Box<dyn Command>>) = match &self.mode {
                 BridgeMode::Local {
                     session,
                     ai_player: Some(ai_p),
                 } => {
                     if session.current_player() == *ai_p {
-                        let cmd = checkers_game::checkers_ai_pick_move(session, *ai_p);
+                        let cmd: Option<Box<dyn Command>> = match self.current_game_type.as_str() {
+                            "chess" => chess_game::chess_ai_pick_move(session, *ai_p, self.chess_ai_depth)
+                                .map(|c| Box::new(c) as Box<dyn Command>),
+                            "backgammon" => {
+                                let has_pending = session
+                                    .world()
+                                    .get_resource::<backgammon_game::PendingDiceResource>()
+                                    .and_then(|p| p.pending.get(ai_p))
+                                    .map(|d| !d.is_empty())
+                                    .unwrap_or(false);
+                                if !has_pending {
+                                    Some(Box::new(backgammon_game::RollDiceCommand { player: *ai_p }) as Box<dyn Command>)
+                                } else {
+                                    backgammon_game::backgammon_ai_pick_move(session, *ai_p)
+                                        .map(|c| Box::new(c) as Box<dyn Command>)
+                                }
+                            }
+                            _ => checkers_game::checkers_ai_pick_move(session, *ai_p)
+                                .map(|c| Box::new(c) as Box<dyn Command>),
+                        };
                         (*ai_p, cmd)
                     } else {
                         break;
@@ -2151,7 +2260,7 @@ impl OpenTableBridge {
             };
 
             if let Some(cmd) = cmd_opt {
-                let _ = self.process_and_emit(ai_p, Box::new(cmd));
+                let _ = self.process_and_emit(ai_p, cmd);
             } else {
                 break;
             }

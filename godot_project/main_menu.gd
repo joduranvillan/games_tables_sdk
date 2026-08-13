@@ -140,18 +140,58 @@ func _stop_attract_mode() -> void:
 	if has_node("Title"):
 		get_node("Title").modulate.a = 1.0
 
-func _generate_placeholder_icon(main_color: Color) -> Texture2D:
-	var img = Image.create(32, 32, false, Image.FORMAT_RGBA8)
-	for x in range(32):
-		for y in range(32):
-			var dist = Vector2(x - 16, y - 16).length()
-			if dist <= 12:
-				img.set_pixel(x, y, main_color)
-			elif dist <= 14:
-				img.set_pixel(x, y, main_color.darkened(0.3))
-			else:
-				img.set_pixel(x, y, Color(0, 0, 0, 0))
-	return ImageTexture.create_from_image(img)
+func _load_game_icon(game_id: String) -> Texture2D:
+	var paths = [
+		"res://assets/icons/%s.svg" % game_id,
+		"res://assets/icons/%s.png" % game_id
+	]
+	for p in paths:
+		if ResourceLoader.exists(p):
+			var res = load(p)
+			if res is Texture2D:
+				return res
+		if FileAccess.file_exists(p):
+			var img = Image.new()
+			var err = img.load(p)
+			if err == OK:
+				return ImageTexture.create_from_image(img)
+	return null
+
+func _apply_button_theme(btn: Button, color: Color) -> void:
+	var base_bg = Color(color.r, color.g, color.b, 0.85)
+	var hover_border = color.lightened(0.3)
+	var shadow_c = color.darkened(0.5)
+
+	var style_normal = StyleBoxFlat.new()
+	style_normal.bg_color = base_bg
+	style_normal.border_color = color.darkened(0.2)
+	style_normal.set_border_width_all(2)
+	style_normal.set_corner_radius_all(10)
+	style_normal.shadow_color = shadow_c
+	style_normal.shadow_size = 4
+	style_normal.shadow_offset = Vector2(0, 2)
+
+	var style_hover = StyleBoxFlat.new()
+	style_hover.bg_color = Color(color.r, color.g, color.b, 0.95)
+	style_hover.border_color = hover_border
+	style_hover.set_border_width_all(2)
+	style_hover.set_corner_radius_all(10)
+	style_hover.shadow_color = shadow_c
+	style_hover.shadow_size = 4
+	style_hover.shadow_offset = Vector2(0, 2)
+
+	var style_pressed = StyleBoxFlat.new()
+	style_pressed.bg_color = color.darkened(0.1)
+	style_pressed.border_color = hover_border
+	style_pressed.set_border_width_all(2)
+	style_pressed.set_corner_radius_all(10)
+	style_pressed.shadow_color = shadow_c
+	style_pressed.shadow_size = 2
+
+	btn.add_theme_stylebox_override("normal", style_normal)
+	btn.add_theme_stylebox_override("hover", style_hover)
+	btn.add_theme_stylebox_override("pressed", style_pressed)
+	btn.add_theme_stylebox_override("focus", style_hover)
 
 func _setup_buttons() -> void:
 	for child in grid_container.get_children():
@@ -160,38 +200,67 @@ func _setup_buttons() -> void:
 	for game in GAMES:
 		var btn = Button.new()
 		var tr_key = "GAME_" + game["id"].to_upper()
-		btn.text = " " + (tr(tr_key) if tr(tr_key) != tr_key else game["name"])
-		btn.custom_minimum_size = Vector2(310, 52)
-		btn.pivot_offset = Vector2(155, 26)
-		btn.add_theme_font_size_override("font_size", 18)
-		
-		# 32x32 icon
-		var icon_tex = _generate_placeholder_icon(game.get("color", Color.CORNFLOWER_BLUE))
-		btn.icon = icon_tex
-		btn.expand_icon = true
-		
+		var display_name = tr(tr_key) if tr(tr_key) != tr_key else game["name"]
+		var color = game.get("color", Color(0.35, 0.45, 0.65))
+
+		_apply_button_theme(btn, color)
+		btn.custom_minimum_size = Vector2(310, 90)
+		btn.pivot_offset = Vector2(155, 45)
+
+		var icon_tex = _load_game_icon(game["id"])
+		if icon_tex != null:
+			btn.text = ""
+			var vbox = VBoxContainer.new()
+			vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+			vbox.add_theme_constant_override("separation", 6)
+
+			var icon_rect = TextureRect.new()
+			icon_rect.texture = icon_tex
+			icon_rect.custom_minimum_size = Vector2(48, 48)
+			icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			vbox.add_child(icon_rect)
+
+			var lbl = Label.new()
+			lbl.text = display_name
+			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			lbl.add_theme_font_size_override("font_size", 16)
+			lbl.add_theme_color_override("font_color", Color.WHITE)
+			lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			vbox.add_child(lbl)
+
+			btn.add_child(vbox)
+		else:
+			btn.text = display_name
+			btn.add_theme_font_size_override("font_size", 18)
+
 		# Hover scaling animation
 		btn.mouse_entered.connect(func():
 			var tw = btn.create_tween()
-			tw.tween_property(btn, "scale", Vector2(1.05, 1.05), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			tw.tween_property(btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		)
 		btn.mouse_exited.connect(func():
 			var tw = btn.create_tween()
 			tw.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		)
-		
+
 		btn.pressed.connect(_on_game_selected.bind(game))
 		grid_container.add_child(btn)
-		
+
 	# Tutorial TEG button
 	var tutorial_btn = Button.new()
 	tutorial_btn.text = "🎓 Tutorial TEG"
-	tutorial_btn.custom_minimum_size = Vector2(310, 52)
-	tutorial_btn.pivot_offset = Vector2(155, 26)
+	_apply_button_theme(tutorial_btn, Color(0.55, 0.35, 0.75))
+	tutorial_btn.custom_minimum_size = Vector2(310, 60)
+	tutorial_btn.pivot_offset = Vector2(155, 30)
 	tutorial_btn.add_theme_font_size_override("font_size", 18)
 	tutorial_btn.mouse_entered.connect(func():
 		var tw = tutorial_btn.create_tween()
-		tw.tween_property(tutorial_btn, "scale", Vector2(1.05, 1.05), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tw.tween_property(tutorial_btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	)
 	tutorial_btn.mouse_exited.connect(func():
 		var tw = tutorial_btn.create_tween()
@@ -208,12 +277,13 @@ func _setup_buttons() -> void:
 	# Settings button
 	var settings_btn = Button.new()
 	settings_btn.text = "⚙️ " + tr("BTN_SETTINGS")
-	settings_btn.custom_minimum_size = Vector2(310, 52)
-	settings_btn.pivot_offset = Vector2(155, 26)
+	_apply_button_theme(settings_btn, Color(0.35, 0.40, 0.45))
+	settings_btn.custom_minimum_size = Vector2(310, 60)
+	settings_btn.pivot_offset = Vector2(155, 30)
 	settings_btn.add_theme_font_size_override("font_size", 18)
 	settings_btn.mouse_entered.connect(func():
 		var tw = settings_btn.create_tween()
-		tw.tween_property(settings_btn, "scale", Vector2(1.05, 1.05), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tw.tween_property(settings_btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	)
 	settings_btn.mouse_exited.connect(func():
 		var tw = settings_btn.create_tween()
@@ -225,12 +295,13 @@ func _setup_buttons() -> void:
 	# Replay button
 	var replay_btn = Button.new()
 	replay_btn.text = "🎬 Ver Replay"
-	replay_btn.custom_minimum_size = Vector2(310, 52)
-	replay_btn.pivot_offset = Vector2(155, 26)
+	_apply_button_theme(replay_btn, Color(0.25, 0.50, 0.55))
+	replay_btn.custom_minimum_size = Vector2(310, 60)
+	replay_btn.pivot_offset = Vector2(155, 30)
 	replay_btn.add_theme_font_size_override("font_size", 18)
 	replay_btn.mouse_entered.connect(func():
 		var tw = replay_btn.create_tween()
-		tw.tween_property(replay_btn, "scale", Vector2(1.05, 1.05), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tw.tween_property(replay_btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	)
 	replay_btn.mouse_exited.connect(func():
 		var tw = replay_btn.create_tween()

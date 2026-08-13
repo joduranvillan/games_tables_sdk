@@ -19,6 +19,9 @@ const COL_VALID_MOVE = Color(0.2, 0.8, 0.2, 0.55)
 var bridge
 var current = P1
 var winner = -1
+var last_move_from: Vector2i = Vector2i(-1, -1)
+var last_move_to: Vector2i = Vector2i(-1, -1)
+var check_king_pos = null
 var selected_pos = null # Vector2i(row, col)
 var valid_moves: Array = [] # Array of Vector2i
 var rejected_cell = null
@@ -35,6 +38,7 @@ var drag_layer: DragDropLayer
 var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
 var network_hud: NetworkStatusHUD
+var mode_option_button: OptionButton
 var opening_option_button: OptionButton
 
 var in_opening_practice: bool = false
@@ -82,19 +86,23 @@ func _on_layout_changed(layout: int) -> void:
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 	if layout == 2: # PHONE
+		if mode_option_button != null:
+			mode_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
 		if opening_option_button != null:
-			opening_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
+			opening_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 50)
 		if turn_indicator != null:
-			turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 50)
+			turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 90)
 		if status != null:
-			status.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 90)
+			status.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 130)
 	else: # DESKTOP / TABLET
+		if mode_option_button != null:
+			mode_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
 		if opening_option_button != null:
-			opening_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
+			opening_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 50)
 		if turn_indicator != null:
-			turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 50)
+			turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 90)
 		if status != null:
-			status.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 95)
+			status.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 135)
 
 func _setup_ui() -> void:
 	grid_container = GridContainer.new()
@@ -134,7 +142,7 @@ func _setup_ui() -> void:
 	# Turn Indicator Widget
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 45)
+	turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 90)
 	add_child(turn_indicator)
 
 	# Network Status HUD
@@ -142,10 +150,22 @@ func _setup_ui() -> void:
 	network_hud.name = "NetworkStatusHUD"
 	add_child(network_hud)
 
+	# Game Mode Selector
+	mode_option_button = OptionButton.new()
+	mode_option_button.name = "ModeOptionButton"
+	mode_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
+	mode_option_button.custom_minimum_size = Vector2(300, 32)
+	mode_option_button.add_item("Hotseat (2 jugadores)")
+	mode_option_button.add_item("vs IA (fácil)")
+	mode_option_button.add_item("vs IA (medio)")
+	mode_option_button.add_item("vs IA (difícil)")
+	mode_option_button.item_selected.connect(_on_mode_selected)
+	add_child(mode_option_button)
+
 	# Opening Practice Selector
 	opening_option_button = OptionButton.new()
 	opening_option_button.name = "OpeningOptionButton"
-	opening_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
+	opening_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 50)
 	opening_option_button.custom_minimum_size = Vector2(300, 32)
 	opening_option_button.add_item("Partida libre (Sin apertura)")
 	opening_option_button.add_item("Ruy López (e4 e5 Nf3 Nc6 Bb5)")
@@ -156,6 +176,33 @@ func _setup_ui() -> void:
 	opening_option_button.add_item("Defensa Caro-Kann (e4 c6 d4 d5)")
 	opening_option_button.item_selected.connect(_on_opening_selected)
 	add_child(opening_option_button)
+
+func _on_mode_selected(index: int) -> void:
+	in_opening_practice = false
+	current_opening_key = ""
+	opening_step_index = 0
+	opening_moves.clear()
+	if opening_option_button != null:
+		opening_option_button.selected = 0
+
+	if bridge != null:
+		match index:
+			0:
+				bridge.start_local_match_chess(P1, P2)
+			1:
+				bridge.start_local_match_chess_vs_ai(P1, P2, 1)
+			2:
+				bridge.start_local_match_chess_vs_ai(P1, P2, 2)
+			3:
+				bridge.start_local_match_chess_vs_ai(P1, P2, 3)
+
+	_init_board_state()
+	current = bridge.current_player() if bridge else P1
+	selected_pos = null
+	valid_moves.clear()
+	winner = -1
+	_update_status()
+	queue_redraw()
 
 func _on_opening_selected(index: int) -> void:
 	if index == 0:
@@ -172,6 +219,8 @@ func _on_opening_selected(index: int) -> void:
 	start_opening_practice(key)
 
 func start_opening_practice(key: String) -> void:
+	if mode_option_button != null:
+		mode_option_button.selected = 0
 	if bridge != null:
 		bridge.start_local_match_chess(P1, P2)
 	_init_board_state()
@@ -195,16 +244,38 @@ func _on_theme_changed(theme: BoardTheme) -> void:
 			cell_nodes[r][c].color = theme.light_color if is_light else theme.dark_color
 	queue_redraw()
 
+func _reset_all_piece_scales() -> void:
+	for r in range(BOARD_SIZE):
+		for c in range(BOARD_SIZE):
+			var sprite = piece_sprites[r][c]
+			if sprite != null and is_instance_valid(sprite):
+				sprite.scale = Vector2(1.0, 1.0)
+
+func _bounce_piece(r: int, c: int) -> void:
+	if animating:
+		return
+	if r < 0 or r >= BOARD_SIZE or c < 0 or c >= BOARD_SIZE:
+		return
+	var sprite = piece_sprites[r][c]
+	if sprite != null and is_instance_valid(sprite):
+		sprite.scale = Vector2(1.0, 1.0)
+		var tw = sprite.create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(sprite, "scale", Vector2(1.15, 1.15), 0.08)
+		tw.tween_property(sprite, "scale", Vector2(1.0, 1.0), 0.08)
+
 func _on_drag_started(from_cell: Vector2i) -> void:
 	if winner != -1 or animating: return
 	var r = from_cell.x
 	var c = from_cell.y
 	var piece = piece_sprites[r][c]
 	if piece != null and piece.get_meta("player") == current:
+		_reset_all_piece_scales()
 		selected_pos = from_cell
 		valid_moves = _calculate_valid_moves(r, c)
+		_bounce_piece(r, c)
 		queue_redraw()
 	else:
+		_reset_all_piece_scales()
 		drag_layer.clear_selection()
 		selected_pos = null
 		valid_moves.clear()
@@ -218,6 +289,7 @@ func _on_piece_dropped(to_cell: Vector2i) -> void:
 	var to_r = to_cell.x
 	var to_c = to_cell.y
 	
+	_reset_all_piece_scales()
 	selected_pos = null
 	valid_moves.clear()
 	queue_redraw()
@@ -231,7 +303,24 @@ func _on_piece_dropped(to_cell: Vector2i) -> void:
 	}
 	bridge.send_command_json(current, JSON.stringify(cmd))
 
+func _process(_delta: float) -> void:
+	if check_king_pos != null:
+		queue_redraw()
+
+func _find_king_pos(player_id: int):
+	for r in range(BOARD_SIZE):
+		for c in range(BOARD_SIZE):
+			var sprite = piece_sprites[r][c]
+			if sprite != null and is_instance_valid(sprite):
+				if sprite.has_meta("kind") and sprite.get_meta("kind") == "King":
+					if sprite.has_meta("player") and sprite.get_meta("player") == player_id:
+						return Vector2i(r, c)
+	return null
+
 func _init_board_state() -> void:
+	last_move_from = Vector2i(-1, -1)
+	last_move_to = Vector2i(-1, -1)
+	check_king_pos = null
 	piece_sprites.clear()
 	for r in range(BOARD_SIZE):
 		var row_arr = []
@@ -274,6 +363,16 @@ func _create_piece_sprite(row: int, col: int, player: int, kind: String) -> Node
 				created_texture = true
 
 	if not created_texture and fallback_to_unicode:
+		var shadow_label = Label.new()
+		shadow_label.text = _get_piece_symbol(kind, player)
+		shadow_label.add_theme_font_size_override("font_size", 42)
+		shadow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		shadow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		shadow_label.size = Vector2(CELL_SIZE, CELL_SIZE)
+		shadow_label.position = -Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0) + Vector2(2, 2)
+		shadow_label.add_theme_color_override("font_color", Color(0, 0, 0, 0.4))
+		piece_node.add_child(shadow_label)
+
 		var label = Label.new()
 		label.text = _get_piece_symbol(kind, player)
 		label.add_theme_font_size_override("font_size", 42)
@@ -358,8 +457,10 @@ func _handle_unified_input(event: InputEvent) -> void:
 			if touch_start_cell != release_cell and touch_start_cell.x >= 0 and touch_start_cell.x < BOARD_SIZE and touch_start_cell.y >= 0 and touch_start_cell.y < BOARD_SIZE:
 				var piece = piece_sprites[touch_start_cell.x][touch_start_cell.y]
 				if piece != null and piece.get_meta("player") == current:
+					_reset_all_piece_scales()
 					selected_pos = touch_start_cell
 					valid_moves = _calculate_valid_moves(touch_start_cell.x, touch_start_cell.y)
+					_bounce_piece(touch_start_cell.x, touch_start_cell.y)
 					_handle_cell_click(row, col)
 		touch_start_cell = Vector2i(-1, -1)
 		is_touch_dragging = false
@@ -371,11 +472,14 @@ func _handle_cell_click(row: int, col: int) -> void:
 	if selected_pos == null:
 		var piece = piece_sprites[row][col]
 		if piece != null and piece.get_meta("player") == current:
+			_reset_all_piece_scales()
 			selected_pos = Vector2i(row, col)
 			valid_moves = _calculate_valid_moves(row, col)
+			_bounce_piece(row, col)
 			queue_redraw()
 	else:
 		if selected_pos.x == row and selected_pos.y == col:
+			_reset_all_piece_scales()
 			selected_pos = null
 			valid_moves.clear()
 			queue_redraw()
@@ -383,12 +487,15 @@ func _handle_cell_click(row: int, col: int) -> void:
 			
 		var piece_at_target = piece_sprites[row][col]
 		if piece_at_target != null and piece_at_target.get_meta("player") == current:
+			_reset_all_piece_scales()
 			selected_pos = Vector2i(row, col)
 			valid_moves = _calculate_valid_moves(row, col)
+			_bounce_piece(row, col)
 			queue_redraw()
 			return
 			
 		var from_pos = selected_pos
+		_reset_all_piece_scales()
 		selected_pos = null
 		valid_moves.clear()
 		queue_redraw()
@@ -437,11 +544,14 @@ func _is_in_bounds(r: int, c: int) -> bool:
 	return r >= 0 and r < BOARD_SIZE and c >= 0 and c < BOARD_SIZE
 
 func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promotion: bool = false) -> void:
+	last_move_from = Vector2i(from_r, from_c)
+	last_move_to = Vector2i(to_r, to_c)
 	var piece = piece_sprites[from_r][from_c]
 	if piece == null:
 		return
 		
 	animating = true
+	_reset_all_piece_scales()
 	active_animations += 1
 
 	var target_piece = piece_sprites[to_r][to_c]
@@ -515,13 +625,21 @@ func _on_event_json(json_str: String) -> void:
 				if w == null:
 					w = 0
 				_on_game_over(int(w))
-				
+
+			current = bridge.current_player()
+			var is_check = (event.get("event_type") == "CheckEvent") or (event.get("in_check") == true)
+			if is_check:
+				check_king_pos = _find_king_pos(current)
+			else:
+				check_king_pos = null
+
 	current = bridge.current_player()
 	_update_status()
 	queue_redraw()
 
 func _on_game_over(w: int) -> void:
 	winner = w
+	check_king_pos = null
 	selected_pos = null
 	valid_moves.clear()
 	_update_status()
@@ -548,6 +666,20 @@ func _on_move_rejected(reason: String) -> void:
 	)
 
 func _draw() -> void:
+	# Halo rojo pulsante sobre la casilla del rey en jaque
+	if check_king_pos != null and _is_in_bounds(check_king_pos.x, check_king_pos.y):
+		var king_rect = Rect2(check_king_pos.y * CELL_SIZE, check_king_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		var alpha = 0.3 + 0.2 * sin(Time.get_ticks_msec() * 0.005)
+		draw_rect(king_rect, Color(1.0, 0.0, 0.0, alpha))
+
+	# Highlight del último movimiento
+	if last_move_from != Vector2i(-1, -1) and _is_in_bounds(last_move_from.x, last_move_from.y):
+		var lm_from_rect = Rect2(last_move_from.y * CELL_SIZE, last_move_from.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		draw_rect(lm_from_rect, Color(0.9, 0.85, 0.3, 0.35))
+	if last_move_to != Vector2i(-1, -1) and _is_in_bounds(last_move_to.x, last_move_to.y):
+		var lm_to_rect = Rect2(last_move_to.y * CELL_SIZE, last_move_to.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		draw_rect(lm_to_rect, Color(0.9, 0.85, 0.3, 0.35))
+
 	if in_opening_practice and opening_step_index < opening_moves.size():
 		var exp_move = opening_moves[opening_step_index]
 		var from_pos = exp_move.from
@@ -572,6 +704,43 @@ func _draw() -> void:
 		for move_pos in valid_moves:
 			var center = Vector2(move_pos.y * CELL_SIZE + CELL_SIZE / 2.0, move_pos.x * CELL_SIZE + CELL_SIZE / 2.0)
 			draw_circle(center, CELL_SIZE * 0.25, COL_VALID_MOVE)
+
+	# Coordenadas del tablero (a-h en la fila inferior, 1-8 en la columna izquierda)
+	var font: Font = null
+	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
+		var tm = get_node_or_null("/root/ThemeManager")
+		if tm != null:
+			var th = tm.get_current_theme() if tm.has_method("get_current_theme") else tm.get_theme()
+			if th != null:
+				font = th.piece_font
+	if font == null:
+		font = ThemeDB.fallback_font
+
+	var font_sz := int(CELL_SIZE * 0.22)
+	var col_l = current_theme.light_color if current_theme else COL_LIGHT
+	var col_d = current_theme.dark_color if current_theme else COL_DARK
+
+	# Letras a-h en la fila inferior (row 7)
+	for c in range(BOARD_SIZE):
+		var is_light = (7 + c) % 2 == 0
+		var opp_color = col_d if is_light else col_l
+		var coord_color = Color(opp_color.r, opp_color.g, opp_color.b, 0.6)
+		var letter = String.chr("a".unicode_at(0) + c)
+		var pos = Vector2(c * CELL_SIZE, (7 + 1) * CELL_SIZE - 4.0)
+		draw_string(font, pos, letter, HORIZONTAL_ALIGNMENT_RIGHT, CELL_SIZE - 4.0, font_sz, coord_color)
+
+	# Números 1-8 en la columna izquierda (col 0)
+	for r in range(BOARD_SIZE):
+		var is_light = (r + 0) % 2 == 0
+		var opp_color = col_d if is_light else col_l
+		var coord_color = Color(opp_color.r, opp_color.g, opp_color.b, 0.6)
+		var number = str(8 - r)
+		var pos = Vector2(4.0, r * CELL_SIZE + font_sz + 2.0)
+		draw_string(font, pos, number, HORIZONTAL_ALIGNMENT_LEFT, CELL_SIZE, font_sz, coord_color)
+
+	# Borde del tablero
+	var board_rect = Rect2(0, 0, BOARD_SIZE * CELL_SIZE, BOARD_SIZE * CELL_SIZE)
+	draw_rect(board_rect, Color(0.2, 0.12, 0.05, 1.0), false, 3.0)
 
 func _update_status() -> void:
 	if winner != -1:

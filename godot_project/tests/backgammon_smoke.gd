@@ -75,6 +75,10 @@ func _initialize() -> void:
 	}))
 	results.append(["Movimiento inválido emite señal move_rejected sin producir crash", move_rejected_reasons.size() > 0])
 
+	# 5. Probar inicio de partida vs IA
+	var started_ai = bridge.start_local_match_backgammon_vs_ai(1, 2)
+	results.append(["start_local_match_backgammon_vs_ai inicia correctamente", started_ai == true])
+
 	var ok := true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])

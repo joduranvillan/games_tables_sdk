@@ -3,6 +3,7 @@
 //! desde la barra, regla de bear-off (sacar fichas) y paso automático
 //! de turno cuando no hay movimientos válidos con los dados tirados.
 
+pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod dice;
@@ -10,6 +11,7 @@ pub mod events;
 pub mod resources;
 pub mod rules;
 
+pub use ai::backgammon_ai_pick_move;
 pub use board::{BoardResource, Sides, CHECKERS_PER_PLAYER, POINTS};
 pub use commands::{
     AcceptDoubleCommand, MoveCheckerCommand, OfferDoubleCommand, RejectDoubleCommand,

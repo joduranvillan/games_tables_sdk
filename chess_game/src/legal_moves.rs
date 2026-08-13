@@ -8,8 +8,8 @@ use crate::position::{PieceKind, Position};
 
 pub struct ChessLegalMoveGenerator;
 
-impl LegalMoveGenerator for ChessLegalMoveGenerator {
-    fn generate(&self, world: &BevyWorld, player: PlayerId) -> Vec<Box<dyn Command>> {
+impl ChessLegalMoveGenerator {
+    pub fn generate_moves(world: &BevyWorld, player: PlayerId) -> Vec<MovePieceCommand> {
         let Some(board) = world.get_resource::<BoardResource>() else {
             return vec![];
         };
@@ -17,7 +17,7 @@ impl LegalMoveGenerator for ChessLegalMoveGenerator {
             return vec![];
         };
 
-        let mut candidates: Vec<Box<dyn Command>> = Vec::new();
+        let mut candidates: Vec<MovePieceCommand> = Vec::new();
 
         let own_pieces: Vec<(Position, crate::position::Piece)> = board
             .pieces
@@ -37,25 +37,34 @@ impl LegalMoveGenerator for ChessLegalMoveGenerator {
                             PieceKind::Bishop,
                             PieceKind::Knight,
                         ] {
-                            candidates.push(Box::new(MovePieceCommand {
+                            candidates.push(MovePieceCommand {
                                 player,
                                 from,
                                 to,
                                 promote_to: Some(kind),
-                            }));
+                            });
                         }
                     } else {
-                        candidates.push(Box::new(MovePieceCommand {
+                        candidates.push(MovePieceCommand {
                             player,
                             from,
                             to,
                             promote_to: None,
-                        }));
+                        });
                     }
                 }
             }
         }
 
         candidates
+    }
+}
+
+impl LegalMoveGenerator for ChessLegalMoveGenerator {
+    fn generate(&self, world: &BevyWorld, player: PlayerId) -> Vec<Box<dyn Command>> {
+        Self::generate_moves(world, player)
+            .into_iter()
+            .map(|cmd| Box::new(cmd) as Box<dyn Command>)
+            .collect()
     }
 }
