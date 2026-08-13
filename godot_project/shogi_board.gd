@@ -74,7 +74,14 @@ func _ready() -> void:
 	if network_hud != null:
 		network_hud.bind_bridge(bridge)
 
-	bridge.start_local_match_shogi(P_SENTE, P_GOTE)
+	if GameManager.get_game_mode() == "vs_ai":
+		bridge.start_local_match_shogi_vs_ai(P_SENTE, P_GOTE)
+		if mode_option_button != null:
+			mode_option_button.selected = 1
+	else:
+		bridge.start_local_match_shogi(P_SENTE, P_GOTE)
+		if mode_option_button != null:
+			mode_option_button.selected = 0
 	current = bridge.current_player()
 	
 	_update_hand_panels()

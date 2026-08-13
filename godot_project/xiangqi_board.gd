@@ -57,7 +57,14 @@ func _ready() -> void:
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
 	
-	bridge.start_local_match_xiangqi(P_RED, P_BLACK)
+	if GameManager.get_game_mode() == "vs_ai":
+		bridge.start_local_match_xiangqi_vs_ai(P_RED, P_BLACK)
+		if mode_option_button != null:
+			mode_option_button.selected = 1
+	else:
+		bridge.start_local_match_xiangqi(P_RED, P_BLACK)
+		if mode_option_button != null:
+			mode_option_button.selected = 0
 	current = bridge.current_player()
 	
 	_update_status()

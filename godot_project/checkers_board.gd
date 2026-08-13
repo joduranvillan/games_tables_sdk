@@ -77,7 +77,10 @@ func _ready() -> void:
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
 
-	bridge.start_local_match(P_TOP, P_BOTTOM)
+	if GameManager.get_game_mode() == "vs_ai":
+		bridge.start_local_match_checkers_vs_ai(42, P_TOP, P_BOTTOM)
+	else:
+		bridge.start_local_match(P_TOP, P_BOTTOM)
 	current = bridge.current_player()
 
 	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
