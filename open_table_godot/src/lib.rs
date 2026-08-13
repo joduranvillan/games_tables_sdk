@@ -277,6 +277,10 @@ impl INode for OpenTableBridge {
             chess_ai_depth: 3,
         }
     }
+
+    fn process(&mut self, _delta: f64) {
+        self.poll_events();
+    }
 }
 
 #[godot_api]
@@ -1810,6 +1814,32 @@ impl OpenTableBridge {
             } => *client_current_player,
             _ => -1,
         }
+    }
+
+    #[func]
+    pub fn current_tick(&self) -> i64 {
+        match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::Replay { session, .. }
+            | BridgeMode::Tournament { session, .. } => session.current_tick().0 as i64,
+            BridgeMode::MultiSession { sessions, active } => sessions
+                .get(*active)
+                .map(|(_, s)| s.current_tick().0 as i64)
+                .unwrap_or(0),
+            _ => 0,
+        }
+    }
+
+    #[func]
+    pub fn get_session_ticks(&self) -> i64 {
+        self.current_tick()
+    }
+
+    #[func]
+    pub fn _process(&mut self, _delta: f64) {
+        self.poll_events();
     }
 
     #[func]
