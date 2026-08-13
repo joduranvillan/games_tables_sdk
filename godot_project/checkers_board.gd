@@ -27,6 +27,7 @@ class PieceSprite extends Node2D:
 	const COL_KING := Color(1.0, 0.85, 0.0)
 
 	func _draw() -> void:
+		draw_circle(Vector2(3, 4), cell_size * 0.36, Color(0, 0, 0, 0.35))
 		var pcolor := GameManager.get_player_color(owner_id)
 		draw_circle(Vector2.ZERO, cell_size * 0.38, pcolor)
 		draw_arc(Vector2.ZERO, cell_size * 0.38, 0.0, TAU, 32, Color(1, 1, 1, 0.6), 2.0)
@@ -211,16 +212,38 @@ func _flash_sprite_red(sprite: Node2D) -> void:
 		anim_player.add_animation_library("", lib)
 	anim_player.play("flash")
 
+func _reset_all_piece_scales() -> void:
+	for r in range(BOARD):
+		for c in range(BOARD):
+			var sprite = piece_sprites[r][c]
+			if sprite != null and is_instance_valid(sprite):
+				sprite.scale = Vector2(1.0, 1.0)
+
+func _bounce_piece(r: int, c: int) -> void:
+	if animating:
+		return
+	if r < 0 or r >= BOARD or c < 0 or c >= BOARD:
+		return
+	var sprite = piece_sprites[r][c]
+	if sprite != null and is_instance_valid(sprite):
+		sprite.scale = Vector2(1.0, 1.0)
+		var tw = sprite.create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(sprite, "scale", Vector2(1.15, 1.15), 0.08)
+		tw.tween_property(sprite, "scale", Vector2(1.0, 1.0), 0.08)
+
 func _on_drag_started(from_cell: Vector2i) -> void:
 	if winner != -1 or animating: return
 	var r = from_cell.x
 	var c = from_cell.y
 	var cell = board[r][c]
 	if cell != null and cell.owner == current:
+		_reset_all_piece_scales()
 		selected = {"row": r, "col": c}
 		valid_moves = _calculate_valid_moves(r, c)
+		_bounce_piece(r, c)
 		queue_redraw()
 	else:
+		_reset_all_piece_scales()
 		drag_layer.clear_selection()
 		selected = null
 		valid_moves.clear()
@@ -228,6 +251,7 @@ func _on_drag_started(from_cell: Vector2i) -> void:
 
 func _on_piece_dropped(to_cell: Vector2i) -> void:
 	if winner != -1 or selected == null or animating: return
+	_reset_all_piece_scales()
 	var from_row = selected.row
 	var from_col = selected.col
 	var to_row = to_cell.x
@@ -364,8 +388,10 @@ func _handle_unified_input(event: InputEvent) -> void:
 			if touch_start_cell != release_cell and touch_start_cell.x >= 0 and touch_start_cell.x < BOARD and touch_start_cell.y >= 0 and touch_start_cell.y < BOARD:
 				var cell = board[touch_start_cell.x][touch_start_cell.y]
 				if cell != null and cell.owner == current:
+					_reset_all_piece_scales()
 					selected = {"row": touch_start_cell.x, "col": touch_start_cell.y}
 					valid_moves = _calculate_valid_moves(touch_start_cell.x, touch_start_cell.y)
+					_bounce_piece(touch_start_cell.x, touch_start_cell.y)
 					_handle_click(event_pos)
 		touch_start_cell = Vector2i(-1, -1)
 		is_touch_dragging = false
@@ -378,6 +404,7 @@ func _handle_click(pos: Vector2) -> void:
 	var row := int(pos.y / CELL)
 
 	if row < 0 or row >= BOARD or col < 0 or col >= BOARD:
+		_reset_all_piece_scales()
 		selected = null
 		valid_moves.clear()
 		queue_redraw()
@@ -386,8 +413,10 @@ func _handle_click(pos: Vector2) -> void:
 	if selected == null:
 		var cell = board[row][col]
 		if cell != null and cell.owner == current:
+			_reset_all_piece_scales()
 			selected = {"row": row, "col": col}
 			valid_moves = _calculate_valid_moves(row, col)
+			_bounce_piece(row, col)
 			queue_redraw()
 		return
 
@@ -395,6 +424,7 @@ func _handle_click(pos: Vector2) -> void:
 	var clicked_dest = Vector2i(row, col)
 	if clicked_dest in valid_moves:
 		var from = selected
+		_reset_all_piece_scales()
 		selected = null
 		valid_moves.clear()
 		queue_redraw()
@@ -407,12 +437,15 @@ func _handle_click(pos: Vector2) -> void:
 	# Si se hace click sobre otra ficha propia -> cambiar selección
 	var cell = board[row][col]
 	if cell != null and cell.owner == current:
+		_reset_all_piece_scales()
 		selected = {"row": row, "col": col}
 		valid_moves = _calculate_valid_moves(row, col)
+		_bounce_piece(row, col)
 		queue_redraw()
 		return
 
 	# Click en otra casilla no válida -> deseleccionar
+	_reset_all_piece_scales()
 	selected = null
 	valid_moves.clear()
 	queue_redraw()
@@ -422,6 +455,7 @@ func _handle_click(pos: Vector2) -> void:
 func _on_piece_moved(player: int, from_row: int, from_col: int, to_row: int, to_col: int,
 		captured_row: int, captured_col: int, promoted: bool) -> void:
 	animating = true
+	_reset_all_piece_scales()
 	selected = null
 	valid_moves.clear()
 

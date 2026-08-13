@@ -8,7 +8,7 @@ use open_table_macros::GameResource;
 /// movimientos que cualquier tirada (no los 4 movimientos que otorgan
 /// los dobles en la variante oficial) — alcanza para probar el
 /// mecanismo sin esa regla especial.
-#[derive(GameResource, Default)]
+#[derive(GameResource, Default, Clone, Debug)]
 pub struct PendingDiceResource {
     pub pending: HashMap<PlayerId, Vec<u32>>,
 }

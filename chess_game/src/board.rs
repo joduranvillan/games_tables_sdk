@@ -128,7 +128,7 @@ impl BoardResource {
     }
 }
 
-#[derive(GameResource)]
+#[derive(GameResource, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Sides {
     pub white: PlayerId,
     pub black: PlayerId,

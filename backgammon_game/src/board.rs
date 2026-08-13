@@ -11,7 +11,7 @@ pub const CHECKERS_PER_PLAYER: u32 = 15;
 /// magnitud indica cuántas fichas hay ahí — el truco clásico para
 /// representar un tablero de backgammon sin necesitar una struct
 /// `Option<(PlayerId, u32)>` por punto.
-#[derive(GameResource)]
+#[derive(GameResource, Clone, Debug)]
 pub struct BoardResource {
     pub points: [i32; POINTS],
     pub bar: HashMap<PlayerId, u32>,
