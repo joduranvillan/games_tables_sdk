@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod events;
@@ -6,6 +7,7 @@ pub mod rules;
 
 use open_table_engine::prelude::*;
 
+pub use ai::{generate_shogi_candidates, piece_value, shogi_ai_pick_move, ShogiAction};
 pub use board::{BoardResource, Piece, PieceKind};
 pub use commands::{DropPieceCommand, MovePieceCommand, ResignCommand};
 pub use events::{GameOverEvent, PieceDroppedEvent, PieceMovedEvent};

@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod events;
@@ -6,6 +7,7 @@ pub mod rules;
 
 use open_table_engine::prelude::*;
 
+pub use ai::{cannon_has_screen, piece_value, xiangqi_ai_pick_move};
 pub use board::{BoardResource, Piece, PieceKind};
 pub use commands::{MovePieceCommand, ResignCommand};
 pub use events::{GameOverEvent, PieceMovedEvent};

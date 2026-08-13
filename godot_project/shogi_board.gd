@@ -45,6 +45,7 @@ var grid_container: GridContainer
 var sente_hand_panel: VBoxContainer
 var gote_hand_panel: VBoxContainer
 var piece_nodes: Array = [] # 9x9 array of Node2D/Control nodes
+var mode_option_button: OptionButton
 
 var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
@@ -133,16 +134,49 @@ func _setup_ui() -> void:
 	sente_hand_panel.custom_minimum_size = Vector2(95, 250)
 	add_child(sente_hand_panel)
 
+	# Mode Option Button
+	mode_option_button = OptionButton.new()
+	mode_option_button.name = "ModeOptionButton"
+	mode_option_button.position = Vector2(120, BOARD_SIZE * CELL_SIZE + 35)
+	mode_option_button.custom_minimum_size = Vector2(180, 32)
+	mode_option_button.add_item("Hotseat (2 jugadores)")
+	mode_option_button.add_item("vs IA (Gote)")
+	mode_option_button.item_selected.connect(_on_mode_selected)
+	add_child(mode_option_button)
+
 	# Turn Indicator Widget
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(120, BOARD_SIZE * CELL_SIZE + 35)
+	turn_indicator.position = Vector2(320, BOARD_SIZE * CELL_SIZE + 35)
 	add_child(turn_indicator)
 
 	# Network Status HUD
 	network_hud = NetworkStatusHUD.new()
 	network_hud.name = "NetworkStatusHUD"
 	add_child(network_hud)
+
+func _on_mode_selected(index: int) -> void:
+	winner = -1
+	selected_board_pos = null
+	selected_hand_piece = ""
+	valid_moves.clear()
+	for r in range(BOARD_SIZE):
+		for c in range(BOARD_SIZE):
+			if piece_nodes[r][c] != null and is_instance_valid(piece_nodes[r][c]):
+				piece_nodes[r][c].queue_free()
+				piece_nodes[r][c] = null
+
+	if bridge != null:
+		if index == 1:
+			bridge.start_local_match_shogi_vs_ai(P_SENTE, P_GOTE)
+		else:
+			bridge.start_local_match_shogi(P_SENTE, P_GOTE)
+
+	_init_board_state()
+	current = bridge.current_player() if bridge else P_SENTE
+	_update_hand_panels()
+	_update_status()
+	queue_redraw()
 
 func _init_board_state() -> void:
 	board.clear()
