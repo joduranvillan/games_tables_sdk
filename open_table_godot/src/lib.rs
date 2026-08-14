@@ -673,11 +673,7 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn start_local_match_backgammon_vs_ai(
-        &mut self,
-        human_player: i64,
-        ai_player: i64,
-    ) -> bool {
+    fn start_local_match_backgammon_vs_ai(&mut self, human_player: i64, ai_player: i64) -> bool {
         if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
             return false;
         }
@@ -2324,8 +2320,10 @@ impl OpenTableBridge {
                 } => {
                     if session.current_player() == *ai_p {
                         let cmd: Option<Box<dyn Command>> = match self.current_game_type.as_str() {
-                            "chess" => chess_game::chess_ai_pick_move(session, *ai_p, self.chess_ai_depth)
-                                .map(|c| Box::new(c) as Box<dyn Command>),
+                            "chess" => {
+                                chess_game::chess_ai_pick_move(session, *ai_p, self.chess_ai_depth)
+                                    .map(|c| Box::new(c) as Box<dyn Command>)
+                            }
                             "shogi" => shogi_game::shogi_ai_pick_move(session, *ai_p),
                             "xiangqi" => xiangqi_game::xiangqi_ai_pick_move(session, *ai_p)
                                 .map(|c| Box::new(c) as Box<dyn Command>),
@@ -2337,7 +2335,9 @@ impl OpenTableBridge {
                                     .map(|d| !d.is_empty())
                                     .unwrap_or(false);
                                 if !has_pending {
-                                    Some(Box::new(backgammon_game::RollDiceCommand { player: *ai_p }) as Box<dyn Command>)
+                                    Some(Box::new(backgammon_game::RollDiceCommand {
+                                        player: *ai_p,
+                                    }) as Box<dyn Command>)
                                 } else {
                                     backgammon_game::backgammon_ai_pick_move(session, *ai_p)
                                         .map(|c| Box::new(c) as Box<dyn Command>)

@@ -1,6 +1,9 @@
 use open_table_engine::prelude::*;
 
-use crate::board::{is_in_check, BoardResource, DrawOfferedResource, HalfMoveClockResource, PositionHistoryResource, Sides};
+use crate::board::{
+    is_in_check, BoardResource, DrawOfferedResource, HalfMoveClockResource,
+    PositionHistoryResource, Sides,
+};
 use crate::commands::MovePieceCommand;
 use crate::legal_moves::ChessLegalMoveGenerator;
 use crate::position::{PieceKind, Position};
@@ -19,7 +22,11 @@ pub fn generate_candidates(session: &Session, player: PlayerId) -> Vec<MovePiece
 pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
         if game_over.0 {
-            if let Some(winner) = session.world().get_resource::<WinnerResource>().and_then(|w| w.0) {
+            if let Some(winner) = session
+                .world()
+                .get_resource::<WinnerResource>()
+                .and_then(|w| w.0)
+            {
                 return if winner == player {
                     100_000.0
                 } else {
@@ -42,7 +49,7 @@ pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
     let mut score = 0.0f32;
 
     // 1. Material
-    for (_, piece) in &board.pieces {
+    for piece in board.pieces.values() {
         let val = match piece.kind {
             PieceKind::Pawn => 1.0,
             PieceKind::Knight => 3.0,
@@ -100,10 +107,10 @@ fn clone_chess_session(session: &Session) -> Session {
         new_session.world_mut().insert_resource(turn.clone());
     }
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
-        new_session.world_mut().insert_resource(game_over.clone());
+        new_session.world_mut().insert_resource(*game_over);
     }
     if let Some(winner) = session.world().get_resource::<WinnerResource>() {
-        new_session.world_mut().insert_resource(winner.clone());
+        new_session.world_mut().insert_resource(*winner);
     }
     if let Some(history) = session.world().get_resource::<PositionHistoryResource>() {
         new_session.world_mut().insert_resource(history.clone());
@@ -129,7 +136,11 @@ pub fn minimax(
 ) -> f32 {
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
         if game_over.0 {
-            if let Some(winner) = session.world().get_resource::<WinnerResource>().and_then(|w| w.0) {
+            if let Some(winner) = session
+                .world()
+                .get_resource::<WinnerResource>()
+                .and_then(|w| w.0)
+            {
                 return if winner == player {
                     100_000.0
                 } else {
@@ -211,7 +222,11 @@ pub fn minimax(
 /// - `depth`: Profundidad máxima del árbol de búsqueda (recomendado 3).
 ///
 /// Devuelve `None` si la partida terminó, si no es el turno de `player` o si no hay jugadas legales.
-pub fn chess_ai_pick_move(session: &Session, player: PlayerId, depth: u8) -> Option<MovePieceCommand> {
+pub fn chess_ai_pick_move(
+    session: &Session,
+    player: PlayerId,
+    depth: u8,
+) -> Option<MovePieceCommand> {
     if session
         .world()
         .get_resource::<GameOverResource>()
@@ -233,7 +248,11 @@ pub fn chess_ai_pick_move(session: &Session, player: PlayerId, depth: u8) -> Opt
     if let Some(board) = session.world().get_resource::<BoardResource>() {
         candidates.sort_by_key(|cmd| {
             let is_capture = board.get(cmd.to).is_some();
-            if is_capture { 0 } else { 1 }
+            if is_capture {
+                0
+            } else {
+                1
+            }
         });
     }
 
@@ -245,7 +264,10 @@ pub fn chess_ai_pick_move(session: &Session, player: PlayerId, depth: u8) -> Opt
 
     for candidate in candidates {
         let mut next_session = clone_chess_session(session);
-        if next_session.process_command(player, Box::new(candidate.clone())).is_ok() {
+        if next_session
+            .process_command(player, Box::new(candidate.clone()))
+            .is_ok()
+        {
             let score = if depth <= 1 {
                 evaluate_position(&next_session, player)
             } else {
@@ -278,7 +300,10 @@ mod tests {
     fn test_chess_ai_devuelve_movimiento_en_posicion_inicial() {
         let session = new_chess_session(SessionId(1), 42, P1, P2);
         let mv = chess_ai_pick_move(&session, P1, 2);
-        assert!(mv.is_some(), "La IA debe devolver un movimiento en la posición inicial");
+        assert!(
+            mv.is_some(),
+            "La IA debe devolver un movimiento en la posición inicial"
+        );
 
         let chosen = mv.unwrap();
         assert_eq!(chosen.player, P1);
@@ -305,8 +330,16 @@ mod tests {
 
         let chosen = mv.unwrap();
         assert_eq!(chosen.player, P1);
-        assert_eq!(chosen.from, Position::new(0, 3), "La torre blanca debe moverse desde d1");
-        assert_eq!(chosen.to, Position::new(4, 3), "La torre blanca debe capturar la dama en d5");
+        assert_eq!(
+            chosen.from,
+            Position::new(0, 3),
+            "La torre blanca debe moverse desde d1"
+        );
+        assert_eq!(
+            chosen.to,
+            Position::new(4, 3),
+            "La torre blanca debe capturar la dama en d5"
+        );
     }
 
     #[test]
