@@ -65,7 +65,14 @@ func _ready() -> void:
 	if network_hud != null:
 		network_hud.bind_bridge(bridge)
 
-	bridge.start_local_match_backgammon(P1, P2)
+	if GameManager.get_game_mode() == "vs_ai":
+		bridge.start_local_match_backgammon_vs_ai(P1, P2)
+		if mode_option_button != null:
+			mode_option_button.selected = 1
+	else:
+		bridge.start_local_match_backgammon(P1, P2)
+		if mode_option_button != null:
+			mode_option_button.selected = 0
 	current = bridge.current_player()
 	
 	_update_checker_positions()

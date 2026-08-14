@@ -74,7 +74,15 @@ func _ready() -> void:
 	bridge.connect("event_json", _on_event_json)
 	bridge.connect("piece_moved", _on_piece_moved_signal)
 	
-	bridge.start_local_match_chess(P1, P2)
+	if GameManager.get_game_mode() == "vs_ai":
+		var depth = GameManager.get_chess_ai_depth()
+		bridge.start_local_match_chess_vs_ai(P1, P2, depth)
+		if mode_option_button != null:
+			mode_option_button.selected = 1
+	else:
+		bridge.start_local_match_chess(P1, P2)
+		if mode_option_button != null:
+			mode_option_button.selected = 0
 	current = bridge.current_player()
 	
 	_on_layout_changed(GameManager.get_layout() if gm != null else 0)

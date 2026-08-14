@@ -33,10 +33,20 @@ var piece_nodes: Array = [] # 10x9 array of Control nodes
 var current: int = P_RED
 var winner: int = -1
 var selected_pos = null # Vector2i(row, col)
+var mode_option_button: OptionButton
 
 @onready var status: Label = $Status
 
 func _ready() -> void:
+	mode_option_button = OptionButton.new()
+	mode_option_button.name = "ModeOptionButton"
+	mode_option_button.position = Vector2(OFFSET_X, OFFSET_Y + (BOARD_ROWS - 1) * CELL_SIZE + 35)
+	mode_option_button.custom_minimum_size = Vector2(180, 32)
+	mode_option_button.add_item("Hotseat (2 jugadores)")
+	mode_option_button.add_item("vs IA (Negro)")
+	mode_option_button.item_selected.connect(_on_mode_selected)
+	add_child(mode_option_button)
+
 	_init_board_state()
 	
 	bridge = OpenTableBridge.new()
@@ -47,9 +57,36 @@ func _ready() -> void:
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
 	
-	bridge.start_local_match_xiangqi(P_RED, P_BLACK)
+	if GameManager.get_game_mode() == "vs_ai":
+		bridge.start_local_match_xiangqi_vs_ai(P_RED, P_BLACK)
+		if mode_option_button != null:
+			mode_option_button.selected = 1
+	else:
+		bridge.start_local_match_xiangqi(P_RED, P_BLACK)
+		if mode_option_button != null:
+			mode_option_button.selected = 0
 	current = bridge.current_player()
 	
+	_update_status()
+	queue_redraw()
+
+func _on_mode_selected(index: int) -> void:
+	winner = -1
+	selected_pos = null
+	for r in range(BOARD_ROWS):
+		for c in range(BOARD_COLS):
+			if piece_nodes[r][c] != null and is_instance_valid(piece_nodes[r][c]):
+				piece_nodes[r][c].queue_free()
+				piece_nodes[r][c] = null
+
+	if bridge != null:
+		if index == 1:
+			bridge.start_local_match_xiangqi_vs_ai(P_RED, P_BLACK)
+		else:
+			bridge.start_local_match_xiangqi(P_RED, P_BLACK)
+
+	_init_board_state()
+	current = bridge.current_player() if bridge else P_RED
 	_update_status()
 	queue_redraw()
 

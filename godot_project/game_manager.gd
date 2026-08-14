@@ -14,12 +14,26 @@ const PLAYER_COLORS: Array[Color] = [
 ]
 
 var active_game_type: String = ""
+var game_mode: String = "hotseat" # "hotseat" or "vs_ai"
+var chess_ai_depth: int = 2
 var sfx_enabled: bool = true
 var animations_enabled: bool = true
 var font_size_tier: int = 1
 var replay_log_bytes: PackedByteArray = PackedByteArray()
 var replay_game_type: String = "checkers"
 var last_layout: int = -1
+
+func set_game_mode(mode: String) -> void:
+	game_mode = mode
+
+func get_game_mode() -> String:
+	return game_mode
+
+func set_chess_ai_depth(depth: int) -> void:
+	chess_ai_depth = depth
+
+func get_chess_ai_depth() -> int:
+	return chess_ai_depth
 
 static func get_layout() -> ScreenLayout:
 	var w = DisplayServer.screen_get_size().x

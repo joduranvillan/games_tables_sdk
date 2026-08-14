@@ -75,6 +75,24 @@ func _initialize() -> void:
 	}))
 	results.append(["Movimiento de jugador fuera de turno genera rechazo", move_rejected_reasons.size() > 0])
 
+	# 4. Verificar lógica visual y cálculo de caminos de LudoBoard
+	var ludo_script = load("res://ludo_board.gd")
+	if ludo_script != null:
+		var board = Node2D.new()
+		board.set_script(ludo_script)
+		
+		# Test get_path_from_to
+		var path_entry = board.get_path_from_to(0, 1, 1, 0)
+		results.append(["get_path_from_to(0, 1) devuelve 1 posición", path_entry.size() == 1])
+
+		var path_steps = board.get_path_from_to(1, 5, 1, 0)
+		results.append(["get_path_from_to(1, 5) devuelve 4 posiciones intermedias", path_steps.size() == 4])
+
+		var path_back = board.get_path_from_to(10, 0, 1, 0)
+		results.append(["get_path_from_to(10, 0) devuelve 1 posición (retorno a base)", path_back.size() == 1])
+
+		board.free()
+
 	var ok := true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])

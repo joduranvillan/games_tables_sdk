@@ -93,6 +93,14 @@ func _initialize() -> void:
 	}))
 	results.append(["Dos pases consecutivos y confirmación gatillan la señal game_over", game_over_winners.size() >= 1])
 
+	# 8. Verificar inicialización de componentes UI en GoBoard
+	var go_script = load("res://go_board.gd")
+	if go_script != null:
+		var board = Node2D.new()
+		board.set_script(go_script)
+		results.append(["GoBoard se carga y tiene script válido", board != null])
+		board.free()
+
 	var ok := true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])

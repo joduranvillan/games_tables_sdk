@@ -136,16 +136,17 @@ func _setup_ui() -> void:
 						
 			btn.texture_normal = ImageTexture.create_from_image(img)
 			
-			var lbl = Label.new()
-			lbl.text = str(t + 1)
-			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			lbl.size = Vector2(30, 30)
-			lbl.add_theme_font_size_override("font_size", 14)
-			btn.add_child(lbl)
-			
 			var pid = p
 			var tid = t
+			btn.draw.connect(func():
+				var font: Font = null
+				if current_theme != null and current_theme.piece_font != null:
+					font = current_theme.piece_font
+				if font == null:
+					font = ThemeDB.fallback_font
+				btn.draw_string(font, Vector2(0, 20), str(pid), HORIZONTAL_ALIGNMENT_CENTER, 30, 14, Color.WHITE)
+			)
+			
 			btn.pressed.connect(func(): _on_token_pressed(pid, tid))
 			add_child(btn)
 			token_buttons[p].append(btn)
@@ -172,15 +173,21 @@ func _animate_dice_roll(val: int) -> void:
 	var orig_pos = Vector2(640, 220)
 	var tween = create_tween()
 	
-	# 0.5s vibration shake
-	for i in range(10):
-		var rand_offset = Vector2(randf_range(-6.0, 6.0), randf_range(-6.0, 6.0))
-		tween.tween_property(dice_label, "position", orig_pos + rand_offset, 0.04)
+	# 0.4s vibration shake
+	for i in range(8):
+		var rand_offset = Vector2(randf_range(-5.0, 5.0), randf_range(-5.0, 5.0))
+		tween.tween_property(dice_label, "position", orig_pos + rand_offset, 0.05)
 		
 	tween.tween_property(dice_label, "position", orig_pos, 0.04)
 	
 	if has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_move()
+
+	if dice_widget != null:
+		if dice_widget.has_method("roll_animation"):
+			dice_widget.roll_animation(val, 0.4, 3)
+		else:
+			dice_widget.show_roll([val])
 
 	tween.finished.connect(func():
 		var faces = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
@@ -248,6 +255,22 @@ func _get_token_board_pos(player: int, token_idx: int, steps: int) -> Vector2:
 			4: return Vector2(margin + 6 * track_step, margin + (12 - home_dist) * track_step)
 	return Vector2(300, 300)
 
+func get_path_from_to(from_cell: int, to_cell: int, player: int = 1, token_idx: int = 0) -> Array[Vector2]:
+	var path: Array[Vector2] = []
+	if from_cell == to_cell:
+		return path
+	
+	if from_cell < to_cell:
+		for s in range(from_cell + 1, to_cell + 1):
+			path.append(_get_token_board_pos(player, token_idx, s))
+	else:
+		if to_cell == 0:
+			path.append(_get_token_board_pos(player, token_idx, 0))
+		else:
+			for s in range(from_cell - 1, to_cell - 1, -1):
+				path.append(_get_token_board_pos(player, token_idx, s))
+	return path
+
 func _update_token_positions() -> void:
 	for p in range(1, 5):
 		for t in range(TOKENS_PER_PLAYER):
@@ -257,16 +280,30 @@ func _update_token_positions() -> void:
 			btn.position = target_pos
 
 func _animate_token_move(p: int, t_idx: int, to_steps: int) -> void:
+	var from_steps = token_steps[p][t_idx]
 	token_steps[p][t_idx] = to_steps
 	var btn = token_buttons[p][t_idx]
-	var target_pos = _get_token_board_pos(p, t_idx, to_steps) - btn.size / 2.0
+	var path = get_path_from_to(from_steps, to_steps, p, t_idx)
+	
+	if path.is_empty():
+		var target_pos = _get_token_board_pos(p, t_idx, to_steps) - btn.size / 2.0
+		btn.position = target_pos
+		return
+
 	var tween = create_tween()
-	tween.tween_property(btn, "position", target_pos, 0.25)
+	for pos in path:
+		var target_pos = pos - btn.size / 2.0
+		tween.tween_property(btn, "position", target_pos, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	
 	if to_steps >= 58:
-		_spawn_particle_burst(target_pos + Vector2(15, 15), Color.GOLD)
+		tween.finished.connect(func():
+			_spawn_particle_burst(btn.position + btn.size / 2.0, Color.GOLD)
+			if has_node("/root/AudioManager"):
+				get_node("/root/AudioManager").play_capture()
+		)
+	else:
 		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_capture()
+			get_node("/root/AudioManager").play_move()
 
 func _on_event_json(json_str: String) -> void:
 	var parser = JSON.new()
@@ -277,8 +314,6 @@ func _on_event_json(json_str: String) -> void:
 			if event_type == "DiceRolledEvent":
 				var val = int(event.get("value", 1))
 				_animate_dice_roll(val)
-				if dice_widget != null:
-					dice_widget.show_roll([val])
 			elif event_type == "TokenMovedEvent":
 				var p = int(event.get("player", current_p))
 				var t_idx = int(event.get("token_index", 0))
@@ -345,6 +380,14 @@ func _draw() -> void:
 				continue
 			var cell_rect = Rect2(margin + i * track_step - 17.5, margin + j * track_step - 17.5, track_step, track_step)
 			draw_rect(cell_rect, Color.BLACK, false, 1.0)
+
+	# Safe squares permanent highlight (start and star cells)
+	var safe_color = Color(0.9, 0.9, 0.3, 0.3)
+	for p in range(1, 5):
+		for s in [1, 9]:
+			var cpos = _get_token_board_pos(p, 0, s)
+			var safe_rect = Rect2(cpos.x - 17.5, cpos.y - 17.5, track_step, track_step)
+			draw_rect(safe_rect, safe_color)
 
 	# Center Goal Zone
 	var center = Vector2(300, 300)
