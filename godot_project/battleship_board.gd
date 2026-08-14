@@ -29,6 +29,8 @@ var sunken_cells: Array[Vector2i] = []
 var own_grid_buttons: Array = []
 var opp_grid_buttons: Array = []
 
+var own_vbox: VBoxContainer
+var opp_vbox: VBoxContainer
 var status_label: Label
 var phase_label: Label
 var rotate_btn: Button
@@ -65,6 +67,7 @@ func _ready() -> void:
 
 	_update_status()
 	_update_grid_ui()
+	queue_redraw()
 
 func _init_grids() -> void:
 	own_shot_grid = []
@@ -80,16 +83,13 @@ func _init_grids() -> void:
 
 func _setup_ui() -> void:
 	# Main Container layout
-	var canvas = CanvasLayer.new()
-	add_child(canvas)
-
 	var margin = MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 15)
-	margin.add_theme_constant_override("margin_right", 15)
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_right", 20)
 	margin.add_theme_constant_override("margin_top", 10)
 	margin.add_theme_constant_override("margin_bottom", 10)
-	canvas.add_child(margin)
+	add_child(margin)
 
 	var main_vbox = VBoxContainer.new()
 	main_vbox.add_theme_constant_override("separation", 10)
@@ -113,12 +113,12 @@ func _setup_ui() -> void:
 
 	# Two Grids Side-by-Side
 	var grids_hbox = HBoxContainer.new()
-	grids_hbox.add_theme_constant_override("separation", 25)
+	grids_hbox.add_theme_constant_override("separation", 35)
 	grids_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	main_vbox.add_child(grids_hbox)
 
 	# --- Left Panel: Own Grid ---
-	var own_vbox = VBoxContainer.new()
+	own_vbox = VBoxContainer.new()
 	grids_hbox.add_child(own_vbox)
 
 	var own_title = Label.new()
@@ -127,9 +127,14 @@ func _setup_ui() -> void:
 	own_title.add_theme_font_size_override("font_size", 16)
 	own_vbox.add_child(own_title)
 
+	var own_margin = MarginContainer.new()
+	own_margin.add_theme_constant_override("margin_left", 22)
+	own_margin.add_theme_constant_override("margin_top", 22)
+	own_vbox.add_child(own_margin)
+
 	var own_grid_container = GridContainer.new()
 	own_grid_container.columns = BOARD_SIZE
-	own_vbox.add_child(own_grid_container)
+	own_margin.add_child(own_grid_container)
 
 	own_grid_buttons = []
 	for r in BOARD_SIZE:
@@ -144,7 +149,7 @@ func _setup_ui() -> void:
 		own_grid_buttons.append(row_btns)
 
 	# --- Right Panel: Opponent Grid ---
-	var opp_vbox = VBoxContainer.new()
+	opp_vbox = VBoxContainer.new()
 	grids_hbox.add_child(opp_vbox)
 
 	var opp_title = Label.new()
@@ -153,9 +158,14 @@ func _setup_ui() -> void:
 	opp_title.add_theme_font_size_override("font_size", 16)
 	opp_vbox.add_child(opp_title)
 
+	var opp_margin = MarginContainer.new()
+	opp_margin.add_theme_constant_override("margin_left", 22)
+	opp_margin.add_theme_constant_override("margin_top", 22)
+	opp_vbox.add_child(opp_margin)
+
 	var opp_grid_container = GridContainer.new()
 	opp_grid_container.columns = BOARD_SIZE
-	opp_vbox.add_child(opp_grid_container)
+	opp_margin.add_child(opp_grid_container)
 
 	opp_grid_buttons = []
 	for r in BOARD_SIZE:
@@ -179,6 +189,43 @@ func _setup_ui() -> void:
 
 	network_hud = NetworkStatusHUD.new()
 	add_child(network_hud)
+
+func _draw() -> void:
+	var font: Font = null
+	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
+		var tm = get_node_or_null("/root/ThemeManager")
+		if tm != null:
+			var th = tm.get_current_theme() if tm.has_method("get_current_theme") else tm.get_theme()
+			if th != null and th.piece_font != null:
+				font = th.piece_font
+	if font == null:
+		font = ThemeDB.fallback_font
+
+	var font_sz := 14
+	var coord_color := Color(0.85, 0.85, 0.9, 0.9)
+
+	_draw_grid_coordinates(own_grid_buttons, font, font_sz, coord_color)
+	_draw_grid_coordinates(opp_grid_buttons, font, font_sz, coord_color)
+
+func _draw_grid_coordinates(grid_buttons: Array, font: Font, font_sz: int, coord_color: Color) -> void:
+	if grid_buttons.is_empty() or grid_buttons[0].is_empty():
+		return
+
+	# Números 1–8 en la fila superior (columnas 0..7)
+	for c in range(BOARD_SIZE):
+		var btn: Button = grid_buttons[0][c]
+		if btn != null and btn.is_inside_tree():
+			var b_pos = to_local(btn.global_position)
+			var num_str = str(c + 1)
+			draw_string(font, Vector2(b_pos.x, b_pos.y - 6), num_str, HORIZONTAL_ALIGNMENT_CENTER, CELL_SIZE, font_sz, coord_color)
+
+	# Letras A–H en la columna izquierda (filas 0..7)
+	for r in range(BOARD_SIZE):
+		var btn: Button = grid_buttons[r][0]
+		if btn != null and btn.is_inside_tree():
+			var b_pos = to_local(btn.global_position)
+			var letter = String.chr("A".unicode_at(0) + r)
+			draw_string(font, Vector2(b_pos.x - 20, b_pos.y + CELL_SIZE * 0.65), letter, HORIZONTAL_ALIGNMENT_CENTER, 18, font_sz, coord_color)
 
 func _on_rotate_pressed() -> void:
 	is_horizontal = not is_horizontal
@@ -243,6 +290,7 @@ func _handle_placement(start_row: int, start_col: int) -> void:
 
 	_update_status()
 	_update_grid_ui()
+	queue_redraw()
 
 func _is_cell_occupied_in_ships(cell: Vector2i, ships: Array) -> bool:
 	for ship in ships:
@@ -263,11 +311,83 @@ func _handle_fire_click(row: int, col: int) -> void:
 	}
 	bridge.send_command_json(current, JSON.stringify(fire_cmd))
 
+func _spawn_shot_animation(player: int, row: int, col: int, is_hit: bool) -> void:
+	if OS.has_feature("headless"):
+		return
+
+	var is_opp_target = (player == current)
+	var btn: Button = null
+	if is_opp_target and row < opp_grid_buttons.size() and col < opp_grid_buttons[row].size():
+		btn = opp_grid_buttons[row][col]
+	elif not is_opp_target and row < own_grid_buttons.size() and col < own_grid_buttons[row].size():
+		btn = own_grid_buttons[row][col]
+
+	if btn == null or not btn.is_inside_tree():
+		return
+
+	var center_pos = btn.global_position + Vector2(btn.size.x / 2.0, btn.size.y / 2.0)
+	var local_pos = to_local(center_pos)
+
+	var explosion_tex_path = "res://assets/explosion.png"
+	if not ResourceLoader.exists(explosion_tex_path):
+		explosion_tex_path = "res://assets/icons/explosion.svg"
+
+	if ResourceLoader.exists(explosion_tex_path):
+		var sprite = Sprite2D.new()
+		sprite.texture = load(explosion_tex_path)
+		sprite.position = local_pos
+		sprite.scale = Vector2(0.2, 0.2)
+		sprite.z_index = 20
+		add_child(sprite)
+		var tw = sprite.create_tween().set_parallel(true)
+		tw.tween_property(sprite, "scale", Vector2(1.2, 1.2), 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(sprite, "modulate:a", 0.0, 0.35).set_delay(0.15)
+		tw.chain().tween_callback(sprite.queue_free)
+	else:
+		# Círculo rojo pulsante con CPUParticles2D
+		var particles = CPUParticles2D.new()
+		particles.position = local_pos
+		particles.emitting = true
+		particles.one_shot = true
+		particles.amount = 16
+		particles.lifetime = 0.5
+		particles.explosiveness = 0.8
+		particles.direction = Vector2(0, -1)
+		particles.spread = 180.0
+		particles.gravity = Vector2(0, 200)
+		particles.initial_velocity_min = 80.0
+		particles.initial_velocity_max = 160.0
+		particles.scale_amount_min = 3.0
+		particles.scale_amount_max = 6.0
+		particles.color = Color(1.0, 0.2, 0.2) if is_hit else Color(0.3, 0.7, 1.0)
+		particles.z_index = 20
+		add_child(particles)
+
+		# Círculo pulsante visual
+		var pulse_circle = Node2D.new()
+		pulse_circle.position = local_pos
+		pulse_circle.z_index = 19
+		var circle_col = Color(1.0, 0.15, 0.15, 0.85) if is_hit else Color(0.2, 0.6, 1.0, 0.85)
+		pulse_circle.draw.connect(func():
+			pulse_circle.draw_circle(Vector2.ZERO, CELL_SIZE * 0.45, circle_col)
+		)
+		add_child(pulse_circle)
+		pulse_circle.queue_redraw()
+		var tw_circle = pulse_circle.create_tween().set_parallel(true)
+		tw_circle.tween_property(pulse_circle, "scale", Vector2(1.4, 1.4), 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw_circle.tween_property(pulse_circle, "modulate:a", 0.0, 0.3)
+		tw_circle.chain().tween_callback(pulse_circle.queue_free)
+
+		var timer = get_tree().create_timer(0.6)
+		timer.timeout.connect(particles.queue_free)
+
 func _on_shot_result(player: int, row: int, col: int, is_hit: bool) -> void:
 	if player == current:
 		opp_shot_grid[row][col] = "hit" if is_hit else "miss"
 	else:
 		own_shot_grid[row][col] = "hit" if is_hit else "miss"
+
+	_spawn_shot_animation(player, row, col, is_hit)
 
 	if is_hit:
 		if has_node("/root/AudioManager"):
@@ -277,6 +397,7 @@ func _on_shot_result(player: int, row: int, col: int, is_hit: bool) -> void:
 			get_node("/root/AudioManager").play_move()
 
 	_update_grid_ui()
+	queue_redraw()
 
 func _on_event_json(json_str: String) -> void:
 	var parser = JSON.new()
@@ -297,22 +418,37 @@ func _on_event_json(json_str: String) -> void:
 				var c = int(target.get("col", 0))
 				var res_str: String = event.get("result", "")
 				var is_hit = (res_str == "Hit" or res_str == "Sunk")
-				var shooting_player = int(event.get("player", current))
+				var shooting_player = int(event.get("player", event.get("shooter", current)))
 				if shooting_player == current:
 					opp_shot_grid[r][c] = "sunk" if res_str == "Sunk" else ("hit" if is_hit else "miss")
 				else:
 					own_shot_grid[r][c] = "sunk" if res_str == "Sunk" else ("hit" if is_hit else "miss")
+
+				_spawn_shot_animation(shooting_player, r, c, is_hit)
 
 				if res_str == "Sunk" and event.has("sunken_ship"):
 					var sunk_coords = event["sunken_ship"]
 					for coord in sunk_coords:
 						var sr = int(coord.get("row", 0))
 						var sc = int(coord.get("col", 0))
-						sunken_cells.append(Vector2i(sr, sc))
-			elif ev_type == "SunkenShipEvent":
-				if event.has("coords"):
+						var spos = Vector2i(sr, sc)
+						if not spos in sunken_cells:
+							sunken_cells.append(spos)
+			elif ev_type == "SunkenShipEvent" or ev_type == "SunkShipEvent":
+				if event.has("positions"):
+					for pos_obj in event["positions"]:
+						var sr = int(pos_obj.get("row", 0)) if pos_obj is Dictionary else int(pos_obj[0])
+						var sc = int(pos_obj.get("col", 0)) if pos_obj is Dictionary else int(pos_obj[1])
+						var spos = Vector2i(sr, sc)
+						if not spos in sunken_cells:
+							sunken_cells.append(spos)
+				elif event.has("coords"):
 					for pair in event["coords"]:
-						sunken_cells.append(Vector2i(pair[0], pair[1]))
+						var sr = int(pair[0]) if pair is Array else int(pair.get("row", 0))
+						var sc = int(pair[1]) if pair is Array else int(pair.get("col", 0))
+						var spos = Vector2i(sr, sc)
+						if not spos in sunken_cells:
+							sunken_cells.append(spos)
 			elif ev_type == "GameOverEvent":
 				winner = int(event.get("winner", -1))
 				phase = Phase.GAME_OVER
@@ -320,12 +456,14 @@ func _on_event_json(json_str: String) -> void:
 	current = bridge.current_player()
 	_update_status()
 	_update_grid_ui()
+	queue_redraw()
 
 func _on_game_over(w: int) -> void:
 	winner = w
 	phase = Phase.GAME_OVER
 	_update_status()
 	_update_grid_ui()
+	queue_redraw()
 	if has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_game_over()
 	var overlay = preload("res://game_over_overlay.tscn").instantiate()
@@ -342,6 +480,7 @@ func _update_status() -> void:
 		status_label.text = "🏆 ¡Fin del juego! Ganó el Jugador %d" % winner
 		if turn_indicator != null:
 			turn_indicator.stop_timer()
+			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 0.4)
 	elif phase == Phase.PLACEMENT_P1:
 		var spec = SHIP_SPECS[current_ship_index] if current_ship_index < SHIP_SPECS.size() else null
 		if spec:
@@ -350,6 +489,10 @@ func _update_status() -> void:
 			]
 		else:
 			status_label.text = "⚓ Jugador 1: Flota lista."
+		if turn_indicator != null:
+			var p_col = GameManager.get_player_color(P1) if has_node("/root/GameManager") else Color(0.2, 0.6, 0.9)
+			turn_indicator.set_turn(P1, "Jugador 1", p_col)
+			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	elif phase == Phase.PLACEMENT_P2:
 		var spec = SHIP_SPECS[current_ship_index] if current_ship_index < SHIP_SPECS.size() else null
 		if spec:
@@ -358,11 +501,25 @@ func _update_status() -> void:
 			]
 		else:
 			status_label.text = "⚓ Jugador 2: Flota lista."
+		if turn_indicator != null:
+			var p_col = GameManager.get_player_color(P2) if has_node("/root/GameManager") else Color(0.9, 0.3, 0.3)
+			turn_indicator.set_turn(P2, "Jugador 2", p_col)
+			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	elif phase == Phase.FIRE:
 		var p_name = "Jugador 1" if current == P1 else "Jugador 2"
 		status_label.text = "🚀 Fase de Disparo - Turno de %s" % p_name
 		if turn_indicator != null:
-			turn_indicator.set_turn(current, p_name, GameManager.get_player_color(current))
+			var p_col = GameManager.get_player_color(current) if has_node("/root/GameManager") else (Color(0.2, 0.6, 0.9) if current == P1 else Color(0.9, 0.3, 0.3))
+			turn_indicator.set_turn(current, p_name, p_col)
+			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+	# Modulate panels based on active board
+	if own_vbox != null:
+		var is_own_active = (phase == Phase.PLACEMENT_P1 or (phase == Phase.FIRE and current == P1))
+		own_vbox.modulate = Color(1.0, 1.0, 1.0, 1.0) if is_own_active else Color(1.0, 1.0, 1.0, 0.6)
+	if opp_vbox != null:
+		var is_opp_active = (phase == Phase.PLACEMENT_P2 or (phase == Phase.FIRE and current == P2))
+		opp_vbox.modulate = Color(1.0, 1.0, 1.0, 1.0) if is_opp_active else Color(1.0, 1.0, 1.0, 0.6)
 
 func _update_grid_ui() -> void:
 	var active_ships = p1_ships if phase == Phase.PLACEMENT_P1 else p2_ships
@@ -376,13 +533,13 @@ func _update_grid_ui() -> void:
 
 			if shot == "sunk" or pos in sunken_cells:
 				btn.text = "⚓"
-				btn.modulate = Color(0.5, 0.0, 0.0) # Darker red for sunken ship cells
+				btn.modulate = Color(0.3, 0.3, 0.3, 0.8) # Sunken ship in gray
 			elif shot == "hit":
 				btn.text = "💥"
-				btn.modulate = Color(1.0, 0.2, 0.2) # Explosion icon (red)
+				btn.modulate = Color(1.0, 0.2, 0.2) # Hit in red
 			elif shot == "miss":
 				btn.text = "💧"
-				btn.modulate = Color(0.3, 0.7, 1.0) # Water splash (blue)
+				btn.modulate = Color(0.3, 0.7, 1.0) # Water splash in blue
 			elif _is_cell_occupied_in_ships(pos, active_ships):
 				btn.text = "🚢"
 				btn.modulate = Color(0.3, 0.8, 0.4) # Ship cell
@@ -399,17 +556,18 @@ func _update_grid_ui() -> void:
 
 			if shot == "sunk" or pos in sunken_cells:
 				btn.text = "⚓"
-				btn.modulate = Color(0.5, 0.0, 0.0) # Darker red for sunken ship cells
+				btn.modulate = Color(0.3, 0.3, 0.3, 0.8) # Sunken ship in gray
 				btn.disabled = true
 			elif shot == "hit":
 				btn.text = "💥"
-				btn.modulate = Color(1.0, 0.2, 0.2) # Explosion icon (red)
+				btn.modulate = Color(1.0, 0.2, 0.2) # Hit in red
 				btn.disabled = true
 			elif shot == "miss":
 				btn.text = "💧"
-				btn.modulate = Color(0.3, 0.7, 1.0) # Water splash (blue)
+				btn.modulate = Color(0.3, 0.7, 1.0) # Water splash in blue
 				btn.disabled = true
 			else:
 				btn.text = "~"
 				btn.modulate = Color.WHITE
 				btn.disabled = (phase != Phase.FIRE or winner != -1)
+

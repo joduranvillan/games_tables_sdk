@@ -276,6 +276,21 @@ redot --headless --path /path/to/games_tables_sdk/godot_project \
       --script res://tests/test_native_p2p_adapter.gd
 ```
 
+### Visual Regression Tests (`visual_regression.gd`)
+
+Compares rendered frames of all 13 board scenes against reference PNG snapshots stored in `godot_project/tests/snapshots/` with a 1% pixel diff tolerance.
+
+```bash
+# Run visual regression tests
+redot --headless --path godot_project --script res://tests/visual_regression.gd
+
+# Regenerate reference snapshots after intentional visual changes
+UPDATE_SNAPSHOTS=1 make test-godot
+```
+
+> **Importante sobre la actualización de snapshots:**
+> Solo debe ejecutarse con `UPDATE_SNAPSHOTS=1` tras introducir **cambios visuales intencionales** en los tableros o temas (por ejemplo, nuevas sombras, coordenadas, temas o partículas). **NUNCA** debe utilizarse como un atajo para "arreglar" un pipeline de CI fallido sin antes investigar y verificar si el cambio visual es deliberado y correcto.
+
 ### TCP Bridge Smoke (Timed)
 
 The `test_tcp_bridge.tscn` scene is interactive (does not call `quit()`). Run it with the provided shell script that enforces a 30-second timeout:

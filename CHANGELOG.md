@@ -3,6 +3,25 @@
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [0.2.0-dev]
+
+### Added
+- **IA Local para Motores de Juego**: Motores de inteligencia artificial offline (Minimax con poda alfa-beta para Ajedrez, heurísticas para Backgammon, Shogi y Xiangqi) con selección de dificultad y soporte en bridge de Godot.
+- **Temas Visuales**: 3 nuevos temas visuales completos en `theme_manager.gd` (Piedra Oscura, Noche Azul y Jade Verde).
+- **Animaciones y Efectos**: Animaciones de "bounce" en selección de piezas, sombras proyectadas de profundidad bajo piezas, emisión de partículas con `CPUParticles2D` en capturas y avances casilla a casilla.
+- **Overlay de Fin de Juego**: `game_over_overlay.gd` rediseñado con paneles translúcidos, animaciones de entrada, anuncios de victoria/derrota/empate y botones de revancha.
+- **Selector de Modo de Juego**: Selector interactivo (Hotseat local vs IA) en menú principal con persistencia.
+
+### Fixed
+- **Robustez en Capa de Red TCP**: Implementación y validación de tests de reconexión de clientes (`tcp_reconnection_smoke.gd`) y simulación de pérdida de paquetes (`tcp_packet_loss_smoke.gd`).
+- **Integración de ELO en UI**: Conexión de tracking de puntuación ELO (`score_tracker.gd`) con la interfaz gráfica de usuario y menú de configuración.
+
+### Changed
+- **Menú Principal**: Fondo animado con shaders, efectos de entrada tipográfica y hover states en botones interactivos.
+- **Tablero de Ajedrez**: Coordenadas algebraicas periféricas (a–h, 1–8), marcos con borde estilizado y highlight visual del último movimiento ejecutado.
+- **Tablero de Go**: Renderizado de los 9 puntos hoshi canónicos, contadores dedicados de capturas de piedras y overlay de territorio en fin de juego.
+- **Tableros de Uno, Ludo y Battleship**: Cartas redondeadas con indicador de color en Uno, fichas numeradas con casillas seguras en Ludo y cuadrículas con coordenadas y barcos hundidos en gris en Battleship.
+
 ## [Unreleased]
 
 ### Added
