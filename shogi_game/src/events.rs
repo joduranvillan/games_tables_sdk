@@ -3,7 +3,7 @@ use open_table_engine::prelude::*;
 use open_table_macros::GameEvent;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct PieceMovedEvent {
     pub player: PlayerId,
     pub from: (usize, usize),
@@ -12,14 +12,14 @@ pub struct PieceMovedEvent {
     pub captured: Option<PieceKind>,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct PieceDroppedEvent {
     pub player: PlayerId,
     pub piece: PieceKind,
     pub to: (usize, usize),
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct GameOverEvent {
     pub winner: Option<PlayerId>,
 }

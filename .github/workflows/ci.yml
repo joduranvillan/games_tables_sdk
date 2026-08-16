@@ -42,6 +42,9 @@ jobs:
       - name: Run fmt check
         run: cargo fmt --all --check
 
+      - name: Check doc warnings
+        run: cargo doc --workspace --no-deps --exclude open_table_godot 2>&1 | grep "warning:" | { grep . && exit 1 || exit 0; }
+
       - name: Run tests
         run: cargo test --workspace --exclude open_table_godot
 

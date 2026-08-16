@@ -20,14 +20,14 @@ pub struct TerritoryCard {
     pub card_type: CardType,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct TerritoryClaimedEvent {
     pub player: PlayerId,
     pub territory: TerritoryId,
     pub armies: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct ArmiesPlacedEvent {
     pub player: PlayerId,
     pub territory: TerritoryId,
@@ -35,7 +35,7 @@ pub struct ArmiesPlacedEvent {
     pub armies_remaining: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct AttackDeclaredEvent {
     pub attacker: PlayerId,
     pub from: TerritoryId,
@@ -43,7 +43,7 @@ pub struct AttackDeclaredEvent {
     pub dice: u8,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct AttackResolvedEvent {
     pub attacker: PlayerId,
     pub defender: PlayerId,
@@ -56,7 +56,7 @@ pub struct AttackResolvedEvent {
     pub territory_conquered: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct TerritoryConqueredEvent {
     pub player: PlayerId,
     pub territory: TerritoryId,
@@ -66,13 +66,13 @@ pub struct TerritoryConqueredEvent {
     pub card_drawn: Option<TerritoryCard>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct PlayerEliminatedEvent {
     pub player: PlayerId,
     pub by: PlayerId,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct FortifiedEvent {
     pub player: PlayerId,
     pub from: TerritoryId,
@@ -80,19 +80,19 @@ pub struct FortifiedEvent {
     pub armies: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct CardsExchangedEvent {
     pub player: PlayerId,
     pub armies_gained: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct PhaseChangedEvent {
     pub player: PlayerId,
     pub new_phase: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct TegGameOverEvent {
     pub winner: PlayerId,
     pub objective: String,

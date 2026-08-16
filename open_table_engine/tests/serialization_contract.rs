@@ -7,10 +7,14 @@ use open_table_core::ids::PlayerId;
 const P1: PlayerId = PlayerId(1);
 const P2: PlayerId = PlayerId(2);
 
-fn assert_roundtrip<T: Serialize + DeserializeOwned + Debug>(value: T) {
+fn assert_roundtrip<T: Serialize + DeserializeOwned + PartialEq + Debug>(value: T) {
     let json = serde_json::to_string(&value).expect("Error al serializar a JSON");
     let deserialized: T = serde_json::from_str(&json).expect("Error al deserializar de JSON");
     let json2 = serde_json::to_string(&deserialized).expect("Error al re-serializar a JSON");
+    assert_eq!(
+        value, deserialized,
+        "El valor deserializado debe coincidir con el original"
+    );
     assert_eq!(
         json, json2,
         "El JSON deserializado y re-serializado debe ser idéntico al original"

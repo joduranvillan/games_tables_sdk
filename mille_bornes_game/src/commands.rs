@@ -11,30 +11,30 @@ use crate::card::{Hazard, Safety};
 /// en vez de hacerlo "afuera" antes de crear la `Session` es lo que
 /// permite que el barajado quede en el log de comandos y el replay lo
 /// reproduzca exactamente igual.
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct SetupDeckCommand;
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct DrawCardCommand {
     #[issuer]
     pub player: PlayerId,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct PlayCardCommand {
     #[issuer]
     pub player: PlayerId,
     pub card_index: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct PlayDistanceCommand {
     #[issuer]
     pub player: PlayerId,
     pub distance: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct PlayHazardCommand {
     #[issuer]
     pub player: PlayerId,
@@ -42,21 +42,21 @@ pub struct PlayHazardCommand {
     pub hazard: Hazard,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct PlaySafetyCommand {
     #[issuer]
     pub player: PlayerId,
     pub safety: Safety,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct DiscardCardCommand {
     #[issuer]
     pub player: PlayerId,
     pub card_index: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct CoupFourreCommand {
     #[issuer]
     pub player: PlayerId,

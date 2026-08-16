@@ -2,6 +2,7 @@
 name = "uno_game"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.82"
 description = "Juego de referencia del OpenTable SDK: UNO."
 license = "MIT OR Apache-2.0"
 

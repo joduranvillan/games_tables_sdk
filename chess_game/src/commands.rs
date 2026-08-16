@@ -5,7 +5,7 @@ use open_table_macros::GameCommand;
 
 use crate::position::{PieceKind, Position};
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct MovePieceCommand {
     #[issuer]
     pub player: PlayerId,
@@ -15,19 +15,19 @@ pub struct MovePieceCommand {
     pub promote_to: Option<PieceKind>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct OfferDrawCommand {
     #[issuer]
     pub player: PlayerId,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct AcceptDrawCommand {
     #[issuer]
     pub player: PlayerId,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct ResignCommand {
     #[issuer]
     pub player: PlayerId,

@@ -2,6 +2,7 @@
 name = "battleship_game"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.82"
 description = "Juego de referencia del OpenTable SDK: batalla naval. Muestra el caso de dos tableros privados (uno por jugador) con eventos publicos de resultado."
 license = "MIT OR Apache-2.0"
 

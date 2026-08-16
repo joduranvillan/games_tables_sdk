@@ -2,7 +2,7 @@ use open_table_core::ids::PlayerId;
 use open_table_macros::GameCommand;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct MovePieceCommand {
     #[issuer]
     pub player: PlayerId,
@@ -10,7 +10,7 @@ pub struct MovePieceCommand {
     pub to: (usize, usize),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct ResignCommand {
     #[issuer]
     pub player: PlayerId,

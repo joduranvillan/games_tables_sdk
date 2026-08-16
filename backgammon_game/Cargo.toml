@@ -2,6 +2,7 @@
 name = "backgammon_game"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.82"
 description = "Juego de referencia del OpenTable SDK: Backgammon simplificado. Muestra un tablero de puntos con conteo con signo, barra y bear-off."
 license = "MIT OR Apache-2.0"
 

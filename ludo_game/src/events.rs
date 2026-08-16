@@ -3,13 +3,13 @@ use serde::{Deserialize, Serialize};
 use open_table_core::ids::PlayerId;
 use open_table_macros::GameEvent;
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct DiceRolledEvent {
     pub player: PlayerId,
     pub value: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct TokenMovedEvent {
     pub player: PlayerId,
     pub token_index: usize,
@@ -20,13 +20,13 @@ pub struct TokenMovedEvent {
     pub finished: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct NoValidMovesEvent {
     pub player: PlayerId,
     pub value: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct GameOverEvent {
     pub winner: PlayerId,
 }

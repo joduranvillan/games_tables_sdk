@@ -5,7 +5,7 @@ use open_table_macros::GameEvent;
 
 use crate::position::{PieceKind, Position};
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct PieceMovedEvent {
     pub player: PlayerId,
     pub from: Position,
@@ -21,7 +21,7 @@ pub struct PieceMovedEvent {
 
 /// `winner: None` significa tablas (ahogado: el rival no está en jaque
 /// pero no tiene ningún movimiento legal).
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct GameOverEvent {
     pub winner: Option<PlayerId>,
 }

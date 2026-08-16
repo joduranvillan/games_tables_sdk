@@ -2,6 +2,7 @@
 name = "mille_bornes_game"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.82"
 description = "Juego de referencia del OpenTable SDK: Mil Millas (Mille Bornes) simplificado. Muestra manos de cartas privadas y peligros/remedios."
 license = "MIT OR Apache-2.0"
 

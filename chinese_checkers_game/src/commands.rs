@@ -5,7 +5,7 @@ use open_table_macros::GameCommand;
 
 use crate::position::Position;
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct MovePegCommand {
     #[issuer]
     pub player: PlayerId,

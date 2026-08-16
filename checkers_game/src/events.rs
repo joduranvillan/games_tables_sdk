@@ -7,7 +7,7 @@ use crate::position::Position;
 
 /// Damas no tiene información oculta: este evento es público (visibilidad
 /// default de `#[derive(GameEvent)]`, todos los jugadores lo ven).
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct PieceMovedEvent {
     pub player: PlayerId,
     pub from: Position,
@@ -16,7 +16,7 @@ pub struct PieceMovedEvent {
     pub promoted: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct GameOverEvent {
     pub winner: PlayerId,
 }

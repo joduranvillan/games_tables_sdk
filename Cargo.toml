@@ -34,6 +34,9 @@ members = [
     "crisis_game",
 ]
 
+[workspace.package]
+rust-version = "1.82"
+
 [profile.release]
 opt-level = "z"
 codegen-units = 1

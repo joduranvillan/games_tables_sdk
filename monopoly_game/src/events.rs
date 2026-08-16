@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use open_table_core::ids::PlayerId;
 use open_table_macros::GameEvent;
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct PlayerMovedEvent {
     pub player: PlayerId,
     pub roll: u32,
@@ -14,7 +14,7 @@ pub struct PlayerMovedEvent {
     pub passed_go: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct RentPaidEvent {
     pub payer: PlayerId,
     pub owner: PlayerId,
@@ -22,36 +22,36 @@ pub struct RentPaidEvent {
     pub amount: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct PropertyPurchasedEvent {
     pub player: PlayerId,
     pub space: usize,
     pub price: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct GameOverEvent {
     pub winner: PlayerId,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct JailedEvent {
     pub player: PlayerId,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct AuctionStartedEvent {
     pub space: usize,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct AuctionWonEvent {
     pub player: PlayerId,
     pub space: usize,
     pub price: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct UtilityRentPaidEvent {
     pub player: PlayerId,
     pub owner: PlayerId,
@@ -60,7 +60,7 @@ pub struct UtilityRentPaidEvent {
     pub amount: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct RailroadRentPaidEvent {
     pub player: PlayerId,
     pub owner: PlayerId,
@@ -68,7 +68,7 @@ pub struct RailroadRentPaidEvent {
     pub amount: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct BankruptcyEvent {
     pub player: PlayerId,
 }

@@ -2,6 +2,7 @@
 name = "open_table_core"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.82"
 description = "Tipos y contratos fundacionales de OpenTable Engine. Sin dependencias de motor (ECS, red, Godot)."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/joduranvillan/games_tables_sdk"

@@ -2,6 +2,7 @@
 name = "chess_game"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.82"
 description = "Juego de referencia del OpenTable SDK: ajedrez. Movimiento completo de las 6 piezas, deteccion de jaque, sin enroque/al paso/promocion elegible."
 license = "MIT OR Apache-2.0"
 

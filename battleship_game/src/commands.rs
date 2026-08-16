@@ -10,7 +10,7 @@ use crate::position::Position;
 /// `TurnOrder`: colocar la flota es una fase de setup simultánea, no un
 /// turno de juego — cada jugador la manda una sola vez, en cualquier
 /// orden, y el `RuleEngine` la rechaza si ya la había mandado antes.
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct PlaceFleetCommand {
     #[issuer]
     pub player: PlayerId,
@@ -19,7 +19,7 @@ pub struct PlaceFleetCommand {
 
 /// Dispara a una casilla del tablero rival. Esta sí respeta `TurnOrder`
 /// — es la fase de juego real, por turnos.
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct FireShotCommand {
     #[issuer]
     pub player: PlayerId,
@@ -28,7 +28,7 @@ pub struct FireShotCommand {
 
 /// Comando para solicitar revancha. Cuando ambos jugadores lo envían,
 /// se reinicia la partida a la fase de colocación.
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct RematchCommand {
     #[issuer]
     pub player: PlayerId,

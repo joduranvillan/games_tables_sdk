@@ -10,7 +10,7 @@ use crate::position::Position;
 /// de 1) como para una captura (distancia diagonal de 2, saltando una
 /// ficha rival) — el `RuleEngine` distingue cuál es cuál según la
 /// distancia.
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct MovePieceCommand {
     #[issuer]
     pub player: PlayerId,
@@ -18,7 +18,7 @@ pub struct MovePieceCommand {
     pub to: Position,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, GameCommand)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct ResignCommand {
     #[issuer]
     pub player: PlayerId,
