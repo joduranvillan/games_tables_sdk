@@ -71,7 +71,11 @@ jobs:
         run: |
           mkdir -p ~/redot
           cd ~/redot
-          wget -q -O redot.zip https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip || wget -q -O redot.zip https://github.com/godotengine/godot-builds/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          wget -q -O redot.zip https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip
+          if [ ! -s redot.zip ]; then
+            echo "ERROR: Failed to download Redot 26.2 (Godot 4.4 compatible). The fallback Godot 4.3 is not supported."
+            exit 1
+          fi
           unzip -q redot.zip
           REDOT_EXEC=$(find ~/redot -type f ! -name "*.zip" | head -n 1)
           if [ -z "$REDOT_EXEC" ]; then
