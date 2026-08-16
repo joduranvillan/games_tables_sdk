@@ -5,11 +5,11 @@ const P2 = 2
 
 # Colors
 const CARD_COLORS = {
-	"Red": Color(0.9, 0.2, 0.2),
-	"Yellow": Color(0.95, 0.85, 0.1),
-	"Green": Color(0.2, 0.75, 0.2),
-	"Blue": Color(0.2, 0.4, 0.9),
-	"Wild": Color(0.3, 0.3, 0.35)
+	"Red": Color("#FF0000"),
+	"Blue": Color("#0000FF"),
+	"Green": Color("#00AA00"),
+	"Yellow": Color("#FFCC00"),
+	"Wild": Color("#33333E")
 }
 
 var bridge
@@ -23,9 +23,11 @@ var deck_count: int = 50
 var active_color: String = "Red"
 
 var hand_container: Control
-var discard_card_node: Panel
+var discard_card_node: PanelContainer
 var discard_label: Label
+var active_color_indicator: ColorRect
 var draw_pile_button: Button
+var deck_button: Button
 var top_info_label: Label
 
 var turn_indicator: TurnIndicator
@@ -66,7 +68,7 @@ func _setup_ui() -> void:
 	add_child(top_info_label)
 
 	# Discard pile visual
-	discard_card_node = Panel.new()
+	discard_card_node = PanelContainer.new()
 	discard_card_node.name = "DiscardPile"
 	discard_card_node.custom_minimum_size = Vector2(120, 180)
 	discard_card_node.size = Vector2(120, 180)
@@ -75,21 +77,33 @@ func _setup_ui() -> void:
 	add_child(discard_card_node)
 	
 	discard_label = Label.new()
-	discard_label.position = Vector2(0, 40)
-	discard_label.size = Vector2(120, 100)
 	discard_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	discard_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	discard_label.add_theme_font_size_override("font_size", 24)
+	discard_label.add_theme_color_override("font_color", Color.WHITE)
+	discard_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	discard_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	discard_card_node.add_child(discard_label)
+
+	# Active Color Indicator (24x24 px ColorRect in top-right of discard area)
+	active_color_indicator = ColorRect.new()
+	active_color_indicator.name = "ActiveColorIndicator"
+	active_color_indicator.custom_minimum_size = Vector2(24, 24)
+	active_color_indicator.size = Vector2(24, 24)
+	active_color_indicator.position = Vector2(discard_card_node.position.x + discard_card_node.size.x - 28, discard_card_node.position.y + 6)
+	active_color_indicator.color = CARD_COLORS.get("Red", Color("#FF0000"))
+	add_child(active_color_indicator)
 	
 	# Draw pile button & counter
 	draw_pile_button = Button.new()
+	draw_pile_button.name = "DrawPileButton"
 	draw_pile_button.position = Vector2(420, 170)
 	draw_pile_button.custom_minimum_size = Vector2(140, 120)
 	draw_pile_button.text = "Robar Carta\n(Pila: 50)"
 	draw_pile_button.add_theme_font_size_override("font_size", 16)
 	draw_pile_button.pressed.connect(_on_draw_pile_pressed)
 	add_child(draw_pile_button)
+	deck_button = draw_pile_button
 	
 	# Fan layout container for hand
 	hand_container = Control.new()
@@ -123,19 +137,24 @@ func _init_default_game_state() -> void:
 	deck_count = 50
 	opponent_card_count = 6
 
-func _update_ui() -> void:
+func _update_active_color_indicator() -> void:
+	if active_color_indicator != null:
+		active_color_indicator.color = CARD_COLORS.get(active_color, Color("#FF0000"))
+
+func _update_ui(animate_drawn_index: int = -1) -> void:
 	# Top card counts display
 	var p1_count = player_hand.size() if current == P1 else opponent_card_count
 	var p2_count = opponent_card_count if current == P1 else player_hand.size()
 	top_info_label.text = "🎴  Jugador 1: %d cartas   |   Jugador 2: %d cartas" % [p1_count, p2_count]
 
-	# Update Discard Pile
+	# Update Discard Pile & Active color
 	_update_discard_display()
+	_update_active_color_indicator()
 	
 	# Update Draw Pile counter text
 	draw_pile_button.text = "Robar Carta\n(Pila: %d)" % deck_count
 	
-	# Update Hand Buttons with Fan Layout
+	# Update Hand Buttons with Fan Layout & PanelContainer
 	for child in hand_container.get_children():
 		child.queue_free()
 		
@@ -158,71 +177,82 @@ func _update_ui() -> void:
 		
 		var is_playable = (c_color == active_color) or (c_value == top_val) or (c_color == "Wild")
 		
-		var btn = TextureButton.new()
-		btn.custom_minimum_size = Vector2(90, 140)
-		btn.size = Vector2(90, 140)
-		btn.ignore_texture_size = true
-		btn.stretch_mode = TextureButton.STRETCH_SCALE
-		btn.pivot_offset = Vector2(45, 140) # Fan pivot at bottom center
-		
-		# Angle spread between -15° and +15°
-		var angle_deg = 0.0
-		if n_cards > 1:
-			angle_deg = lerp(-15.0, 15.0, float(i) / float(n_cards - 1))
-		btn.rotation_degrees = angle_deg
-		
-		var resting_pos = Vector2(start_x + i * spread, 30.0 + abs(angle_deg) * 0.8)
-		btn.position = resting_pos
-		btn.set_meta("resting_y", resting_pos.y)
+		var panel = PanelContainer.new()
+		panel.custom_minimum_size = Vector2(90, 140)
+		panel.size = Vector2(90, 140)
+		panel.pivot_offset = Vector2(45, 140) # Fan pivot at bottom center
+		panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
-		# Create card texture
-		var img = Image.create(90, 140, false, Image.FORMAT_RGBA8)
-		var base_col = CARD_COLORS.get(c_color, Color(0.5, 0.5, 0.5))
-		
-		for x in range(90):
-			for y in range(140):
-				# Flashing golden border if playable, else crisp white border
-				if is_playable and (x < 5 or x >= 85 or y < 5 or y >= 135):
-					img.set_pixel(x, y, Color(1.0, 0.84, 0.0)) # Golden border
-				elif x < 2 or x >= 88 or y < 2 or y >= 138:
-					img.set_pixel(x, y, Color.WHITE)
-				else:
-					img.set_pixel(x, y, base_col)
-					
-		btn.texture_normal = ImageTexture.create_from_image(img)
-		
-		# Label on card
+		# StyleBoxFlat with corner_radius_*_px = 8 and border_width = 2
+		var style = StyleBoxFlat.new()
+		var base_col = CARD_COLORS.get(c_color, Color("#33333E"))
+		style.bg_color = base_col
+		style.set_corner_radius_all(8)
+		style.set_border_width_all(2)
+		if is_playable:
+			style.border_color = Color(1.0, 0.85, 0.1) # Golden border if playable
+		else:
+			style.border_color = Color(1.0, 1.0, 1.0, 0.8) # Crisp white border
+		panel.add_theme_stylebox_override("panel", style)
+
+		# Label with white centered text
 		var lbl = Label.new()
 		lbl.text = "%s\n%s" % [c_color, c_value]
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		lbl.size = Vector2(90, 140)
 		lbl.add_theme_font_size_override("font_size", 16)
-		btn.add_child(lbl)
+		lbl.add_theme_color_override("font_color", Color.WHITE)
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lbl.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		panel.add_child(lbl)
+
+		# Angle spread between -15° and +15°
+		var angle_deg = 0.0
+		if n_cards > 1:
+			angle_deg = lerp(-15.0, 15.0, float(i) / float(n_cards - 1))
+		panel.rotation_degrees = angle_deg
 		
+		var resting_pos = Vector2(start_x + i * spread, 30.0 + abs(angle_deg) * 0.8)
+		panel.position = resting_pos
+		panel.set_meta("resting_y", resting_pos.y)
+
 		# Flashing golden animation on playable cards
 		if is_playable:
-			var tw_pulse = btn.create_tween().set_loops()
-			tw_pulse.tween_property(btn, "modulate", Color(1.3, 1.25, 0.6), 0.4)
-			tw_pulse.tween_property(btn, "modulate", Color(1.0, 1.0, 1.0), 0.4)
+			var tw_pulse = panel.create_tween().set_loops()
+			tw_pulse.tween_property(panel, "modulate", Color(1.25, 1.25, 0.7), 0.4)
+			tw_pulse.tween_property(panel, "modulate", Color(1.0, 1.0, 1.0), 0.4)
 
-		# Hover elevation (+20px lift)
-		btn.mouse_entered.connect(func():
-			var tw = btn.create_tween().set_parallel(true)
-			tw.tween_property(btn, "position:y", btn.get_meta("resting_y") - 25.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-			tw.tween_property(btn, "scale", Vector2(1.1, 1.1), 0.15)
-			btn.z_index = 10
+		# Hover elevation (+25px lift)
+		panel.mouse_entered.connect(func():
+			var tw = panel.create_tween().set_parallel(true)
+			tw.tween_property(panel, "position:y", panel.get_meta("resting_y") - 25.0, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			tw.tween_property(panel, "scale", Vector2(1.1, 1.1), 0.15)
+			panel.z_index = 10
 		)
-		btn.mouse_exited.connect(func():
-			var tw = btn.create_tween().set_parallel(true)
-			tw.tween_property(btn, "position:y", btn.get_meta("resting_y"), 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-			tw.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.15)
-			btn.z_index = 0
+		panel.mouse_exited.connect(func():
+			var tw = panel.create_tween().set_parallel(true)
+			tw.tween_property(panel, "position:y", panel.get_meta("resting_y"), 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			tw.tween_property(panel, "scale", Vector2(1.0, 1.0), 0.15)
+			panel.z_index = 0
 		)
 
 		var card_idx = i
-		btn.pressed.connect(func(): _on_card_pressed(card_idx, btn))
-		hand_container.add_child(btn)
+		panel.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				_on_card_pressed(card_idx, panel)
+		)
+
+		hand_container.add_child(panel)
+
+		# Animación de robo: entra desde el mazo (deck_button.global_position) hasta su posición final con Tween de 0.3 s
+		if i == animate_drawn_index and deck_button != null:
+			var deck_global = deck_button.global_position
+			var start_local = hand_container.to_local(deck_global)
+			panel.position = start_local
+			panel.scale = Vector2(0.6, 0.6)
+			var tw_draw = panel.create_tween().set_parallel(true)
+			tw_draw.tween_property(panel, "position", resting_pos, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			tw_draw.tween_property(panel, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _update_discard_display() -> void:
 	var top_card = discard_pile.back() if not discard_pile.is_empty() else {"color": "Red", "value": "1"}
@@ -230,41 +260,38 @@ func _update_discard_display() -> void:
 	var top_val = str(top_card.get("value", "1"))
 	
 	discard_label.text = "%s\n%s" % [top_col_name, top_val]
-	var bg_col = CARD_COLORS.get(top_col_name, Color(0.5, 0.5, 0.5))
+	var bg_col = CARD_COLORS.get(top_col_name, Color("#33333E"))
 	
 	var style = StyleBoxFlat.new()
 	style.bg_color = bg_col
-	style.set_corner_radius_all(10)
-	style.border_width_left = 3
-	style.border_width_top = 3
-	style.border_width_right = 3
-	style.border_width_bottom = 3
+	style.set_corner_radius_all(8)
+	style.set_border_width_all(2)
 	style.border_color = Color.WHITE
 	discard_card_node.add_theme_stylebox_override("panel", style)
 
 func _animate_card_to_discard(card_dict: Dictionary, start_global_pos: Vector2) -> void:
 	# Create sliding temp panel to discard pile
-	var anim_panel = Panel.new()
+	var anim_panel = PanelContainer.new()
 	anim_panel.size = Vector2(90, 140)
 	anim_panel.position = start_global_pos
 	anim_panel.pivot_offset = Vector2(45, 70)
 	
-	var bg_col = CARD_COLORS.get(card_dict.get("color", "Red"), Color(0.5, 0.5, 0.5))
+	var bg_col = CARD_COLORS.get(card_dict.get("color", "Red"), Color("#33333E"))
 	var style = StyleBoxFlat.new()
 	style.bg_color = bg_col
 	style.set_corner_radius_all(8)
+	style.set_border_width_all(2)
 	style.border_color = Color.GOLD
-	style.border_width_left = 3
-	style.border_width_top = 3
-	style.border_width_right = 3
-	style.border_width_bottom = 3
 	anim_panel.add_theme_stylebox_override("panel", style)
 
 	var lbl = Label.new()
 	lbl.text = "%s\n%s" % [card_dict.get("color", "Red"), str(card_dict.get("value", "0"))]
-	lbl.size = Vector2(90, 140)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_color_override("font_color", Color.WHITE)
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	anim_panel.add_child(lbl)
 
 	add_child(anim_panel)
@@ -275,6 +302,7 @@ func _animate_card_to_discard(card_dict: Dictionary, start_global_pos: Vector2) 
 	tween.tween_property(anim_panel, "rotation_degrees", randf_range(-15.0, 15.0), 0.3)
 	tween.chain().tween_callback(func():
 		_update_discard_display()
+		_update_active_color_indicator()
 		anim_panel.queue_free()
 	)
 
@@ -316,9 +344,10 @@ func _on_draw_pile_pressed() -> void:
 	if deck_count > 0:
 		deck_count -= 1
 		player_hand.append({"color": "Yellow", "value": "7"})
+		var drawn_idx = player_hand.size() - 1
 		if has_node("/root/AudioManager"):
 			get_node("/root/AudioManager").play_move()
-		_update_ui()
+		_update_ui(drawn_idx)
 
 func _on_event_json(json_str: String) -> void:
 	var parser = JSON.new()
@@ -333,6 +362,13 @@ func _on_event_json(json_str: String) -> void:
 					_animate_card_to_discard(c, Vector2(350, 50))
 				if event.has("new_color"):
 					active_color = str(event["new_color"])
+				_update_active_color_indicator()
+			elif event_type == "ColorChangedEvent":
+				if event.has("color"):
+					active_color = str(event["color"])
+				elif event.has("new_color"):
+					active_color = str(event["new_color"])
+				_update_active_color_indicator()
 			elif event_type == "CardsDrawnEvent":
 				var cnt = int(event.get("count", 1))
 				deck_count = max(0, deck_count - cnt)

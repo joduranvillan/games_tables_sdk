@@ -34,10 +34,10 @@ pub fn clone_backgammon_session(session: &Session) -> Session {
         new_session.world_mut().insert_resource(turn.clone());
     }
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
-        new_session.world_mut().insert_resource(game_over.clone());
+        new_session.world_mut().insert_resource(*game_over);
     }
     if let Some(winner) = session.world().get_resource::<WinnerResource>() {
-        new_session.world_mut().insert_resource(winner.clone());
+        new_session.world_mut().insert_resource(*winner);
     }
 
     new_session

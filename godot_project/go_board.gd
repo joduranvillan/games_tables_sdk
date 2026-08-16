@@ -26,6 +26,8 @@ var grid_container: GridContainer
 var stones_container: Node2D
 
 var captured_score_label: Label
+var captures_label_b: Label
+var captures_label_n: Label
 var drag_layer: DragDropLayer
 var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
@@ -68,12 +70,34 @@ func _setup_ui() -> void:
 	# Captured Stones Top-Right Panel
 	captured_score_label = Label.new()
 	captured_score_label.name = "CapturedScoreLabel"
-	captured_score_label.position = Vector2(400, 15)
+	captured_score_label.position = Vector2(380, 15)
 	captured_score_label.size = Vector2(300, 45)
 	captured_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	captured_score_label.add_theme_font_size_override("font_size", 16)
 	captured_score_label.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
 	add_child(captured_score_label)
+
+	# Captured Stones Counters below the board
+	var captures_container = HBoxContainer.new()
+	captures_container.name = "CapturesContainer"
+	captures_container.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
+	captures_container.size = Vector2(BOARD_SIZE * CELL_SIZE, 30)
+	captures_container.add_theme_constant_override("separation", 24)
+	add_child(captures_container)
+
+	captures_label_b = Label.new()
+	captures_label_b.name = "CapturesLabelB"
+	captures_label_b.text = "Capturas B: 0"
+	captures_label_b.add_theme_font_size_override("font_size", 16)
+	captures_label_b.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
+	captures_container.add_child(captures_label_b)
+
+	captures_label_n = Label.new()
+	captures_label_n.name = "CapturesLabelN"
+	captures_label_n.text = "Capturas N: 0"
+	captures_label_n.add_theme_font_size_override("font_size", 16)
+	captures_label_n.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
+	captures_container.add_child(captures_label_n)
 
 	# Drag & Drop / Input Layer
 	drag_layer = DragDropLayer.new()
@@ -86,7 +110,7 @@ func _setup_ui() -> void:
 	# Turn Indicator Widget
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 45)
+	turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 48)
 	add_child(turn_indicator)
 
 	# Network Status HUD
@@ -95,8 +119,12 @@ func _setup_ui() -> void:
 	add_child(network_hud)
 
 func _update_captured_score() -> void:
+	if captures_label_b != null:
+		captures_label_b.text = "Capturas B: %d" % white_captured
+	if captures_label_n != null:
+		captures_label_n.text = "Capturas N: %d" % black_captured
 	if captured_score_label != null:
-		captured_score_label.text = "Piedras capturadas — Negro: %d / Blanco: %d" % [black_captured, white_captured]
+		captured_score_label.text = "Capturas N: %d | Capturas B: %d" % [black_captured, white_captured]
 
 func _on_theme_changed(theme: BoardTheme) -> void:
 	current_theme = theme
@@ -186,6 +214,7 @@ func _place_stone(row: int, col: int, player: int) -> void:
 	stone.custom_minimum_size = Vector2(CELL_SIZE * 0.85, CELL_SIZE * 0.85)
 	stone.size = Vector2(CELL_SIZE * 0.85, CELL_SIZE * 0.85)
 	stone.pivot_offset = stone.size / 2.0
+	stone.scale = Vector2.ZERO
 	
 	var img = Image.create(64, 64, false, Image.FORMAT_RGBA8)
 	var col_color = COL_BLACK_STONE if player == P_BLACK else COL_WHITE_STONE
@@ -208,6 +237,9 @@ func _place_stone(row: int, col: int, player: int) -> void:
 	
 	stones_container.add_child(stone)
 	stone_nodes[row][col] = stone
+
+	var tween = create_tween()
+	tween.tween_property(stone, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	
 	if has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_move()
@@ -234,28 +266,37 @@ func _on_event_json(json_str: String) -> void:
 		var event = parser.data
 		if event is Dictionary:
 			var event_type = event.get("command_type", event.get("event_type", ""))
-			if event_type == "StonePlacedEvent":
+			if event_type.ends_with("StonePlacedEvent") or event_type == "StonePlacedEvent" or event_type == "stone_placed":
 				var r = int(event.get("y", 0))
 				var c = int(event.get("x", 0))
 				var p = int(event.get("player", current))
 				_place_stone(r, c, p)
-			elif event_type == "StonesCapturedEvent":
+			elif event_type.ends_with("StonesCapturedEvent") or event_type.ends_with("StonesRemovedEvent") or event_type == "StonesCapturedEvent" or event_type == "StonesRemovedEvent":
 				var cap_coords = []
 				if event.has("coords"):
 					for pair in event["coords"]:
 						cap_coords.append(Vector2i(pair[0], pair[1]))
+				elif event.has("stones"):
+					for pair in event["stones"]:
+						cap_coords.append(Vector2i(pair[0], pair[1]))
+				var count = int(event.get("count", cap_coords.size()))
 				var cap_player = int(event.get("player", current))
+				var num_captured = max(count, cap_coords.size())
 				if cap_player == P_BLACK:
-					black_captured += cap_coords.size()
+					black_captured += num_captured
 				else:
-					white_captured += cap_coords.size()
+					white_captured += num_captured
 				_animate_captures(cap_coords)
 				_update_captured_score()
-			elif event_type == "GameOverEvent":
+			elif event_type.ends_with("GameOverEvent") or event_type == "GameOverEvent":
 				var w = event.get("winner", -1)
 				if w == null: w = 0
 				if event.has("black_score"): black_score = float(event["black_score"])
 				if event.has("white_score"): white_score = float(event["white_score"])
+				if event.has("territory") and event["territory"] is Array:
+					territory_map.clear()
+					for row in event["territory"]:
+						territory_map.append(row.duplicate())
 				_on_game_over(int(w))
 				
 	current = bridge.current_player()
@@ -360,23 +401,40 @@ func _draw() -> void:
 		var end_v = Vector2(i * CELL_SIZE + CELL_SIZE / 2.0, (BOARD_SIZE - 0.5) * CELL_SIZE)
 		draw_line(start_v, end_v, line_col, 2.0)
 		
-	# Star points (Hoshi) for 9x9 board: 5 points
-	var hoshi_points = [Vector2i(2, 2), Vector2i(2, 6), Vector2i(6, 2), Vector2i(6, 6), Vector2i(4, 4)]
+	# Star points (Hoshi) for Go board:
+	# 9 points on canonical intersections: 3-3, 3-7, 5-5 (indices 2, 4, 6) on 9x9; 3-3, 3-9, 3-15 (indices 3, 9, 15) on 19x19
+	var hoshi_points: Array[Vector2i] = []
+	if BOARD_SIZE == 9:
+		for r in [2, 4, 6]:
+			for c in [2, 4, 6]:
+				hoshi_points.append(Vector2i(r, c))
+	elif BOARD_SIZE == 19:
+		for r in [3, 9, 15]:
+			for c in [3, 9, 15]:
+				hoshi_points.append(Vector2i(r, c))
+	elif BOARD_SIZE == 13:
+		for r in [3, 6, 9]:
+			for c in [3, 6, 9]:
+				hoshi_points.append(Vector2i(r, c))
+	else:
+		hoshi_points = [Vector2i(2, 2), Vector2i(2, 6), Vector2i(6, 2), Vector2i(6, 6), Vector2i(4, 4)]
+		
+	var hoshi_radius = CELL_SIZE * 0.12
 	for hp in hoshi_points:
 		var pos = Vector2(hp.y * CELL_SIZE + CELL_SIZE / 2.0, hp.x * CELL_SIZE + CELL_SIZE / 2.0)
-		draw_circle(pos, 4.0, line_col)
+		draw_circle(pos, hoshi_radius, Color.BLACK)
 
-	# Territory scoring color grid overlay on game over
+	# Territory scoring color grid overlay on game over (alpha 0.35 on empty intersections)
 	if winner != -1 and territory_map.size() > 0:
 		for r in range(BOARD_SIZE):
 			for c in range(BOARD_SIZE):
-				var owner = territory_map[r][c]
-				if owner != null:
-					var cell_pos = Vector2(c * CELL_SIZE + 15, r * CELL_SIZE + 15)
-					var cell_rect = Rect2(cell_pos, Vector2(CELL_SIZE - 30, CELL_SIZE - 30))
-					var t_col = Color(0.1, 0.1, 0.1, 0.55) if owner == P_BLACK else Color(0.95, 0.95, 0.95, 0.65)
-					draw_rect(cell_rect, t_col)
-					draw_rect(cell_rect, Color.GOLD, false, 2.0)
+				if board[r][c] == null:
+					var owner = territory_map[r][c]
+					if owner != null:
+						var cell_pos = Vector2(c * CELL_SIZE + 4, r * CELL_SIZE + 4)
+						var cell_rect = Rect2(cell_pos, Vector2(CELL_SIZE - 8, CELL_SIZE - 8))
+						var t_col = Color(0.1, 0.1, 0.1, 0.35) if owner == P_BLACK else Color(0.95, 0.95, 0.95, 0.35)
+						draw_rect(cell_rect, t_col)
 
 func _update_status() -> void:
 	if winner != -1:

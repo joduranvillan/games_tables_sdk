@@ -115,3 +115,25 @@ func show_roll(values: Array) -> void:
 
 	is_rolling = false
 	animation_done.emit()
+
+func roll_animation(val: int, duration: float = 0.4, steps: int = 3) -> void:
+	is_rolling = true
+	if dice_rects.size() > 0:
+		dice_rects[0].visible = true
+	for i in range(1, dice_rects.size()):
+		dice_rects[i].visible = false
+
+	var step_delay = duration / float(max(1, steps))
+	if is_inside_tree():
+		for s in range(steps):
+			var rand_val = randi() % 6
+			if dice_textures.size() > rand_val and dice_rects.size() > 0:
+				dice_rects[0].texture = dice_textures[rand_val]
+			await get_tree().create_timer(step_delay).timeout
+
+	if dice_rects.size() > 0 and dice_textures.size() > 0:
+		var idx = clamp(val - 1, 0, dice_textures.size() - 1)
+		dice_rects[0].texture = dice_textures[idx]
+
+	is_rolling = false
+	animation_done.emit()

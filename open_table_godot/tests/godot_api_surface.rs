@@ -1,11 +1,8 @@
-use open_table_godot::godot::prelude::*;
+use godot::prelude::*;
 use open_table_godot::OpenTableBridge;
 
 #[test]
 fn test_godot_bridge_api_surface_compilation() {
-    // Verificamos estáticamente que los métodos esperados por el bridge GDScript existen
-    // en OpenTableBridge y tienen firmas compatibles.
-
     let _f1: fn(&mut OpenTableBridge, i64, i64) = OpenTableBridge::start_local_match;
     let _f2: fn(&mut OpenTableBridge, i64, GString) = OpenTableBridge::send_command_json;
     let _f3: fn(&OpenTableBridge) -> i64 = OpenTableBridge::current_player;

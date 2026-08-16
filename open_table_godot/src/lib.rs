@@ -277,6 +277,10 @@ impl INode for OpenTableBridge {
             chess_ai_depth: 3,
         }
     }
+
+    fn process(&mut self, _delta: f64) {
+        self.poll_events();
+    }
 }
 
 #[godot_api]
@@ -451,6 +455,37 @@ impl OpenTableBridge {
     }
 
     #[func]
+    fn start_local_match_shogi_vs_ai(&mut self, human_player: i64, ai_player: i64) -> bool {
+        if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "shogi".to_string();
+        let p_human = PlayerId(human_player as u32);
+        let p_ai = PlayerId(ai_player as u32);
+
+        let (p1, p2) = if human_player < ai_player {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let session = new_shogi_session(SessionId(1), 1, p1, p2);
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
+    }
+
+    #[func]
     fn start_local_match_xiangqi(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "xiangqi".to_string();
         let session =
@@ -459,6 +494,37 @@ impl OpenTableBridge {
             session,
             ai_player: None,
         };
+    }
+
+    #[func]
+    fn start_local_match_xiangqi_vs_ai(&mut self, human_player: i64, ai_player: i64) -> bool {
+        if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "xiangqi".to_string();
+        let p_human = PlayerId(human_player as u32);
+        let p_ai = PlayerId(ai_player as u32);
+
+        let (p1, p2) = if human_player < ai_player {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let session = new_xiangqi_session(SessionId(1), 1, p1, p2);
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
     }
 
     #[func]
@@ -607,11 +673,7 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn start_local_match_backgammon_vs_ai(
-        &mut self,
-        human_player: i64,
-        ai_player: i64,
-    ) -> bool {
+    fn start_local_match_backgammon_vs_ai(&mut self, human_player: i64, ai_player: i64) -> bool {
         if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
             return false;
         }
@@ -1751,6 +1813,32 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn current_tick(&self) -> i64 {
+        match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::Replay { session, .. }
+            | BridgeMode::Tournament { session, .. } => session.current_tick().0 as i64,
+            BridgeMode::MultiSession { sessions, active } => sessions
+                .get(*active)
+                .map(|(_, s)| s.current_tick().0 as i64)
+                .unwrap_or(0),
+            _ => 0,
+        }
+    }
+
+    #[func]
+    pub fn get_session_ticks(&self) -> i64 {
+        self.current_tick()
+    }
+
+    #[func]
+    pub fn _process(&mut self, _delta: f64) {
+        self.poll_events();
+    }
+
+    #[func]
     pub fn checkers_ai_pick_move(&mut self, player_id: i64) -> bool {
         let p_id = PlayerId(player_id as u32);
         if let BridgeMode::Local { session, .. } = &mut self.mode {
@@ -2232,7 +2320,12 @@ impl OpenTableBridge {
                 } => {
                     if session.current_player() == *ai_p {
                         let cmd: Option<Box<dyn Command>> = match self.current_game_type.as_str() {
-                            "chess" => chess_game::chess_ai_pick_move(session, *ai_p, self.chess_ai_depth)
+                            "chess" => {
+                                chess_game::chess_ai_pick_move(session, *ai_p, self.chess_ai_depth)
+                                    .map(|c| Box::new(c) as Box<dyn Command>)
+                            }
+                            "shogi" => shogi_game::shogi_ai_pick_move(session, *ai_p),
+                            "xiangqi" => xiangqi_game::xiangqi_ai_pick_move(session, *ai_p)
                                 .map(|c| Box::new(c) as Box<dyn Command>),
                             "backgammon" => {
                                 let has_pending = session
@@ -2242,7 +2335,9 @@ impl OpenTableBridge {
                                     .map(|d| !d.is_empty())
                                     .unwrap_or(false);
                                 if !has_pending {
-                                    Some(Box::new(backgammon_game::RollDiceCommand { player: *ai_p }) as Box<dyn Command>)
+                                    Some(Box::new(backgammon_game::RollDiceCommand {
+                                        player: *ai_p,
+                                    }) as Box<dyn Command>)
                                 } else {
                                     backgammon_game::backgammon_ai_pick_move(session, *ai_p)
                                         .map(|c| Box::new(c) as Box<dyn Command>)
