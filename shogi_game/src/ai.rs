@@ -130,7 +130,7 @@ pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
     let mut score = 0.0f32;
 
     // Piezas en el tablero
-    for (_, piece) in &board.squares {
+    for piece in board.squares.values() {
         let val = piece_value(piece.kind);
         if piece.owner == player {
             score += val;
@@ -168,13 +168,13 @@ pub fn clone_shogi_session(session: &Session) -> Session {
         new_session.world_mut().insert_resource(board.clone());
     }
     if let Some(turn) = session.world().get_resource::<TurnResource>() {
-        new_session.world_mut().insert_resource(turn.clone());
+        new_session.world_mut().insert_resource(*turn);
     }
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
-        new_session.world_mut().insert_resource(game_over.clone());
+        new_session.world_mut().insert_resource(*game_over);
     }
     if let Some(winner) = session.world().get_resource::<WinnerResource>() {
-        new_session.world_mut().insert_resource(winner.clone());
+        new_session.world_mut().insert_resource(*winner);
     }
 
     new_session

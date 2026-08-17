@@ -8,7 +8,7 @@ use crate::rules::all_legal_moves_for;
 /// Comprueba si un Cañón en la posición `(cx, cy)` dispone de al menos una pieza en su fila o columna
 /// que pueda servir como pantalla / plataforma de salto.
 pub fn cannon_has_screen(board: &BoardResource, cx: usize, cy: usize) -> bool {
-    for (&(x, y), _) in &board.squares {
+    for &(x, y) in board.squares.keys() {
         if (x == cx && y != cy) || (y == cy && x != cx) {
             return true;
         }
@@ -90,13 +90,13 @@ pub fn clone_xiangqi_session(session: &Session) -> Session {
         new_session.world_mut().insert_resource(board.clone());
     }
     if let Some(turn) = session.world().get_resource::<TurnResource>() {
-        new_session.world_mut().insert_resource(turn.clone());
+        new_session.world_mut().insert_resource(*turn);
     }
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
-        new_session.world_mut().insert_resource(game_over.clone());
+        new_session.world_mut().insert_resource(*game_over);
     }
     if let Some(winner) = session.world().get_resource::<WinnerResource>() {
-        new_session.world_mut().insert_resource(winner.clone());
+        new_session.world_mut().insert_resource(*winner);
     }
 
     new_session
