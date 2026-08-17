@@ -8,11 +8,13 @@ use crate::position::Position;
 /// Un barco es simplemente la lista de casillas que ocupa.
 pub type Ship = Vec<Position>;
 
-/// Tamaños de flota esperados para el MVP: 3 barcos (4, 3 y 2 casillas).
-/// El juego real (10x10, 5 barcos) queda para más adelante — esto alcanza
-/// para probar el mecanismo de información oculta sin escribir un
-/// validador de flota completo.
-pub const EXPECTED_SHIP_SIZES: [usize; 3] = [4, 3, 2];
+/// Tamaños de flota estándar de Batalla Naval:
+/// - Portaaviones: 5 casillas
+/// - Acorazado: 4 casillas
+/// - Crucero: 3 casillas
+/// - Submarino: 3 casillas
+/// - Destructor: 2 casillas
+pub const EXPECTED_SHIP_SIZES: [usize; 5] = [5, 4, 3, 3, 2];
 
 #[derive(GameResource, Default)]
 pub struct FleetResource {

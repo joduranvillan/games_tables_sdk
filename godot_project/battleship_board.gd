@@ -1,13 +1,15 @@
 extends Node2D
 
-const BOARD_SIZE := 8
-const CELL_SIZE := 46.0
+const BOARD_SIZE := 10
+const CELL_SIZE := 40.0
 const P1 := 1
 const P2 := 2
 const SHIP_SPECS := [
-	{"name": "Portaaviones", "size": 4, "color": Color(0.2, 0.6, 0.9)},
-	{"name": "Acorazado", "size": 3, "color": Color(0.3, 0.8, 0.4)},
-	{"name": "Submarino", "size": 2, "color": Color(0.9, 0.7, 0.2)}
+	{"name": "Portaaviones", "size": 5, "color": Color(0.2, 0.6, 0.9)},
+	{"name": "Acorazado", "size": 4, "color": Color(0.3, 0.8, 0.4)},
+	{"name": "Crucero", "size": 3, "color": Color(0.8, 0.4, 0.8)},
+	{"name": "Submarino", "size": 3, "color": Color(0.9, 0.7, 0.2)},
+	{"name": "Destructor", "size": 2, "color": Color(0.9, 0.3, 0.3)}
 ]
 
 enum Phase { PLACEMENT_P1, PLACEMENT_P2, FIRE, GAME_OVER }
@@ -211,7 +213,7 @@ func _draw_grid_coordinates(grid_buttons: Array, font: Font, font_sz: int, coord
 	if grid_buttons.is_empty() or grid_buttons[0].is_empty():
 		return
 
-	# Números 1–8 en la fila superior (columnas 0..7)
+	# Números 1–10 en la fila superior (columnas 0..9)
 	for c in range(BOARD_SIZE):
 		var btn: Button = grid_buttons[0][c]
 		if btn != null and btn.is_inside_tree():
@@ -219,7 +221,7 @@ func _draw_grid_coordinates(grid_buttons: Array, font: Font, font_sz: int, coord
 			var num_str = str(c + 1)
 			draw_string(font, Vector2(b_pos.x, b_pos.y - 6), num_str, HORIZONTAL_ALIGNMENT_CENTER, CELL_SIZE, font_sz, coord_color)
 
-	# Letras A–H en la columna izquierda (filas 0..7)
+	# Letras A–J en la columna izquierda (filas 0..9)
 	for r in range(BOARD_SIZE):
 		var btn: Button = grid_buttons[r][0]
 		if btn != null and btn.is_inside_tree():

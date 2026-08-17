@@ -105,11 +105,7 @@ pub fn piece_value(kind: PieceKind) -> f32 {
 pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
         if game_over.0 {
-            if let Some(winner) = session
-                .world()
-                .get_resource::<WinnerResource>()
-                .and_then(|w| w.0)
-            {
+            if let Some(winner) = session.world().get_resource::<WinnerResource>().and_then(|w| w.0) {
                 return if winner == player {
                     100_000.0
                 } else {
@@ -134,7 +130,7 @@ pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
     let mut score = 0.0f32;
 
     // Piezas en el tablero
-    for piece in board.squares.values() {
+    for (_, piece) in &board.squares {
         let val = piece_value(piece.kind);
         if piece.owner == player {
             score += val;
@@ -175,10 +171,10 @@ pub fn clone_shogi_session(session: &Session) -> Session {
         new_session.world_mut().insert_resource(turn.clone());
     }
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
-        new_session.world_mut().insert_resource(*game_over);
+        new_session.world_mut().insert_resource(game_over.clone());
     }
     if let Some(winner) = session.world().get_resource::<WinnerResource>() {
-        new_session.world_mut().insert_resource(*winner);
+        new_session.world_mut().insert_resource(winner.clone());
     }
 
     new_session
@@ -195,11 +191,7 @@ pub fn minimax(
 ) -> f32 {
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
         if game_over.0 {
-            if let Some(winner) = session
-                .world()
-                .get_resource::<WinnerResource>()
-                .and_then(|w| w.0)
-            {
+            if let Some(winner) = session.world().get_resource::<WinnerResource>().and_then(|w| w.0) {
                 return if winner == player {
                     100_000.0
                 } else {
@@ -228,10 +220,7 @@ pub fn minimax(
         let mut max_eval = f32::NEG_INFINITY;
         for action in candidates {
             let mut next_session = clone_shogi_session(session);
-            if next_session
-                .process_command(current, action.to_command())
-                .is_ok()
-            {
+            if next_session.process_command(current, action.to_command()).is_ok() {
                 has_legal = true;
                 let eval = minimax(&next_session, depth - 1, alpha, beta, false, player);
                 if eval > max_eval {
@@ -248,11 +237,7 @@ pub fn minimax(
         if !has_legal {
             let in_chk = is_in_check(board, current);
             return if in_chk {
-                if current == player {
-                    f32::NEG_INFINITY
-                } else {
-                    f32::INFINITY
-                }
+                if current == player { f32::NEG_INFINITY } else { f32::INFINITY }
             } else {
                 0.0
             };
@@ -262,10 +247,7 @@ pub fn minimax(
         let mut min_eval = f32::INFINITY;
         for action in candidates {
             let mut next_session = clone_shogi_session(session);
-            if next_session
-                .process_command(current, action.to_command())
-                .is_ok()
-            {
+            if next_session.process_command(current, action.to_command()).is_ok() {
                 has_legal = true;
                 let eval = minimax(&next_session, depth - 1, alpha, beta, true, player);
                 if eval < min_eval {
@@ -282,11 +264,7 @@ pub fn minimax(
         if !has_legal {
             let in_chk = is_in_check(board, current);
             return if in_chk {
-                if current == player {
-                    f32::NEG_INFINITY
-                } else {
-                    f32::INFINITY
-                }
+                if current == player { f32::NEG_INFINITY } else { f32::INFINITY }
             } else {
                 0.0
             };
@@ -319,11 +297,7 @@ pub fn shogi_ai_pick_move(session: &Session, player: PlayerId) -> Option<Box<dyn
     candidates.sort_by_key(|action| match action {
         ShogiAction::Move(cmd) => {
             let is_capture = board.squares.contains_key(&cmd.to);
-            if is_capture || cmd.promote {
-                0
-            } else {
-                1
-            }
+            if is_capture || cmd.promote { 0 } else { 1 }
         }
         ShogiAction::Drop(_) => 2,
     });
@@ -336,10 +310,7 @@ pub fn shogi_ai_pick_move(session: &Session, player: PlayerId) -> Option<Box<dyn
 
     for action in candidates {
         let mut next_session = clone_shogi_session(session);
-        if next_session
-            .process_command(player, action.to_command())
-            .is_ok()
-        {
+        if next_session.process_command(player, action.to_command()).is_ok() {
             let score = minimax(&next_session, depth - 1, alpha, beta, false, player);
             if score > best_score || best_action.is_none() {
                 best_score = score;
@@ -366,10 +337,7 @@ mod tests {
     fn test_shogi_ai_devuelve_movimiento_en_posicion_inicial() {
         let session = new_shogi_session(SessionId(1), 1, P1, P2);
         let mv = shogi_ai_pick_move(&session, P1);
-        assert!(
-            mv.is_some(),
-            "La IA de Shogi debe devolver un movimiento en la posición inicial"
-        );
+        assert!(mv.is_some(), "La IA de Shogi debe devolver un movimiento en la posición inicial");
 
         let mut test_session = clone_shogi_session(&session);
         assert!(

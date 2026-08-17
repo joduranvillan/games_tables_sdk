@@ -2,12 +2,14 @@
 //! Maneja información oculta (ubicación de barcos), fase de colocación
 //! de flotas y disparos por turnos.
 
+pub mod board;
 pub mod commands;
 pub mod events;
 pub mod fleet;
 pub mod position;
 pub mod rules;
 
+pub use board::BOARD_SIZE;
 pub use commands::{FireShotCommand, PlaceFleetCommand, RematchCommand};
 pub use events::{FleetPlacedEvent, GameOverEvent, ShotResult, ShotResultEvent, SunkenShipEvent};
 pub use fleet::{FleetResource, RematchResource, Ship, ShotsResource, EXPECTED_SHIP_SIZES};

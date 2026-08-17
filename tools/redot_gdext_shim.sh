@@ -35,11 +35,10 @@ for arg in "$@"; do
 			if [[ "$VER" =~ ^4\. ]]; then
 				echo "$VER"
 			else
-				# Redot 26.x is based on Godot 4.4 — report as 4.4
-				echo "4.4.0.stable.official.000000000"
+				echo "4.3.0.stable.official.000000000"
 			fi
 		else
-			echo "4.4.0.stable.official.000000000"
+			echo "4.3.0.stable.official.000000000"
 		fi
 		exit 0
 	fi

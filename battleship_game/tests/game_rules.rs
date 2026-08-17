@@ -11,7 +11,8 @@ fn pos(row: u8, col: u8) -> Position {
     Position::new(row, col)
 }
 
-/// Flota estándar del MVP: barcos de 4, 3 y 2 casillas, separados para no ser adyacentes.
+/// Flota estándar de Batalla Naval (10x10): 5 barcos de 5, 4, 3, 3 y 2 casillas,
+/// en filas pares para no ser adyacentes.
 fn standard_fleet(row_offset: u8) -> Vec<Ship> {
     vec![
         vec![
@@ -19,13 +20,25 @@ fn standard_fleet(row_offset: u8) -> Vec<Ship> {
             pos(row_offset, 1),
             pos(row_offset, 2),
             pos(row_offset, 3),
+            pos(row_offset, 4),
         ],
         vec![
             pos(row_offset + 2, 0),
             pos(row_offset + 2, 1),
             pos(row_offset + 2, 2),
+            pos(row_offset + 2, 3),
         ],
-        vec![pos(row_offset + 4, 0), pos(row_offset + 4, 1)],
+        vec![
+            pos(row_offset + 4, 0),
+            pos(row_offset + 4, 1),
+            pos(row_offset + 4, 2),
+        ],
+        vec![
+            pos(row_offset + 6, 0),
+            pos(row_offset + 6, 1),
+            pos(row_offset + 6, 2),
+        ],
+        vec![pos(row_offset + 8, 0), pos(row_offset + 8, 1)],
     ]
 }
 
@@ -88,7 +101,7 @@ fn un_disparo_certero_se_reporta_como_hit_y_uno_al_agua_como_miss() {
     place_fleet(&mut session, P1, standard_fleet(0));
     place_fleet(&mut session, P2, standard_fleet(0));
 
-    // P1 dispara y le pega al barco de 3 casillas de P2 en (2,0).
+    // P1 dispara y le pega al barco de 4 casillas de P2 en (2,0).
     let events = session
         .process_command(
             P1,
@@ -132,10 +145,18 @@ fn hundir_todos_los_barcos_rivales_termina_la_partida() {
         pos(0, 1),
         pos(0, 2),
         pos(0, 3),
+        pos(0, 4),
         pos(2, 0),
         pos(2, 1),
         pos(2, 2),
+        pos(2, 3),
         pos(4, 0),
+        pos(4, 1),
+        pos(4, 2),
+        pos(6, 0),
+        pos(6, 1),
+        pos(6, 2),
+        pos(8, 0),
     ];
     let filler_targets = [
         pos(7, 0),
@@ -146,6 +167,14 @@ fn hundir_todos_los_barcos_rivales_termina_la_partida() {
         pos(7, 5),
         pos(7, 6),
         pos(7, 7),
+        pos(9, 0),
+        pos(9, 1),
+        pos(9, 2),
+        pos(9, 3),
+        pos(9, 4),
+        pos(9, 5),
+        pos(9, 6),
+        pos(9, 7),
     ];
     let mut last_events;
     for (i, target) in shots_p1.into_iter().enumerate() {
@@ -173,7 +202,7 @@ fn hundir_todos_los_barcos_rivales_termina_la_partida() {
             P1,
             Box::new(FireShotCommand {
                 player: P1,
-                target: pos(4, 1),
+                target: pos(8, 1),
             }),
         )
         .expect("el último disparo debería hundir el último barco");
@@ -229,9 +258,11 @@ fn barcos_superpuestos_o_diagonales_son_rechazados() {
     let mut session = new_battleship_session(SessionId(7), 1, P1, P2);
 
     let overlapping = vec![
-        vec![pos(0, 0), pos(0, 1), pos(0, 2), pos(0, 3)],
-        vec![pos(0, 0), pos(1, 0), pos(2, 0)],
-        vec![pos(2, 2), pos(2, 3)],
+        vec![pos(0, 0), pos(0, 1), pos(0, 2), pos(0, 3), pos(0, 4)],
+        vec![pos(0, 0), pos(1, 0), pos(2, 0), pos(3, 0)],
+        vec![pos(4, 0), pos(4, 1), pos(4, 2)],
+        vec![pos(6, 0), pos(6, 1), pos(6, 2)],
+        vec![pos(8, 0), pos(8, 1)],
     ];
     let res = session.process_command(
         P1,
@@ -243,9 +274,11 @@ fn barcos_superpuestos_o_diagonales_son_rechazados() {
     assert!(res.is_err(), "barcos superpuestos deben rechazarse");
 
     let diagonal = vec![
-        vec![pos(0, 0), pos(1, 1), pos(2, 2), pos(3, 3)],
-        vec![pos(5, 0), pos(5, 1), pos(5, 2)],
-        vec![pos(6, 0), pos(6, 1)],
+        vec![pos(0, 0), pos(1, 1), pos(2, 2), pos(3, 3), pos(4, 4)],
+        vec![pos(6, 0), pos(6, 1), pos(6, 2), pos(6, 3)],
+        vec![pos(7, 5), pos(7, 6), pos(7, 7)],
+        vec![pos(9, 0), pos(9, 1), pos(9, 2)],
+        vec![pos(9, 5), pos(9, 6)],
     ];
     let res = session.process_command(
         P1,
@@ -263,9 +296,11 @@ fn test_barco_adyacente_a_otro_es_rechazado() {
 
     // Barco 1 en fila 0, Barco 2 en fila 1 (adyacente verticalmente)
     let adjacent_fleet = vec![
-        vec![pos(0, 0), pos(0, 1), pos(0, 2), pos(0, 3)],
-        vec![pos(1, 0), pos(1, 1), pos(1, 2)],
-        vec![pos(3, 0), pos(3, 1)],
+        vec![pos(0, 0), pos(0, 1), pos(0, 2), pos(0, 3), pos(0, 4)],
+        vec![pos(1, 0), pos(1, 1), pos(1, 2), pos(1, 3)],
+        vec![pos(4, 0), pos(4, 1), pos(4, 2)],
+        vec![pos(6, 0), pos(6, 1), pos(6, 2)],
+        vec![pos(8, 0), pos(8, 1)],
     ];
     let res = session.process_command(
         P1,
@@ -276,11 +311,13 @@ fn test_barco_adyacente_a_otro_es_rechazado() {
     );
     assert!(res.is_err(), "barcos adyacentes deben ser rechazados");
 
-    // Barcos tocándose diagonalmente: pos(0,3) y pos(1,4)
+    // Barcos tocándose diagonalmente: pos(0,4) y pos(1,5)
     let diagonal_touching = vec![
-        vec![pos(0, 0), pos(0, 1), pos(0, 2), pos(0, 3)],
-        vec![pos(1, 4), pos(1, 5), pos(1, 6)],
-        vec![pos(3, 0), pos(3, 1)],
+        vec![pos(0, 0), pos(0, 1), pos(0, 2), pos(0, 3), pos(0, 4)],
+        vec![pos(1, 5), pos(1, 6), pos(1, 7), pos(1, 8)],
+        vec![pos(4, 0), pos(4, 1), pos(4, 2)],
+        vec![pos(6, 0), pos(6, 1), pos(6, 2)],
+        vec![pos(8, 0), pos(8, 1)],
     ];
     let res = session.process_command(
         P1,
@@ -343,14 +380,14 @@ fn test_impactar_todos_los_segmentos_hunde_el_barco_y_emite_evento() {
     place_fleet(&mut session, P1, standard_fleet(0));
     place_fleet(&mut session, P2, standard_fleet(0));
 
-    // El barco de 3 celdas de P2 está en fila 2: pos(2, 0), pos(2, 1), pos(2, 2)
-    // Disparo 1: pos(2, 0)
+    // El barco de 3 celdas de P2 está en fila 4: pos(4, 0), pos(4, 1), pos(4, 2)
+    // Disparo 1: pos(4, 0)
     let ev1 = session
         .process_command(
             P1,
             Box::new(FireShotCommand {
                 player: P1,
-                target: pos(2, 0),
+                target: pos(4, 0),
             }),
         )
         .unwrap();
@@ -370,13 +407,13 @@ fn test_impactar_todos_los_segmentos_hunde_el_barco_y_emite_evento() {
         )
         .unwrap();
 
-    // Disparo 2: pos(2, 1)
+    // Disparo 2: pos(4, 1)
     let ev2 = session
         .process_command(
             P1,
             Box::new(FireShotCommand {
                 player: P1,
-                target: pos(2, 1),
+                target: pos(4, 1),
             }),
         )
         .unwrap();
@@ -396,13 +433,13 @@ fn test_impactar_todos_los_segmentos_hunde_el_barco_y_emite_evento() {
         )
         .unwrap();
 
-    // Disparo 3: pos(2, 2) - último segmento
+    // Disparo 3: pos(4, 2) - último segmento
     let ev3 = session
         .process_command(
             P1,
             Box::new(FireShotCommand {
                 player: P1,
-                target: pos(2, 2),
+                target: pos(4, 2),
             }),
         )
         .unwrap();
@@ -417,7 +454,7 @@ fn test_impactar_todos_los_segmentos_hunde_el_barco_y_emite_evento() {
     assert_eq!(sunken_event.ship_type, 3);
     assert_eq!(
         sunken_event.positions,
-        vec![pos(2, 0), pos(2, 1), pos(2, 2)]
+        vec![pos(4, 0), pos(4, 1), pos(4, 2)]
     );
 }
 
@@ -498,9 +535,11 @@ fn test_revancha_reinicia_la_fase_de_colocacion() {
 fn test_barco_fuera_de_los_limites_es_rechazado() {
     let mut session = new_battleship_session(SessionId(10), 1, P1, P2);
     let ships = vec![
+        vec![pos(0, 6), pos(0, 7), pos(0, 8), pos(0, 9), pos(0, 10)],
         vec![pos(2, 0), pos(2, 1), pos(2, 2), pos(2, 3)],
-        vec![pos(0, 6), pos(0, 7), pos(0, 8)],
-        vec![pos(4, 0), pos(4, 1)],
+        vec![pos(4, 0), pos(4, 1), pos(4, 2)],
+        vec![pos(6, 0), pos(6, 1), pos(6, 2)],
+        vec![pos(8, 0), pos(8, 1)],
     ];
     let result = session.process_command(P1, Box::new(PlaceFleetCommand { player: P1, ships }));
     assert!(
@@ -536,4 +575,37 @@ fn test_drop_cleanup_no_afecta_estado() {
     assert!(fleet.has_placed_fleet(P1));
     assert!(fleet.has_placed_fleet(P2));
     assert_eq!(fleet.hits.get(&P2), Some(&vec![pos(0, 0)]));
+}
+
+#[test]
+fn test_tablero_es_10x10() {
+    let mut session = new_battleship_session(SessionId(100), 1, P1, P2);
+    place_fleet(&mut session, P1, standard_fleet(0));
+    place_fleet(&mut session, P2, standard_fleet(0));
+
+    // Disparo legal en la casilla límite inferior derecha (9, 9)
+    let res_legal = session.process_command(
+        P1,
+        Box::new(FireShotCommand {
+            player: P1,
+            target: pos(9, 9),
+        }),
+    );
+    assert!(
+        res_legal.is_ok(),
+        "el disparo en (9, 9) debe ser legal en un tablero 10x10"
+    );
+
+    // Disparo fuera de límites en (10, 0) debe dar error
+    let res_illegal = session.process_command(
+        P2,
+        Box::new(FireShotCommand {
+            player: P2,
+            target: pos(10, 0),
+        }),
+    );
+    assert!(
+        matches!(res_illegal, Err(EngineError::InvalidCommand { .. })),
+        "el disparo en (10, 0) debe ser rechazado como fuera de límites"
+    );
 }

@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub use crate::board::BOARD_SIZE;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Position {
     pub row: u8,
@@ -15,7 +17,3 @@ impl Position {
         self.row < BOARD_SIZE && self.col < BOARD_SIZE
     }
 }
-
-/// Tablero de 8x8 (más chico que el oficial de 10x10, para partidas más
-/// rápidas — no cambia ninguna mecánica, solo el tamaño).
-pub const BOARD_SIZE: u8 = 8;

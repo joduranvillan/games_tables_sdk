@@ -25,14 +25,16 @@ func _initialize() -> void:
 	bridge.start_local_match_battleship(1, 2)
 	results.append(["start_local_match_battleship inicia correctamente en fase de colocación", bridge != null])
 
-	# 2. Colocar flota válida para el Jugador 1 (3 barcos: tamaños 4, 3 y 2)
+	# 2. Colocar flota válida para el Jugador 1 (5 barcos: tamaños 5, 4, 3, 3 y 2)
 	bridge.send_command_json(1, JSON.stringify({
 		"command_type": "PlaceFleetCommand",
 		"player": 1,
 		"ships": [
-			[{"row": 0, "col": 0}, {"row": 0, "col": 1}, {"row": 0, "col": 2}, {"row": 0, "col": 3}],
-			[{"row": 2, "col": 0}, {"row": 2, "col": 1}, {"row": 2, "col": 2}],
-			[{"row": 4, "col": 0}, {"row": 4, "col": 1}]
+			[{"row": 0, "col": 0}, {"row": 0, "col": 1}, {"row": 0, "col": 2}, {"row": 0, "col": 3}, {"row": 0, "col": 4}],
+			[{"row": 2, "col": 0}, {"row": 2, "col": 1}, {"row": 2, "col": 2}, {"row": 2, "col": 3}],
+			[{"row": 4, "col": 0}, {"row": 4, "col": 1}, {"row": 4, "col": 2}],
+			[{"row": 6, "col": 0}, {"row": 6, "col": 1}, {"row": 6, "col": 2}],
+			[{"row": 8, "col": 0}, {"row": 8, "col": 1}]
 		]
 	}))
 
@@ -51,9 +53,11 @@ func _initialize() -> void:
 		"command_type": "PlaceFleetCommand",
 		"player": 2,
 		"ships": [
-			[{"row": 15, "col": 0}, {"row": 15, "col": 1}, {"row": 15, "col": 2}, {"row": 15, "col": 3}],
-			[{"row": 2, "col": 0}, {"row": 2, "col": 1}, {"row": 2, "col": 2}],
-			[{"row": 4, "col": 0}, {"row": 4, "col": 1}]
+			[{"row": 15, "col": 0}, {"row": 15, "col": 1}, {"row": 15, "col": 2}, {"row": 15, "col": 3}, {"row": 15, "col": 4}],
+			[{"row": 2, "col": 0}, {"row": 2, "col": 1}, {"row": 2, "col": 2}, {"row": 2, "col": 3}],
+			[{"row": 4, "col": 0}, {"row": 4, "col": 1}, {"row": 4, "col": 2}],
+			[{"row": 6, "col": 0}, {"row": 6, "col": 1}, {"row": 6, "col": 2}],
+			[{"row": 8, "col": 0}, {"row": 8, "col": 1}]
 		]
 	}))
 
