@@ -1,13 +1,61 @@
 use monopoly_game::{
-    new_monopoly_session, AuctionBidCommand, AuctionStartedEvent, AuctionWonEvent, BankruptcyEvent,
-    BuyPropertyCommand, GameOverEvent, JailedEvent, PayJailFeeCommand, PlayerMovedEvent,
-    PropertyPurchasedEvent, RailroadRentPaidEvent, RentPaidEvent, RollAndMoveCommand,
-    UtilityRentPaidEvent, STARTING_MONEY,
+    apply_land_effect, board_layout, new_monopoly_session, AuctionBidCommand, AuctionStartedEvent,
+    AuctionWonEvent, BankruptcyEvent, BuyPropertyCommand, ChanceCard, CommunityChestCard,
+    GameOverEvent, JailedEvent, PayJailFeeCommand, PlayerMovedEvent, PropertyPurchasedEvent,
+    RailroadRentPaidEvent, RentPaidEvent, RollAndMoveCommand, SpaceKind, TaxPaidEvent,
+    UtilityRentPaidEvent, BOARD_SIZE, GO_TO_JAIL_SPACE, JAIL_SPACE, STARTING_MONEY,
 };
 use open_table_engine::prelude::*;
 
 const P1: PlayerId = PlayerId(1);
 const P2: PlayerId = PlayerId(2);
+
+#[test]
+fn test_tablero_estandar_40_casillas_con_todas_las_variantes() {
+    let layout = board_layout();
+    assert_eq!(layout.len(), 40);
+    assert_eq!(BOARD_SIZE, 40);
+
+    let mut properties = 0;
+    let mut railroads = 0;
+    let mut utilities = 0;
+    let mut taxes = 0;
+    let mut chances = 0;
+    let mut community_chests = 0;
+
+    for space in &layout {
+        match space {
+            SpaceKind::Property { .. } => properties += 1,
+            SpaceKind::Railroad { .. } => railroads += 1,
+            SpaceKind::Utility { .. } => utilities += 1,
+            SpaceKind::Tax { .. } => taxes += 1,
+            SpaceKind::Chance => chances += 1,
+            SpaceKind::CommunityChest => community_chests += 1,
+            SpaceKind::Go | SpaceKind::Jail | SpaceKind::FreeParking | SpaceKind::GoToJail => {}
+        }
+    }
+
+    assert_eq!(properties, 22, "22 calles");
+    assert_eq!(railroads, 4, "4 estaciones");
+    assert_eq!(utilities, 2, "2 suministros/servicios");
+    assert_eq!(properties + railroads + utilities, 28, "28 propiedades totales");
+    assert_eq!(taxes, 2, "2 impuestos (Renta y Lujo)");
+    assert_eq!(chances, 3, "3 cartas de Suerte");
+    assert_eq!(community_chests, 3, "3 cartas de Arca Comunitaria");
+
+    assert_eq!(layout[0], SpaceKind::Go);
+    assert_eq!(layout[10], SpaceKind::Jail);
+    assert_eq!(layout[20], SpaceKind::FreeParking);
+    assert_eq!(layout[30], SpaceKind::GoToJail);
+    assert_eq!(JAIL_SPACE, 10);
+    assert_eq!(GO_TO_JAIL_SPACE, 30);
+}
+
+#[test]
+fn test_10_cartas_de_suerte_y_10_de_arca_comunitaria() {
+    assert_eq!(ChanceCard::ALL.len(), 10);
+    assert_eq!(CommunityChestCard::ALL.len(), 10);
+}
 
 #[test]
 fn el_setup_arranca_con_dinero_estandar_y_posicion_cero() {
@@ -70,7 +118,7 @@ fn comprar_una_propiedad_descuenta_el_precio_y_asigna_el_dueno() {
                 space: 1,
                 is_doubles: false,
             },
-        ); // "Av. Roja 1", precio 60
+        ); // "Av. Mediterráneo", precio 60
 
     let events = session
         .process_command(
@@ -105,7 +153,7 @@ fn caer_en_propiedad_ajena_paga_renta_al_dueno() {
             .world_mut()
             .resource_mut::<monopoly_game::PlayersResource>()
             .properties
-            .insert(4, P2); // "Av. Verde 2", renta base 10
+            .insert(3, P2); // "Av. Báltica", renta base 4
 
         let events = session
             .process_command(P1, Box::new(RollAndMoveCommand { player: P1 }))
@@ -114,7 +162,7 @@ fn caer_en_propiedad_ajena_paga_renta_al_dueno() {
             .as_any()
             .downcast_ref::<PlayerMovedEvent>()
             .unwrap();
-        if moved.new_position != 4 {
+        if moved.new_position != 3 {
             continue;
         }
         let rent_event = events
@@ -124,10 +172,10 @@ fn caer_en_propiedad_ajena_paga_renta_al_dueno() {
             rent_event.is_some(),
             "debería haber pagado renta al caer en la propiedad de P2"
         );
-        assert_eq!(rent_event.unwrap().amount, 10);
+        assert_eq!(rent_event.unwrap().amount, 4);
         return;
     }
-    panic!("ninguna seed probada cayó en la casilla 4");
+    panic!("ninguna seed probada cayó en la casilla 3");
 }
 
 #[test]
@@ -138,9 +186,9 @@ fn poseer_todo_el_grupo_de_color_duplica_la_renta() {
             let mut players = session
                 .world_mut()
                 .resource_mut::<monopoly_game::PlayersResource>();
-            // P2 posee todo el grupo Verde (casillas 3 y 4)
-            players.properties.insert(3, P2); // Av. Verde 1 (renta 8)
-            players.properties.insert(4, P2); // Av. Verde 2 (renta 10)
+            // P2 posee todo el grupo Marrón (casillas 1 y 3)
+            players.properties.insert(1, P2); // Av. Mediterráneo (renta 2)
+            players.properties.insert(3, P2); // Av. Báltica (renta 4)
         }
 
         let events = session
@@ -150,18 +198,18 @@ fn poseer_todo_el_grupo_de_color_duplica_la_renta() {
             .as_any()
             .downcast_ref::<PlayerMovedEvent>()
             .unwrap();
-        if moved.new_position != 4 {
+        if moved.new_position != 3 {
             continue;
         }
         let rent_event = events
             .iter()
             .find_map(|e| e.as_any().downcast_ref::<RentPaidEvent>());
         assert!(rent_event.is_some());
-        // Al poseer el grupo completo, la renta de Av. Verde 2 (10) se duplica a 20!
-        assert_eq!(rent_event.unwrap().amount, 20);
+        // Al poseer el grupo completo, la renta de Av. Báltica (4) se duplica a 8!
+        assert_eq!(rent_event.unwrap().amount, 8);
         return;
     }
-    panic!("ninguna seed probada cayó en la casilla 4");
+    panic!("ninguna seed probada cayó en la casilla 3");
 }
 
 #[test]
@@ -177,8 +225,8 @@ fn quedarse_sin_dinero_tras_pagar_renta_termina_la_partida() {
             let mut players = session
                 .world_mut()
                 .resource_mut::<monopoly_game::PlayersResource>();
-            players.money.insert(P1, 5); // menos que la renta de 10
-            players.properties.insert(4, P2);
+            players.money.insert(P1, 2); // menos que la renta de 4
+            players.properties.insert(3, P2);
         }
 
         let events = session
@@ -188,7 +236,7 @@ fn quedarse_sin_dinero_tras_pagar_renta_termina_la_partida() {
             .as_any()
             .downcast_ref::<PlayerMovedEvent>()
             .unwrap();
-        if moved.new_position != 4 {
+        if moved.new_position != 3 {
             continue;
         }
         assert!(events.iter().any(|e| e
@@ -198,13 +246,20 @@ fn quedarse_sin_dinero_tras_pagar_renta_termina_la_partida() {
             == Some(P2)));
         return;
     }
-    panic!("ninguna seed probada cayó en la casilla 4");
+    panic!("ninguna seed probada cayó en la casilla 3");
 }
 
 #[test]
-fn test_caer_en_go_to_jail_envia_a_jail_y_emite_jailed_event() {
+fn test_jugador_cae_en_ve_a_la_carcel() {
     for seed in 0..100u64 {
         let mut session = new_monopoly_session(SessionId(400 + seed), seed, P1, P2);
+        // Ubicar al jugador en casilla 24 para que tire 6 y caiga en 30 (Ve a la Cárcel)
+        session
+            .world_mut()
+            .resource_mut::<monopoly_game::PlayersResource>()
+            .position
+            .insert(P1, 24);
+
         let events = session
             .process_command(P1, Box::new(RollAndMoveCommand { player: P1 }))
             .expect("moverse debería funcionar");
@@ -213,11 +268,8 @@ fn test_caer_en_go_to_jail_envia_a_jail_y_emite_jailed_event() {
             .as_any()
             .downcast_ref::<PlayerMovedEvent>()
             .unwrap();
-        if moved.roll == 8 {
-            assert_eq!(
-                moved.new_position, 4,
-                "La nueva posición debe ser 4 (JAIL_SPACE)"
-            );
+        if moved.roll == 6 {
+            assert_eq!(moved.new_position, 30, "El tiro 6 desde 24 llega a 30 (GO_TO_JAIL_SPACE)");
             let jailed_event = events
                 .iter()
                 .find_map(|e| e.as_any().downcast_ref::<JailedEvent>());
@@ -226,13 +278,23 @@ fn test_caer_en_go_to_jail_envia_a_jail_y_emite_jailed_event() {
 
             let players = session.world().resource::<monopoly_game::PlayersResource>();
             assert_eq!(
-                players.position[&P1], 4,
-                "La posición guardada en PlayersResource debe ser 4"
+                players.position[&P1], 10,
+                "La posición final guardada debe ser 10 (JAIL_SPACE)"
+            );
+            let jail = session.world().resource::<monopoly_game::JailResource>();
+            assert!(
+                jail.jailed.contains_key(&P1),
+                "El jugador debe figurar en JailResource"
             );
             return;
         }
     }
-    panic!("ninguna seed probada resultó en un tiro de 8");
+    panic!("ninguna seed probada resultó en un tiro de 6");
+}
+
+#[test]
+fn test_caer_en_go_to_jail_envia_a_jail_y_emite_jailed_event() {
+    test_jugador_cae_en_ve_a_la_carcel();
 }
 
 #[test]
@@ -243,7 +305,7 @@ fn test_jugador_en_carcel_no_se_mueve_hasta_que_sale() {
             let mut players = session
                 .world_mut()
                 .resource_mut::<monopoly_game::PlayersResource>();
-            players.position.insert(P1, 4);
+            players.position.insert(P1, 10);
             let mut jail = session
                 .world_mut()
                 .resource_mut::<monopoly_game::JailResource>();
@@ -260,7 +322,7 @@ fn test_jugador_en_carcel_no_se_mueve_hasta_que_sale() {
             if !m.is_doubles {
                 let players = session.world().resource::<monopoly_game::PlayersResource>();
                 assert_eq!(
-                    players.position[&P1], 4,
+                    players.position[&P1], 10,
                     "El jugador en cárcel no debe moverse si no saca dobles"
                 );
 
@@ -352,11 +414,18 @@ fn test_rechazo_de_compra_inicia_subasta() {
 fn test_renta_de_servicio_es_4x_con_uno_y_10x_con_dos() {
     for seed in 0..100u64 {
         let mut session = new_monopoly_session(SessionId(1200 + seed), seed, P1, P2);
+        // Casilla 12 es Compañía Eléctrica
         session
             .world_mut()
             .resource_mut::<monopoly_game::PlayersResource>()
             .properties
-            .insert(11, P2);
+            .insert(12, P2);
+        // Posicionar a P1 en casilla 6 para que al tirar 6 caiga en 12
+        session
+            .world_mut()
+            .resource_mut::<monopoly_game::PlayersResource>()
+            .position
+            .insert(P1, 6);
 
         let events = session
             .process_command(P1, Box::new(RollAndMoveCommand { player: P1 }))
@@ -365,7 +434,7 @@ fn test_renta_de_servicio_es_4x_con_uno_y_10x_con_dos() {
             .as_any()
             .downcast_ref::<PlayerMovedEvent>()
             .unwrap();
-        if moved.new_position != 11 {
+        if moved.new_position != 12 {
             continue;
         }
 
@@ -388,8 +457,9 @@ fn test_renta_de_servicio_es_4x_con_uno_y_10x_con_dos() {
             let mut players = session2
                 .world_mut()
                 .resource_mut::<monopoly_game::PlayersResource>();
-            players.properties.insert(11, P2);
-            players.properties.insert(14, P2);
+            players.properties.insert(12, P2); // Compañía Eléctrica
+            players.properties.insert(28, P2); // Planta de Agua
+            players.position.insert(P1, 6);
         }
         let events2 = session2
             .process_command(P1, Box::new(RollAndMoveCommand { player: P1 }))
@@ -406,13 +476,14 @@ fn test_renta_de_servicio_es_4x_con_uno_y_10x_con_dos() {
         assert_eq!(re2.amount, 10 * moved.roll);
         return;
     }
-    panic!("ninguna seed cayó en la casilla 11");
+    panic!("ninguna seed cayó en la casilla 12");
 }
 
 #[test]
 fn test_renta_de_ferrocarril_escala_con_cantidad_de_estaciones() {
     for seed in 0..100u64 {
         let mut session = new_monopoly_session(SessionId(1300 + seed), seed, P1, P2);
+        // Casilla 5 es Ferrocarril Reading
         session
             .world_mut()
             .resource_mut::<monopoly_game::PlayersResource>()
@@ -450,9 +521,9 @@ fn test_quiebra_transfiere_propiedades_al_acreedor() {
             let mut players = session
                 .world_mut()
                 .resource_mut::<monopoly_game::PlayersResource>();
-            players.money.insert(P1, 5);
+            players.money.insert(P1, 2);
             players.properties.insert(1, P1);
-            players.properties.insert(4, P2);
+            players.properties.insert(3, P2);
         }
 
         let events = session
@@ -462,7 +533,7 @@ fn test_quiebra_transfiere_propiedades_al_acreedor() {
             .as_any()
             .downcast_ref::<PlayerMovedEvent>()
             .unwrap();
-        if moved.new_position != 4 {
+        if moved.new_position != 3 {
             continue;
         }
 
@@ -485,6 +556,35 @@ fn test_quiebra_transfiere_propiedades_al_acreedor() {
         assert!(game_over.is_some(), "debe finalizar la partida");
         assert_eq!(game_over.unwrap().winner, P2);
         return;
+    }
+    panic!("ninguna seed cayó en la casilla 3");
+}
+
+#[test]
+fn test_impuesto_sobre_la_renta_y_lujo() {
+    for seed in 0..100u64 {
+        let mut session = new_monopoly_session(SessionId(1500 + seed), seed, P1, P2);
+        // Casilla 4 es Impuesto sobre la Renta (200$)
+        let events = session
+            .process_command(P1, Box::new(RollAndMoveCommand { player: P1 }))
+            .unwrap();
+        let moved = events[0]
+            .as_any()
+            .downcast_ref::<PlayerMovedEvent>()
+            .unwrap();
+        if moved.new_position == 4 {
+            let tax_event = events
+                .iter()
+                .find_map(|e| e.as_any().downcast_ref::<TaxPaidEvent>());
+            assert!(tax_event.is_some(), "Debe emitirse un TaxPaidEvent");
+            let te = tax_event.unwrap();
+            assert_eq!(te.amount, 200);
+            assert_eq!(te.player, P1);
+
+            let players = session.world().resource::<monopoly_game::PlayersResource>();
+            assert_eq!(players.money[&P1], STARTING_MONEY - 200);
+            return;
+        }
     }
     panic!("ninguna seed cayó en la casilla 4");
 }
@@ -522,24 +622,13 @@ fn monopoly_primer_jugador_en_quebrar() {
             .insert_resource(monopoly_game::AuctionResource::default());
 
         {
-            let mut board = test_session
-                .world_mut()
-                .resource_mut::<monopoly_game::BoardResource>();
-            board.spaces[15] = monopoly_game::board::Space::Property {
-                name: "Av. Cara".to_string(),
-                group: "Cara".to_string(),
-                price: 500,
-                rent: 100,
-            };
-        }
-        {
             let mut players_res = test_session
                 .world_mut()
                 .resource_mut::<monopoly_game::PlayersResource>();
-            players_res.properties.insert(15, p1);
+            players_res.properties.insert(24, p1); // Av. Illinois, renta 20
             players_res.properties.insert(1, p2);
-            players_res.money.insert(p2, 50);
-            players_res.position.insert(p2, 13);
+            players_res.money.insert(p2, 10);
+            players_res.position.insert(p2, 22); // al tirar 2 caerá en 24
         }
 
         // P1 tira
@@ -598,7 +687,7 @@ fn monopoly_primer_jugador_en_quebrar() {
             .as_any()
             .downcast_ref::<PlayerMovedEvent>()
             .unwrap();
-        if moved.new_position != 15 {
+        if moved.new_position != 24 {
             continue;
         }
 

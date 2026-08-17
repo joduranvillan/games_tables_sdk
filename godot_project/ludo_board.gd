@@ -17,6 +17,30 @@ var token_steps = {
 	4: [0, 0, 0, 0]
 }
 
+# 52 track coordinates and home columns on 15x15 standard grid
+const TRACK_GRID = [
+	Vector2(1, 6), Vector2(2, 6), Vector2(3, 6), Vector2(4, 6), Vector2(5, 6),
+	Vector2(6, 5), Vector2(6, 4), Vector2(6, 3), Vector2(6, 2), Vector2(6, 1), Vector2(6, 0),
+	Vector2(7, 0),
+	Vector2(8, 0), Vector2(8, 1), Vector2(8, 2), Vector2(8, 3), Vector2(8, 4), Vector2(8, 5),
+	Vector2(9, 6), Vector2(10, 6), Vector2(11, 6), Vector2(12, 6), Vector2(13, 6), Vector2(14, 6),
+	Vector2(14, 7),
+	Vector2(14, 8), Vector2(13, 8), Vector2(12, 8), Vector2(11, 8), Vector2(10, 8), Vector2(9, 8),
+	Vector2(8, 9), Vector2(8, 10), Vector2(8, 11), Vector2(8, 12), Vector2(8, 13), Vector2(8, 14),
+	Vector2(7, 14),
+	Vector2(6, 14), Vector2(6, 13), Vector2(6, 12), Vector2(6, 11), Vector2(6, 10), Vector2(6, 9),
+	Vector2(5, 8), Vector2(4, 8), Vector2(3, 8), Vector2(2, 8), Vector2(1, 8), Vector2(0, 8),
+	Vector2(0, 7),
+	Vector2(0, 6)
+]
+
+const HOME_GRIDS = {
+	1: [Vector2(1, 7), Vector2(2, 7), Vector2(3, 7), Vector2(4, 7), Vector2(5, 7)],
+	2: [Vector2(7, 1), Vector2(7, 2), Vector2(7, 3), Vector2(7, 4), Vector2(7, 5)],
+	3: [Vector2(13, 7), Vector2(12, 7), Vector2(11, 7), Vector2(10, 7), Vector2(9, 7)],
+	4: [Vector2(7, 13), Vector2(7, 12), Vector2(7, 11), Vector2(7, 10), Vector2(7, 9)]
+}
+
 # UI elements
 var token_buttons = {1: [], 2: [], 3: [], 4: []}
 var dice_button: Button
@@ -216,44 +240,41 @@ func _spawn_particle_burst(global_pos: Vector2, color: Color) -> void:
 	var timer = get_tree().create_timer(1.0)
 	timer.timeout.connect(particles.queue_free)
 
-func _get_token_board_pos(player: int, token_idx: int, steps: int) -> Vector2:
+func get_cell_position(step: int, player: int = 1) -> Vector2:
 	# 0 = Base
-	if steps == 0:
-		var base_corners = {
-			1: Vector2(80, 80),    # Red top-left
-			2: Vector2(440, 80),   # Green top-right
-			3: Vector2(440, 440),  # Yellow bottom-right
-			4: Vector2(80, 440)    # Blue bottom-left
+	if step == 0:
+		var base_centers = {
+			1: Vector2(125, 125),  # Red top-left
+			2: Vector2(475, 125),  # Green top-right
+			3: Vector2(475, 475),  # Yellow bottom-right
+			4: Vector2(125, 475)   # Blue bottom-left
 		}
-		var offsets = [Vector2(-25, -25), Vector2(25, -25), Vector2(-25, 25), Vector2(25, 25)]
-		return base_corners.get(player, Vector2(80, 80)) + offsets[token_idx]
-		
-	# 58 = Goal
-	if steps >= 58:
+		return base_centers.get(player, Vector2(125, 125))
+
+	# 57/58 = Goal
+	if step >= 58:
 		return Vector2(300, 300)
-		
+
 	# Track calculation (1..52) and Home column (53..57)
-	var margin = 40.0
+	var margin = 55.0
 	var track_step = 35.0
-	
-	if steps <= 52:
-		var p = (steps + (player - 1) * 13) % 52
-		if p < 6: return Vector2(margin + (6 + p) * track_step, margin + 6 * track_step)
-		elif p < 12: return Vector2(margin + 12 * track_step, margin + (5 - (p - 6)) * track_step)
-		elif p < 18: return Vector2(margin + (12 - (p - 12)) * track_step, margin)
-		elif p < 24: return Vector2(margin + 6 * track_step, margin + (p - 18) * track_step)
-		elif p < 30: return Vector2(margin + (5 - (p - 24)) * track_step, margin + 6 * track_step)
-		elif p < 36: return Vector2(margin, margin + (6 + (p - 30)) * track_step)
-		elif p < 42: return Vector2(margin + (p - 36) * track_step, margin + 12 * track_step)
-		else: return Vector2(margin + 6 * track_step, margin + (12 - (p - 42)) * track_step)
+
+	if step <= 52:
+		var idx = (step - 1 + (player - 1) * 13) % 52
+		var g = TRACK_GRID[idx]
+		return Vector2(margin + g.x * track_step, margin + g.y * track_step)
 	else:
-		var home_dist = steps - 52
-		match player:
-			1: return Vector2(margin + home_dist * track_step, margin + 6 * track_step)
-			2: return Vector2(margin + 6 * track_step, margin + home_dist * track_step)
-			3: return Vector2(margin + (12 - home_dist) * track_step, margin + 6 * track_step)
-			4: return Vector2(margin + 6 * track_step, margin + (12 - home_dist) * track_step)
-	return Vector2(300, 300)
+		var h_idx = clampi(step - 53, 0, 4)
+		var g = HOME_GRIDS.get(player, HOME_GRIDS[1])[h_idx]
+		return Vector2(margin + g.x * track_step, margin + g.y * track_step)
+
+func _get_token_board_pos(player: int, token_idx: int, steps: int) -> Vector2:
+	if steps == 0:
+		var base_center = get_cell_position(0, player)
+		var offsets = [Vector2(-25, -25), Vector2(25, -25), Vector2(-25, 25), Vector2(25, 25)]
+		return base_center + offsets[token_idx]
+
+	return get_cell_position(steps, player)
 
 func get_path_from_to(from_cell: int, to_cell: int, player: int = 1, token_idx: int = 0) -> Array[Vector2]:
 	var path: Array[Vector2] = []
@@ -360,18 +381,18 @@ func _draw() -> void:
 	
 	# Base Corner Zones (4 Home bases)
 	var zones = [
-		{"rect": Rect2(20, 20, 220, 220), "col": GameManager.get_player_color(1)},
-		{"rect": Rect2(360, 20, 220, 220), "col": GameManager.get_player_color(2)},
-		{"rect": Rect2(360, 360, 220, 220), "col": GameManager.get_player_color(3)},
-		{"rect": Rect2(20, 360, 220, 220), "col": GameManager.get_player_color(4)}
+		{"rect": Rect2(20, 20, 210, 210), "col": GameManager.get_player_color(1)},
+		{"rect": Rect2(370, 20, 210, 210), "col": GameManager.get_player_color(2)},
+		{"rect": Rect2(370, 370, 210, 210), "col": GameManager.get_player_color(3)},
+		{"rect": Rect2(20, 370, 210, 210), "col": GameManager.get_player_color(4)}
 	]
 	for z in zones:
 		draw_rect(z.rect, z.col)
 		draw_rect(z.rect, Color.BLACK, false, 2.0)
-		draw_circle(z.rect.position + z.rect.size / 2.0, 70, Color.WHITE)
+		draw_circle(z.rect.position + z.rect.size / 2.0, 65, Color.WHITE)
 		
 	# Cross track 52 cells
-	var margin = 40.0
+	var margin = 55.0
 	var track_step = 35.0
 	for i in range(15):
 		for j in range(15):
@@ -381,18 +402,27 @@ func _draw() -> void:
 			var cell_rect = Rect2(margin + i * track_step - 17.5, margin + j * track_step - 17.5, track_step, track_step)
 			draw_rect(cell_rect, Color.BLACK, false, 1.0)
 
+	# Draw home columns
+	for p in range(1, 5):
+		var p_col = GameManager.get_player_color(p)
+		p_col.a = 0.35
+		for g in HOME_GRIDS[p]:
+			var h_rect = Rect2(margin + g.x * track_step - 17.5, margin + g.y * track_step - 17.5, track_step, track_step)
+			draw_rect(h_rect, p_col)
+			draw_rect(h_rect, Color.BLACK, false, 1.0)
+
 	# Safe squares permanent highlight (start and star cells)
-	var safe_color = Color(0.9, 0.9, 0.3, 0.3)
+	var safe_color = Color(0.9, 0.9, 0.3, 0.35)
 	for p in range(1, 5):
 		for s in [1, 9]:
-			var cpos = _get_token_board_pos(p, 0, s)
+			var cpos = get_cell_position(s, p)
 			var safe_rect = Rect2(cpos.x - 17.5, cpos.y - 17.5, track_step, track_step)
 			draw_rect(safe_rect, safe_color)
 
 	# Center Goal Zone
 	var center = Vector2(300, 300)
-	draw_circle(center, 40, Color(0.9, 0.9, 0.9))
-	draw_circle(center, 40, Color.GOLD, false, 3.0)
+	draw_circle(center, 38, Color(0.9, 0.9, 0.9))
+	draw_circle(center, 38, Color.GOLD, false, 3.0)
 
 func _update_status() -> void:
 	if winner != -1:

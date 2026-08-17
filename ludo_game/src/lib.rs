@@ -9,7 +9,8 @@ pub mod events;
 pub mod rules;
 
 pub use board::{
-    PendingRollResource, TokensResource, HOME_STRETCH_LEN, MAX_STEPS, TOKENS_PER_PLAYER, TRACK_LEN,
+    next_step_for, PendingRollResource, TokensResource, BOARD_STEPS, HOME_STRETCH_LEN, MAX_STEPS,
+    TOKENS_PER_PLAYER, TRACK_LEN,
 };
 pub use commands::{MoveTokenCommand, RollDiceCommand};
 pub use events::{DiceRolledEvent, GameOverEvent, NoValidMovesEvent, TokenMovedEvent};

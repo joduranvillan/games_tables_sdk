@@ -81,17 +81,17 @@ fn sacar_un_6_da_turno_extra_y_no_avanza_el_turno() {
 
 #[test]
 fn pisar_una_ficha_rival_la_manda_de_vuelta_a_la_base() {
-    // Con 2 jugadores, TRACK_LEN=24, start_offset[P1]=0, start_offset[P2]=12.
-    // Si P1 avanza a steps=12, su posición absoluta es (0+12-1)%24 = 11.
+    // Con 2 jugadores, TRACK_LEN=52, start_offset[P1]=0, start_offset[P2]=26.
+    // Si P1 avanza a steps=26, su posición absoluta es (0+26-1)%52 = 25.
     // Para que P2 esté en esa misma celda absoluta, necesita
-    // (12+steps-1)%24 == 11, que se cumple con steps=24 ((12+24-1)%24=35%24=11).
+    // (26+steps-1)%52 == 25, que se cumple con steps=52 ((26+52-1)%52=77%52=25).
     let mut session = new_ludo_session(SessionId(5), 1, vec![P1, P2]);
     {
         let mut tokens = session
             .world_mut()
             .resource_mut::<ludo_game::TokensResource>();
-        tokens.tokens.get_mut(&P1).unwrap()[0] = 11; // a un paso de la colisión
-        tokens.tokens.get_mut(&P2).unwrap()[0] = 24; // en la misma celda absoluta que P1 tras +1
+        tokens.tokens.get_mut(&P1).unwrap()[0] = 25; // a un paso de la colisión
+        tokens.tokens.get_mut(&P2).unwrap()[0] = 52; // en la misma celda absoluta que P1 tras +1
     }
     {
         let mut pending = session
@@ -175,10 +175,10 @@ fn casilla_segura_de_salida_evita_captura() {
         let mut tokens = session
             .world_mut()
             .resource_mut::<ludo_game::TokensResource>();
-        // P2 está en su casilla de salida (steps=1). start_offset[P2]=12. board_position(P2, 1) = 12.
+        // P2 está en su casilla de salida (steps=1). start_offset[P2]=26. board_position(P2, 1) = 26.
         tokens.tokens.get_mut(&P2).unwrap()[0] = 1;
-        // P1 aterriza en la misma casilla 12 (con start_offset[P1]=0, necesita steps=13 para board_position=12).
-        tokens.tokens.get_mut(&P1).unwrap()[0] = 12;
+        // P1 aterriza en la misma casilla 26 (con start_offset[P1]=0, necesita steps=27 para board_position=26).
+        tokens.tokens.get_mut(&P1).unwrap()[0] = 26;
     }
     {
         let mut pending = session
@@ -211,10 +211,10 @@ fn test_token_no_puede_entrar_en_columna_de_casa_rival() {
         let mut tokens = session
             .world_mut()
             .resource_mut::<ludo_game::TokensResource>();
-        // P1 tiene una ficha en su columna de casa (steps = 25).
-        tokens.tokens.get_mut(&P1).unwrap()[0] = 25;
-        // P2 está en la casilla compartida 23 (steps = 12 para P2 ya que start_offset[P2]=12).
-        tokens.tokens.get_mut(&P2).unwrap()[0] = 12;
+        // P1 tiene una ficha en su columna de casa (steps = 53).
+        tokens.tokens.get_mut(&P1).unwrap()[0] = 53;
+        // P2 está en la casilla compartida 51 (steps = 26 para P2 ya que start_offset[P2]=26, (26+26-1)%52 = 51).
+        tokens.tokens.get_mut(&P2).unwrap()[0] = 26;
     }
     // Avanzar el turno a P2 para que sea su turno
     {
@@ -233,12 +233,12 @@ fn test_token_no_puede_entrar_en_columna_de_casa_rival() {
         .as_any()
         .downcast_ref::<TokenMovedEvent>()
         .unwrap();
-    // La ficha de P2 pasa a steps = 13 (posición absoluta 0 del tramo compartido), NO a la columna de casa de P1
-    assert_eq!(moved.to_steps, 13);
+    // La ficha de P2 pasa a steps = 27 (posición absoluta 0 del tramo compartido), NO a la columna de casa de P1
+    assert_eq!(moved.to_steps, 27);
     let tokens = session.world().resource::<ludo_game::TokensResource>();
-    assert_eq!(tokens.board_position(P2, 13), Some(0));
+    assert_eq!(tokens.board_position(P2, 27), Some(0));
     assert_eq!(
-        tokens.tokens[&P1][0], 25,
+        tokens.tokens[&P1][0], 53,
         "la ficha de P1 en su columna de casa permanece intacta"
     );
 }
@@ -250,7 +250,7 @@ fn test_dado_mayor_que_casillas_restantes_en_meta_es_invalido() {
         let mut tokens = session
             .world_mut()
             .resource_mut::<ludo_game::TokensResource>();
-        // Colocar ficha a 2 casillas de la meta: MAX_STEPS = 29, así que steps = 27 (faltan 2)
+        // Colocar ficha a 2 casillas de la meta: MAX_STEPS = 57, así que steps = 55 (faltan 2)
         tokens.tokens.get_mut(&P1).unwrap()[0] = MAX_STEPS - 2;
     }
     {
@@ -277,8 +277,8 @@ fn test_bloqueo_impide_que_rival_aterrice_en_casilla() {
         // P1 tiene dos fichas en la casilla de posición absoluta 10 (steps = 11 para P1).
         tokens.tokens.get_mut(&P1).unwrap()[0] = 11;
         tokens.tokens.get_mut(&P1).unwrap()[1] = 11;
-        // P2 tiene una ficha en posición absoluta 8 (steps = 21 para P2, ya que (12 + 21 - 1)%24 = 32%24 = 8).
-        tokens.tokens.get_mut(&P2).unwrap()[0] = 21;
+        // P2 tiene una ficha en posición absoluta 8 (steps = 35 para P2, ya que (26 + 35 - 1)%52 = 60%52 = 8).
+        tokens.tokens.get_mut(&P2).unwrap()[0] = 35;
     }
     // Dar turno a P2
     {
@@ -323,6 +323,85 @@ fn test_seleccion_de_token_invalido_es_rechazada() {
         matches!(result, Err(EngineError::InvalidCommand { .. })),
         "seleccionar un token que no tiene movimiento válido debe ser rechazado"
     );
+}
+
+#[test]
+fn test_ficha_recorre_tablero_completo_en_52_pasos() {
+    let mut session = new_ludo_session(SessionId(52), 1, vec![P1, P2]);
+
+    // 1. La ficha empieza en la base (steps = 0)
+    let tokens = session.world().resource::<ludo_game::TokensResource>();
+    assert_eq!(tokens.tokens[&P1][0], 0);
+    assert_eq!(tokens.board_position(P1, 0), None);
+
+    // 2. Sale de base con un 6 -> entra a la ruta compartida en steps = 1
+    {
+        let mut pending = session
+            .world_mut()
+            .resource_mut::<ludo_game::PendingRollResource>();
+        pending.pending.insert(P1, 6);
+    }
+    let ev1 = move_token(&mut session, P1, 0).expect("sale de base con un 6");
+    let moved1 = ev1[0].as_any().downcast_ref::<TokenMovedEvent>().unwrap();
+    assert_eq!(moved1.from_steps, 0);
+    assert_eq!(moved1.to_steps, 1);
+
+    let tokens = session.world().resource::<ludo_game::TokensResource>();
+    assert_eq!(tokens.board_position(P1, 1), Some(0)); // casilla inicial de P1
+
+    // 3. Recorre las 52 casillas de la ruta compartida en sentido horario hasta steps = 52
+    {
+        let mut t = session
+            .world_mut()
+            .resource_mut::<ludo_game::TokensResource>();
+        t.tokens.get_mut(&P1).unwrap()[0] = 52;
+    }
+    let tokens = session.world().resource::<ludo_game::TokensResource>();
+    assert_eq!(tokens.tokens[&P1][0], 52);
+    assert_eq!(tokens.board_position(P1, 52), Some(51)); // casilla previa a la entrada de meta
+
+    // 4. Entra a su zona de meta (5 casillas adicionales, steps = 53..=57).
+    // Con tirada de 1 entra a la primera casilla de la meta (steps = 53).
+    {
+        let mut pending = session
+            .world_mut()
+            .resource_mut::<ludo_game::PendingRollResource>();
+        pending.pending.insert(P1, 1);
+    }
+    let ev_meta = move_token(&mut session, P1, 0).expect("entra a zona de meta");
+    let moved_meta = ev_meta[0]
+        .as_any()
+        .downcast_ref::<TokenMovedEvent>()
+        .unwrap();
+    assert_eq!(moved_meta.from_steps, 52);
+    assert_eq!(moved_meta.to_steps, 53);
+    assert!(!moved_meta.finished);
+
+    let tokens = session.world().resource::<ludo_game::TokensResource>();
+    // En la zona de meta privada (steps > 52), board_position devuelve None (a salvo de capturas)
+    assert_eq!(tokens.board_position(P1, 53), None);
+
+    // 5. Avanza los 4 pasos restantes hasta la meta final (MAX_STEPS = 57)
+    {
+        let mut t = session
+            .world_mut()
+            .resource_mut::<ludo_game::TokensResource>();
+        t.tokens.get_mut(&P1).unwrap()[0] = 56;
+    }
+    {
+        let mut pending = session
+            .world_mut()
+            .resource_mut::<ludo_game::PendingRollResource>();
+        pending.pending.insert(P1, 1);
+    }
+    let ev_final = move_token(&mut session, P1, 0).expect("llega a la meta final");
+    let moved_final = ev_final[0]
+        .as_any()
+        .downcast_ref::<TokenMovedEvent>()
+        .unwrap();
+    assert_eq!(moved_final.from_steps, 56);
+    assert_eq!(moved_final.to_steps, 57);
+    assert!(moved_final.finished);
 }
 
 #[test]
@@ -433,19 +512,19 @@ fn test_esquinas_segun_numero_de_jugadores() {
     let s2 = new_ludo_session(SessionId(21), 1, vec![P1, P2]);
     let t2 = s2.world().resource::<ludo_game::TokensResource>();
     assert_eq!(t2.start_offset[&P1], 0);
-    assert_eq!(t2.start_offset[&P2], 12);
+    assert_eq!(t2.start_offset[&P2], 26);
 
     let s3 = new_ludo_session(SessionId(22), 1, vec![P1, P2, P3]);
     let t3 = s3.world().resource::<ludo_game::TokensResource>();
     assert_eq!(t3.start_offset[&P1], 0);
-    assert_eq!(t3.start_offset[&P2], 8);
-    assert_eq!(t3.start_offset[&P3], 16);
+    assert_eq!(t3.start_offset[&P2], 17);
+    assert_eq!(t3.start_offset[&P3], 34);
 
     let p4 = PlayerId(4);
     let s4 = new_ludo_session(SessionId(23), 1, vec![P1, P2, P3, p4]);
     let t4 = s4.world().resource::<ludo_game::TokensResource>();
     assert_eq!(t4.start_offset[&P1], 0);
-    assert_eq!(t4.start_offset[&P2], 6);
-    assert_eq!(t4.start_offset[&P3], 12);
-    assert_eq!(t4.start_offset[&p4], 18);
+    assert_eq!(t4.start_offset[&P2], 13);
+    assert_eq!(t4.start_offset[&P3], 26);
+    assert_eq!(t4.start_offset[&p4], 39);
 }

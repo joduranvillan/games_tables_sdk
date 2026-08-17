@@ -14,7 +14,7 @@ pub use commands::{
     CoupFourreCommand, DiscardCardCommand, DrawCardCommand, PlayCardCommand, PlayDistanceCommand,
     PlayHazardCommand, PlaySafetyCommand, SetupDeckCommand,
 };
-pub use deck::{DeckResource, MAX_HAND_SIZE, TARGET_DISTANCE};
+pub use deck::{DeckResource, MAX_HAND_SIZE, TARGET_DISTANCE, WIN_DISTANCE};
 pub use events::{
     CardDiscardedEvent, CardDrawnEvent, DistancePlayedEvent, GameOverEvent, HazardPlayedEvent,
     RemedyPlayedEvent, SafetyPlayedEvent, TripExtendedEvent,

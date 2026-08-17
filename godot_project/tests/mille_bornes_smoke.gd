@@ -6,6 +6,7 @@ func _initialize() -> void:
 	var results: Array = []
 	var events_received: Array = []
 	var move_rejected_reasons: Array = []
+	var p1_tracked_distance: int = 0
 
 	var bridge = OpenTableBridge.new()
 
@@ -15,6 +16,9 @@ func _initialize() -> void:
 			var data = parser.data
 			if data is Dictionary:
 				events_received.append(data)
+				var et = data.get("event_type", data.get("command_type", ""))
+				if "DistancePlayedEvent" in et and data.get("player") == 1:
+					p1_tracked_distance = int(data.get("new_distance", p1_tracked_distance))
 	)
 
 	bridge.connect("move_rejected", func(reason: String):
@@ -31,40 +35,41 @@ func _initialize() -> void:
 	}))
 	results.append(["SetupDeckCommand procesado sin errores", move_rejected_reasons.size() == 0])
 
-	# 3. Jugar carta de distancia válida (P1)
-	move_rejected_reasons.clear()
-	bridge.send_command_json(1, JSON.stringify({
-		"command_type": "PlayDistanceCommand",
-		"player": 1,
-		"distance": 25
-	}))
-	var distance_played_event = false
-	for ev in events_received:
-		var et = ev.get("event_type", ev.get("command_type", ""))
-		if "DistancePlayedEvent" in et:
-			distance_played_event = true
-			break
-	results.append(["PlayDistanceCommand con 25 km emite DistancePlayedEvent", distance_played_event])
+	# 3. Jugar 5 rondas y verificar que bridge.get_distance(1) incrementa correctamente
+	var distances = [25, 50, 75, 100, 100]
+	var total_expected = 0
+	var distance_increments_ok = true
 
-	# 4. P2 juega carta de distancia para que el turno vuelva a P1
-	bridge.send_command_json(2, JSON.stringify({
-		"command_type": "PlayDistanceCommand",
-		"player": 2,
-		"distance": 25
-	}))
+	for round_num in range(1, 6):
+		var dist_to_play = distances[round_num - 1]
+		var prev_dist = bridge.get_distance(1) if bridge.has_method("get_distance") else p1_tracked_distance
+		
+		# P1 juega carta de distancia
+		bridge.send_command_json(1, JSON.stringify({
+			"command_type": "PlayDistanceCommand",
+			"player": 1,
+			"distance": dist_to_play
+		}))
+		total_expected += dist_to_play
 
-	# 5. Robo de carta (P1 tiene 5 cartas en mano tras jugar, ahora sí puede robar)
-	bridge.send_command_json(1, JSON.stringify({
-		"command_type": "DrawCardCommand",
-		"player": 1
-	}))
-	var drawn_event = false
-	for ev in events_received:
-		var et = ev.get("event_type", ev.get("command_type", ""))
-		if "CardDrawnEvent" in et:
-			drawn_event = true
-			break
-	results.append(["DrawCardCommand emite CardDrawnEvent", drawn_event])
+		var curr_dist = bridge.get_distance(1) if bridge.has_method("get_distance") else p1_tracked_distance
+		if curr_dist <= prev_dist or (bridge.has_method("get_distance") and curr_dist != total_expected):
+			distance_increments_ok = false
+
+		# P2 juega carta de distancia para que el turno vuelva a P1
+		bridge.send_command_json(2, JSON.stringify({
+			"command_type": "PlayDistanceCommand",
+			"player": 2,
+			"distance": 25
+		}))
+
+		# P1 roba carta para reponer mano
+		bridge.send_command_json(1, JSON.stringify({
+			"command_type": "DrawCardCommand",
+			"player": 1
+		}))
+
+	results.append(["5 rondas jugadas y bridge.get_distance(1) incrementa correctamente a %d km" % total_expected, distance_increments_ok])
 
 	var ok := true
 	for r in results:

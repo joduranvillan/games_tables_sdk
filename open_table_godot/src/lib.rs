@@ -1838,6 +1838,36 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn get_distance(&self, player_id: i64) -> i64 {
+        let p_id = PlayerId(player_id as u32);
+        match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::Replay { session, .. }
+            | BridgeMode::Tournament { session, .. } => {
+                if let Some(deck) = session.world().get_resource::<mille_bornes_game::DeckResource>() {
+                    deck.distance.get(&p_id).copied().unwrap_or(0) as i64
+                } else {
+                    0
+                }
+            }
+            BridgeMode::MultiSession { sessions, active } => {
+                if let Some((_, session)) = sessions.get(*active) {
+                    if let Some(deck) = session.world().get_resource::<mille_bornes_game::DeckResource>() {
+                        deck.distance.get(&p_id).copied().unwrap_or(0) as i64
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                }
+            }
+            _ => 0,
+        }
+    }
+
+    #[func]
     pub fn _process(&mut self, _delta: f64) {
         self.poll_events();
     }

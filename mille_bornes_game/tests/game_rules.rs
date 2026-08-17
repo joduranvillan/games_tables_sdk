@@ -1,7 +1,7 @@
 use mille_bornes_game::{
     new_mille_bornes_session, Card, CardDiscardedEvent, CoupFourreCommand, DiscardCardCommand,
     DrawCardCommand, GameOverEvent, Hazard, HazardPlayedEvent, PlayCardCommand, MAX_HAND_SIZE,
-    TARGET_DISTANCE,
+    TARGET_DISTANCE, WIN_DISTANCE,
 };
 use open_table_engine::prelude::*;
 
@@ -455,6 +455,12 @@ fn test_tercera_carta_200_es_rechazada() {
 #[test]
 fn test_extension_de_viaje_a_1000_cuando_se_agotan_las_200() {
     let mut session = new_mille_bornes_session(SessionId(13), 1, P1, P2);
+    {
+        let mut deck = session
+            .world_mut()
+            .resource_mut::<mille_bornes_game::DeckResource>();
+        deck.target_distance = 700;
+    }
 
     session
         .process_command(
@@ -508,4 +514,44 @@ fn test_extension_de_viaje_a_1000_cuando_se_agotan_las_200() {
         .world()
         .resource::<mille_bornes_game::DeckResource>();
     assert_eq!(deck.target_distance, 1000);
+}
+
+#[test]
+fn test_gana_con_1000km() {
+    let mut session = new_mille_bornes_session(SessionId(100), 1, P1, P2);
+    {
+        let mut deck = session
+            .world_mut()
+            .resource_mut::<mille_bornes_game::DeckResource>();
+        deck.distance.insert(P1, 800);
+        deck.hands.get_mut(&P1).unwrap()[0] = Card::Distance(200);
+    }
+
+    let events = session
+        .process_command(
+            P1,
+            Box::new(PlayCardCommand {
+                player: P1,
+                card_index: 0,
+            }),
+        )
+        .expect("jugar carta de 200 para llegar a 1000 km");
+
+    let played = events
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<mille_bornes_game::DistancePlayedEvent>())
+        .expect("DistancePlayedEvent");
+    assert_eq!(played.new_distance, 1000);
+
+    let game_over = events
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<GameOverEvent>())
+        .expect("GameOverEvent al alcanzar 1000 km");
+    assert_eq!(game_over.winner, P1);
+
+    let deck = session
+        .world()
+        .resource::<mille_bornes_game::DeckResource>();
+    assert_eq!(deck.distance[&P1], 1000);
+    assert_eq!(WIN_DISTANCE, 1000);
 }

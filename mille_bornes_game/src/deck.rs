@@ -5,7 +5,8 @@ use open_table_macros::GameResource;
 
 use crate::card::{Card, Hazard, Safety};
 
-pub const TARGET_DISTANCE: u32 = 700;
+pub const WIN_DISTANCE: u32 = 1000;
+pub const TARGET_DISTANCE: u32 = WIN_DISTANCE;
 pub const MAX_HAND_SIZE: usize = 6;
 
 #[derive(GameResource)]
@@ -37,20 +38,21 @@ impl Default for DeckResource {
     }
 }
 
-/// Composición del mazo simplificado: menos cartas que el juego real,
-/// pero mantiene la proporción distancia/peligro/remedio.
+/// Composición del mazo estándar:
+/// - 25 km × 10, 50 km × 10, 75 km × 10, 100 km × 12, 200 km × 4 (total 46 cartas de distancia)
+/// - Hazard/Remedy/Safety: según distribución estándar.
 pub fn build_deck() -> Vec<Card> {
     let mut deck = Vec::new();
-    for _ in 0..4 {
+    for _ in 0..10 {
         deck.push(Card::Distance(25));
     }
-    for _ in 0..4 {
+    for _ in 0..10 {
         deck.push(Card::Distance(50));
     }
-    for _ in 0..3 {
+    for _ in 0..10 {
         deck.push(Card::Distance(75));
     }
-    for _ in 0..3 {
+    for _ in 0..12 {
         deck.push(Card::Distance(100));
     }
     for _ in 0..4 {

@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use open_table_core::ids::PlayerId;
 use open_table_macros::GameResource;
 
-pub const TRACK_LEN: u32 = 24;
+pub const BOARD_STEPS: usize = 52;
+pub const TRACK_LEN: u32 = 52;
 pub const HOME_STRETCH_LEN: u32 = 5;
 pub const MAX_STEPS: u32 = TRACK_LEN + HOME_STRETCH_LEN;
 pub const TOKENS_PER_PLAYER: usize = 4;
@@ -13,10 +14,27 @@ pub const TOKENS_PER_PLAYER: usize = 4;
 /// modelar el track compartido con wraparound distinto por jugador.
 ///
 /// - `0`: todavía en la base, no entró al tablero.
-/// - `1..=TRACK_LEN`: en el tramo compartido.
-/// - `TRACK_LEN+1..=MAX_STEPS`: en el tramo final privado de ese jugador.
-/// - `MAX_STEPS`: llegó, ficha terminada.
+/// - `1..=TRACK_LEN`: en el tramo compartido (52 casillas).
+/// - `TRACK_LEN+1..=MAX_STEPS`: en el tramo final privado de ese jugador (5 casillas).
+/// - `MAX_STEPS`: llegó, ficha terminada (meta).
 pub type Steps = u32;
+
+/// Calcula el siguiente paso para una ficha dado su progreso actual y el dado.
+/// Retorna `None` si el movimiento es ilegal (requiere 6 para salir de base,
+/// o el dado excede las casillas exactas para llegar a la meta).
+pub fn next_step_for(_player: PlayerId, from: Steps, die: u32) -> Option<Steps> {
+    if from == 0 {
+        if die == 6 {
+            Some(1)
+        } else {
+            None
+        }
+    } else if from + die <= MAX_STEPS {
+        Some(from + die)
+    } else {
+        None
+    }
+}
 
 #[derive(GameResource)]
 pub struct TokensResource {
@@ -81,6 +99,10 @@ impl TokensResource {
         false
     }
 
+    pub fn next_step_for(&self, player: PlayerId, from: Steps, die: u32) -> Option<Steps> {
+        next_step_for(player, from, die)
+    }
+
     /// Verifica si mover la ficha `token_index` de `player` con `roll` es un movimiento legal.
     pub fn is_valid_move_for_token(&self, player: PlayerId, token_index: usize, roll: u32) -> bool {
         let Some(tokens) = self.tokens.get(&player) else {
@@ -94,21 +116,17 @@ impl TokensResource {
             return false;
         }
 
+        let Some(target_steps) = self.next_step_for(player, current_steps, roll) else {
+            return false;
+        };
+
         if current_steps == 0 {
-            if roll != 6 {
-                return false;
-            }
             if let Some(start_pos) = self.board_position(player, 1) {
                 if self.has_rival_blockade_at(start_pos, player) {
                     return false;
                 }
             }
             return true;
-        }
-
-        let target_steps = current_steps + roll;
-        if target_steps > MAX_STEPS {
-            return false;
         }
 
         // Verificar bloqueo rival en todo el trayecto (paso a paso y aterrizaje)

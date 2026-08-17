@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use open_table_core::ids::PlayerId;
 use open_table_macros::GameEvent;
 
+use crate::board::{ChanceCard, CommunityChestCard};
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct PlayerMovedEvent {
     pub player: PlayerId,
@@ -71,4 +73,26 @@ pub struct RailroadRentPaidEvent {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct BankruptcyEvent {
     pub player: PlayerId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct TaxPaidEvent {
+    pub player: PlayerId,
+    pub space: usize,
+    pub name: String,
+    pub amount: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct ChanceCardDrawnEvent {
+    pub player: PlayerId,
+    pub card: ChanceCard,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct CommunityChestCardDrawnEvent {
+    pub player: PlayerId,
+    pub card: CommunityChestCard,
+    pub description: String,
 }
