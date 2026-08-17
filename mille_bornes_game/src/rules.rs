@@ -14,8 +14,6 @@ use crate::events::{
     RemedyPlayedEvent, SafetyPlayedEvent, TripExtendedEvent,
 };
 
-pub const WIN_DISTANCE: u32 = 1000;
-
 #[derive(GameResource, Default)]
 pub struct SpeedLimitResource {
     pub limited: HashSet<PlayerId>,
