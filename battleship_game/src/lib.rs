@@ -13,7 +13,7 @@ pub use board::BOARD_SIZE;
 pub use commands::{FireShotCommand, PlaceFleetCommand, RematchCommand};
 pub use events::{FleetPlacedEvent, GameOverEvent, ShotResult, ShotResultEvent, SunkenShipEvent};
 pub use fleet::{FleetResource, RematchResource, Ship, ShotsResource, EXPECTED_SHIP_SIZES};
-pub use position::{Position, BOARD_SIZE};
+pub use position::Position;
 pub use rules::build_battleship_rules;
 
 use open_table_engine::prelude::*;

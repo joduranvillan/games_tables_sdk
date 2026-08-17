@@ -153,7 +153,7 @@ pub fn minimax(
         let mut max_eval = f32::NEG_INFINITY;
         for mv in candidates {
             let mut next_session = clone_xiangqi_session(session);
-            if next_session.process_command(current, mv).is_ok() {
+            if next_session.process_command(current, Box::new(mv)).is_ok() {
                 let eval = minimax(&next_session, depth - 1, alpha, beta, false, player);
                 if eval > max_eval {
                     max_eval = eval;
@@ -171,7 +171,7 @@ pub fn minimax(
         let mut min_eval = f32::INFINITY;
         for mv in candidates {
             let mut next_session = clone_xiangqi_session(session);
-            if next_session.process_command(current, mv).is_ok() {
+            if next_session.process_command(current, Box::new(mv)).is_ok() {
                 let eval = minimax(&next_session, depth - 1, alpha, beta, true, player);
                 if eval < min_eval {
                     min_eval = eval;
@@ -225,7 +225,7 @@ pub fn xiangqi_ai_pick_move(session: &Session, player: PlayerId) -> Option<MoveP
 
     for mv in candidates {
         let mut next_session = clone_xiangqi_session(session);
-        if next_session.process_command(player, mv.clone()).is_ok() {
+        if next_session.process_command(player, Box::new(mv.clone())).is_ok() {
             let score = minimax(&next_session, depth - 1, alpha, beta, false, player);
             if score > best_score || best_move.is_none() {
                 best_score = score;
