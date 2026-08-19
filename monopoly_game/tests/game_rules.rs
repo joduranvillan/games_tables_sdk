@@ -1,7 +1,7 @@
 use monopoly_game::{
-    apply_land_effect, board_layout, new_monopoly_session, AuctionBidCommand, AuctionStartedEvent,
-    AuctionWonEvent, BankruptcyEvent, BuyPropertyCommand, ChanceCard, CommunityChestCard,
-    GameOverEvent, JailedEvent, PayJailFeeCommand, PlayerMovedEvent, PropertyPurchasedEvent,
+    board_layout, new_monopoly_session, AuctionBidCommand, AuctionStartedEvent, AuctionWonEvent,
+    BankruptcyEvent, BuyPropertyCommand, ChanceCard, CommunityChestCard, GameOverEvent,
+    JailedEvent, PayJailFeeCommand, PlayerMovedEvent, PropertyPurchasedEvent,
     RailroadRentPaidEvent, RentPaidEvent, RollAndMoveCommand, SpaceKind, TaxPaidEvent,
     UtilityRentPaidEvent, BOARD_SIZE, GO_TO_JAIL_SPACE, JAIL_SPACE, STARTING_MONEY,
 };
@@ -38,7 +38,11 @@ fn test_tablero_estandar_40_casillas_con_todas_las_variantes() {
     assert_eq!(properties, 22, "22 calles");
     assert_eq!(railroads, 4, "4 estaciones");
     assert_eq!(utilities, 2, "2 suministros/servicios");
-    assert_eq!(properties + railroads + utilities, 28, "28 propiedades totales");
+    assert_eq!(
+        properties + railroads + utilities,
+        28,
+        "28 propiedades totales"
+    );
     assert_eq!(taxes, 2, "2 impuestos (Renta y Lujo)");
     assert_eq!(chances, 3, "3 cartas de Suerte");
     assert_eq!(community_chests, 3, "3 cartas de Arca Comunitaria");
@@ -269,7 +273,10 @@ fn test_jugador_cae_en_ve_a_la_carcel() {
             .downcast_ref::<PlayerMovedEvent>()
             .unwrap();
         if moved.roll == 6 {
-            assert_eq!(moved.new_position, 30, "El tiro 6 desde 24 llega a 30 (GO_TO_JAIL_SPACE)");
+            assert_eq!(
+                moved.new_position, 30,
+                "El tiro 6 desde 24 llega a 30 (GO_TO_JAIL_SPACE)"
+            );
             let jailed_event = events
                 .iter()
                 .find_map(|e| e.as_any().downcast_ref::<JailedEvent>());

@@ -1,4 +1,4 @@
-use crate::board::{PendingRollResource, TokensResource, MAX_STEPS, TOKENS_PER_PLAYER, WIN_STEPS};
+use crate::board::{PendingRollResource, TokensResource, MAX_STEPS, WIN_STEPS};
 use crate::commands::MoveTokenCommand;
 use open_table_engine::prelude::*;
 
@@ -26,12 +26,11 @@ pub fn ludo_ai_pick_move(session: &Session, player: PlayerId) -> Option<MoveToke
     let mut best_token: Option<usize> = None;
     let mut best_score: i32 = i32::MIN;
 
-    for token_index in 0..TOKENS_PER_PLAYER {
+    for (token_index, &current_steps) in player_tokens.iter().enumerate() {
         if !tokens_res.is_valid_move_for_token(player, token_index, pending_roll) {
             continue;
         }
 
-        let current_steps = player_tokens[token_index];
         let target_steps = if current_steps == 0 {
             1
         } else {

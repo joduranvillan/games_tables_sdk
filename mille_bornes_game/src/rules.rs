@@ -8,7 +8,7 @@ use crate::commands::{
     CoupFourreCommand, DiscardCardCommand, DrawCardCommand, PlayCardCommand, PlayDistanceCommand,
     PlayHazardCommand, PlaySafetyCommand, SetupDeckCommand,
 };
-use crate::deck::{build_deck, DeckResource, MAX_HAND_SIZE, TARGET_DISTANCE, WIN_DISTANCE};
+use crate::deck::{build_deck, DeckResource, MAX_HAND_SIZE, TARGET_DISTANCE};
 use crate::events::{
     CardDiscardedEvent, CardDrawnEvent, DistancePlayedEvent, GameOverEvent, HazardPlayedEvent,
     RemedyPlayedEvent, SafetyPlayedEvent, TripExtendedEvent,

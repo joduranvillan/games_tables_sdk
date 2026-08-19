@@ -265,7 +265,10 @@ pub fn apply_land_effect(
             players.position.insert(player, JAIL_SPACE);
             let _ = players;
 
-            world.resource_mut::<JailResource>().jailed.insert(player, 3);
+            world
+                .resource_mut::<JailResource>()
+                .jailed
+                .insert(player, 3);
             events.push(Box::new(JailedEvent { player }));
             false
         }
@@ -325,7 +328,11 @@ pub fn apply_land_effect(
                         .get(&player)
                         .copied()
                         .unwrap_or(0);
-                    let target_util = if old_pos < 12 || old_pos > 28 { 12 } else { 28 };
+                    let target_util = if !(12..=28).contains(&old_pos) {
+                        12
+                    } else {
+                        28
+                    };
                     let mut players = world.resource_mut::<PlayersResource>();
                     let mut money = players.money.get(&player).copied().unwrap_or(0);
                     if old_pos > 28 {
@@ -374,7 +381,9 @@ pub fn apply_land_effect(
                     let _ = players;
 
                     let rr_space = board_spaces[target_rr].clone();
-                    apply_land_effect(&rr_space, target_rr, player, roll, is_doubles, world, events)
+                    apply_land_effect(
+                        &rr_space, target_rr, player, roll, is_doubles, world, events,
+                    )
                 }
                 ChanceCard::BankDividend50 | ChanceCard::GetOutOfJailFree => {
                     let mut players = world.resource_mut::<PlayersResource>();
@@ -397,7 +406,10 @@ pub fn apply_land_effect(
                     players.position.insert(player, JAIL_SPACE);
                     let _ = players;
 
-                    world.resource_mut::<JailResource>().jailed.insert(player, 3);
+                    world
+                        .resource_mut::<JailResource>()
+                        .jailed
+                        .insert(player, 3);
                     events.push(Box::new(JailedEvent { player }));
                     false
                 }
@@ -463,7 +475,10 @@ pub fn apply_land_effect(
                     players.position.insert(player, JAIL_SPACE);
                     let _ = players;
 
-                    world.resource_mut::<JailResource>().jailed.insert(player, 3);
+                    world
+                        .resource_mut::<JailResource>()
+                        .jailed
+                        .insert(player, 3);
                     events.push(Box::new(JailedEvent { player }));
                     false
                 }
@@ -703,6 +718,7 @@ pub fn build_monopoly_rules() -> RuleEngine {
         }
 
         let mut jailed = false;
+        let landed_pos = new_pos;
         if new_pos == GO_TO_JAIL_SPACE {
             new_pos = JAIL_SPACE;
             jailed = true;
@@ -725,7 +741,7 @@ pub fn build_monopoly_rules() -> RuleEngine {
             d1,
             d2,
             is_doubles,
-            new_position: new_pos,
+            new_position: landed_pos,
             passed_go,
         }));
 

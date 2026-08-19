@@ -1,14 +1,50 @@
 use open_table_engine::prelude::*;
 
-use crate::board::BoardResource;
+use crate::board::{BoardResource, MultiCaptureResource, Sides};
 use crate::commands::MovePieceCommand;
+use crate::legal_moves::CheckersLegalMoveGenerator;
 use crate::position::Position;
+
+fn clone_checkers_session(session: &Session) -> Session {
+    let sides = session
+        .world()
+        .get_resource::<Sides>()
+        .copied()
+        .unwrap_or(Sides {
+            increasing: PlayerId(1),
+            decreasing: PlayerId(2),
+        });
+
+    let mut new_session =
+        crate::new_checkers_session(session.id, 0, sides.increasing, sides.decreasing);
+
+    if let Some(board) = session.world().get_resource::<BoardResource>() {
+        new_session.world_mut().insert_resource(board.clone());
+    }
+    if let Some(mc) = session.world().get_resource::<MultiCaptureResource>() {
+        new_session.world_mut().insert_resource(mc.clone());
+    }
+    if let Some(turn) = session.world().get_resource::<TurnResource>() {
+        new_session.world_mut().insert_resource(turn.clone());
+    }
+    if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
+        new_session.world_mut().insert_resource(*game_over);
+    }
+    if let Some(winner) = session.world().get_resource::<WinnerResource>() {
+        new_session.world_mut().insert_resource(*winner);
+    }
+    new_session
+        .world_mut()
+        .insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(
+            CheckersLegalMoveGenerator,
+        )));
+
+    new_session
+}
 
 /// Selecciona una jugada legal para el jugador especificado en la sesión dada.
 ///
-/// Evalúa los movimientos posibles (capturas y pasos simples) mediante
-/// prueba y error llamando a `session.process_command` en una copia temporal
-/// de la sesión. Si existen capturas legales, selecciona una al azar entre ellas.
+/// Si existen capturas legales, selecciona una al azar entre ellas.
 /// Si no hay capturas, selecciona al azar entre los movimientos simples legales.
 /// Devuelve `None` si la partida ha terminado, si no es el turno del jugador o
 /// si no hay movimientos legales disponibles.
@@ -27,28 +63,9 @@ pub fn checkers_ai_pick_move(session: &Session, player: PlayerId) -> Option<Move
 
     let board = session.world().get_resource::<BoardResource>()?;
 
-    let players = session
-        .world()
-        .get_resource::<TurnResource>()
-        .map(|t| t.0.players().to_vec())
-        .unwrap_or_default();
-    if players.is_empty() {
-        return None;
-    }
-    let p1 = players[0];
-    let p2 = players.get(1).copied().unwrap_or(p1);
-
-    // Recreamos el estado actual en una sesión base de prueba
-    let mut base_trial = crate::new_checkers_session(session.id, 0, p1, p2);
-    for (_tick, _elapsed, cmd) in session.command_log() {
-        let sender = cmd.issuer().unwrap_or_else(|| base_trial.current_player());
-        let _ = base_trial.process_command(sender, cmd.clone());
-    }
-
     let mut captures = Vec::new();
     let mut simple_moves = Vec::new();
 
-    // Recorremos las fichas del jugador
     for r in 0..8u8 {
         for c in 0..8u8 {
             let from = Position::new(r, c);
@@ -57,7 +74,6 @@ pub fn checkers_ai_pick_move(session: &Session, player: PlayerId) -> Option<Move
                     continue;
                 }
 
-                // Generar posiciones de destino candidatas (diagonales 1 y 2)
                 let offsets: &[(i8, i8)] = &[
                     (-1, -1),
                     (-1, 1),
@@ -79,15 +95,7 @@ pub fn checkers_ai_pick_move(session: &Session, player: PlayerId) -> Option<Move
                         }
 
                         let candidate_cmd = MovePieceCommand { player, from, to };
-
-                        // Probar el comando sobre una copia de base_trial
-                        let mut test_session = crate::new_checkers_session(session.id, 0, p1, p2);
-                        for (_tick, _elapsed, cmd) in base_trial.command_log() {
-                            let sender = cmd
-                                .issuer()
-                                .unwrap_or_else(|| test_session.current_player());
-                            let _ = test_session.process_command(sender, cmd.clone());
-                        }
+                        let mut test_session = clone_checkers_session(session);
 
                         if test_session
                             .process_command(player, Box::new(candidate_cmd.clone()))
@@ -135,7 +143,6 @@ mod tests {
     fn test_ai_always_returns_a_move_when_board_not_over() {
         let mut session = new_checkers_session(SessionId(1), 42, P1, P2);
 
-        // La partida está recién iniciada (no ha terminado)
         let is_over = session
             .world()
             .get_resource::<GameOverResource>()
@@ -153,7 +160,6 @@ mod tests {
         let chosen_move = mv.unwrap();
         assert_eq!(chosen_move.player, current_player);
 
-        // Comprobamos que el movimiento seleccionado por la IA es realmente aplicable en la sesión
         let res = session.process_command(current_player, Box::new(chosen_move));
         assert!(
             res.is_ok(),

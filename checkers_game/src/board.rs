@@ -13,7 +13,7 @@ pub struct MultiCaptureResource {
 /// (las claras quedan siempre en `None`) — simplifica el código de
 /// indexado a costa de un poco de memoria desperdiciada, precio
 /// razonable para un juego de referencia.
-#[derive(GameResource)]
+#[derive(GameResource, Clone)]
 pub struct BoardResource {
     pub cells: [[Option<Piece>; 8]; 8],
 }

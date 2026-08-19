@@ -49,7 +49,9 @@ pub fn clone_go_session(session: &Session) -> Session {
         new_session.world_mut().insert_resource(history.clone());
     }
     if let Some(dead_marking) = session.world().get_resource::<DeadMarkingResource>() {
-        new_session.world_mut().insert_resource(dead_marking.clone());
+        new_session
+            .world_mut()
+            .insert_resource(dead_marking.clone());
     }
     if let Some(turn) = session.world().get_resource::<TurnResource>() {
         new_session.world_mut().insert_resource(turn.clone());
@@ -117,7 +119,7 @@ pub fn go_ai_pick_move(session: &Session, player: PlayerId) -> Option<PlaceStone
     let rollouts_per_candidate = (total_budget / n).max(5);
 
     let mut rng = FastRng::new(
-        (session.id.0 ^ (session.current_tick().0 as u64))
+        (session.id.0 ^ session.current_tick().0)
             .wrapping_mul(0x9e3779b97f4a7c15)
             .wrapping_add(1),
     );
@@ -161,10 +163,8 @@ pub fn go_ai_pick_move(session: &Session, player: PlayerId) -> Option<PlaceStone
                 }
 
                 if empty_positions.is_empty() {
-                    let _ = sim_session.process_command(
-                        current_p,
-                        Box::new(PassCommand { player: current_p }),
-                    );
+                    let _ = sim_session
+                        .process_command(current_p, Box::new(PassCommand { player: current_p }));
                     consecutive_passes += 1;
                     if consecutive_passes >= 2 {
                         break;
@@ -194,10 +194,8 @@ pub fn go_ai_pick_move(session: &Session, player: PlayerId) -> Option<PlaceStone
                 }
 
                 if !played {
-                    let _ = sim_session.process_command(
-                        current_p,
-                        Box::new(PassCommand { player: current_p }),
-                    );
+                    let _ = sim_session
+                        .process_command(current_p, Box::new(PassCommand { player: current_p }));
                     consecutive_passes += 1;
                     if consecutive_passes >= 2 {
                         break;

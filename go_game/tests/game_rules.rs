@@ -410,4 +410,3 @@ fn test_go_ai_devuelve_movimiento_o_none_en_posicion_inicial() {
         elapsed
     );
 }
-

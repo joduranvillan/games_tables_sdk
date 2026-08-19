@@ -381,7 +381,13 @@ fn test_ficha_recorre_tablero_completo_en_52_pasos() {
     // En la zona de meta privada (steps > 52), board_position devuelve None (a salvo de capturas)
     assert_eq!(tokens.board_position(P1, 53), None);
 
-    // 5. Avanza los 4 pasos restantes hasta la meta final (MAX_STEPS = 57)
+    // 5. Avanza los 4 pasos restantes hasta la meta final (MAX_STEPS = 57).
+    // El roll de 1 en step 4 avanzó el turno a P2; lo restauramos a P1.
+    session
+        .world_mut()
+        .resource_mut::<TurnResource>()
+        .0
+        .set_current_player(P1);
     {
         let mut t = session
             .world_mut()
@@ -573,4 +579,3 @@ fn test_ludo_ai_captura_cuando_puede() {
         "La IA debe priorizar la captura (token 0) sobre avanzar la ficha atrasada (token 1)"
     );
 }
-

@@ -36,7 +36,11 @@ pub fn piece_value(kind: PieceKind) -> f32 {
 pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
         if game_over.0 {
-            if let Some(winner) = session.world().get_resource::<WinnerResource>().and_then(|w| w.0) {
+            if let Some(winner) = session
+                .world()
+                .get_resource::<WinnerResource>()
+                .and_then(|w| w.0)
+            {
                 return if winner == player {
                     100_000.0
                 } else {
@@ -113,7 +117,11 @@ pub fn minimax(
 ) -> f32 {
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
         if game_over.0 {
-            if let Some(winner) = session.world().get_resource::<WinnerResource>().and_then(|w| w.0) {
+            if let Some(winner) = session
+                .world()
+                .get_resource::<WinnerResource>()
+                .and_then(|w| w.0)
+            {
                 return if winner == player {
                     100_000.0
                 } else {
@@ -225,7 +233,10 @@ pub fn xiangqi_ai_pick_move(session: &Session, player: PlayerId) -> Option<MoveP
 
     for mv in candidates {
         let mut next_session = clone_xiangqi_session(session);
-        if next_session.process_command(player, Box::new(mv.clone())).is_ok() {
+        if next_session
+            .process_command(player, Box::new(mv.clone()))
+            .is_ok()
+        {
             let score = minimax(&next_session, depth - 1, alpha, beta, false, player);
             if score > best_score || best_move.is_none() {
                 best_score = score;
@@ -259,7 +270,9 @@ mod tests {
 
         let mut test_session = clone_xiangqi_session(&session);
         assert!(
-            test_session.process_command(P_RED, mv.unwrap()).is_ok(),
+            test_session
+                .process_command(P_RED, Box::new(mv.unwrap()))
+                .is_ok(),
             "El movimiento seleccionado por la IA de Xiangqi debe ser legal"
         );
     }

@@ -572,4 +572,3 @@ func _update_grid_ui() -> void:
 				btn.text = "~"
 				btn.modulate = Color.WHITE
 				btn.disabled = (phase != Phase.FIRE or winner != -1)
-

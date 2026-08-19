@@ -727,4 +727,3 @@ fn test_chess_ai_no_mueve_rey_a_casilla_atacada() {
         );
     }
 }
-

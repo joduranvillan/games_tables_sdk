@@ -539,7 +539,10 @@ fn test_gana_con_1000km() {
 
     let played = events
         .iter()
-        .find_map(|e| e.as_any().downcast_ref::<mille_bornes_game::DistancePlayedEvent>())
+        .find_map(|e| {
+            e.as_any()
+                .downcast_ref::<mille_bornes_game::DistancePlayedEvent>()
+        })
         .expect("DistancePlayedEvent");
     assert_eq!(played.new_distance, 1000);
 

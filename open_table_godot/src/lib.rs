@@ -467,7 +467,7 @@ impl OpenTableBridge {
         &mut self,
         human_player: i64,
         ai_player: i64,
-        #[opt] _depth: Option<i64>,
+        _depth: i64,
     ) -> bool {
         if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
             return false;
@@ -514,7 +514,6 @@ impl OpenTableBridge {
         &mut self,
         human_player: i64,
         ai_player: i64,
-        #[opt] _depth: Option<i64>,
     ) -> bool {
         if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
             return false;
@@ -560,7 +559,7 @@ impl OpenTableBridge {
         &mut self,
         human_player: i64,
         ai_player: i64,
-        #[opt] board_size: Option<i64>,
+        board_size: i64,
     ) -> bool {
         if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
             return false;
@@ -736,11 +735,7 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn start_local_match_backgammon_vs_ai(
-        &mut self,
-        human_player: i64,
-        ai_player: i64,
-    ) -> bool {
+    fn start_local_match_backgammon_vs_ai(&mut self, human_player: i64, ai_player: i64) -> bool {
         if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
             return false;
         }
@@ -1410,16 +1405,16 @@ impl OpenTableBridge {
             return;
         };
 
-        let command: Box<dyn Command> =
-            match parse_command_json(&json_str, &self.current_game_type) {
-                Ok(cmd) => cmd,
-                Err(e) => {
-                    let msg = format!("Error parsing command JSON: {e}");
-                    godot_error!("[EngineError] {}", msg);
-                    self.emit_bridge_signal("move_rejected", &[Variant::from(msg)]);
-                    return;
-                }
-            };
+        let command: Box<dyn Command> = match parse_command_json(&json_str, &self.current_game_type)
+        {
+            Ok(cmd) => cmd,
+            Err(e) => {
+                let msg = format!("Error parsing command JSON: {e}");
+                godot_error!("[EngineError] {}", msg);
+                self.emit_bridge_signal("move_rejected", &[Variant::from(msg)]);
+                return;
+            }
+        };
 
         if let Ok(events) = self.process_and_emit(player_id, command) {
             match &mut self.mode {
@@ -1967,7 +1962,10 @@ impl OpenTableBridge {
             | BridgeMode::NativeHost { session, .. }
             | BridgeMode::Replay { session, .. }
             | BridgeMode::Tournament { session, .. } => {
-                if let Some(deck) = session.world().get_resource::<mille_bornes_game::DeckResource>() {
+                if let Some(deck) = session
+                    .world()
+                    .get_resource::<mille_bornes_game::DeckResource>()
+                {
                     deck.distance.get(&p_id).copied().unwrap_or(0) as i64
                 } else {
                     0
@@ -1975,7 +1973,10 @@ impl OpenTableBridge {
             }
             BridgeMode::MultiSession { sessions, active } => {
                 if let Some((_, session)) = sessions.get(*active) {
-                    if let Some(deck) = session.world().get_resource::<mille_bornes_game::DeckResource>() {
+                    if let Some(deck) = session
+                        .world()
+                        .get_resource::<mille_bornes_game::DeckResource>()
+                    {
                         deck.distance.get(&p_id).copied().unwrap_or(0) as i64
                     } else {
                         0
@@ -2479,10 +2480,15 @@ impl OpenTableBridge {
                 } => {
                     let curr_p = session.current_player();
                     let is_ai_turn = curr_p == *ai_p;
-                    if is_ai_turn || self.current_game_type == "shogi" || self.current_game_type == "xiangqi" {
+                    if is_ai_turn
+                        || self.current_game_type == "shogi"
+                        || self.current_game_type == "xiangqi"
+                    {
                         let cmd: Option<Box<dyn Command>> = match self.current_game_type.as_str() {
-                            "chess" if is_ai_turn => chess_game::chess_ai_pick_move(session, *ai_p, self.chess_ai_depth)
-                                .map(|c| Box::new(c) as Box<dyn Command>),
+                            "chess" if is_ai_turn => {
+                                chess_game::chess_ai_pick_move(session, *ai_p, self.chess_ai_depth)
+                                    .map(|c| Box::new(c) as Box<dyn Command>)
+                            }
                             "shogi" => shogi_game::shogi_ai_pick_move(session, curr_p),
                             "xiangqi" => xiangqi_game::xiangqi_ai_pick_move(session, curr_p)
                                 .map(|c| Box::new(c) as Box<dyn Command>),
@@ -2500,7 +2506,9 @@ impl OpenTableBridge {
                                     .map(|d| !d.is_empty())
                                     .unwrap_or(false);
                                 if !has_pending {
-                                    Some(Box::new(backgammon_game::RollDiceCommand { player: *ai_p }) as Box<dyn Command>)
+                                    Some(Box::new(backgammon_game::RollDiceCommand {
+                                        player: *ai_p,
+                                    }) as Box<dyn Command>)
                                 } else {
                                     backgammon_game::backgammon_ai_pick_move(session, *ai_p)
                                         .map(|c| Box::new(c) as Box<dyn Command>)

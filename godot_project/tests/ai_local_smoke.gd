@@ -84,7 +84,7 @@ func _initialize() -> void:
 		if go_bridge.current_player() == 1 and go_mv_idx < go_human_moves.size():
 			var mv = go_human_moves[go_mv_idx]
 			go_mv_idx += 1
-			go_bridge.send_command_json(JSON.stringify({
+			go_bridge.send_command_json(1, JSON.stringify({
 				"type": "PlaceStoneCommand",
 				"player": 1,
 				"x": mv["x"],
@@ -106,7 +106,7 @@ func _initialize() -> void:
 	results.append(["start_local_match_ludo_vs_ai inició correctamente", ludo_started])
 
 	# Ludo requiere tiradas de dado antes de que la IA actúe
-	ludo_bridge.send_command_json(JSON.stringify({"type": "RollDiceCommand", "player": 1}))
+	ludo_bridge.send_command_json(1, JSON.stringify({"type": "RollDiceCommand", "player": 1}))
 	for i in range(30):
 		ludo_bridge._process(0.016)
 	var ludo_ticks = ludo_bridge.session_tick_count()

@@ -726,4 +726,3 @@ fn test_checkers_ai_captura_multiple_cuando_puede() {
     assert_eq!(chosen.from, pos(0, 1));
     assert_eq!(chosen.to, pos(2, 3));
 }
-

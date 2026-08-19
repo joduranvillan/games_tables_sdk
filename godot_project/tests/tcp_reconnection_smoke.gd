@@ -72,7 +72,7 @@ func _initialize() -> void:
 	if saved_token != "":
 		ok_reconn = client2.reconnect_to_host("127.0.0.1", PORT, saved_player_id, saved_token)
 	else:
-		ok_reconn = client2.reconnect_to_host("127.0.0.1", PORT, "P2")
+		ok_reconn = client2.reconnect_to_host("127.0.0.1", PORT, 2, "")
 
 	results.append(["Client2 reconnect_to_host retorno true", ok_reconn])
 
