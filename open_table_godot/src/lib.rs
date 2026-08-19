@@ -510,11 +510,7 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn start_local_match_xiangqi_vs_ai(
-        &mut self,
-        human_player: i64,
-        ai_player: i64,
-    ) -> bool {
+    fn start_local_match_xiangqi_vs_ai(&mut self, human_player: i64, ai_player: i64) -> bool {
         if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
             return false;
         }
@@ -1384,11 +1380,7 @@ impl OpenTableBridge {
     // UNIVERSAL COMMANDS & STATE
     // ------------------------------------------------------------------
     #[func]
-    pub fn send_command_json(
-        &mut self,
-        player_id: i64,
-        json_str: GString,
-    ) {
+    pub fn send_command_json(&mut self, player_id: i64, json_str: GString) {
         let pid = PlayerId(player_id as u32);
         let s = json_str.to_string();
         let command: Box<dyn Command> = match parse_command_json(&s, &self.current_game_type) {
