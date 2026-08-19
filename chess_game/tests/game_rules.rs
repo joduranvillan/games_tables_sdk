@@ -1,7 +1,7 @@
 use chess_game::{
-    new_chess_session, AcceptDrawCommand, BoardResource, DrawOfferedResource, GameOverEvent,
-    HalfMoveClockResource, MovePieceCommand, OfferDrawCommand, Piece, PieceKind, Position,
-    ResignCommand,
+    chess_ai_pick_move, load_chess_position_from_fen, new_chess_session, AcceptDrawCommand,
+    BoardResource, DrawOfferedResource, GameOverEvent, HalfMoveClockResource, MovePieceCommand,
+    OfferDrawCommand, Piece, PieceKind, Position, ResignCommand,
 };
 use open_table_engine::prelude::*;
 
@@ -711,3 +711,20 @@ fn test_rendicion_termina_la_partida() {
     let winner = session.world().resource::<WinnerResource>().0;
     assert_eq!(winner, Some(BLACK));
 }
+
+#[test]
+fn test_chess_ai_no_mueve_rey_a_casilla_atacada() {
+    // Posición: Rey blanco en e1 (row 0, col 4), Torre negra en d8 (row 7, col 3).
+    // La IA a depth=1 no debe mover el rey a d1 (row 0, col 3) porque estaría en jaque.
+    let fen = "3r4/8/8/8/8/8/8/4K3 w - - 0 1";
+    let mut session = new_chess_session(SessionId(1), 42, WHITE, BLACK);
+    load_chess_position_from_fen(&mut session, fen).unwrap();
+    let mv = chess_ai_pick_move(&session, WHITE, 1);
+    if let Some(m) = mv {
+        assert!(
+            !(m.from == Position::new(0, 4) && m.to == Position::new(0, 3)),
+            "La IA no debe mover el rey a casilla atacada por la torre"
+        );
+    }
+}
+

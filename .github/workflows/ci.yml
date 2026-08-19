@@ -36,6 +36,9 @@ jobs:
       - name: Run cargo deny check
         run: cargo deny check
 
+      - name: Check duplicate dependencies
+        run: cargo deny check duplicates
+
       - name: Run clippy
         run: cargo clippy --workspace --exclude open_table_godot -- -D warnings
 
@@ -99,3 +102,15 @@ jobs:
         run: |
           test -f target/debug/libopen_table_godot.so || test -f target/debug/libopen_table_godot.dylib || test -f target/debug/open_table_godot.dll
           echo "Godot bridge artifact produced successfully!"
+
+  build-android-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Build Android Plugin
+        run: cd platform_plugins && (./gradlew :android:assembleRelease --no-daemon || gradle :android:assembleRelease --no-daemon)
+        working-directory: .

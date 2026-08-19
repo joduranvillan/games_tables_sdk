@@ -466,9 +466,11 @@ func _update_status() -> void:
 		status.text = "¡Retiró todas sus fichas! Ganó el jugador %s (Backgammon)" % winner
 		if turn_indicator != null:
 			turn_indicator.stop_timer()
+			turn_indicator.set_active(false)
 	else:
 		var name = "Rojo (P1)" if current == P1 else "Azul (P2)"
 		var col = PLAYER_COLORS[current]
 		status.text = "Turno: Jugador %s (Backgammon)" % name
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, name, col)
+			turn_indicator.set_active(true)

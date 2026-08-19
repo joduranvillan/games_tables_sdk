@@ -3,8 +3,11 @@ name = "checkers_game"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
-description = "Juego de referencia del OpenTable SDK: damas (checkers). Sin vista todavía (no hay open_table_godot aún) - se juega por consola con el ejemplo local_match."
+description = "Juego de referencia del OpenTable SDK: damas (checkers / draughts)."
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/joduranvillan/games_tables_sdk"
+keywords = ["game", "board-game", "checkers", "draughts", "rules"]
+categories = ["game-engines", "games"]
 
 [dependencies]
 open_table_core = { path = "../open_table_core" }

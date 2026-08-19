@@ -1,6 +1,6 @@
 use ludo_game::{
-    new_ludo_session, GameOverEvent, MoveTokenCommand, NoValidMovesEvent, RollDiceCommand,
-    TokenMovedEvent, MAX_STEPS,
+    ludo_ai_pick_move, new_ludo_session, GameOverEvent, MoveTokenCommand, NoValidMovesEvent,
+    PendingRollResource, RollDiceCommand, TokenMovedEvent, TokensResource, MAX_STEPS,
 };
 use open_table_engine::prelude::*;
 
@@ -528,3 +528,49 @@ fn test_esquinas_segun_numero_de_jugadores() {
     assert_eq!(t4.start_offset[&P3], 26);
     assert_eq!(t4.start_offset[&p4], 39);
 }
+
+#[test]
+fn test_ludo_ai_saca_ficha_con_seis() {
+    let mut session = new_ludo_session(SessionId(101), 1, vec![P1, P2]);
+    {
+        let mut pending = session.world_mut().resource_mut::<PendingRollResource>();
+        pending.pending.insert(P1, 6);
+    }
+
+    let mv = ludo_ai_pick_move(&session, P1);
+    assert!(mv.is_some(), "La IA debe generar un movimiento con dado 6");
+    let cmd = mv.unwrap();
+    assert_eq!(cmd.player, P1);
+    assert_eq!(
+        cmd.token_index, 0,
+        "La IA debe elegir sacar la primera ficha de base (token 0)"
+    );
+}
+
+#[test]
+fn test_ludo_ai_captura_cuando_puede() {
+    let mut session = new_ludo_session(SessionId(102), 1, vec![P1, P2]);
+    {
+        let mut tokens = session.world_mut().resource_mut::<TokensResource>();
+        // P1: token 0 en steps=10, token 1 en steps=5
+        tokens.tokens.get_mut(&P1).unwrap()[0] = 10;
+        tokens.tokens.get_mut(&P1).unwrap()[1] = 5;
+
+        // P2: token 0 en steps=40 (posición compartida absoluta 13)
+        tokens.tokens.get_mut(&P2).unwrap()[0] = 40;
+    }
+    {
+        let mut pending = session.world_mut().resource_mut::<PendingRollResource>();
+        pending.pending.insert(P1, 4);
+    }
+
+    let mv = ludo_ai_pick_move(&session, P1);
+    assert!(mv.is_some(), "La IA debe seleccionar un movimiento");
+    let cmd = mv.unwrap();
+    assert_eq!(cmd.player, P1);
+    assert_eq!(
+        cmd.token_index, 0,
+        "La IA debe priorizar la captura (token 0) sobre avanzar la ficha atrasada (token 1)"
+    );
+}
+

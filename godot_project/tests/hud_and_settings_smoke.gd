@@ -1,4 +1,4 @@
-## Smoke test for NetworkStatusHUD, SettingsMenu, SceneManager, and TranslationLoader.
+## Smoke test for NetworkStatusHUD, SettingsMenu, SceneManager, TranslationLoader, and GameOverOverlay.
 extends SceneTree
 
 func _init() -> void:
@@ -33,6 +33,16 @@ func _init() -> void:
 	trans._ready()
 	print("SceneTransition instantiated successfully.")
 	trans.free()
+
+	# 5. GameOverOverlay
+	var overlay = load("res://game_over_overlay.gd").new()
+	overlay._ready()
+	overlay.show_result(1, false)
+	assert(overlay.visible == true, "overlay debe estar visible tras show_result")
+	overlay._on_go_to_menu_pressed()
+	assert(overlay.visible == false, "overlay debe ocultarse al navegar al menú")
+	print("GameOverOverlay verified.")
+	overlay.free()
 	
 	print("--- Smoke Test HUD & Settings PASSED ---")
 	quit(0)

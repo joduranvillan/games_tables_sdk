@@ -28,7 +28,12 @@ for test_file in godot_project/tests/*.gd; do
     test_name=$(basename "$test_file")
     echo "--- Corriendo test: $test_name ---"
     
-    if output=$("$REDOT_BIN" --headless --path godot_project --script "res://tests/$test_name" 2>&1); then
+    TIMEOUT_CMD=""
+    if command -v timeout &>/dev/null; then
+        TIMEOUT_CMD="timeout 20s"
+    fi
+
+    if output=$($TIMEOUT_CMD "$REDOT_BIN" --headless --path godot_project --script "res://tests/$test_name" 2>&1); then
         echo "$output"
         if echo "$output" | grep -q "HAY FALLOS"; then
             echo "RESULTADO: FAIL ($test_name)"

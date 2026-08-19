@@ -3,24 +3,29 @@
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
-## [0.2.0-dev]
+## [0.2.0] — 2026-08-14
 
 ### Added
-- **IA Local para Motores de Juego**: Motores de inteligencia artificial offline (Minimax con poda alfa-beta para Ajedrez, heurísticas para Backgammon, Shogi y Xiangqi) con selección de dificultad y soporte en bridge de Godot.
-- **Temas Visuales**: 3 nuevos temas visuales completos en `theme_manager.gd` (Piedra Oscura, Noche Azul y Jade Verde).
-- **Animaciones y Efectos**: Animaciones de "bounce" en selección de piezas, sombras proyectadas de profundidad bajo piezas, emisión de partículas con `CPUParticles2D` en capturas y avances casilla a casilla.
-- **Overlay de Fin de Juego**: `game_over_overlay.gd` rediseñado con paneles translúcidos, animaciones de entrada, anuncios de victoria/derrota/empate y botones de revancha.
-- **Selector de Modo de Juego**: Selector interactivo (Hotseat local vs IA) en menú principal con persistencia.
+- IA local offline: Chess (Minimax depth 3), Checkers (heurística), Backgammon (heurística),
+  Shogi (Minimax depth 2), Xiangqi (Minimax depth 2).
+- 3 nuevos temas visuales: Piedra Oscura, Noche Azul, Jade Verde.
+- Animaciones de selección (bounce), captura (partículas CPUParticles2D) y jaque (halo rojo pulsante).
+- Overlay de fin de juego rediseñado con fade-in y animación de título.
+- Selector de modo de juego (Hotseat/vs IA) en el Menú Principal con persistencia.
+- ELO integrado en la UI: pestaña Estadísticas en Ajustes con ranking por juego.
+- Tests TCP de reconexión y simulación de pérdida de paquetes.
+- `godot_api_surface` test movido a `open_table_godot/tests/` (arquitectura más limpia).
 
 ### Fixed
-- **Robustez en Capa de Red TCP**: Implementación y validación de tests de reconexión de clientes (`tcp_reconnection_smoke.gd`) y simulación de pérdida de paquetes (`tcp_packet_loss_smoke.gd`).
-- **Integración de ELO en UI**: Conexión de tracking de puntuación ELO (`score_tracker.gd`) con la interfaz gráfica de usuario y menú de configuración.
+- Shim Redot → Godot 4.4: `redot_gdext_shim.sh` ahora reporta 4.4.0 para Redot 26.x.
+- `open_table_godot` removido de dev-deps de `open_table_engine` para limpiar el build sin Godot.
+- Clippy: `clone_on_copy` y `for_kv_map` en módulos de IA de chess, backgammon, shogi, xiangqi.
+- CI: eliminado fallback a Godot 4.3 (incompatible con el código que usa API 4.4+).
 
 ### Changed
-- **Menú Principal**: Fondo animado con shaders, efectos de entrada tipográfica y hover states en botones interactivos.
-- **Tablero de Ajedrez**: Coordenadas algebraicas periféricas (a–h, 1–8), marcos con borde estilizado y highlight visual del último movimiento ejecutado.
-- **Tablero de Go**: Renderizado de los 9 puntos hoshi canónicos, contadores dedicados de capturas de piedras y overlay de territorio en fin de juego.
-- **Tableros de Uno, Ludo y Battleship**: Cartas redondeadas con indicador de color en Uno, fichas numeradas con casillas seguras en Ludo y cuadrículas con coordenadas y barcos hundidos en gris en Battleship.
+- Tablero de Ajedrez: coordenadas a–h/1–8, borde, highlight último movimiento.
+- Tablero de Go: puntos hoshi, animación de escala, contador de capturas.
+- Menú Principal: fondo animado con shader, hover con escala en botones.
 
 ## [Unreleased]
 

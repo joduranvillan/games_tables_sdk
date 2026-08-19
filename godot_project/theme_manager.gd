@@ -76,11 +76,47 @@ func _create_presets() -> void:
 	minimal.valid_move_color = Color(0.0, 0.8, 0.6, 0.6)
 	themes["minimal"] = minimal
 
+	# 3. Piedra Oscura (Stone)
+	var stone = BoardTheme.new()
+	stone.theme_name = "Piedra Oscura"
+	stone.light_color = Color("#8B8B8B")
+	stone.dark_color = Color("#3A3A3A")
+	stone.board_color = Color("#2A2A2A")
+	stone.line_color = Color("#AAAAAA")
+	stone.select_color = Color(0.9, 0.6, 0.2, 0.55)
+	stone.valid_move_color = Color(0.3, 0.7, 0.9, 0.6)
+	themes["stone"] = stone
+
+	# 4. Noche Azul (Night)
+	var night = BoardTheme.new()
+	night.theme_name = "Noche Azul"
+	night.light_color = Color("#5B7A9C")
+	night.dark_color = Color("#1A2634")
+	night.board_color = Color("#121A24")
+	night.line_color = Color("#7C9BB8")
+	night.select_color = Color(0.4, 0.8, 1.0, 0.55)
+	night.valid_move_color = Color(0.2, 0.9, 0.7, 0.6)
+	themes["night"] = night
+
+	# 5. Jade Verde (Jade)
+	var jade = BoardTheme.new()
+	jade.theme_name = "Jade Verde"
+	jade.light_color = Color("#A3C9A8")
+	jade.dark_color = Color("#2D5A3D")
+	jade.board_color = Color("#1E3F2B")
+	jade.line_color = Color("#C5E1D4")
+	jade.select_color = Color(1.0, 0.85, 0.3, 0.55)
+	jade.valid_move_color = Color(0.1, 0.9, 0.4, 0.6)
+	themes["jade"] = jade
+
 	current_theme = themes["wood"]
 
 func toggle_theme() -> BoardTheme:
-	if current_theme_key == "wood":
-		set_theme("minimal")
+	var keys = ["wood", "minimal", "stone", "night", "jade"]
+	var idx = keys.find(current_theme_key)
+	if idx != -1:
+		var next_key = keys[(idx + 1) % keys.size()]
+		set_theme(next_key)
 	else:
 		set_theme("wood")
 	return current_theme
@@ -91,6 +127,12 @@ func set_theme(theme_name: String) -> void:
 		key = "wood"
 	elif key.contains("minimal") or key.contains("moderno"):
 		key = "minimal"
+	elif key.contains("stone") or key.contains("piedra"):
+		key = "stone"
+	elif key.contains("night") or key.contains("noche"):
+		key = "night"
+	elif key.contains("jade"):
+		key = "jade"
 		
 	if themes.has(key):
 		current_theme_key = key

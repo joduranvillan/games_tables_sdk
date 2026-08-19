@@ -4,6 +4,10 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+    plugins {
+        id("com.android.library") version "8.2.2"
+        id("org.jetbrains.kotlin.android") version "1.9.22"
+    }
 }
 
 dependencyResolutionManagement {
@@ -14,6 +18,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "OpenTablePlatformPlugins"
+rootProject.name = "OpenTableNearbyPlugin"
 include(":android")
 project(":android").projectDir = File("android")

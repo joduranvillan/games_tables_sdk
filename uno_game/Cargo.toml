@@ -5,6 +5,9 @@ edition = "2021"
 rust-version = "1.82"
 description = "Juego de referencia del OpenTable SDK: UNO."
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/joduranvillan/games_tables_sdk"
+keywords = ["game", "card-game", "uno", "cards", "rules"]
+categories = ["game-engines", "games"]
 
 [dependencies]
 open_table_core = { path = "../open_table_core" }

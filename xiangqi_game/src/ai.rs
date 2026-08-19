@@ -90,7 +90,7 @@ pub fn clone_xiangqi_session(session: &Session) -> Session {
         new_session.world_mut().insert_resource(board.clone());
     }
     if let Some(turn) = session.world().get_resource::<TurnResource>() {
-        new_session.world_mut().insert_resource(*turn);
+        new_session.world_mut().insert_resource(turn.clone());
     }
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
         new_session.world_mut().insert_resource(*game_over);

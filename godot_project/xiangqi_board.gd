@@ -34,6 +34,7 @@ var current: int = P_RED
 var winner: int = -1
 var selected_pos = null # Vector2i(row, col)
 var mode_option_button: OptionButton
+var turn_indicator: TurnIndicator
 
 @onready var status: Label = $Status
 
@@ -46,6 +47,11 @@ func _ready() -> void:
 	mode_option_button.add_item("vs IA (Negro)")
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	add_child(mode_option_button)
+
+	turn_indicator = TurnIndicator.new()
+	turn_indicator.name = "TurnIndicator"
+	turn_indicator.position = Vector2(OFFSET_X, OFFSET_Y + (BOARD_ROWS - 1) * CELL_SIZE + 75)
+	add_child(turn_indicator)
 
 	_init_board_state()
 	
@@ -311,6 +317,13 @@ func _draw() -> void:
 func _update_status() -> void:
 	if winner != -1:
 		status.text = "¡Jaque mate! Ganó el jugador %s (Xiangqi)" % winner
+		if turn_indicator != null:
+			turn_indicator.stop_timer()
+			turn_indicator.set_active(false)
 	else:
 		var who = "Rojo (1)" if current == P_RED else "Negro (2)"
+		var p_col = COL_RED_PIECE if current == P_RED else COL_BLACK_PIECE
 		status.text = "Turno: %s (Xiangqi)" % who
+		if turn_indicator != null:
+			turn_indicator.set_turn(current, who, p_col)
+			turn_indicator.set_active(true)

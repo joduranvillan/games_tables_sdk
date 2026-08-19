@@ -32,7 +32,10 @@ const LANG_KEYS = [
 
 const THEME_KEYS = [
 	{"key": "wood", "name": "THEME_WOOD"},
-	{"key": "minimal", "name": "THEME_MINIMAL"}
+	{"key": "minimal", "name": "THEME_MINIMAL"},
+	{"key": "stone", "name": "THEME_STONE"},
+	{"key": "night", "name": "THEME_NIGHT"},
+	{"key": "jade", "name": "THEME_JADE"}
 ]
 
 const FONT_TIER_NAMES = ["Pequeño", "Mediano", "Grande"]

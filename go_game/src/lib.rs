@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod events;
@@ -5,6 +6,7 @@ pub mod rules;
 
 use open_table_engine::prelude::*;
 
+pub use ai::go_ai_pick_move;
 pub use board::{BoardHistoryResource, BoardResource, DeadMarkingResource, Stone};
 pub use commands::{
     ConfirmDeadCommand, MarkDeadCommand, PassCommand, PlaceHandicapCommand, PlaceStoneCommand,

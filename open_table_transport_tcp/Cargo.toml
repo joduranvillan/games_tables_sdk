@@ -3,8 +3,11 @@ name = "open_table_transport_tcp"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
-description = "Implementación de Transport sobre TCP para desktop. Sirve para probar el ciclo completo Command -> red -> RuleEngine -> Events -> red sin depender de Nearby Connections / MultipeerConnectivity."
+description = "Implementación de Transport sobre TCP para desktop en OpenTable SDK."
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/joduranvillan/games_tables_sdk"
+keywords = ["networking", "tcp", "transport", "board-games", "opentable"]
+categories = ["network-programming", "game-engines"]
 
 [dependencies]
 open_table_core = { path = "../open_table_core" }

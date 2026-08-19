@@ -7,6 +7,7 @@ pub const BOARD_STEPS: usize = 52;
 pub const TRACK_LEN: u32 = 52;
 pub const HOME_STRETCH_LEN: u32 = 5;
 pub const MAX_STEPS: u32 = TRACK_LEN + HOME_STRETCH_LEN;
+pub const WIN_STEPS: u32 = MAX_STEPS;
 pub const TOKENS_PER_PLAYER: usize = 4;
 
 /// Progreso de una ficha, medido como "pasos recorridos desde la base",

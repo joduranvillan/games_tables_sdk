@@ -3,8 +3,11 @@ name = "battleship_game"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
-description = "Juego de referencia del OpenTable SDK: batalla naval. Muestra el caso de dos tableros privados (uno por jugador) con eventos publicos de resultado."
+description = "Juego de referencia del OpenTable SDK: batalla naval (Battleship)."
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/joduranvillan/games_tables_sdk"
+keywords = ["game", "board-game", "battleship", "naval", "rules"]
+categories = ["game-engines", "games"]
 
 [dependencies]
 open_table_core = { path = "../open_table_core" }

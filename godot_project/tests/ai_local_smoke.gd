@@ -1,4 +1,4 @@
-# Test headless de humo para la IA local (Checkers y Chess vs IA).
+# Test headless de humo para la IA local (Checkers, Chess, Go y Ludo vs IA).
 # Correr: redot --headless --path godot_project --script res://tests/ai_local_smoke.gd
 extends SceneTree
 
@@ -62,6 +62,58 @@ func _initialize() -> void:
 	results.append(["Chess: ticks de la sesión > 2 (la IA respondió a los movimientos) [ticks=%d]" % chess_ticks, chess_ticks > 2])
 
 	chess_bridge.free()
+
+	# =========================================================================
+	# 3. TEST GO (9x9) VS IA
+	# =========================================================================
+	var go_bridge = OpenTableBridge.new()
+	var go_started = go_bridge.start_local_match_go_vs_ai(1, 2, 9)
+	results.append(["start_local_match_go_vs_ai(1, 2, 9) inició correctamente", go_started])
+
+	var go_human_moves = [
+		{"x": 4, "y": 4},
+		{"x": 2, "y": 2},
+		{"x": 6, "y": 6},
+		{"x": 2, "y": 6},
+		{"x": 6, "y": 2},
+		{"x": 4, "y": 2}
+	]
+	var go_mv_idx = 0
+
+	for i in range(80):          # Go: hasta 80 frames
+		if go_bridge.current_player() == 1 and go_mv_idx < go_human_moves.size():
+			var mv = go_human_moves[go_mv_idx]
+			go_mv_idx += 1
+			go_bridge.send_command_json(JSON.stringify({
+				"type": "PlaceStoneCommand",
+				"player": 1,
+				"x": mv["x"],
+				"y": mv["y"]
+			}))
+		go_bridge._process(0.016)
+
+	var go_ticks = go_bridge.session_tick_count()
+	results.append(["La IA de Go debe hacer al menos 5 movimientos [ticks=%d]" % go_ticks, go_ticks > 5])
+	assert(go_ticks > 5, "La IA de Go debe hacer al menos 5 movimientos")
+
+	go_bridge.free()
+
+	# =========================================================================
+	# 4. TEST LUDO VS IA
+	# =========================================================================
+	var ludo_bridge = OpenTableBridge.new()
+	var ludo_started = ludo_bridge.start_local_match_ludo_vs_ai(1, 2)
+	results.append(["start_local_match_ludo_vs_ai inició correctamente", ludo_started])
+
+	# Ludo requiere tiradas de dado antes de que la IA actúe
+	ludo_bridge.send_command_json(JSON.stringify({"type": "RollDiceCommand", "player": 1}))
+	for i in range(30):
+		ludo_bridge._process(0.016)
+	var ludo_ticks = ludo_bridge.session_tick_count()
+	results.append(["El bridge debe haber procesado al menos 1 tick [ticks=%d]" % ludo_ticks, ludo_ticks >= 1])
+	assert(ludo_ticks >= 1, "El bridge debe haber procesado al menos 1 tick")
+
+	ludo_bridge.free()
 
 	# =========================================================================
 	# EVALUACIÓN DE RESULTADOS

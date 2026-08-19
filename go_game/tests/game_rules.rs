@@ -1,6 +1,7 @@
 use go_game::{
-    new_go_session, BoardResource, ConfirmDeadCommand, GameOverEvent, MarkDeadCommand, PassCommand,
-    PlaceHandicapCommand, PlaceStoneCommand, Stone, StonesCapturedEvent,
+    go_ai_pick_move, new_go_session, BoardResource, ConfirmDeadCommand, GameOverEvent,
+    MarkDeadCommand, PassCommand, PlaceHandicapCommand, PlaceStoneCommand, Stone,
+    StonesCapturedEvent,
 };
 use open_table_engine::prelude::*;
 
@@ -387,3 +388,26 @@ fn test_pasar_fuera_de_turno_es_rechazado() {
         "pasar fuera de turno debe ser rechazado"
     );
 }
+
+#[test]
+fn test_go_ai_devuelve_movimiento_o_none_en_posicion_inicial() {
+    let start = std::time::Instant::now();
+    let session = new_go_session(SessionId(200), 42, P1, P2);
+
+    let mv = go_ai_pick_move(&session, P1);
+    let elapsed = start.elapsed();
+
+    assert!(
+        mv.is_some(),
+        "La IA de Go debe devolver un movimiento en posición inicial"
+    );
+    let chosen = mv.unwrap();
+    assert!(chosen.x < 9 && chosen.y < 9);
+    assert_eq!(chosen.player, P1);
+    assert!(
+        elapsed.as_secs_f32() < 2.0,
+        "La ejecución de la IA debe tardar menos de 2s en 9x9, tardó {:?}",
+        elapsed
+    );
+}
+

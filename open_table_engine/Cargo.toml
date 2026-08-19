@@ -5,6 +5,9 @@ edition = "2021"
 rust-version = "1.82"
 description = "Motor de OpenTable Engine: bevy_ecs + scheduler + rule engine sobre los contratos de open_table_core."
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/joduranvillan/games_tables_sdk"
+keywords = ["game-engine", "board-games", "ecs", "opentable", "rules"]
+categories = ["game-engines", "games"]
 
 [dependencies]
 open_table_core = { path = "../open_table_core" }

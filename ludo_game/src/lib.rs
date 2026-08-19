@@ -3,14 +3,16 @@
 //! hay jugada posible), casillas seguras en las salidas de cada jugador,
 //! captura por posición compartida y tramo final.
 
+pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod events;
 pub mod rules;
 
+pub use ai::ludo_ai_pick_move;
 pub use board::{
     next_step_for, PendingRollResource, TokensResource, BOARD_STEPS, HOME_STRETCH_LEN, MAX_STEPS,
-    TOKENS_PER_PLAYER, TRACK_LEN,
+    TOKENS_PER_PLAYER, TRACK_LEN, WIN_STEPS,
 };
 pub use commands::{MoveTokenCommand, RollDiceCommand};
 pub use events::{DiceRolledEvent, GameOverEvent, NoValidMovesEvent, TokenMovedEvent};

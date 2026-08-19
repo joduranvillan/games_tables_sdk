@@ -44,6 +44,8 @@ var valid_moves: Array = [] # Array of Vector2i
 var grid_container: GridContainer
 var sente_hand_panel: VBoxContainer
 var gote_hand_panel: VBoxContainer
+var _hand_p1: VBoxContainer
+var _hand_p2: VBoxContainer
 var piece_nodes: Array = [] # 9x9 array of Node2D/Control nodes
 var mode_option_button: OptionButton
 
@@ -161,6 +163,32 @@ func _setup_ui() -> void:
 	network_hud = NetworkStatusHUD.new()
 	network_hud.name = "NetworkStatusHUD"
 	add_child(network_hud)
+
+	_setup_hand_panels()
+
+func _setup_hand_panels() -> void:
+	_hand_p1 = VBoxContainer.new()
+	_hand_p1.name = "HandP1"
+	_hand_p1.position = Vector2(750, 45)
+	_hand_p1.custom_minimum_size = Vector2(100, 160)
+	add_child(_hand_p1)
+
+	_hand_p2 = VBoxContainer.new()
+	_hand_p2.name = "HandP2"
+	_hand_p2.position = Vector2(750, 245)
+	_hand_p2.custom_minimum_size = Vector2(100, 160)
+	add_child(_hand_p2)
+
+func _update_hand_display(player: int, pieces: Array) -> void:
+	var panel := _hand_p1 if player == 1 else _hand_p2
+	if panel == null:
+		return
+	for child in panel.get_children():
+		child.queue_free()
+	for piece_name in pieces:
+		var lbl := Label.new()
+		lbl.text = tr(str(piece_name))  # nombre de pieza en idioma activo via tr()
+		panel.add_child(lbl)
 
 func _on_mode_selected(index: int) -> void:
 	winner = -1
@@ -381,6 +409,53 @@ func _update_hand_panels() -> void:
 	
 	_populate_hand_container(sente_hand_panel, P_SENTE)
 	_populate_hand_container(gote_hand_panel, P_GOTE)
+	_refresh_hand_displays_from_event_or_state({})
+
+func _refresh_hand_displays_from_event_or_state(event: Dictionary = {}) -> void:
+	var p1_pieces: Array = []
+	var p2_pieces: Array = []
+	
+	if event.has("hand_p1") and event["hand_p1"] is Array:
+		p1_pieces = event["hand_p1"]
+	elif event.has("hands") and event["hands"] is Dictionary:
+		p1_pieces = event["hands"].get("1", event["hands"].get(1, []))
+	
+	if event.has("hand_p2") and event["hand_p2"] is Array:
+		p2_pieces = event["hand_p2"]
+	elif event.has("hands") and event["hands"] is Dictionary:
+		p2_pieces = event["hands"].get("2", event["hands"].get(2, []))
+		
+	if p1_pieces.is_empty() and bridge != null and bridge.has_method("get_state_json"):
+		var state_str = bridge.get_state_json()
+		var p_json = JSON.new()
+		if p_json.parse(state_str) == OK and p_json.data is Dictionary:
+			var s_data = p_json.data
+			if s_data.has("hand_p1") and s_data["hand_p1"] is Array:
+				p1_pieces = s_data["hand_p1"]
+			if s_data.has("hand_p2") and s_data["hand_p2"] is Array:
+				p2_pieces = s_data["hand_p2"]
+				
+	if p1_pieces.is_empty() and bridge != null and bridge.has_method("get_hand_json"):
+		var h1_str = bridge.get_hand_json(1)
+		var p_json = JSON.new()
+		if p_json.parse(h1_str) == OK and p_json.data is Array:
+			p1_pieces = p_json.data
+		var h2_str = bridge.get_hand_json(2)
+		if p_json.parse(h2_str) == OK and p_json.data is Array:
+			p2_pieces = p_json.data
+			
+	if p1_pieces.is_empty() and hands.has(P_SENTE):
+		for k in hands[P_SENTE].keys():
+			for i in range(hands[P_SENTE][k]):
+				p1_pieces.append(k)
+				
+	if p2_pieces.is_empty() and hands.has(P_GOTE):
+		for k in hands[P_GOTE].keys():
+			for i in range(hands[P_GOTE][k]):
+				p2_pieces.append(k)
+				
+	_update_hand_display(1, p1_pieces)
+	_update_hand_display(2, p2_pieces)
 
 func _populate_hand_container(panel: VBoxContainer, player: int) -> void:
 	var player_hand = hands.get(player, {})
@@ -417,9 +492,25 @@ func _on_event_json(json_str: String) -> void:
 				var to_c = int(to[1])
 				
 				var piece_data = board[from_r][from_c]
+				var cap_evt = event.get("captured", null)
+				var is_cap = (cap_evt != null) or (board[to_r][to_c] != null)
 				if piece_data != null:
-					if board[to_r][to_c] != null:
-						var cap_kind = board[to_r][to_c].get("kind", "Pawn")
+					if is_cap:
+						var cap_kind = "Pawn"
+						if cap_evt != null and cap_evt is Dictionary:
+							cap_kind = cap_evt.get("kind", "Pawn")
+						elif cap_evt != null and cap_evt is String:
+							cap_kind = cap_evt
+						elif board[to_r][to_c] != null:
+							cap_kind = board[to_r][to_c].get("kind", "Pawn")
+
+						if cap_kind.begins_with("Promoted"):
+							cap_kind = cap_kind.replace("Promoted", "")
+						elif cap_kind == "Horse":
+							cap_kind = "Bishop"
+						elif cap_kind == "Dragon":
+							cap_kind = "Rook"
+
 						var p_hand = hands[piece_data.player]
 						p_hand[cap_kind] = p_hand.get(cap_kind, 0) + 1
 						if piece_nodes[to_r][to_c] != null:
@@ -438,6 +529,9 @@ func _on_event_json(json_str: String) -> void:
 					piece_nodes[to_r][to_c] = node
 					if node != null:
 						node.position = Vector2(120 + to_c * CELL_SIZE + 3, 20 + to_r * CELL_SIZE + 3)
+
+				if is_cap:
+					_refresh_hand_displays_from_event_or_state(event)
 						
 			elif event_type == "PieceDroppedEvent":
 				var to = event.get("to", [0, 0])
@@ -451,6 +545,8 @@ func _on_event_json(json_str: String) -> void:
 					hands[p][kind] = max(0, hands[p][kind] - 1)
 				if has_node("/root/AudioManager"):
 					get_node("/root/AudioManager").play_move()
+
+				_refresh_hand_displays_from_event_or_state(event)
 					
 			elif event_type == "GameOverEvent":
 				var w = event.get("winner", -1)
@@ -491,6 +587,7 @@ func _update_status() -> void:
 		status.text = "¡Jaque mate! Ganó el jugador %s" % winner
 		if turn_indicator != null:
 			turn_indicator.stop_timer()
+			turn_indicator.set_active(false)
 	else:
 		var name = "Sente (P1)" if current == P_SENTE else "Gote (P2)"
 		var col = GameManager.get_player_color(current)
@@ -498,3 +595,4 @@ func _update_status() -> void:
 		status.text = "Turno: Jugador %s (Shogi)%s" % [name, hand_sel_text]
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, name, col)
+			turn_indicator.set_active(true)

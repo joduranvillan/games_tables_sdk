@@ -26,6 +26,8 @@ var selected_pos = null # Vector2i(row, col)
 var valid_moves: Array = [] # Array of Vector2i
 var rejected_cell = null
 var highlight_moves_enabled: bool = true
+var _hover_cell: Vector2i = Vector2i(-1, -1)
+var _hover_moves: Array[Vector2i] = []
 var animating: bool = false
 var active_animations: int = 0
 
@@ -414,10 +416,89 @@ var touch_start_cell: Vector2i = Vector2i(-1, -1)
 var is_touch_dragging: bool = false
 const DEAD_ZONE: float = 8.0
 
+func _pixel_to_cell(pos: Vector2) -> Vector2i:
+	var r = int(pos.y / CELL_SIZE)
+	var c = int(pos.x / CELL_SIZE)
+	if _is_in_bounds(r, c):
+		return Vector2i(r, c)
+	return Vector2i(-1, -1)
+
+func _handle_mouse_hover(pos: Vector2) -> void:
+	if winner != -1 or animating:
+		if _hover_cell != Vector2i(-1, -1):
+			_hover_cell = Vector2i(-1, -1)
+			_hover_moves.clear()
+			queue_redraw()
+		return
+
+	var cell = _pixel_to_cell(pos)
+	if cell != _hover_cell:
+		_hover_cell = cell
+		_hover_moves.clear()
+		if cell != Vector2i(-1, -1) and _is_in_bounds(cell.x, cell.y):
+			var piece = piece_sprites[cell.x][cell.y]
+			if piece != null and piece.get_meta("player") == current:
+				_hover_moves = _get_moves_for_hover_cell(cell)
+		queue_redraw()
+
+func _get_moves_for_hover_cell(cell: Vector2i) -> Array[Vector2i]:
+	var moves: Array[Vector2i] = []
+	if not _is_in_bounds(cell.x, cell.y):
+		return moves
+
+	if bridge != null and bridge.has_method("get_legal_moves_for_cell"):
+		var raw = bridge.get_legal_moves_for_cell(cell.x, cell.y)
+		if raw is PackedInt32Array:
+			if raw.size() % 2 == 0 and raw.size() > 0:
+				for i in range(0, raw.size(), 2):
+					var tr = raw[i]
+					var tc = raw[i + 1]
+					if _is_in_bounds(tr, tc):
+						moves.append(Vector2i(tr, tc))
+			else:
+				for idx in raw:
+					var tr = int(idx) / BOARD_SIZE
+					var tc = int(idx) % BOARD_SIZE
+					if _is_in_bounds(tr, tc):
+						moves.append(Vector2i(tr, tc))
+		elif raw is Array:
+			for item in raw:
+				if item is Vector2i:
+					moves.append(item)
+				elif item is Vector2:
+					moves.append(Vector2i(int(item.x), int(item.y)))
+				elif item is Dictionary:
+					var t_row = item.get("to_row", item.get("to", {}).get("row", -1) if item.get("to") is Dictionary else -1)
+					var t_col = item.get("to_col", item.get("to", {}).get("col", -1) if item.get("to") is Dictionary else -1)
+					if _is_in_bounds(t_row, t_col):
+						moves.append(Vector2i(t_row, t_col))
+				elif item is int:
+					var tr = int(item) / BOARD_SIZE
+					var tc = int(item) % BOARD_SIZE
+					if _is_in_bounds(tr, tc):
+						moves.append(Vector2i(tr, tc))
+
+	if moves.is_empty():
+		var calc = _calculate_valid_moves(cell.x, cell.y)
+		for m in calc:
+			if m is Vector2i:
+				moves.append(m)
+			elif m is Vector2:
+				moves.append(Vector2i(int(m.x), int(m.y)))
+	return moves
+
 func _gui_input(event: InputEvent) -> void:
+	if OS.has_feature("headless"):
+		return
+	if event is InputEventMouseMotion:
+		_handle_mouse_hover(event.position)
 	_handle_unified_input(event)
 
 func _input(event: InputEvent) -> void:
+	if OS.has_feature("headless"):
+		return
+	if event is InputEventMouseMotion:
+		_handle_mouse_hover(event.position)
 	_handle_unified_input(event)
 
 func _handle_unified_input(event: InputEvent) -> void:
@@ -638,6 +719,8 @@ func _on_event_json(json_str: String) -> void:
 			var is_check = (event.get("event_type") == "CheckEvent") or (event.get("in_check") == true)
 			if is_check:
 				check_king_pos = _find_king_pos(current)
+				if check_king_pos != null:
+					_play_check_shake()
 			else:
 				check_king_pos = null
 
@@ -645,11 +728,25 @@ func _on_event_json(json_str: String) -> void:
 	_update_status()
 	queue_redraw()
 
+func _play_check_shake() -> void:
+	if OS.has_feature("headless"):
+		return
+	var original_pos := position
+	var t := create_tween()
+	if t != null:
+		t.tween_property(self, "position", original_pos + Vector2(6, 0), 0.05)
+		t.tween_property(self, "position", original_pos - Vector2(6, 0), 0.05)
+		t.tween_property(self, "position", original_pos + Vector2(4, 0), 0.04)
+		t.tween_property(self, "position", original_pos - Vector2(4, 0), 0.04)
+		t.tween_property(self, "position", original_pos, 0.03)
+
 func _on_game_over(w: int) -> void:
 	winner = w
 	check_king_pos = null
 	selected_pos = null
 	valid_moves.clear()
+	_hover_cell = Vector2i(-1, -1)
+	_hover_moves.clear()
 	_update_status()
 	queue_redraw()
 	if has_node("/root/AudioManager"):
@@ -708,6 +805,11 @@ func _draw() -> void:
 		var rej_rect = Rect2(rejected_cell.y * CELL_SIZE, rejected_cell.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
 		draw_rect(rej_rect, Color(1.0, 0.2, 0.2, 0.6))
 
+	if highlight_moves_enabled and selected_pos == null and _hover_cell != Vector2i(-1, -1):
+		for move_pos in _hover_moves:
+			var center = Vector2(move_pos.y * CELL_SIZE + CELL_SIZE / 2.0, move_pos.x * CELL_SIZE + CELL_SIZE / 2.0)
+			draw_circle(center, CELL_SIZE * 0.15, Color(0.5, 0.9, 0.5, 0.3))
+
 	if highlight_moves_enabled and selected_pos != null:
 		for move_pos in valid_moves:
 			var center = Vector2(move_pos.y * CELL_SIZE + CELL_SIZE / 2.0, move_pos.x * CELL_SIZE + CELL_SIZE / 2.0)
@@ -755,6 +857,7 @@ func _update_status() -> void:
 		status.text = "¡Jaque mate! Ganó el jugador %s" % winner
 		if turn_indicator != null:
 			turn_indicator.stop_timer()
+			turn_indicator.set_active(false)
 	else:
 		var p_name = "Jugador %s" % current
 		var p_col = GameManager.get_player_color(current)
@@ -772,3 +875,4 @@ func _update_status() -> void:
 
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, p_name, p_col)
+			turn_indicator.set_active(true)

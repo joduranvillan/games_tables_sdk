@@ -18,6 +18,20 @@ var current_player_id: int = 1
 
 var pulse_tween: Tween
 var bridge_node = null
+var _active_tween: Tween = null
+
+func set_active(is_active: bool) -> void:
+	modulate = Color(1, 1, 1, 1.0) if is_active else Color(1, 1, 1, 0.4)
+	if is_active and not OS.has_feature("headless"):
+		if _active_tween != null and _active_tween.is_valid():
+			_active_tween.kill()
+		var t := create_tween().set_loops()
+		t.tween_property(self, "modulate:a", 0.7, 0.6)
+		t.tween_property(self, "modulate:a", 1.0, 0.6)
+		_active_tween = t
+	elif _active_tween:
+		_active_tween.kill()
+		_active_tween = null
 
 func _init() -> void:
 	custom_minimum_size = Vector2(360, 40)

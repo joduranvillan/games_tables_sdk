@@ -1,4 +1,4 @@
-use checkers_game::{new_checkers_session, MovePieceCommand, Position};
+use checkers_game::{checkers_ai_pick_move, new_checkers_session, MovePieceCommand, Position};
 use open_table_engine::prelude::*;
 
 const P1: PlayerId = PlayerId(1); // arriba, avanza filas crecientes
@@ -684,3 +684,46 @@ fn test_cadena_de_tres_saltos_consecutivos() {
         "solo cambia de turno a P2 tras agotar los saltos"
     );
 }
+
+#[test]
+fn test_checkers_ai_captura_multiple_cuando_puede() {
+    // Posición con captura doble disponible; la IA debe elegir una captura cuando hay captura disponible.
+    let mut session = new_checkers_session(SessionId(1), 42, P1, P2);
+    {
+        let mut board = session
+            .world_mut()
+            .resource_mut::<checkers_game::BoardResource>();
+        for r in 0..8u8 {
+            for c in 0..8u8 {
+                board.set(pos(r, c), None);
+            }
+        }
+        board.set(
+            pos(0, 1),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(1, 2),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(3, 4),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
+    }
+    let mv = checkers_ai_pick_move(&session, P1);
+    assert!(mv.is_some());
+    let chosen = mv.unwrap();
+    assert_eq!(chosen.from, pos(0, 1));
+    assert_eq!(chosen.to, pos(2, 3));
+}
+

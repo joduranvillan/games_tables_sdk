@@ -196,11 +196,15 @@ fn parse_command_json(
         return Ok(cmd);
     }
 
-    if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
-        if let Some(obj) = val.as_object() {
-            if let Some(serde_json::Value::String(ct)) = obj.get("command_type") {
+    if let Ok(mut val) = serde_json::from_str::<serde_json::Value>(json_str) {
+        if let Some(obj) = val.as_object_mut() {
+            if !obj.contains_key("command_type") {
+                if let Some(t) = obj.get("type").cloned() {
+                    obj.insert("command_type".to_string(), t);
+                }
+            }
+            if let Some(serde_json::Value::String(ct)) = obj.get("command_type").cloned() {
                 if !ct.contains("::") {
-                    let ct_clone = ct.clone();
                     let dynamic_prefix = if !current_game_type.is_empty() {
                         format!("{current_game_type}_game::")
                     } else {
@@ -237,7 +241,7 @@ fn parse_command_json(
                         if let Some(test_obj) = test_val.as_object_mut() {
                             test_obj.insert(
                                 "command_type".to_string(),
-                                serde_json::Value::String(format!("{prefix}{ct_clone}")),
+                                serde_json::Value::String(format!("{prefix}{ct}")),
                             );
                         }
                         if let Ok(new_str) = serde_json::to_string(&test_val) {
@@ -245,6 +249,10 @@ fn parse_command_json(
                                 return Ok(cmd);
                             }
                         }
+                    }
+                } else if let Ok(new_str) = serde_json::to_string(&val) {
+                    if let Ok(cmd) = serde_json::from_str::<Box<dyn Command>>(&new_str) {
+                        return Ok(cmd);
                     }
                 }
             }
@@ -455,7 +463,12 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn start_local_match_shogi_vs_ai(&mut self, human_player: i64, ai_player: i64) -> bool {
+    fn start_local_match_shogi_vs_ai(
+        &mut self,
+        human_player: i64,
+        ai_player: i64,
+        #[opt] _depth: Option<i64>,
+    ) -> bool {
         if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
             return false;
         }
@@ -497,7 +510,12 @@ impl OpenTableBridge {
     }
 
     #[func]
-    fn start_local_match_xiangqi_vs_ai(&mut self, human_player: i64, ai_player: i64) -> bool {
+    fn start_local_match_xiangqi_vs_ai(
+        &mut self,
+        human_player: i64,
+        ai_player: i64,
+        #[opt] _depth: Option<i64>,
+    ) -> bool {
         if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
             return false;
         }
@@ -535,6 +553,51 @@ impl OpenTableBridge {
             session,
             ai_player: None,
         };
+    }
+
+    #[func]
+    fn start_local_match_go_vs_ai(
+        &mut self,
+        human_player: i64,
+        ai_player: i64,
+        #[opt] board_size: Option<i64>,
+    ) -> bool {
+        if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "go".to_string();
+        let p_human = PlayerId(human_player as u32);
+        let p_ai = PlayerId(ai_player as u32);
+
+        let (p1, p2) = if human_player < ai_player {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let size = board_size.unwrap_or(9);
+        let size = if size > 0 { size as usize } else { 9 };
+        let mut session = new_go_session(SessionId(1), 1, p1, p2);
+        if size != 9 {
+            let board = go_game::BoardResource::new(size, p1, p2);
+            let mut history = go_game::BoardHistoryResource::new();
+            history.history.insert(board.compute_hash());
+            session.world_mut().insert_resource(board);
+            session.world_mut().insert_resource(history);
+        }
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
     }
 
     #[func]
@@ -730,6 +793,37 @@ impl OpenTableBridge {
             session,
             ai_player: None,
         };
+    }
+
+    #[func]
+    fn start_local_match_ludo_vs_ai(&mut self, human: i64, ai: i64) -> bool {
+        if human == ai || human <= 0 || ai <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "ludo".to_string();
+        let p_human = PlayerId(human as u32);
+        let p_ai = PlayerId(ai as u32);
+
+        let (p1, p2) = if human < ai {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let session = new_ludo_session(SessionId(1), 1, vec![p1, p2]);
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
     }
 
     #[func]
@@ -1292,10 +1386,32 @@ impl OpenTableBridge {
     // UNIVERSAL COMMANDS & STATE
     // ------------------------------------------------------------------
     #[func]
-    pub fn send_command_json(&mut self, player: i64, json_str: GString) {
-        let player_id = PlayerId(player as u32);
+    pub fn send_command_json(
+        &mut self,
+        player_or_json: Variant,
+        #[opt] maybe_json: Option<GString>,
+    ) {
+        let (player_id, json_str) = if let Some(j) = maybe_json {
+            let pid = player_or_json
+                .try_to::<i64>()
+                .unwrap_or_else(|_| self.current_player());
+            (PlayerId(pid as u32), j.to_string())
+        } else if let Ok(j) = player_or_json.try_to::<GString>() {
+            let s = j.to_string();
+            let pid = if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
+                v.get("player")
+                    .and_then(|p| p.as_i64())
+                    .unwrap_or_else(|| self.current_player())
+            } else {
+                self.current_player()
+            };
+            (PlayerId(pid as u32), s)
+        } else {
+            return;
+        };
+
         let command: Box<dyn Command> =
-            match parse_command_json(&json_str.to_string(), &self.current_game_type) {
+            match parse_command_json(&json_str, &self.current_game_type) {
                 Ok(cmd) => cmd,
                 Err(e) => {
                     let msg = format!("Error parsing command JSON: {e}");
@@ -1838,6 +1954,11 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn session_tick_count(&self) -> i64 {
+        self.current_tick()
+    }
+
+    #[func]
     pub fn get_distance(&self, player_id: i64) -> i64 {
         let p_id = PlayerId(player_id as u32);
         match &self.mode {
@@ -2346,20 +2467,32 @@ impl OpenTableBridge {
     }
 
     fn process_ai_turn_if_needed(&mut self) {
+        let mut steps = 0;
         loop {
-            let (ai_p, cmd_opt): (PlayerId, Option<Box<dyn Command>>) = match &self.mode {
+            if steps >= 2 {
+                break;
+            }
+            let (acting_p, cmd_opt): (PlayerId, Option<Box<dyn Command>>) = match &self.mode {
                 BridgeMode::Local {
                     session,
                     ai_player: Some(ai_p),
                 } => {
-                    if session.current_player() == *ai_p {
+                    let curr_p = session.current_player();
+                    let is_ai_turn = curr_p == *ai_p;
+                    if is_ai_turn || self.current_game_type == "shogi" || self.current_game_type == "xiangqi" {
                         let cmd: Option<Box<dyn Command>> = match self.current_game_type.as_str() {
-                            "chess" => chess_game::chess_ai_pick_move(session, *ai_p, self.chess_ai_depth)
+                            "chess" if is_ai_turn => chess_game::chess_ai_pick_move(session, *ai_p, self.chess_ai_depth)
                                 .map(|c| Box::new(c) as Box<dyn Command>),
-                            "shogi" => shogi_game::shogi_ai_pick_move(session, *ai_p),
-                            "xiangqi" => xiangqi_game::xiangqi_ai_pick_move(session, *ai_p)
+                            "shogi" => shogi_game::shogi_ai_pick_move(session, curr_p),
+                            "xiangqi" => xiangqi_game::xiangqi_ai_pick_move(session, curr_p)
                                 .map(|c| Box::new(c) as Box<dyn Command>),
-                            "backgammon" => {
+                            "go" if is_ai_turn => go_game::go_ai_pick_move(session, *ai_p)
+                                .map(|c| Box::new(c) as Box<dyn Command>)
+                                .or_else(|| {
+                                    Some(Box::new(go_game::PassCommand { player: *ai_p })
+                                        as Box<dyn Command>)
+                                }),
+                            "backgammon" if is_ai_turn => {
                                 let has_pending = session
                                     .world()
                                     .get_resource::<backgammon_game::PendingDiceResource>()
@@ -2373,10 +2506,25 @@ impl OpenTableBridge {
                                         .map(|c| Box::new(c) as Box<dyn Command>)
                                 }
                             }
-                            _ => checkers_game::checkers_ai_pick_move(session, *ai_p)
+                            "ludo" if is_ai_turn => {
+                                let has_pending = session
+                                    .world()
+                                    .get_resource::<ludo_game::PendingRollResource>()
+                                    .and_then(|p| p.pending.get(ai_p))
+                                    .is_some();
+                                if !has_pending {
+                                    Some(Box::new(ludo_game::RollDiceCommand { player: *ai_p })
+                                        as Box<dyn Command>)
+                                } else {
+                                    ludo_game::ludo_ai_pick_move(session, *ai_p)
+                                        .map(|c| Box::new(c) as Box<dyn Command>)
+                                }
+                            }
+                            _ if is_ai_turn => checkers_game::checkers_ai_pick_move(session, *ai_p)
                                 .map(|c| Box::new(c) as Box<dyn Command>),
+                            _ => None,
                         };
-                        (*ai_p, cmd)
+                        (curr_p, cmd)
                     } else {
                         break;
                     }
@@ -2385,7 +2533,8 @@ impl OpenTableBridge {
             };
 
             if let Some(cmd) = cmd_opt {
-                let _ = self.process_and_emit(ai_p, cmd);
+                steps += 1;
+                let _ = self.process_and_emit(acting_p, cmd);
             } else {
                 break;
             }

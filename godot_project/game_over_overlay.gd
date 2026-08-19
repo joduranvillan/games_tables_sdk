@@ -52,8 +52,13 @@ func _apply_styles() -> void:
 			btn.add_theme_stylebox_override("pressed", btn_style_hover)
 			btn.add_theme_font_size_override("font_size", 18)
 
-func show_winner(winner_id: int) -> void:
-	if winner_id <= 0:
+func get_viewport_rect() -> Rect2:
+	if get_viewport():
+		return get_viewport().get_visible_rect()
+	return Rect2(0, 0, 1024, 600)
+
+func show_result(winner_id: int, is_draw: bool) -> void:
+	if is_draw:
 		if title_label:
 			title_label.text = "¡Empate!"
 			title_label.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
@@ -61,7 +66,7 @@ func show_winner(winner_id: int) -> void:
 			winner_label.text = "Partida finalizada sin ganador"
 			winner_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
 	else:
-		var p_color = GameManager.get_player_color(winner_id)
+		var p_color = GameManager.get_player_color(winner_id) if Engine.has_singleton("GameManager") or has_node("/root/GameManager") else Color(1.0, 0.85, 0.2)
 		if title_label:
 			title_label.text = "¡Victoria!"
 			title_label.add_theme_color_override("font_color", p_color)
@@ -69,31 +74,66 @@ func show_winner(winner_id: int) -> void:
 			winner_label.text = "¡Jugador %d gana la partida!" % winner_id
 			winner_label.add_theme_color_override("font_color", p_color)
 
+		if not OS.has_feature("headless"):
+			var vp_size = get_viewport_rect().size
+			var max_x = max(100.0, vp_size.x - 50.0)
+			for i in range(3):
+				var p := CPUParticles2D.new()
+				p.position = Vector2(randi_range(50, int(max_x)), -20)
+				p.amount = 40
+				p.lifetime = 3.0
+				p.explosiveness = 0.0        # continuo
+				p.spread = 20.0
+				p.direction = Vector2(0, 1)  # cae hacia abajo
+				p.gravity = Vector2(0, 120)
+				p.initial_velocity_min = 80.0
+				p.initial_velocity_max = 200.0
+				p.angular_velocity_min = -180.0
+				p.angular_velocity_max = 180.0
+				p.color = Color.from_hsv(randf(), 0.8, 1.0)
+				p.one_shot = false
+				add_child(p)
+
 	show()
 	_animate_in()
+
+func show_winner(winner_id: int) -> void:
+	show_result(winner_id, winner_id <= 0)
+
+func hide() -> void:
+	for child in get_children():
+		if child is CPUParticles2D:
+			child.queue_free()
+	super.hide()
 
 func _animate_in() -> void:
 	if color_rect:
 		color_rect.modulate.a = 0.0
 		var fade_tween = create_tween()
-		fade_tween.tween_property(color_rect, "modulate:a", 1.0, 0.3)
+		if fade_tween:
+			fade_tween.tween_property(color_rect, "modulate:a", 1.0, 0.3)
 
-	if title_label:
+	if title_label and get_tree():
 		await get_tree().process_frame
 		var target_y = title_label.position.y
 		title_label.position.y = -50.0
-		var title_tween = create_tween().set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-		title_tween.tween_property(title_label, "position:y", target_y, 0.4)
+		var title_tween = create_tween()
+		if title_tween:
+			title_tween.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+			title_tween.tween_property(title_label, "position:y", target_y, 0.4)
 
 func _on_restart_pressed() -> void:
+	hide()
 	rematch_requested.emit()
-	get_tree().reload_current_scene()
+	if get_tree():
+		get_tree().reload_current_scene()
 
 func _on_go_to_menu_pressed() -> void:
+	hide()
 	menu_requested.emit()
 	if has_node("/root/SceneManager"):
 		get_node("/root/SceneManager").transition_to("res://main.tscn")
-	else:
+	elif get_tree():
 		get_tree().change_scene_to_file("res://main.tscn")
 
 # Alias handlers for backward compatibility
@@ -102,4 +142,3 @@ func _on_play_again_pressed() -> void:
 
 func _on_main_menu_pressed() -> void:
 	_on_go_to_menu_pressed()
-

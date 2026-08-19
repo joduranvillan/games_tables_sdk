@@ -441,9 +441,11 @@ func _update_status() -> void:
 		status.text = "¡Fin del juego! Ganó el jugador %s (Negro: %.1f, Blanco: %.1f)" % [winner, black_score, white_score]
 		if turn_indicator != null:
 			turn_indicator.stop_timer()
+			turn_indicator.set_active(false)
 	else:
 		var who = "Negro (1)" if current == P_BLACK else "Blanco (2)"
 		var p_col = COL_BLACK_STONE if current == P_BLACK else COL_WHITE_STONE
 		status.text = "Turno: %s (Go 9x9)" % who
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, who, p_col)
+			turn_indicator.set_active(true)

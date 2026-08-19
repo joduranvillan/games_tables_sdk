@@ -559,9 +559,11 @@ func _update_status() -> void:
 		status.text = "¡Ganó el jugador %s!" % who
 		if turn_indicator != null:
 			turn_indicator.stop_timer()
+			turn_indicator.set_active(false)
 	else:
 		var who := "Jugador 1" if current == P_TOP else "Jugador 2"
 		var p_col = GameManager.get_player_color(current)
 		status.text = "Turno: %s" % who
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, who, p_col)
+			turn_indicator.set_active(true)
