@@ -575,8 +575,11 @@ impl OpenTableBridge {
             (p_ai, p_human)
         };
 
-        let size = board_size.unwrap_or(9);
-        let size = if size > 0 { size as usize } else { 9 };
+        let size = if board_size > 0 {
+            board_size as usize
+        } else {
+            9
+        };
         let mut session = new_go_session(SessionId(1), 1, p1, p2);
         if size != 9 {
             let board = go_game::BoardResource::new(size, p1, p2);
@@ -1383,30 +1386,12 @@ impl OpenTableBridge {
     #[func]
     pub fn send_command_json(
         &mut self,
-        player_or_json: Variant,
-        #[opt] maybe_json: Option<GString>,
+        player_id: i64,
+        json_str: GString,
     ) {
-        let (player_id, json_str) = if let Some(j) = maybe_json {
-            let pid = player_or_json
-                .try_to::<i64>()
-                .unwrap_or_else(|_| self.current_player());
-            (PlayerId(pid as u32), j.to_string())
-        } else if let Ok(j) = player_or_json.try_to::<GString>() {
-            let s = j.to_string();
-            let pid = if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
-                v.get("player")
-                    .and_then(|p| p.as_i64())
-                    .unwrap_or_else(|| self.current_player())
-            } else {
-                self.current_player()
-            };
-            (PlayerId(pid as u32), s)
-        } else {
-            return;
-        };
-
-        let command: Box<dyn Command> = match parse_command_json(&json_str, &self.current_game_type)
-        {
+        let pid = PlayerId(player_id as u32);
+        let s = json_str.to_string();
+        let command: Box<dyn Command> = match parse_command_json(&s, &self.current_game_type) {
             Ok(cmd) => cmd,
             Err(e) => {
                 let msg = format!("Error parsing command JSON: {e}");
@@ -1416,7 +1401,7 @@ impl OpenTableBridge {
             }
         };
 
-        if let Ok(events) = self.process_and_emit(player_id, command) {
+        if let Ok(events) = self.process_and_emit(pid, command) {
             match &mut self.mode {
                 BridgeMode::Host { transport, .. } => {
                     let serialized = serde_json::to_vec(&events).unwrap_or_default();
