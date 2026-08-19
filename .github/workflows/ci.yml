@@ -111,6 +111,9 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
       - name: Build Android Plugin
-        run: cd platform_plugins && (./gradlew :android:assembleRelease --no-daemon || gradle :android:assembleRelease --no-daemon)
+        run: cd platform_plugins && gradle :android:assembleRelease --no-daemon
         working-directory: .
