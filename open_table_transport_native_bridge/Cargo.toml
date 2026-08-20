@@ -1,6 +1,6 @@
 [package]
 name = "open_table_transport_native_bridge"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.82"
 description = "Capa de protocolo (handshake, identidad, reconexión, timeout) para transportes móviles nativos de OpenTable SDK."

@@ -1,6 +1,6 @@
 [package]
 name = "open_table_qr"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.82"
 description = "Generación de código QR de invitación a una sala de juego en OpenTable SDK."

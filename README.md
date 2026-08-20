@@ -4,7 +4,7 @@
 [![codecov](https://codecov.io/gh/joduranvillan/games_tables_sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/joduranvillan/games_tables_sdk)
 [![Crates.io](https://img.shields.io/crates/v/open_table_core.svg)](https://crates.io/crates/open_table_core)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
-[![Juegos Implementados](https://img.shields.io/badge/juegos-12%2F12-brightgreen.svg)](#juegos-de-referencia-y-reglas)
+[![Juegos Implementados](https://img.shields.io/badge/juegos-13%2F13-brightgreen.svg)](#juegos-de-referencia-y-reglas)
 
 Para el diseño completo (diagrama de capas, detalle por crate, flujo de
 una jugada de punta a punta, matriz de estado) ver
@@ -23,6 +23,7 @@ Cada uno con su propio `Command`/`Event`/`Resource`, reglas reales registradas e
 | **Go** (`go_game`) | ✅ | ⚠️ (sin regla de Ko) | ✅ | ✅ | ✅ | [`go.md`](./docs/games/go.md) |
 | **Shogi** (`shogi_game`) | ✅ | ⚠️ (falta Nifu/Uchifuzume) | ✅ | ✅ | ✅ | [`shogi.md`](./docs/games/shogi.md) |
 | **Xiangqi** (`xiangqi_game`) | ✅ | ⚠️ (falta General Volador) | ✅ | ✅ | ✅ | [`xiangqi.md`](./docs/games/xiangqi.md) |
+| **Damas Chinas** (`chinese_checkers_game`) | ✅ | ⚠️ (tablero estrella) | ✅ | ✅ | ✅ | [`chinese_checkers.md`](./docs/games/chinese_checkers.md) |
 | **Backgammon** (`backgammon_game`) | ✅ | ⚠️ (sin doubling cube) | ✅ | ✅ | ✅ | [`backgammon.md`](./docs/games/backgammon.md) |
 | **Batalla naval** (`battleship_game`) | ✅ | ⚠️ (tablero 8x8) | ✅ | ✅ | ✅ | [`battleship.md`](./docs/games/battleship.md) |
 | **Ludo** (`ludo_game`) | ✅ | ⚠️ (24 casillas) | ✅ | ✅ | ✅ | [`ludo.md`](./docs/games/ludo.md) |
