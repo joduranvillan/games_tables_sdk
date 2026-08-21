@@ -5,7 +5,6 @@ edition = "2021"
 rust-version = "1.82"
 description = "Proc-macros derive para reducir el boilerplate de open_table_core/open_table_engine: GameCommand, GameEvent, GameResource, GameComponent."
 license = "MIT OR Apache-2.0"
-publish = false
 
 [lib]
 proc-macro = true

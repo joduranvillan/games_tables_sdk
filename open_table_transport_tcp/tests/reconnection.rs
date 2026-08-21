@@ -311,3 +311,268 @@ fn test_retry_policy_limita_intentos_a_max_attempts() {
     assert!(result.is_err());
     assert!(elapsed >= Duration::from_millis(15));
 }
+
+
+#[test]
+fn test_reconexion_con_eventos_reales_de_checkers() {
+    let mut host_transport = TcpHostTransport::bind("127.0.0.1:0").expect("bind del host");
+    let addr = host_transport.local_addr();
+
+    let (mut p1_transport, p1, p1_token) =
+        TcpClientTransport::connect_as_new_player(addr, "Player1").unwrap();
+    let (mut p2_transport, p2, _p2_token) =
+        TcpClientTransport::connect_as_new_player(addr, "Player2").unwrap();
+
+    let _ = wait_for_data(
+        || host_transport.poll_connection_events(),
+        Duration::from_secs(1),
+    );
+
+    let seed = 2024;
+    let mut host_session = checkers_game::new_checkers_session(SessionId(1), seed, p1, p2);
+
+    let cmd: Box<dyn Command> = Box::new(checkers_game::commands::ResignCommand {
+        player: p1,
+    });
+    
+    let envelope = CommandEnvelope {
+        tick: host_session.current_tick(),
+        payload: cmd,
+    };
+    let bytes = serde_json::to_vec(&envelope).unwrap();
+    p1_transport.send(open_table_transport_tcp::HOST_PLAYER_ID, &bytes).unwrap();
+
+    let received = wait_for_data(|| host_transport.poll_received(), Duration::from_secs(2));
+    let (sender, raw) = &received[0];
+    let decoded: CommandEnvelope = serde_json::from_slice(raw).unwrap();
+    host_session.process_command(*sender, decoded.payload).unwrap();
+
+    p1_transport.disconnect().unwrap();
+    drop(p1_transport);
+
+    let disconnect_event = wait_until(
+        || {
+            host_transport
+                .poll_connection_events()
+                .into_iter()
+                .find(|e| matches!(e, ConnectionEvent::Disconnected { player } if *player == p1))
+        },
+        Duration::from_secs(2),
+    );
+
+    let mut p1_transport =
+        TcpClientTransport::reconnect(addr, p1, p1_token).unwrap();
+
+    let reconnect_event = wait_until(
+        || {
+            host_transport
+                .poll_connection_events()
+                .into_iter()
+                .find(|e| matches!(e, ConnectionEvent::Reconnected { player } if *player == p1))
+        },
+        Duration::from_secs(2),
+    );
+
+    let log_bytes = host_session.export_log().unwrap();
+    let temp_session = checkers_game::new_checkers_session(SessionId(1), seed, p1, p2);
+    let (_temp_session, all_events) = Session::replay_on_session(
+        temp_session,
+        &log_bytes,
+    )
+    .unwrap();
+
+    let events_for_p1 = filter_events_for_player(&all_events, p1);
+    assert!(!events_for_p1.is_empty(), "P1 should have received events in resync");
+
+    for event in &events_for_p1 {
+        let bytes = serde_json::to_vec(&EventEnvelope {
+            tick: host_session.current_tick(),
+            payload: clone_event_for_wire(*event),
+        })
+        .unwrap();
+        host_transport.send(p1, &bytes).unwrap();
+    }
+
+    let received_by_p1 = wait_for_data_count(
+        || p1_transport.poll_received(),
+        events_for_p1.len(),
+        Duration::from_secs(2),
+    );
+    assert_eq!(received_by_p1.len(), events_for_p1.len());
+}
+
+#[test]
+fn test_reconexion_con_eventos_reales_de_chess() {
+    let mut host_transport = TcpHostTransport::bind("127.0.0.1:0").expect("bind del host");
+    let addr = host_transport.local_addr();
+
+    let (mut p1_transport, p1, p1_token) =
+        TcpClientTransport::connect_as_new_player(addr, "Player1").unwrap();
+    let (mut p2_transport, p2, _p2_token) =
+        TcpClientTransport::connect_as_new_player(addr, "Player2").unwrap();
+
+    let _ = wait_for_data(
+        || host_transport.poll_connection_events(),
+        Duration::from_secs(1),
+    );
+
+    let seed = 2024;
+    let mut host_session = chess_game::new_chess_session(SessionId(1), seed, p1, p2);
+
+    let cmd: Box<dyn Command> = Box::new(chess_game::commands::ResignCommand {
+        player: p1,
+    });
+    
+    let envelope = CommandEnvelope {
+        tick: host_session.current_tick(),
+        payload: cmd,
+    };
+    let bytes = serde_json::to_vec(&envelope).unwrap();
+    p1_transport.send(open_table_transport_tcp::HOST_PLAYER_ID, &bytes).unwrap();
+
+    let received = wait_for_data(|| host_transport.poll_received(), Duration::from_secs(2));
+    let (sender, raw) = &received[0];
+    let decoded: CommandEnvelope = serde_json::from_slice(raw).unwrap();
+    host_session.process_command(*sender, decoded.payload).unwrap();
+
+    p1_transport.disconnect().unwrap();
+    drop(p1_transport);
+
+    let disconnect_event = wait_until(
+        || {
+            host_transport
+                .poll_connection_events()
+                .into_iter()
+                .find(|e| matches!(e, ConnectionEvent::Disconnected { player } if *player == p1))
+        },
+        Duration::from_secs(2),
+    );
+
+    let mut p1_transport =
+        TcpClientTransport::reconnect(addr, p1, p1_token).unwrap();
+
+    let reconnect_event = wait_until(
+        || {
+            host_transport
+                .poll_connection_events()
+                .into_iter()
+                .find(|e| matches!(e, ConnectionEvent::Reconnected { player } if *player == p1))
+        },
+        Duration::from_secs(2),
+    );
+
+    let log_bytes = host_session.export_log().unwrap();
+    let temp_session = chess_game::new_chess_session(SessionId(1), seed, p1, p2);
+    let (_temp_session, all_events) = Session::replay_on_session(
+        temp_session,
+        &log_bytes,
+    )
+    .unwrap();
+
+    let events_for_p1 = filter_events_for_player(&all_events, p1);
+    assert!(!events_for_p1.is_empty(), "P1 should have received events in resync");
+
+    for event in &events_for_p1 {
+        let bytes = serde_json::to_vec(&EventEnvelope {
+            tick: host_session.current_tick(),
+            payload: clone_event_for_wire(*event),
+        })
+        .unwrap();
+        host_transport.send(p1, &bytes).unwrap();
+    }
+
+    let received_by_p1 = wait_for_data_count(
+        || p1_transport.poll_received(),
+        events_for_p1.len(),
+        Duration::from_secs(2),
+    );
+    assert_eq!(received_by_p1.len(), events_for_p1.len());
+}
+
+#[test]
+fn test_reconexion_con_eventos_reales_de_go() {
+    let mut host_transport = TcpHostTransport::bind("127.0.0.1:0").expect("bind del host");
+    let addr = host_transport.local_addr();
+
+    let (mut p1_transport, p1, p1_token) =
+        TcpClientTransport::connect_as_new_player(addr, "Player1").unwrap();
+    let (mut p2_transport, p2, _p2_token) =
+        TcpClientTransport::connect_as_new_player(addr, "Player2").unwrap();
+
+    let _ = wait_for_data(
+        || host_transport.poll_connection_events(),
+        Duration::from_secs(1),
+    );
+
+    let seed = 2024;
+    let mut host_session = go_game::new_go_session(SessionId(1), seed, p1, p2);
+
+    let cmd: Box<dyn Command> = Box::new(go_game::commands::ResignCommand {
+        player: p1,
+    });
+    
+    let envelope = CommandEnvelope {
+        tick: host_session.current_tick(),
+        payload: cmd,
+    };
+    let bytes = serde_json::to_vec(&envelope).unwrap();
+    p1_transport.send(open_table_transport_tcp::HOST_PLAYER_ID, &bytes).unwrap();
+
+    let received = wait_for_data(|| host_transport.poll_received(), Duration::from_secs(2));
+    let (sender, raw) = &received[0];
+    let decoded: CommandEnvelope = serde_json::from_slice(raw).unwrap();
+    host_session.process_command(*sender, decoded.payload).unwrap();
+
+    p1_transport.disconnect().unwrap();
+    drop(p1_transport);
+
+    let disconnect_event = wait_until(
+        || {
+            host_transport
+                .poll_connection_events()
+                .into_iter()
+                .find(|e| matches!(e, ConnectionEvent::Disconnected { player } if *player == p1))
+        },
+        Duration::from_secs(2),
+    );
+
+    let mut p1_transport =
+        TcpClientTransport::reconnect(addr, p1, p1_token).unwrap();
+
+    let reconnect_event = wait_until(
+        || {
+            host_transport
+                .poll_connection_events()
+                .into_iter()
+                .find(|e| matches!(e, ConnectionEvent::Reconnected { player } if *player == p1))
+        },
+        Duration::from_secs(2),
+    );
+
+    let log_bytes = host_session.export_log().unwrap();
+    let temp_session = go_game::new_go_session(SessionId(1), seed, p1, p2);
+    let (_temp_session, all_events) = Session::replay_on_session(
+        temp_session,
+        &log_bytes,
+    )
+    .unwrap();
+
+    let events_for_p1 = filter_events_for_player(&all_events, p1);
+    assert!(!events_for_p1.is_empty(), "P1 should have received events in resync");
+
+    for event in &events_for_p1 {
+        let bytes = serde_json::to_vec(&EventEnvelope {
+            tick: host_session.current_tick(),
+            payload: clone_event_for_wire(*event),
+        })
+        .unwrap();
+        host_transport.send(p1, &bytes).unwrap();
+    }
+
+    let received_by_p1 = wait_for_data_count(
+        || p1_transport.poll_received(),
+        events_for_p1.len(),
+        Duration::from_secs(2),
+    );
+    assert_eq!(received_by_p1.len(), events_for_p1.len());
+}

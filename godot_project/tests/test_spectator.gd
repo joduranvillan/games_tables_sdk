@@ -43,6 +43,69 @@ func _initialize() -> void:
 
 	results.append(["el espectador recibió la señal spectator_event_received", spectator_jsons.size() >= 1])
 
+	# --- TEST DE ESPECTADOR TARDÍO (RESYNC HISTÓRICO DE COMANDOS / EVENTOS) ---
+	var late_moved_events: Array = []
+	var late_spectator_jsons: Array = []
+	var host_late = OpenTableBridge.new()
+	var port_late: int = 18100
+	host_late.start_hosting(port_late, 1, 2)
+
+	# Jugar 2 movimientos antes de que el espectador se conecte
+	# Movimiento 1 (Jugador 1): (2, 1) -> (3, 2)
+	host_late.send_move(1, 2, 1, 3, 2)
+	for _i in range(5):
+		host_late.poll_events()
+		OS.delay_msec(10)
+
+	# Movimiento 2 (Jugador 2): (5, 0) -> (4, 1)
+	host_late.send_move(2, 5, 0, 4, 1)
+	for _i in range(5):
+		host_late.poll_events()
+		OS.delay_msec(10)
+
+	# Ahora se une el espectador tardío
+	var late_spectator_bridge = OpenTableBridge.new()
+	late_spectator_bridge.connect("piece_moved", func(p, fr, fc, tr, tc, cr, cc, promoted):
+		late_moved_events.append({"player": p, "from_row": fr, "from_col": fc, "to_row": tr, "to_col": tc}))
+	late_spectator_bridge.connect("spectator_event_received", func(event_json):
+		late_spectator_jsons.append(event_json))
+
+	var late_addr: String = "127.0.0.1:%d" % port_late
+	var late_ok: bool = late_spectator_bridge.start_spectating(late_addr)
+	results.append(["espectador tardío se conecta al host", late_ok])
+
+	# Procesar eventos para que se complete la conexión y el resync histórico
+	for _i in range(25):
+		host_late.poll_events()
+		late_spectator_bridge.poll_events()
+		OS.delay_msec(10)
+
+	results.append(["espectador tardío recibió los 2 movimientos históricos por resync", late_moved_events.size() == 2])
+	if late_moved_events.size() >= 2:
+		var m1_ok: bool = late_moved_events[0].player == 1 and late_moved_events[0].to_row == 3 and late_moved_events[0].to_col == 2
+		var m2_ok: bool = late_moved_events[1].player == 2 and late_moved_events[1].to_row == 4 and late_moved_events[1].to_col == 1
+		results.append(["movimiento histórico 1 recibido en orden correcto (3,2)", m1_ok])
+		results.append(["movimiento histórico 2 recibido en orden correcto (4,1)", m2_ok])
+	else:
+		results.append(["movimiento histórico 1 recibido en orden correcto (3,2)", false])
+		results.append(["movimiento histórico 2 recibido en orden correcto (4,1)", false])
+
+	results.append(["espectador tardío recibió señales spectator_event_received históricas", late_spectator_jsons.size() >= 2])
+
+	# Realizar un 3er movimiento en vivo: (2, 3) -> (3, 4)
+	host_late.send_move(1, 2, 3, 3, 4)
+	for _i in range(15):
+		host_late.poll_events()
+		late_spectator_bridge.poll_events()
+		OS.delay_msec(10)
+
+	results.append(["espectador tardío recibió el tercer movimiento en vivo tras el resync", late_moved_events.size() == 3])
+	if late_moved_events.size() == 3:
+		var m3_ok: bool = late_moved_events[2].player == 1 and late_moved_events[2].to_row == 3 and late_moved_events[2].to_col == 4
+		results.append(["tercer movimiento en vivo correcto (3,4)", m3_ok])
+	else:
+		results.append(["tercer movimiento en vivo correcto (3,4)", false])
+
 	var ok := true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
@@ -52,4 +115,6 @@ func _initialize() -> void:
 	print("=== RESULTADO TEST ESPECTADOR: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	host_bridge.free()
 	spectator_bridge.free()
+	host_late.free()
+	late_spectator_bridge.free()
 	quit(0 if ok else 1)

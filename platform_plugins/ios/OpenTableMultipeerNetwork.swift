@@ -1,5 +1,6 @@
 import Foundation
 import MultipeerConnectivity
+import UIKit
 
 /// Envuelve `MultipeerConnectivity` con la misma interfaz lógica que
 /// `OpenTableNearbyPlugin.kt` en Android — mismo `join_code` para filtrar

@@ -156,6 +156,10 @@ Para preparar y publicar una nueva versión de los crates de OpenTable SDK:
    make publish-dry-run
    ```
 
+   **Nota sobre Dry-Run y Dependencias de Workspace**: Al ejecutar `make publish-dry-run`, Cargo empaqueta cada crate y, durante la validación, reemplaza las dependencias locales (`path`) consultando el registro de `crates.io`. Por tanto, debes tener en cuenta que:
+   - Es **obligatorio** que las dependencias locales en los `Cargo.toml` incluyan la propiedad `version` (por ejemplo: `open_table_core = { path = "../open_table_core", version = "0.2.0" }`). De lo contrario, la validación fallará por falta de versión requerida.
+   - Incluso con la propiedad `version` especificada, la ejecución en modo dry-run para los crates dependientes (como `checkers_game` o `open_table_engine`) **fallará** con un error del tipo `no matching package named 'open_table_core' found` si la versión local requerida no se encuentra ya físicamente publicada en `crates.io`. Este es el comportamiento real y esperado de Cargo en entornos workspace.
+
 3. **Pasos Manuales de Publicación**:
    Por seguridad, el script **nunca realiza push ni publica automáticamente**. Debes completar el proceso manualmente:
    ```bash

@@ -490,3 +490,13 @@ assert!(
 | TCP bridge scene (timed) | `bash run_test.sh` |
 | Clippy all crates | `cargo clippy --workspace -- -D warnings` |
 | Format check | `cargo fmt --all -- --check` |
+
+## Test de Estabilidad de Memoria
+
+El motor incluye un test de estrés de memoria para asegurar que no existan fugas al procesar comandos repetitivamente (`memory_stability`). Este test está ignorado por defecto (`#[ignore]`) porque toma más tiempo de lo usual y depende de lecturas del sistema (RSS).
+
+Para correr el test manualmente, usar:
+
+```bash
+cargo test --test memory_stability -- --ignored
+```

@@ -96,7 +96,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "backgammon_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -110,7 +110,7 @@ dependencies = [
 
 [[package]]
 name = "battleship_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -368,7 +368,7 @@ dependencies = [
 
 [[package]]
 name = "checkers_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "chess_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -395,7 +395,7 @@ dependencies = [
 
 [[package]]
 name = "chinese_checkers_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -514,7 +514,7 @@ dependencies = [
 
 [[package]]
 name = "crisis_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -892,7 +892,7 @@ checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
 
 [[package]]
 name = "go_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -1174,7 +1174,7 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
 name = "ludo_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -1193,7 +1193,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "mille_bornes_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -1233,7 +1233,7 @@ dependencies = [
 
 [[package]]
 name = "monopoly_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -1298,7 +1298,7 @@ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
 name = "open_table_core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
@@ -1310,7 +1310,7 @@ dependencies = [
 
 [[package]]
 name = "open_table_engine"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "backgammon_game",
  "bevy_ecs",
@@ -1338,7 +1338,7 @@ dependencies = [
 
 [[package]]
 name = "open_table_godot"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "backgammon_game",
  "battleship_game",
@@ -1356,6 +1356,7 @@ dependencies = [
  "open_table_qr",
  "open_table_transport_native_bridge",
  "open_table_transport_tcp",
+ "serde",
  "serde_json",
  "shogi_game",
  "uno_game",
@@ -1364,7 +1365,7 @@ dependencies = [
 
 [[package]]
 name = "open_table_macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -1378,7 +1379,7 @@ dependencies = [
 
 [[package]]
 name = "open_table_qr"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "open_table_core",
  "qrcode",
@@ -1389,7 +1390,7 @@ dependencies = [
 
 [[package]]
 name = "open_table_transport_native_bridge"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "getrandom 0.4.3",
  "open_table_core",
@@ -1399,11 +1400,12 @@ dependencies = [
 
 [[package]]
 name = "open_table_transport_tcp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "checkers_game",
  "chess_game",
  "getrandom 0.4.3",
+ "go_game",
  "open_table_core",
  "open_table_engine",
  "serde",
@@ -1414,7 +1416,7 @@ dependencies = [
 
 [[package]]
 name = "open_table_transport_websocket"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "checkers_game",
  "chess_game",
@@ -1868,7 +1870,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "shogi_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -2159,7 +2161,7 @@ checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
 
 [[package]]
 name = "uno_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -2457,7 +2459,7 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
 name = "xiangqi_game"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",

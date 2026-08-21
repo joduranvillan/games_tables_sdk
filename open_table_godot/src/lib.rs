@@ -36,7 +36,19 @@ use open_table_transport_native_bridge::{
     HandshakeStatus, NativeClientTransport, NativeHostTransport, RawByteLink, RawLinkEvent,
 };
 use open_table_transport_tcp::{ConnectionEvent, TcpClientTransport, TcpHostTransport};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
+
+/// Mensajes de sincronización y resync en red (espectadores tardíos y reconexión).
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum SyncProtocolMessage {
+    RequestSync,
+    SyncLog {
+        game_type: String,
+        log_bytes: Vec<u8>,
+    },
+}
 
 struct OpenTableExtension;
 
@@ -51,11 +63,57 @@ pub struct SharedLinkQueue {
     pub outgoing_broadcasts: Vec<Vec<u8>>,
 }
 
+/// Enlace de transporte nativo para Android (Nearby Connections).
 pub struct GodotNearbyLink {
     pub queue: Arc<Mutex<SharedLinkQueue>>,
 }
 
+impl GodotNearbyLink {
+    pub fn new(queue: Arc<Mutex<SharedLinkQueue>>) -> Self {
+        Self { queue }
+    }
+}
+
 impl RawByteLink for GodotNearbyLink {
+    fn send_raw(&mut self, peer_tag: &str, bytes: &[u8]) -> EngineResult<()> {
+        let mut q = self.queue.lock().unwrap();
+        q.outgoing_sends
+            .push((peer_tag.to_string(), bytes.to_vec()));
+        Ok(())
+    }
+
+    fn broadcast_raw(&mut self, bytes: &[u8]) -> EngineResult<()> {
+        let mut q = self.queue.lock().unwrap();
+        q.outgoing_broadcasts.push(bytes.to_vec());
+        Ok(())
+    }
+
+    fn poll_raw_received(&mut self) -> Vec<(String, Vec<u8>)> {
+        let mut q = self.queue.lock().unwrap();
+        std::mem::take(&mut q.incoming)
+    }
+
+    fn poll_link_events(&mut self) -> Vec<RawLinkEvent> {
+        let mut q = self.queue.lock().unwrap();
+        std::mem::take(&mut q.events)
+    }
+}
+
+/// Enlace de transporte nativo para iOS (MultipeerConnectivity / OpenTableMultipeer).
+///
+/// Implementa `RawByteLink` para interactuar de forma transparente con el singleton
+/// de Swift `OpenTableMultipeer` de iOS a través de la cola compartida `SharedLinkQueue`.
+pub struct GodotMultipeerLink {
+    pub queue: Arc<Mutex<SharedLinkQueue>>,
+}
+
+impl GodotMultipeerLink {
+    pub fn new(queue: Arc<Mutex<SharedLinkQueue>>) -> Self {
+        Self { queue }
+    }
+}
+
+impl RawByteLink for GodotMultipeerLink {
     fn send_raw(&mut self, peer_tag: &str, bytes: &[u8]) -> EngineResult<()> {
         let mut q = self.queue.lock().unwrap();
         q.outgoing_sends
@@ -116,6 +174,17 @@ enum BridgeMode {
         queue: Arc<Mutex<SharedLinkQueue>>,
         handshake_complete: bool,
     },
+    MultipeerHost {
+        session: Session,
+        transport: NativeHostTransport<GodotMultipeerLink>,
+        queue: Arc<Mutex<SharedLinkQueue>>,
+    },
+    MultipeerClient {
+        transport: NativeClientTransport<GodotMultipeerLink>,
+        player_id: PlayerId,
+        queue: Arc<Mutex<SharedLinkQueue>>,
+        handshake_complete: bool,
+    },
     Replay {
         session: Session,
         pending_commands: Vec<open_table_engine::session::LoggedCommand>,
@@ -135,6 +204,41 @@ enum BridgeMode {
         sessions: Vec<(String, Session)>,
         active: usize,
     },
+}
+
+fn get_session_init_params(
+    game_type: &str,
+    p1: PlayerId,
+    p2: PlayerId,
+) -> (SessionId, u64, Vec<PlayerId>, RuleEngine) {
+    let id = SessionId(1);
+    let seed = 1;
+    match game_type.to_lowercase().as_str() {
+        "checkers" => (id, seed, vec![p1, p2], checkers_game::build_checkers_rules()),
+        "chess" => (id, seed, vec![p1, p2], chess_game::build_chess_rules()),
+        "shogi" => (id, seed, vec![p1, p2], shogi_game::build_shogi_rules()),
+        "xiangqi" => (id, seed, vec![p1, p2], xiangqi_game::build_xiangqi_rules()),
+        "go" => (id, seed, vec![p1, p2], go_game::build_go_rules()),
+        "uno" => (id, seed, vec![p1, p2], uno_game::build_uno_rules()),
+        "crisis" => (id, seed, vec![p1, p2], crisis_game::build_crisis_rules()),
+        "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => (
+            id,
+            seed,
+            vec![p1, p2],
+            chinese_checkers_game::build_chinese_checkers_rules(),
+        ),
+        "mille_bornes" | "mille-bornes" | "millebornes" => (
+            id,
+            seed,
+            vec![p1, p2],
+            mille_bornes_game::build_mille_bornes_rules(),
+        ),
+        "backgammon" => (id, seed, vec![p1, p2], backgammon_game::build_backgammon_rules()),
+        "monopoly" => (id, seed, vec![p1, p2], monopoly_game::build_monopoly_rules()),
+        "ludo" => (id, seed, vec![p1, p2], ludo_game::build_ludo_rules()),
+        "battleship" => (id, seed, vec![p1, p2], battleship_game::build_battleship_rules()),
+        _ => (id, seed, vec![p1, p2], checkers_game::build_checkers_rules()),
+    }
 }
 
 fn create_session_for_players(game_type: &str, p1: PlayerId, p2: PlayerId) -> Option<Session> {
@@ -970,6 +1074,7 @@ impl OpenTableBridge {
             BridgeMode::Local { session, .. }
             | BridgeMode::Host { session, .. }
             | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
             | BridgeMode::Tournament { session, .. } => {
                 chess_game::load_chess_position_from_fen(session, &fen.to_string()).is_ok()
             }
@@ -990,6 +1095,7 @@ impl OpenTableBridge {
             BridgeMode::Local { session, .. }
             | BridgeMode::Host { session, .. }
             | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
             | BridgeMode::Tournament { session, .. } => session.export_chess_pgn(),
             BridgeMode::MultiSession { sessions, active } => sessions
                 .get(*active)
@@ -1105,7 +1211,11 @@ impl OpenTableBridge {
         }
 
         match TcpClientTransport::reconnect(&addr, player_id, token) {
-            Ok(transport) => {
+            Ok(mut transport) => {
+                let sync_req = SyncProtocolMessage::RequestSync;
+                if let Ok(serialized) = serde_json::to_vec(&sync_req) {
+                    let _ = transport.send(open_table_transport_tcp::HOST_PLAYER_ID, &serialized);
+                }
                 self.mode = BridgeMode::Client {
                     transport,
                     player_id,
@@ -1139,7 +1249,11 @@ impl OpenTableBridge {
     fn start_spectating(&mut self, host_addr: GString) -> bool {
         let addr = host_addr.to_string();
         match TcpClientTransport::connect_as_new_player(&addr, "Spectator") {
-            Ok((transport, _player_id, _reconnect_token)) => {
+            Ok((mut transport, _player_id, _reconnect_token)) => {
+                let sync_req = SyncProtocolMessage::RequestSync;
+                if let Ok(serialized) = serde_json::to_vec(&sync_req) {
+                    let _ = transport.send(open_table_transport_tcp::HOST_PLAYER_ID, &serialized);
+                }
                 self.mode = BridgeMode::Spectator { transport };
                 true
             }
@@ -1152,6 +1266,7 @@ impl OpenTableBridge {
         match &self.mode {
             BridgeMode::Client { player_id, .. } => player_id.0 as i64,
             BridgeMode::NativeClient { player_id, .. } => player_id.0 as i64,
+            BridgeMode::MultipeerClient { player_id, .. } => player_id.0 as i64,
             _ => -1,
         }
     }
@@ -1161,8 +1276,11 @@ impl OpenTableBridge {
         match &self.mode {
             BridgeMode::NativeClient {
                 handshake_complete, ..
+            }
+            | BridgeMode::MultipeerClient {
+                handshake_complete, ..
             } => *handshake_complete,
-            BridgeMode::NativeHost { .. } => true,
+            BridgeMode::NativeHost { .. } | BridgeMode::MultipeerHost { .. } => true,
             _ => false,
         }
     }
@@ -1172,6 +1290,11 @@ impl OpenTableBridge {
         let command_parts = match &self.mode {
             BridgeMode::Client { player_id, .. } => Some(*player_id),
             BridgeMode::NativeClient {
+                player_id,
+                handshake_complete,
+                ..
+            }
+            | BridgeMode::MultipeerClient {
                 player_id,
                 handshake_complete,
                 ..
@@ -1194,6 +1317,12 @@ impl OpenTableBridge {
                     let _ = transport.send(open_table_transport_tcp::HOST_PLAYER_ID, &serialized);
                 }
                 BridgeMode::NativeClient { transport, .. } => {
+                    let _ = transport.send(
+                        open_table_transport_native_bridge::HOST_PLAYER_ID,
+                        &serialized,
+                    );
+                }
+                BridgeMode::MultipeerClient { transport, .. } => {
                     let _ = transport.send(
                         open_table_transport_native_bridge::HOST_PLAYER_ID,
                         &serialized,
@@ -1264,10 +1393,69 @@ impl OpenTableBridge {
     }
 
     #[func]
+    fn start_multipeer_hosting(&mut self, player_top_id: i64, player_bottom_id: i64) {
+        let session = new_checkers_session(
+            SessionId(1),
+            1,
+            PlayerId(player_top_id as u32),
+            PlayerId(player_bottom_id as u32),
+        );
+        let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
+        let link = GodotMultipeerLink {
+            queue: queue.clone(),
+        };
+        let transport = NativeHostTransport::new(link);
+        self.mode = BridgeMode::MultipeerHost {
+            session,
+            transport,
+            queue,
+        };
+        godot_print!("✅ Multipeer Host (iOS) iniciado");
+    }
+
+    #[func]
+    fn start_multipeer_client(&mut self, player_name: GString) {
+        let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
+        let link = GodotMultipeerLink {
+            queue: queue.clone(),
+        };
+        let transport = NativeClientTransport::begin_join(link, &player_name.to_string())
+            .expect("no pude iniciar handshake multipeer");
+        self.mode = BridgeMode::MultipeerClient {
+            transport,
+            player_id: PlayerId(0),
+            queue,
+            handshake_complete: false,
+        };
+        godot_print!("✅ Handshake multipeer (iOS) iniciado");
+    }
+
+    #[func]
+    fn reconnect_multipeer(&mut self, player_id: i64, token: GString) {
+        let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
+        let link = GodotMultipeerLink {
+            queue: queue.clone(),
+        };
+        let pid = PlayerId(player_id as u32);
+        let transport = NativeClientTransport::begin_reconnect(link, pid, token.to_string())
+            .expect("no pude iniciar reconexión multipeer");
+        self.mode = BridgeMode::MultipeerClient {
+            transport,
+            player_id: pid,
+            queue,
+            handshake_complete: false,
+        };
+        godot_print!("✅ Reconexión multipeer (iOS) iniciada para PlayerId={}", player_id);
+    }
+
+    #[func]
     fn feed_native_data_received(&mut self, peer_tag: GString, bytes: PackedByteArray) {
         let incoming_bytes = bytes.to_vec();
         match &self.mode {
-            BridgeMode::NativeHost { queue, .. } | BridgeMode::NativeClient { queue, .. } => {
+            BridgeMode::NativeHost { queue, .. }
+            | BridgeMode::NativeClient { queue, .. }
+            | BridgeMode::MultipeerHost { queue, .. }
+            | BridgeMode::MultipeerClient { queue, .. } => {
                 let mut q = queue.lock().unwrap();
                 q.incoming.push((peer_tag.to_string(), incoming_bytes));
             }
@@ -1278,13 +1466,26 @@ impl OpenTableBridge {
     #[func]
     fn feed_native_peer_disconnected(&mut self, peer_tag: GString) {
         match &self.mode {
-            BridgeMode::NativeHost { queue, .. } | BridgeMode::NativeClient { queue, .. } => {
+            BridgeMode::NativeHost { queue, .. }
+            | BridgeMode::NativeClient { queue, .. }
+            | BridgeMode::MultipeerHost { queue, .. }
+            | BridgeMode::MultipeerClient { queue, .. } => {
                 let mut q = queue.lock().unwrap();
                 q.events
                     .push(RawLinkEvent::Disconnected(peer_tag.to_string()));
             }
             _ => {}
         }
+    }
+
+    #[func]
+    fn feed_multipeer_data_received(&mut self, peer_tag: GString, bytes: PackedByteArray) {
+        self.feed_native_data_received(peer_tag, bytes);
+    }
+
+    #[func]
+    fn feed_multipeer_peer_disconnected(&mut self, peer_tag: GString) {
+        self.feed_native_peer_disconnected(peer_tag);
     }
 
     fn emit_bridge_signal(&mut self, signal_name: &str, args: &[Variant]) {
@@ -1316,6 +1517,11 @@ impl OpenTableBridge {
                 (prev, res)
             }
             BridgeMode::NativeHost { session, .. } => {
+                let prev = session.current_player();
+                let res = session.process_command(sender, command);
+                (prev, res)
+            }
+            BridgeMode::MultipeerHost { session, .. } => {
                 let prev = session.current_player();
                 let res = session.process_command(sender, command);
                 (prev, res)
@@ -1355,6 +1561,7 @@ impl OpenTableBridge {
                     BridgeMode::Local { session, .. } => session.current_player(),
                     BridgeMode::Host { session, .. } => session.current_player(),
                     BridgeMode::NativeHost { session, .. } => session.current_player(),
+                    BridgeMode::MultipeerHost { session, .. } => session.current_player(),
                     BridgeMode::Replay { session, .. } => session.current_player(),
                     BridgeMode::Tournament { session, .. } => session.current_player(),
                     BridgeMode::MultiSession { sessions, active } => sessions
@@ -1403,6 +1610,10 @@ impl OpenTableBridge {
                     let serialized = serde_json::to_vec(&events).unwrap_or_default();
                     let _ = transport.broadcast(&serialized);
                 }
+                BridgeMode::MultipeerHost { transport, .. } => {
+                    let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                    let _ = transport.broadcast(&serialized);
+                }
                 _ => {}
             }
         }
@@ -1416,6 +1627,7 @@ impl OpenTableBridge {
             BridgeMode::Local { session, .. }
             | BridgeMode::Host { session, .. }
             | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
             | BridgeMode::Replay { session, .. }
             | BridgeMode::Tournament { session, .. } => session.get_legal_moves(player),
             BridgeMode::MultiSession { sessions, active } => sessions
@@ -1476,6 +1688,10 @@ impl OpenTableBridge {
                     let serialized = serde_json::to_vec(&events).unwrap_or_default();
                     let _ = transport.broadcast(&serialized);
                 }
+                BridgeMode::MultipeerHost { transport, .. } => {
+                    let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                    let _ = transport.broadcast(&serialized);
+                }
                 _ => {}
             }
         }
@@ -1496,6 +1712,7 @@ impl OpenTableBridge {
             BridgeMode::Local { session, .. }
             | BridgeMode::Host { session, .. }
             | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
             | BridgeMode::Tournament { session, .. } => session.save_to_file(&path).is_ok(),
             BridgeMode::MultiSession { sessions, active } => {
                 if let Some((_, s)) = sessions.get(*active) {
@@ -1527,77 +1744,7 @@ impl OpenTableBridge {
 
         let p1 = PlayerId(1);
         let p2 = PlayerId(2);
-        let (id, seed, players, rules) = match game_type.to_lowercase().as_str() {
-            "checkers" => (
-                SessionId(1),
-                1,
-                vec![p1, p2],
-                checkers_game::build_checkers_rules(),
-            ),
-            "chess" => (
-                SessionId(1),
-                1,
-                vec![p1, p2],
-                chess_game::build_chess_rules(),
-            ),
-            "shogi" => (
-                SessionId(1),
-                1,
-                vec![p1, p2],
-                shogi_game::build_shogi_rules(),
-            ),
-            "xiangqi" => (
-                SessionId(1),
-                1,
-                vec![p1, p2],
-                xiangqi_game::build_xiangqi_rules(),
-            ),
-            "go" => (SessionId(1), 1, vec![p1, p2], go_game::build_go_rules()),
-            "uno" => (SessionId(1), 1, vec![p1, p2], uno_game::build_uno_rules()),
-            "crisis" => (
-                SessionId(1),
-                1,
-                vec![p1, p2],
-                crisis_game::build_crisis_rules(),
-            ),
-            "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => (
-                SessionId(1),
-                1,
-                vec![p1, p2],
-                chinese_checkers_game::build_chinese_checkers_rules(),
-            ),
-            "mille_bornes" | "mille-bornes" | "millebornes" => (
-                SessionId(1),
-                1,
-                vec![p1, p2],
-                mille_bornes_game::build_mille_bornes_rules(),
-            ),
-            "backgammon" => (
-                SessionId(1),
-                1,
-                vec![p1, p2],
-                backgammon_game::build_backgammon_rules(),
-            ),
-            "monopoly" => (
-                SessionId(1),
-                1,
-                vec![p1, p2],
-                monopoly_game::build_monopoly_rules(),
-            ),
-            "ludo" => (SessionId(1), 1, vec![p1, p2], ludo_game::build_ludo_rules()),
-            "battleship" => (
-                SessionId(1),
-                1,
-                vec![p1, p2],
-                battleship_game::build_battleship_rules(),
-            ),
-            _ => (
-                SessionId(1),
-                1,
-                vec![p1, p2],
-                checkers_game::build_checkers_rules(),
-            ),
-        };
+        let (id, seed, players, rules) = get_session_init_params(game_type, p1, p2);
 
         let log_bytes = match std::fs::read(&path) {
             Ok(b) => b,
@@ -1626,6 +1773,7 @@ impl OpenTableBridge {
             BridgeMode::Local { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::Host { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::NativeHost { session, .. } => session.export_log().unwrap_or_default(),
+            BridgeMode::MultipeerHost { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::Replay { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::MultiSession { sessions, active } => sessions
                 .get(*active)
@@ -1702,6 +1850,8 @@ impl OpenTableBridge {
                 | BridgeMode::Client { .. }
                 | BridgeMode::NativeHost { .. }
                 | BridgeMode::NativeClient { .. }
+                | BridgeMode::MultipeerHost { .. }
+                | BridgeMode::MultipeerClient { .. }
                 | BridgeMode::Spectator { .. }
         )
     }
@@ -1890,6 +2040,7 @@ impl OpenTableBridge {
             BridgeMode::Local { session, .. } => session.current_player().0 as i64,
             BridgeMode::Host { session, .. } => session.current_player().0 as i64,
             BridgeMode::NativeHost { session, .. } => session.current_player().0 as i64,
+            BridgeMode::MultipeerHost { session, .. } => session.current_player().0 as i64,
             BridgeMode::Replay { session, .. } => session.current_player().0 as i64,
             BridgeMode::Tournament { session, .. } => session.current_player().0 as i64,
             BridgeMode::MultiSession { sessions, active } => sessions
@@ -1910,6 +2061,7 @@ impl OpenTableBridge {
             BridgeMode::Local { session, .. }
             | BridgeMode::Host { session, .. }
             | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
             | BridgeMode::Replay { session, .. }
             | BridgeMode::Tournament { session, .. } => session.current_tick().0 as i64,
             BridgeMode::MultiSession { sessions, active } => sessions
@@ -1937,6 +2089,7 @@ impl OpenTableBridge {
             BridgeMode::Local { session, .. }
             | BridgeMode::Host { session, .. }
             | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
             | BridgeMode::Replay { session, .. }
             | BridgeMode::Tournament { session, .. } => {
                 if let Some(deck) = session
@@ -2001,6 +2154,8 @@ impl OpenTableBridge {
             BridgeMode::Spectator { .. } => self.poll_spectator_events(),
             BridgeMode::NativeHost { .. } => self.poll_native_host_events(),
             BridgeMode::NativeClient { .. } => self.poll_native_client_events(),
+            BridgeMode::MultipeerHost { .. } => self.poll_multipeer_host_events(),
+            BridgeMode::MultipeerClient { .. } => self.poll_multipeer_client_events(),
             BridgeMode::Local { .. } => self.process_ai_turn_if_needed(),
             BridgeMode::None
             | BridgeMode::Replay { .. }
@@ -2038,6 +2193,22 @@ impl OpenTableBridge {
 
         let received = transport.poll_received();
         for (player_id, command_bytes) in received {
+            if let Ok(SyncProtocolMessage::RequestSync) =
+                serde_json::from_slice::<SyncProtocolMessage>(&command_bytes)
+            {
+                if let BridgeMode::Host { session, transport } = &mut self.mode {
+                    let log_bytes = session.export_log().unwrap_or_default();
+                    let sync_msg = SyncProtocolMessage::SyncLog {
+                        game_type: self.current_game_type.clone(),
+                        log_bytes,
+                    };
+                    if let Ok(serialized) = serde_json::to_vec(&sync_msg) {
+                        let _ = transport.send(player_id, &serialized);
+                    }
+                }
+                continue;
+            }
+
             let cmd_str = String::from_utf8_lossy(&command_bytes);
             if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
                 if let Ok(events) = self.process_and_emit(player_id, command) {
@@ -2056,6 +2227,29 @@ impl OpenTableBridge {
         };
         let received = transport.poll_received();
         for (_host_id, event_bytes) in received {
+            if let Ok(SyncProtocolMessage::SyncLog {
+                game_type,
+                log_bytes,
+            }) = serde_json::from_slice::<SyncProtocolMessage>(&event_bytes)
+            {
+                let gtype = if !game_type.is_empty() {
+                    game_type
+                } else {
+                    self.current_game_type.clone()
+                };
+                let (id, seed, players, rules) =
+                    get_session_init_params(&gtype, PlayerId(1), PlayerId(2));
+                if let Ok((loaded_session, events)) =
+                    Session::replay_collecting_events(id, seed, players, rules, &log_bytes)
+                {
+                    let current_p = loaded_session.current_player().0 as i64;
+                    self.emit_game_events(&events);
+                    self.base_mut()
+                        .emit_signal("turn_changed", &[Variant::from(current_p)]);
+                }
+                continue;
+            }
+
             if let Ok(events) = serde_json::from_slice::<Vec<Box<dyn Event>>>(&event_bytes) {
                 self.emit_game_events(&events);
             }
@@ -2068,6 +2262,32 @@ impl OpenTableBridge {
         };
         let received = transport.poll_received();
         for (_host_id, event_bytes) in received {
+            if let Ok(SyncProtocolMessage::SyncLog {
+                game_type,
+                log_bytes,
+            }) = serde_json::from_slice::<SyncProtocolMessage>(&event_bytes)
+            {
+                let gtype = if !game_type.is_empty() {
+                    game_type
+                } else {
+                    self.current_game_type.clone()
+                };
+                let (id, seed, players, rules) =
+                    get_session_init_params(&gtype, PlayerId(1), PlayerId(2));
+                if let Ok((_loaded_session, events)) =
+                    Session::replay_collecting_events(id, seed, players, rules, &log_bytes)
+                {
+                    for event in &events {
+                        if let Ok(json) = serde_json::to_string(event) {
+                            self.base_mut()
+                                .emit_signal("spectator_event_received", &[Variant::from(json)]);
+                        }
+                    }
+                    self.emit_game_events(&events);
+                }
+                continue;
+            }
+
             if let Ok(events) = serde_json::from_slice::<Vec<Box<dyn Event>>>(&event_bytes) {
                 for event in &events {
                     if let Ok(json) = serde_json::to_string(event) {
@@ -2108,6 +2328,22 @@ impl OpenTableBridge {
 
         let received = transport.poll_received();
         for (player_id, command_bytes) in received {
+            if let Ok(SyncProtocolMessage::RequestSync) =
+                serde_json::from_slice::<SyncProtocolMessage>(&command_bytes)
+            {
+                if let BridgeMode::NativeHost { session, transport, .. } = &mut self.mode {
+                    let log_bytes = session.export_log().unwrap_or_default();
+                    let sync_msg = SyncProtocolMessage::SyncLog {
+                        game_type: self.current_game_type.clone(),
+                        log_bytes,
+                    };
+                    if let Ok(serialized) = serde_json::to_vec(&sync_msg) {
+                        let _ = transport.send(player_id, &serialized);
+                    }
+                }
+                continue;
+            }
+
             let cmd_str = String::from_utf8_lossy(&command_bytes);
             if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
                 if let Ok(events) = self.process_and_emit(player_id, command) {
@@ -2140,6 +2376,10 @@ impl OpenTableBridge {
                 } => {
                     *player_id = pid;
                     *handshake_complete = true;
+                    let sync_req = SyncProtocolMessage::RequestSync;
+                    if let Ok(serialized) = serde_json::to_vec(&sync_req) {
+                        let _ = transport.send(open_table_transport_native_bridge::HOST_PLAYER_ID, &serialized);
+                    }
                     self.base_mut()
                         .emit_signal("connected", &[Variant::from(pid.0 as i64)]);
                     self.base_mut().emit_signal(
@@ -2159,6 +2399,157 @@ impl OpenTableBridge {
 
         let received = transport.poll_received();
         for (_host_id, event_bytes) in received {
+            if let Ok(SyncProtocolMessage::SyncLog {
+                game_type,
+                log_bytes,
+            }) = serde_json::from_slice::<SyncProtocolMessage>(&event_bytes)
+            {
+                let gtype = if !game_type.is_empty() {
+                    game_type
+                } else {
+                    self.current_game_type.clone()
+                };
+                let (id, seed, players, rules) =
+                    get_session_init_params(&gtype, PlayerId(1), PlayerId(2));
+                if let Ok((loaded_session, events)) =
+                    Session::replay_collecting_events(id, seed, players, rules, &log_bytes)
+                {
+                    let current_p = loaded_session.current_player().0 as i64;
+                    self.emit_game_events(&events);
+                    self.base_mut()
+                        .emit_signal("turn_changed", &[Variant::from(current_p)]);
+                }
+                continue;
+            }
+
+            if let Ok(events) = serde_json::from_slice::<Vec<Box<dyn Event>>>(&event_bytes) {
+                self.emit_game_events(&events);
+            }
+        }
+    }
+
+    fn poll_multipeer_host_events(&mut self) {
+        let BridgeMode::MultipeerHost { transport, .. } = &mut self.mode else {
+            return;
+        };
+
+        let connection_events = transport.poll_connection_events();
+        for event in connection_events {
+            match event {
+                open_table_transport_native_bridge::ConnectionEvent::Joined { player } => {
+                    self.base_mut()
+                        .emit_signal("peer_joined", &[Variant::from(player.0 as i64)]);
+                    self.base_mut()
+                        .emit_signal("player_joined", &[Variant::from(player.0 as i64)]);
+                }
+                open_table_transport_native_bridge::ConnectionEvent::Disconnected { player } => {
+                    self.base_mut()
+                        .emit_signal("peer_disconnected", &[Variant::from(player.0 as i64)]);
+                }
+                _ => {}
+            }
+        }
+
+        let BridgeMode::MultipeerHost { transport, .. } = &mut self.mode else {
+            return;
+        };
+
+        let received = transport.poll_received();
+        for (player_id, command_bytes) in received {
+            if let Ok(SyncProtocolMessage::RequestSync) =
+                serde_json::from_slice::<SyncProtocolMessage>(&command_bytes)
+            {
+                if let BridgeMode::MultipeerHost { session, transport, .. } = &mut self.mode {
+                    let log_bytes = session.export_log().unwrap_or_default();
+                    let sync_msg = SyncProtocolMessage::SyncLog {
+                        game_type: self.current_game_type.clone(),
+                        log_bytes,
+                    };
+                    if let Ok(serialized) = serde_json::to_vec(&sync_msg) {
+                        let _ = transport.send(player_id, &serialized);
+                    }
+                }
+                continue;
+            }
+
+            let cmd_str = String::from_utf8_lossy(&command_bytes);
+            if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
+                if let Ok(events) = self.process_and_emit(player_id, command) {
+                    if let BridgeMode::MultipeerHost { transport, .. } = &mut self.mode {
+                        let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                        let _ = transport.broadcast(&serialized);
+                    }
+                }
+            }
+        }
+    }
+
+    fn poll_multipeer_client_events(&mut self) {
+        let BridgeMode::MultipeerClient {
+            transport,
+            player_id,
+            handshake_complete,
+            ..
+        } = &mut self.mode
+        else {
+            return;
+        };
+
+        if !*handshake_complete {
+            match transport.poll_handshake() {
+                HandshakeStatus::Pending => {}
+                HandshakeStatus::Established {
+                    player_id: pid,
+                    reconnect_token,
+                } => {
+                    *player_id = pid;
+                    *handshake_complete = true;
+                    let sync_req = SyncProtocolMessage::RequestSync;
+                    if let Ok(serialized) = serde_json::to_vec(&sync_req) {
+                        let _ = transport.send(open_table_transport_native_bridge::HOST_PLAYER_ID, &serialized);
+                    }
+                    self.base_mut()
+                        .emit_signal("connected", &[Variant::from(pid.0 as i64)]);
+                    self.base_mut().emit_signal(
+                        "native_handshake_established",
+                        &[Variant::from(pid.0 as i64), Variant::from(reconnect_token)],
+                    );
+                }
+                HandshakeStatus::Rejected { .. } => {
+                    self.base_mut().emit_signal("disconnected", &[]);
+                }
+            }
+        }
+
+        let BridgeMode::MultipeerClient { transport, .. } = &mut self.mode else {
+            return;
+        };
+
+        let received = transport.poll_received();
+        for (_host_id, event_bytes) in received {
+            if let Ok(SyncProtocolMessage::SyncLog {
+                game_type,
+                log_bytes,
+            }) = serde_json::from_slice::<SyncProtocolMessage>(&event_bytes)
+            {
+                let gtype = if !game_type.is_empty() {
+                    game_type
+                } else {
+                    self.current_game_type.clone()
+                };
+                let (id, seed, players, rules) =
+                    get_session_init_params(&gtype, PlayerId(1), PlayerId(2));
+                if let Ok((loaded_session, events)) =
+                    Session::replay_collecting_events(id, seed, players, rules, &log_bytes)
+                {
+                    let current_p = loaded_session.current_player().0 as i64;
+                    self.emit_game_events(&events);
+                    self.base_mut()
+                        .emit_signal("turn_changed", &[Variant::from(current_p)]);
+                }
+                continue;
+            }
+
             if let Ok(events) = serde_json::from_slice::<Vec<Box<dyn Event>>>(&event_bytes) {
                 self.emit_game_events(&events);
             }
@@ -2167,7 +2558,10 @@ impl OpenTableBridge {
 
     fn flush_native_outgoing(&mut self) {
         let (sends, broadcasts) = match &self.mode {
-            BridgeMode::NativeHost { queue, .. } | BridgeMode::NativeClient { queue, .. } => {
+            BridgeMode::NativeHost { queue, .. }
+            | BridgeMode::NativeClient { queue, .. }
+            | BridgeMode::MultipeerHost { queue, .. }
+            | BridgeMode::MultipeerClient { queue, .. } => {
                 let mut q = queue.lock().unwrap();
                 let sends = std::mem::take(&mut q.outgoing_sends);
                 let broadcasts = std::mem::take(&mut q.outgoing_broadcasts);

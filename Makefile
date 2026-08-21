@@ -29,7 +29,7 @@ metrics:
 publish-dry-run:
 	@for crate in $(PUBLISH_CRATES); do \
 		echo "==> Dry-run publish: $$crate"; \
-		cargo publish --dry-run -p $$crate || exit 1; \
+		cargo publish --dry-run --allow-dirty -p $$crate || exit 1; \
 	done
 
 audit:
