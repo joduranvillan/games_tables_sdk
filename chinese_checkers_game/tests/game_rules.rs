@@ -239,3 +239,37 @@ fn test_cadena_de_tres_saltos_consecutivos() {
     assert_eq!(board.pegs.get(&landing3), Some(&P1));
     assert!(!board.pegs.contains_key(&start));
 }
+
+#[test]
+fn test_tablero_tiene_exactamente_121_casillas_validas() {
+    let mut count = 0;
+    for q in -15..=15 {
+        for r in -15..=15 {
+            if Position::new(q, r).is_on_board() {
+                count += 1;
+            }
+        }
+    }
+    assert_eq!(
+        count, 121,
+        "El tablero con las 6 puntas triangulares debe tener exactamente 121 casillas"
+    );
+}
+
+#[test]
+fn test_las_6_puntas_no_se_superponen_con_el_hexagono_central() {
+    for corner in 0..6 {
+        let cells = chinese_checkers_game::position::corner_cells(corner);
+        assert_eq!(cells.len(), 10);
+        for pos in cells {
+            let in_central_hex =
+                pos.q.abs().max(pos.r.abs()).max((pos.q + pos.r).abs()) <= chinese_checkers_game::position::BOARD_RADIUS;
+            assert!(
+                !in_central_hex,
+                "La casilla {:?} de la punta {} no debe pertenecer al hexágono central",
+                pos, corner
+            );
+        }
+    }
+}
+
