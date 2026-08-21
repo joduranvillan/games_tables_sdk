@@ -262,8 +262,8 @@ fn test_las_6_puntas_no_se_superponen_con_el_hexagono_central() {
         let cells = chinese_checkers_game::position::corner_cells(corner);
         assert_eq!(cells.len(), 10);
         for pos in cells {
-            let in_central_hex =
-                pos.q.abs().max(pos.r.abs()).max((pos.q + pos.r).abs()) <= chinese_checkers_game::position::BOARD_RADIUS;
+            let in_central_hex = pos.q.abs().max(pos.r.abs()).max((pos.q + pos.r).abs())
+                <= chinese_checkers_game::position::BOARD_RADIUS;
             assert!(
                 !in_central_hex,
                 "La casilla {:?} de la punta {} no debe pertenecer al hexágono central",
@@ -272,4 +272,3 @@ fn test_las_6_puntas_no_se_superponen_con_el_hexagono_central() {
         }
     }
 }
-
