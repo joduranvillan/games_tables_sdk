@@ -39,7 +39,7 @@ fn test_memory_stability_10k_commands() {
     // However, it must be a syntactically valid JSON payload of a registered command type.
     // If we just use `process_command` with a MovePieceCommand, it will get rejected by rules
     // (e.g. invalid move) but it exercises the engine's command processing pipeline.
-    
+
     let invalid_move = Box::new(MovePieceCommand {
         player: p1,
         from: Position::new(0, 0),
@@ -54,7 +54,7 @@ fn test_memory_stability_10k_commands() {
             from: Position::new(0, 0),
             to: Position::new(0, 0),
         });
-        
+
         let _ = session.process_command(p1, cmd);
     }
 

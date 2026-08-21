@@ -214,7 +214,12 @@ fn get_session_init_params(
     let id = SessionId(1);
     let seed = 1;
     match game_type.to_lowercase().as_str() {
-        "checkers" => (id, seed, vec![p1, p2], checkers_game::build_checkers_rules()),
+        "checkers" => (
+            id,
+            seed,
+            vec![p1, p2],
+            checkers_game::build_checkers_rules(),
+        ),
         "chess" => (id, seed, vec![p1, p2], chess_game::build_chess_rules()),
         "shogi" => (id, seed, vec![p1, p2], shogi_game::build_shogi_rules()),
         "xiangqi" => (id, seed, vec![p1, p2], xiangqi_game::build_xiangqi_rules()),
@@ -233,11 +238,31 @@ fn get_session_init_params(
             vec![p1, p2],
             mille_bornes_game::build_mille_bornes_rules(),
         ),
-        "backgammon" => (id, seed, vec![p1, p2], backgammon_game::build_backgammon_rules()),
-        "monopoly" => (id, seed, vec![p1, p2], monopoly_game::build_monopoly_rules()),
+        "backgammon" => (
+            id,
+            seed,
+            vec![p1, p2],
+            backgammon_game::build_backgammon_rules(),
+        ),
+        "monopoly" => (
+            id,
+            seed,
+            vec![p1, p2],
+            monopoly_game::build_monopoly_rules(),
+        ),
         "ludo" => (id, seed, vec![p1, p2], ludo_game::build_ludo_rules()),
-        "battleship" => (id, seed, vec![p1, p2], battleship_game::build_battleship_rules()),
-        _ => (id, seed, vec![p1, p2], checkers_game::build_checkers_rules()),
+        "battleship" => (
+            id,
+            seed,
+            vec![p1, p2],
+            battleship_game::build_battleship_rules(),
+        ),
+        _ => (
+            id,
+            seed,
+            vec![p1, p2],
+            checkers_game::build_checkers_rules(),
+        ),
     }
 }
 
@@ -1445,7 +1470,10 @@ impl OpenTableBridge {
             queue,
             handshake_complete: false,
         };
-        godot_print!("✅ Reconexión multipeer (iOS) iniciada para PlayerId={}", player_id);
+        godot_print!(
+            "✅ Reconexión multipeer (iOS) iniciada para PlayerId={}",
+            player_id
+        );
     }
 
     #[func]
@@ -2331,7 +2359,10 @@ impl OpenTableBridge {
             if let Ok(SyncProtocolMessage::RequestSync) =
                 serde_json::from_slice::<SyncProtocolMessage>(&command_bytes)
             {
-                if let BridgeMode::NativeHost { session, transport, .. } = &mut self.mode {
+                if let BridgeMode::NativeHost {
+                    session, transport, ..
+                } = &mut self.mode
+                {
                     let log_bytes = session.export_log().unwrap_or_default();
                     let sync_msg = SyncProtocolMessage::SyncLog {
                         game_type: self.current_game_type.clone(),
@@ -2378,7 +2409,10 @@ impl OpenTableBridge {
                     *handshake_complete = true;
                     let sync_req = SyncProtocolMessage::RequestSync;
                     if let Ok(serialized) = serde_json::to_vec(&sync_req) {
-                        let _ = transport.send(open_table_transport_native_bridge::HOST_PLAYER_ID, &serialized);
+                        let _ = transport.send(
+                            open_table_transport_native_bridge::HOST_PLAYER_ID,
+                            &serialized,
+                        );
                     }
                     self.base_mut()
                         .emit_signal("connected", &[Variant::from(pid.0 as i64)]);
@@ -2459,7 +2493,10 @@ impl OpenTableBridge {
             if let Ok(SyncProtocolMessage::RequestSync) =
                 serde_json::from_slice::<SyncProtocolMessage>(&command_bytes)
             {
-                if let BridgeMode::MultipeerHost { session, transport, .. } = &mut self.mode {
+                if let BridgeMode::MultipeerHost {
+                    session, transport, ..
+                } = &mut self.mode
+                {
                     let log_bytes = session.export_log().unwrap_or_default();
                     let sync_msg = SyncProtocolMessage::SyncLog {
                         game_type: self.current_game_type.clone(),
@@ -2506,7 +2543,10 @@ impl OpenTableBridge {
                     *handshake_complete = true;
                     let sync_req = SyncProtocolMessage::RequestSync;
                     if let Ok(serialized) = serde_json::to_vec(&sync_req) {
-                        let _ = transport.send(open_table_transport_native_bridge::HOST_PLAYER_ID, &serialized);
+                        let _ = transport.send(
+                            open_table_transport_native_bridge::HOST_PLAYER_ID,
+                            &serialized,
+                        );
                     }
                     self.base_mut()
                         .emit_signal("connected", &[Variant::from(pid.0 as i64)]);
