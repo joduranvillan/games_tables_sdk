@@ -62,6 +62,10 @@ func _ready() -> void:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
 
+	var gm = get_node_or_null("/root/GameManager")
+	if gm != null and gm.has_signal("layout_changed"):
+		gm.layout_changed.connect(_on_layout_changed)
+
 	_setup_ui()
 	_init_board_state()
 	
@@ -86,6 +90,7 @@ func _ready() -> void:
 			mode_option_button.selected = 0
 	current = bridge.current_player()
 	
+	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
 	_update_hand_panels()
 	_update_status()
 	queue_redraw()
@@ -96,7 +101,16 @@ func _on_theme_changed(theme: BoardTheme) -> void:
 		for cell in grid_container.get_children():
 			if cell is ColorRect:
 				cell.color = theme.board_color
+				for ch in cell.get_children():
+					if ch is ReferenceRect:
+						ch.border_color = theme.line_color
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 	queue_redraw()
+
+func _on_layout_changed(_layout: int) -> void:
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 func _setup_ui() -> void:
 	# 9x9 GridContainer for the board
@@ -106,15 +120,17 @@ func _setup_ui() -> void:
 	grid_container.position = Vector2(120, 20)
 	add_child(grid_container)
 	
+	var bg_col = current_theme.board_color if current_theme != null else COL_BOARD
+	var line_col = current_theme.line_color if current_theme != null else COL_LINE
 	for r in range(BOARD_SIZE):
 		for c in range(BOARD_SIZE):
 			var cell = ColorRect.new()
 			cell.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
-			cell.color = COL_BOARD
+			cell.color = bg_col
 			
 			var border = ReferenceRect.new()
 			border.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
-			border.border_color = COL_LINE
+			border.border_color = line_col
 			border.border_width = 1.0
 			border.editor_only = false
 			cell.add_child(border)

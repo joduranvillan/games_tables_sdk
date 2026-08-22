@@ -42,6 +42,10 @@ func _ready() -> void:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
 
+	var gm = get_node_or_null("/root/GameManager")
+	if gm != null and gm.has_signal("layout_changed"):
+		gm.layout_changed.connect(_on_layout_changed)
+
 	_setup_ui()
 	_init_board()
 	
@@ -58,6 +62,7 @@ func _ready() -> void:
 	bridge.start_local_match_go(P_BLACK, P_WHITE)
 	current = bridge.current_player()
 	
+	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
 	_update_status()
 	_update_captured_score()
 	queue_redraw()
@@ -128,7 +133,13 @@ func _update_captured_score() -> void:
 
 func _on_theme_changed(theme: BoardTheme) -> void:
 	current_theme = theme
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 	queue_redraw()
+
+func _on_layout_changed(_layout: int) -> void:
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 func _on_cell_clicked(cell: Vector2i) -> void:
 	if winner != -1: return

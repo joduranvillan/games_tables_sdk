@@ -61,6 +61,10 @@ func _ready() -> void:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
 
+	var gm = get_node_or_null("/root/GameManager")
+	if gm != null and gm.has_signal("layout_changed"):
+		gm.layout_changed.connect(_on_layout_changed)
+
 	_setup_ui()
 	
 	bridge = OpenTableBridge.new()
@@ -77,13 +81,20 @@ func _ready() -> void:
 	bridge.start_local_match_ludo(1, 2)
 	current_p = bridge.current_player()
 	
+	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
 	_update_token_positions()
 	_update_status()
 	queue_redraw()
 
 func _on_theme_changed(theme: BoardTheme) -> void:
 	current_theme = theme
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 	queue_redraw()
+
+func _on_layout_changed(_layout: int) -> void:
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 func _setup_ui() -> void:
 	# Dice Roll Button
@@ -374,10 +385,13 @@ func _on_move_rejected(reason: String) -> void:
 		get_node("/root/AudioManager").play_invalid()
 
 func _draw() -> void:
+	var bg_col = current_theme.board_color if current_theme != null else Color(0.95, 0.95, 0.95)
+	var line_col = current_theme.line_color if current_theme != null else Color.BLACK
+
 	# Main Board Outer Square
 	var board_rect = Rect2(20, 20, 560, 560)
-	draw_rect(board_rect, Color(0.95, 0.95, 0.95))
-	draw_rect(board_rect, Color.BLACK, false, 3.0)
+	draw_rect(board_rect, bg_col)
+	draw_rect(board_rect, line_col, false, 3.0)
 	
 	# Base Corner Zones (4 Home bases)
 	var zones = [
@@ -388,7 +402,7 @@ func _draw() -> void:
 	]
 	for z in zones:
 		draw_rect(z.rect, z.col)
-		draw_rect(z.rect, Color.BLACK, false, 2.0)
+		draw_rect(z.rect, line_col, false, 2.0)
 		draw_circle(z.rect.position + z.rect.size / 2.0, 65, Color.WHITE)
 		
 	# Cross track 52 cells
@@ -400,7 +414,7 @@ func _draw() -> void:
 			if (i < 6 and j < 6) or (i > 8 and j < 6) or (i < 6 and j > 8) or (i > 8 and j > 8):
 				continue
 			var cell_rect = Rect2(margin + i * track_step - 17.5, margin + j * track_step - 17.5, track_step, track_step)
-			draw_rect(cell_rect, Color.BLACK, false, 1.0)
+			draw_rect(cell_rect, line_col, false, 1.0)
 
 	# Draw home columns
 	for p in range(1, 5):
@@ -409,7 +423,7 @@ func _draw() -> void:
 		for g in HOME_GRIDS[p]:
 			var h_rect = Rect2(margin + g.x * track_step - 17.5, margin + g.y * track_step - 17.5, track_step, track_step)
 			draw_rect(h_rect, p_col)
-			draw_rect(h_rect, Color.BLACK, false, 1.0)
+			draw_rect(h_rect, line_col, false, 1.0)
 
 	# Safe squares permanent highlight (start and star cells)
 	var safe_color = Color(0.9, 0.9, 0.3, 0.35)

@@ -51,6 +51,10 @@ func _ready() -> void:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
 
+	var gm = get_node_or_null("/root/GameManager")
+	if gm != null and gm.has_signal("layout_changed"):
+		gm.layout_changed.connect(_on_layout_changed)
+
 	_init_board_state()
 	_setup_ui()
 	
@@ -75,13 +79,20 @@ func _ready() -> void:
 			mode_option_button.selected = 0
 	current = bridge.current_player()
 	
+	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
 	_update_checker_positions()
 	_update_status()
 	queue_redraw()
 
 func _on_theme_changed(theme: BoardTheme) -> void:
 	current_theme = theme
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 	queue_redraw()
+
+func _on_layout_changed(_layout: int) -> void:
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 func _init_board_state() -> void:
 	points = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
@@ -421,14 +432,21 @@ func _on_move_rejected(reason: String) -> void:
 		get_node("/root/AudioManager").play_invalid()
 
 func _draw() -> void:
+	var col_board = current_theme.board_color if current_theme != null else COL_BOARD
+	var col_inner = current_theme.dark_color.darkened(0.1) if current_theme != null else COL_BOARD_INNER
+	var col_bar = current_theme.dark_color.darkened(0.3) if current_theme != null else COL_BAR
+	var col_pt_a = current_theme.light_color if current_theme != null else COL_POINT_A
+	var col_pt_b = current_theme.dark_color if current_theme != null else COL_POINT_B
+	var col_sel = current_theme.select_color if current_theme != null else Color(1.0, 0.9, 0.2, 0.7)
+
 	# Main Outer Board Frame
 	var board_rect = Rect2(40, 40, 560, 480)
-	draw_rect(board_rect, COL_BOARD)
-	draw_rect(Rect2(55, 55, 530, 450), COL_BOARD_INNER)
+	draw_rect(board_rect, col_board)
+	draw_rect(Rect2(55, 55, 530, 450), col_inner)
 	
 	# Central Bar for Hit Checkers
 	var bar_rect = Rect2(290, 40, 60, 480)
-	draw_rect(bar_rect, COL_BAR)
+	draw_rect(bar_rect, col_bar)
 	draw_rect(bar_rect, Color(0.4, 0.25, 0.15), false, 2.0)
 	draw_string(ThemeDB.fallback_font, Vector2(300, 265), "BARRA", HORIZONTAL_ALIGNMENT_CENTER, -1, 12, Color(0.8, 0.7, 0.5))
 
@@ -438,11 +456,11 @@ func _draw() -> void:
 	draw_string(ThemeDB.fallback_font, Vector2(620, 110), "P1 (Rojo): %d/15" % borne_off_checkers[P1], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, PLAYER_COLORS[P1])
 	draw_string(ThemeDB.fallback_font, Vector2(620, 140), "P2 (Azul): %d/15" % borne_off_checkers[P2], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, PLAYER_COLORS[P2])
 	
-	# 24 Triangular Points with Red / White alternate colors
+	# 24 Triangular Points with alternate colors
 	for pt in range(TOTAL_POINTS):
 		var base_pos = _get_point_base_pos(pt)
 		var is_top = (pt >= 12)
-		var tri_col = COL_POINT_A if (pt % 2 == 0) else COL_POINT_B
+		var tri_col = col_pt_a if (pt % 2 == 0) else col_pt_b
 		
 		var p1: Vector2 = base_pos + Vector2(-18, 0)
 		var p2: Vector2 = base_pos + Vector2(18, 0)
@@ -457,9 +475,9 @@ func _draw() -> void:
 	# Selected highlight
 	if selected_from >= 0:
 		var sel_base = _get_point_base_pos(selected_from)
-		draw_circle(sel_base, 20.0, Color(1.0, 0.9, 0.2, 0.7))
+		draw_circle(sel_base, 20.0, col_sel)
 	elif selected_from == -1:
-		draw_circle(Vector2(320, 280), 25.0, Color(1.0, 0.9, 0.2, 0.7))
+		draw_circle(Vector2(320, 280), 25.0, col_sel)
 
 func _update_status() -> void:
 	if winner != -1:

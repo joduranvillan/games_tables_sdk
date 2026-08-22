@@ -48,6 +48,11 @@ func _ready() -> void:
 		var tm = get_node_or_null("/root/ThemeManager")
 		if tm != null:
 			current_theme = tm.get_theme()
+			tm.theme_changed.connect(_on_theme_changed)
+
+	var gm = get_node_or_null("/root/GameManager")
+	if gm != null and gm.has_signal("layout_changed"):
+		gm.layout_changed.connect(_on_layout_changed)
 
 	_init_grids()
 	_setup_ui()
@@ -67,9 +72,21 @@ func _ready() -> void:
 	bridge.start_local_match_battleship(P1, P2)
 	current = bridge.current_player()
 
+	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
 	_update_status()
 	_update_grid_ui()
 	queue_redraw()
+
+func _on_theme_changed(theme: BoardTheme) -> void:
+	current_theme = theme
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
+	_update_grid_ui()
+	queue_redraw()
+
+func _on_layout_changed(_layout: int) -> void:
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 func _init_grids() -> void:
 	own_shot_grid = []
