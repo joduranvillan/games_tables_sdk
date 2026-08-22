@@ -117,6 +117,7 @@ jobs:
           echo "Godot bridge artifact produced successfully!"
 
   build-android-plugin:
+    name: Build Android Plugin
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -130,3 +131,50 @@ jobs:
       - name: Build Android Plugin
         run: cd platform_plugins && gradle :android:assembleRelease --no-daemon
         working-directory: .
+
+  build-ios-plugin:
+    name: Build iOS Swift Plugin (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Install Rust toolchain with iOS targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios, aarch64-apple-ios-sim
+
+      - name: Check Rust crates for iOS target
+        run: |
+          cargo check -p open_table_core --target aarch64-apple-ios
+          cargo check -p open_table_engine --target aarch64-apple-ios
+          cargo check -p open_table_transport_native_bridge --target aarch64-apple-ios
+
+      - name: Compile iOS Swift Plugin (Device & Simulator)
+        run: |
+          IPHONEOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          IPHONESIM_SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
+
+          echo "Compiling Swift plugin for iOS Device (arm64)..."
+          swiftc -parse-as-library \
+            -target arm64-apple-ios15.0 \
+            -sdk "$IPHONEOS_SDK" \
+            -emit-object \
+            platform_plugins/ios/OpenTableMultipeerNetwork.swift \
+            platform_plugins/ios/OpenTableMultipeer.swift \
+            platform_plugins/ios/OpenTableMultipeerPlugin.swift \
+            -o build-ios-device.o
+
+          echo "Compiling Swift plugin for iOS Simulator (arm64)..."
+          swiftc -parse-as-library \
+            -target arm64-apple-ios15.0-simulator \
+            -sdk "$IPHONESIM_SDK" \
+            -emit-object \
+            platform_plugins/ios/OpenTableMultipeerNetwork.swift \
+            platform_plugins/ios/OpenTableMultipeer.swift \
+            platform_plugins/ios/OpenTableMultipeerPlugin.swift \
+            -o build-ios-simulator.o
+
+          echo "iOS Swift plugin compiled successfully for both Device and Simulator!"
