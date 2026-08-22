@@ -49,6 +49,72 @@ falta compilarlos con Android Studio / Xcode.
 
 Para integrar OpenTable SDK en un proyecto externo de Rust o en Godot Engine, consulta la **[`Guía de Integración`](./docs/integration_guide.md)** con ejemplos completos de código para Rust y GDScript.
 
+## Logros, Rating ELO y Oponente de IA Local
+
+El SDK incluye módulos de alto nivel listos para usar directamente desde GDScript en Godot 4 / Redot:
+
+### 1. Sistema de Logros (`AchievementManager`)
+Gestiona el desbloqueo, persistencia y feedback visual de logros del jugador (`godot_project/achievement_manager.gd`), validado mediante `godot_project/tests/achievements_smoke.gd`.
+
+- **Persistencia automática**: Guarda el progreso en `user://achievements.json`.
+- **Notificaciones HUD**: Despliega alertas animadas flotantes estilo popup en pantalla cuando un logro es obtenido.
+- **API y Señales principales**:
+  ```gdscript
+  # Desbloquear un logro por ID (retorna true si se desbloqueó por primera vez)
+  var newly_unlocked = AchievementManager.unlock("primera_victoria_damas")
+
+  # Consultar estado
+  if AchievementManager.is_unlocked("gane_jaque_mate"):
+      print("Logro obtenido")
+
+  # Suscribirse a la señal de desbloqueo
+  AchievementManager.achievement_unlocked.connect(func(id: String, info: Dictionary):
+      print("¡Logro desbloqueado: ", info["title"], " - ", info["description"])
+  )
+  ```
+
+### 2. Rating ELO (`open_table_engine::elo` y GDScript Bridge)
+Cálculo oficial de puntuación ELO ($E_a = \frac{1}{1 + 10^{(R_b - R_a)/400}}$, $\Delta = K \cdot (S - E)$) implementado de forma pura en Rust (`open_table_engine/src/elo.rs`) y expuesto a Godot vía GDExtension (`open_table_godot`).
+
+- **Fórmula FIDE**: Soporta factores K configurables (por defecto $K=32$ para partidas estándar, $K=16$ para jugadores veteranos).
+- **Cálculo de Deltas desde GDScript**:
+  ```gdscript
+  var bridge = OpenTableBridge.new()
+
+  # Calcula los nuevos ratings tras una victoria (winner_id, loser_id, elo_winner, elo_loser, k_factor)
+  var nuevos_elos: Array = bridge.compute_elo_delta(1, 2, 1200.0, 1200.0, 32.0)
+  var nuevo_elo_ganador: float = nuevos_elos[0] # 1216.0
+  var nuevo_elo_perdedor: float = nuevos_elos[1] # 1184.0
+  ```
+- **Seguimiento Integrado**: `ScoreTracker` (`godot_project/score_tracker.gd`) almacena automáticamente el rating ELO por jugador y tipo de juego en `user://scores.json`.
+
+### 3. Oponente de IA Local Offline (`ai_player: Option<PlayerId>`)
+El motor cuenta con algoritmos de IA locales y deterministas (heurísticas posicionales, Minimax/evaluación con profundidad configurable y agentes de toma de decisiones) para jugar contra la máquina sin conexión ni dependencias externas.
+
+- **Modos vs IA soportados**: Ajedrez (`chess`), Damas (`checkers`), Go (`go`), Shogi (`shogi`), Xiangqi (`xiangqi`), Backgammon (`backgammon`) y Ludo (`ludo`).
+- **Ciclo Autónomo en `_process()`**: Cuando el turno actual coincide con `ai_player`, el bridge procesa y ejecuta automáticamente la jugada en el ECS emitiendo las señales correspondientes (`move_piece`, `board_updated`, `game_over`), validado en `ai_local_smoke.gd` y `ai_shogi_xiangqi_smoke.gd`.
+- **Inicialización desde GDScript**:
+  ```gdscript
+  var bridge = OpenTableBridge.new()
+
+  # Ajedrez vs IA (Jugador 1 humano vs Jugador 2 IA con profundidad 2)
+  bridge.start_local_match_chess_vs_ai(1, 2, 2)
+
+  # Damas vs IA (seed aleatorio, Jugador 1 humano vs Jugador 2 IA)
+  bridge.start_local_match_checkers_vs_ai(42, 1, 2)
+
+  # Go (9x9) vs IA
+  bridge.start_local_match_go_vs_ai(1, 2, 9)
+
+  # Shogi y Xiangqi vs IA
+  bridge.start_local_match_shogi_vs_ai(1, 2, 1)
+  bridge.start_local_match_xiangqi_vs_ai(1, 2)
+
+  # Backgammon y Ludo vs IA
+  bridge.start_local_match_backgammon_vs_ai(1, 2)
+  bridge.start_local_match_ludo_vs_ai(1, 2)
+  ```
+
 ## Cómo correr los tests de cualquier juego
 
 ```bash
