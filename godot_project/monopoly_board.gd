@@ -2,215 +2,694 @@ extends Node2D
 
 const P1 = 1
 const P2 = 2
-const TOTAL_SPACES = 16
+const TOTAL_SPACES = 40
 
-# Property colors & names around the 16 perimeter spaces
-const PROPERTY_INFO = [
-	{"name": "SALIDA 🏁", "price": 0, "color": Color(0.9, 0.9, 0.9)},
-	{"name": "Av. Mediterráneo", "price": 60, "color": Color(0.6, 0.3, 0.1)},
-	{"name": "Caja de Comunidad", "price": 0, "color": Color(0.9, 0.8, 0.6)},
-	{"name": "Av. Báltica", "price": 60, "color": Color(0.6, 0.3, 0.1)},
-	{"name": "CÁRCEL 🔒", "price": 0, "color": Color(0.7, 0.7, 0.7)},
-	{"name": "Av. Oriental", "price": 100, "color": Color(0.5, 0.8, 0.9)},
-	{"name": "Compañía Electricidad", "price": 150, "color": Color(0.9, 0.9, 0.4)},
-	{"name": "Av. Vermont", "price": 100, "color": Color(0.5, 0.8, 0.9)},
-	{"name": "PARADA LIBRE 🅿️", "price": 0, "color": Color(0.9, 0.9, 0.9)},
-	{"name": "Av. San Carlos", "price": 140, "color": Color(0.9, 0.5, 0.7)},
-	{"name": "Ferrocarril", "price": 200, "color": Color(0.3, 0.3, 0.3)},
-	{"name": "Av. Estados", "price": 140, "color": Color(0.9, 0.5, 0.7)},
-	{"name": "IR A LA CÁRCEL 🚔", "price": 0, "color": Color(0.7, 0.2, 0.2)},
-	{"name": "Av. Virginia", "price": 160, "color": Color(0.9, 0.6, 0.2)},
-	{"name": "Compañía de Agua", "price": 150, "color": Color(0.4, 0.7, 0.9)},
-	{"name": "Plaza San James", "price": 180, "color": Color(0.9, 0.6, 0.2)}
+# Color definitions for property groups
+const GROUP_COLORS = {
+	"Marrón": Color("#8B4513"),
+	"Celeste": Color("#5DADE2"),
+	"Rosa": Color("#EC407A"),
+	"Naranja": Color("#FF9800"),
+	"Rojo": Color("#E53935"),
+	"Amarillo": Color("#FBC02D"),
+	"Verde": Color("#2E7D32"),
+	"Azul Oscuro": Color("#1565C0"),
+	"Ferrocarril": Color("#37474F"),
+	"Suministros": Color("#F57F17"),
+	"Impuesto": Color("#607D8B"),
+	"Especial": Color("#455A64")
+}
+
+# 40 official board spaces definitions matching open_table engine
+const SPACES = [
+	# 0: GO
+	{"name": "SALIDA", "group": "Especial", "price": 0, "rent": 0, "icon": "🏁", "desc": "Cobra $200 al pasar"},
+	# 1..3: Marrón
+	{"name": "Av. Mediterráneo", "group": "Marrón", "price": 60, "rent": 2, "icon": "🏠", "desc": "Propiedad Marrón"},
+	{"name": "Arca Comunal", "group": "Especial", "price": 0, "rent": 0, "icon": "🎁", "desc": "Toma una carta"},
+	{"name": "Av. Báltica", "group": "Marrón", "price": 60, "rent": 4, "icon": "🏠", "desc": "Propiedad Marrón"},
+	# 4: Impuesto Renta
+	{"name": "Imp. sobre la Renta", "group": "Impuesto", "price": 0, "rent": 200, "icon": "💸", "desc": "Paga $200"},
+	# 5: Ferrocarril Reading
+	{"name": "Ferrocarril Reading", "group": "Ferrocarril", "price": 200, "rent": 25, "icon": "🚂", "desc": "Estación de Tren"},
+	# 6..9: Celeste
+	{"name": "Av. Oriental", "group": "Celeste", "price": 100, "rent": 6, "icon": "🏠", "desc": "Propiedad Celeste"},
+	{"name": "Suerte", "group": "Especial", "price": 0, "rent": 0, "icon": "❓", "desc": "Toma una carta"},
+	{"name": "Av. Vermont", "group": "Celeste", "price": 100, "rent": 6, "icon": "🏠", "desc": "Propiedad Celeste"},
+	{"name": "Av. Connecticut", "group": "Celeste", "price": 120, "rent": 8, "icon": "🏠", "desc": "Propiedad Celeste"},
+	# 10: Cárcel / Solo Visita
+	{"name": "CÁRCEL / VISITA", "group": "Especial", "price": 0, "rent": 0, "icon": "🔒", "desc": "Solo Visita o Preso"},
+	# 11..14: Rosa + Compañía Eléctrica
+	{"name": "Plaza San Carlos", "group": "Rosa", "price": 140, "rent": 10, "icon": "🏠", "desc": "Propiedad Rosa"},
+	{"name": "Cía. Eléctrica", "group": "Suministros", "price": 150, "rent": 10, "icon": "💡", "desc": "Servicio Eléctrico"},
+	{"name": "Av. Estados", "group": "Rosa", "price": 140, "rent": 10, "icon": "🏠", "desc": "Propiedad Rosa"},
+	{"name": "Av. Virginia", "group": "Rosa", "price": 160, "rent": 12, "icon": "🏠", "desc": "Propiedad Rosa"},
+	# 15: Ferrocarril Pennsylvania
+	{"name": "Ferrocarril Pennsylvania", "group": "Ferrocarril", "price": 200, "rent": 25, "icon": "🚂", "desc": "Estación de Tren"},
+	# 16..19: Naranja
+	{"name": "Plaza St. James", "group": "Naranja", "price": 180, "rent": 14, "icon": "🏠", "desc": "Propiedad Naranja"},
+	{"name": "Arca Comunal", "group": "Especial", "price": 0, "rent": 0, "icon": "🎁", "desc": "Toma una carta"},
+	{"name": "Av. Tennessee", "group": "Naranja", "price": 180, "rent": 14, "icon": "🏠", "desc": "Propiedad Naranja"},
+	{"name": "Av. Nueva York", "group": "Naranja", "price": 200, "rent": 16, "icon": "🏠", "desc": "Propiedad Naranja"},
+	# 20: Parking Gratuito
+	{"name": "PARKING GRATIS", "group": "Especial", "price": 0, "rent": 0, "icon": "🅿️", "desc": "Descanso seguro"},
+	# 21..24: Rojo
+	{"name": "Av. Kentucky", "group": "Rojo", "price": 220, "rent": 18, "icon": "🏠", "desc": "Propiedad Roja"},
+	{"name": "Suerte", "group": "Especial", "price": 0, "rent": 0, "icon": "❓", "desc": "Toma una carta"},
+	{"name": "Av. Indiana", "group": "Rojo", "price": 220, "rent": 18, "icon": "🏠", "desc": "Propiedad Roja"},
+	{"name": "Av. Illinois", "group": "Rojo", "price": 240, "rent": 20, "icon": "🏠", "desc": "Propiedad Roja"},
+	# 25: Ferrocarril B. & O.
+	{"name": "Ferrocarril B. & O.", "group": "Ferrocarril", "price": 200, "rent": 25, "icon": "🚂", "desc": "Estación de Tren"},
+	# 26..29: Amarillo + Planta de Agua
+	{"name": "Av. Atlántico", "group": "Amarillo", "price": 260, "rent": 22, "icon": "🏠", "desc": "Propiedad Amarilla"},
+	{"name": "Av. Ventnor", "group": "Amarillo", "price": 260, "rent": 22, "icon": "🏠", "desc": "Propiedad Amarilla"},
+	{"name": "Planta de Agua", "group": "Suministros", "price": 150, "rent": 10, "icon": "🚰", "desc": "Servicio de Agua"},
+	{"name": "Jardines Marvin", "group": "Amarillo", "price": 280, "rent": 24, "icon": "🏠", "desc": "Propiedad Amarilla"},
+	# 30: Ve a la Cárcel
+	{"name": "VAYA A LA CÁRCEL", "group": "Especial", "price": 0, "rent": 0, "icon": "🚔", "desc": "Directo a prisión"},
+	# 31..34: Verde
+	{"name": "Av. Pacífico", "group": "Verde", "price": 300, "rent": 26, "icon": "🏠", "desc": "Propiedad Verde"},
+	{"name": "Av. Carolina Norte", "group": "Verde", "price": 300, "rent": 26, "icon": "🏠", "desc": "Propiedad Verde"},
+	{"name": "Arca Comunal", "group": "Especial", "price": 0, "rent": 0, "icon": "🎁", "desc": "Toma una carta"},
+	{"name": "Av. Pennsylvania", "group": "Verde", "price": 320, "rent": 28, "icon": "🏠", "desc": "Propiedad Verde"},
+	# 35: Ferrocarril Short Line
+	{"name": "Ferrocarril Short Line", "group": "Ferrocarril", "price": 200, "rent": 25, "icon": "🚂", "desc": "Estación de Tren"},
+	# 36..39: Suerte, Azul Oscuro, Impuesto de Lujo
+	{"name": "Suerte", "group": "Especial", "price": 0, "rent": 0, "icon": "❓", "desc": "Toma una carta"},
+	{"name": "Plaza Park", "group": "Azul Oscuro", "price": 350, "rent": 35, "icon": "🏠", "desc": "Propiedad Azul"},
+	{"name": "Impuesto de Lujo", "group": "Impuesto", "price": 0, "rent": 100, "icon": "💎", "desc": "Paga $100"},
+	{"name": "Paseo Tablado", "group": "Azul Oscuro", "price": 400, "rent": 50, "icon": "🏠", "desc": "Propiedad Azul"}
 ]
 
 const PLAYER_COLORS = {
-	1: Color(0.9, 0.2, 0.2), # Red
-	2: Color(0.2, 0.4, 0.9)  # Blue
+	1: Color("#E53935"), # Red
+	2: Color("#1E88E5")  # Blue
 }
 
 var bridge
 var current = P1
 var winner = -1
 
+# Game State
 var positions = {P1: 0, P2: 0}
 var money = {P1: 1500, P2: 1500}
 var property_owners = {} # space_idx -> player_id
+var property_houses = {} # space_idx -> count (1..4 houses, 5 = hotel)
+var jailed_players = {P1: 0, P2: 0}
 
-# UI components
+var last_dice_1: int = 1
+var last_dice_2: int = 1
+var last_roll_doubles: bool = false
+var pending_buy_space: int = -1
+
+# Board Geometry
+var board_rect: Rect2 = Rect2(60, 130, 580, 580)
+var corner_size: float = 70.0
+var space_step: float = 48.88
+
+# UI Components
 var player_tokens = {P1: null, P2: null}
 var roll_button: Button
-var purchase_dialog: Panel
-var purchase_label: Label
-var money_label: Label
+var pay_jail_btn: Button
+var card_event_banner: PanelContainer
+var card_event_label: Label
 
-@onready var status: Label = $Status
+# Purchase Dialog
+var buy_modal: PanelContainer
+var buy_header_bar: ColorRect
+var buy_title_lbl: Label
+var buy_price_lbl: Label
+var buy_rent_info_lbl: Label
+var buy_btn_confirm: Button
+var buy_btn_auction: Button
+
+# Auction Dialog
+var auction_modal: PanelContainer
+var auction_title_lbl: Label
+var auction_current_bid_lbl: Label
+var auction_bid_input: SpinBox
+var auction_btn_bid: Button
+var auction_btn_pass: Button
+var current_auction_space: int = -1
+var current_auction_bid: int = 0
+var highest_bidder: int = 0
+
+# Center HUD
+var center_panel: Panel
+var p1_hud: PanelContainer
+var p1_money_lbl: Label
+var p1_props_lbl: Label
+var p2_hud: PanelContainer
+var p2_money_lbl: Label
+var p2_props_lbl: Label
+var dice_display_lbl: Label
+
+var turn_indicator: TurnIndicator
+var rules_popup: RulesPopup
+var current_theme: BoardTheme
+
+@onready var status: Label = $Status if has_node("Status") else null
 
 func _ready() -> void:
+	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
+		var tm = get_node_or_null("/root/ThemeManager")
+		if tm != null:
+			current_theme = tm.get_theme()
+			tm.theme_changed.connect(_on_theme_changed)
+	else:
+		_create_default_theme()
+
 	_setup_ui()
-	
+
+	var gm = get_node_or_null("/root/GameManager")
+	if gm != null and gm.has_signal("layout_changed"):
+		gm.layout_changed.connect(_on_layout_changed)
+
 	bridge = OpenTableBridge.new()
 	bridge.name = "Bridge"
 	add_child(bridge)
-	
+
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
-	
+	if bridge.has_signal("turn_changed"):
+		bridge.connect("turn_changed", _on_turn_changed)
+
 	bridge.start_local_match_monopoly(P1, P2)
 	current = bridge.current_player()
-	
+
+	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
 	_update_token_positions()
-	_update_money_display()
+	_update_hud_display()
 	_update_status()
 	queue_redraw()
 
+func _create_default_theme() -> void:
+	current_theme = BoardTheme.new()
+	current_theme.theme_name = "Monopoly Clásico"
+	current_theme.board_color = Color("#0D1B2A")
+	current_theme.line_color = Color("#415A77")
+	current_theme.light_color = Color("#E0E1DD")
+	current_theme.dark_color = Color("#1B263B")
+	current_theme.select_color = Color(1.0, 0.85, 0.25, 0.85)
+	current_theme.valid_move_color = Color(0.2, 0.9, 0.5, 0.85)
+
+func _on_theme_changed(theme: BoardTheme) -> void:
+	current_theme = theme
+	_apply_theme_styling()
+	queue_redraw()
+
+func _apply_theme_styling() -> void:
+	if current_theme == null:
+		return
+
+	if center_panel:
+		var c_style = StyleBoxFlat.new()
+		c_style.bg_color = current_theme.dark_color.darkened(0.2)
+		c_style.border_color = current_theme.line_color.darkened(0.2)
+		c_style.set_border_width_all(2)
+		c_style.set_corner_radius_all(12)
+		center_panel.add_theme_stylebox_override("panel", c_style)
+
 func _setup_ui() -> void:
-	# Roll button
+	# Top bar
+	var top_bar = HBoxContainer.new()
+	top_bar.position = Vector2(60, 20)
+	top_bar.size = Vector2(580, 45)
+	top_bar.add_theme_constant_override("separation", 15)
+	add_child(top_bar)
+
+	var title_lbl = Label.new()
+	title_lbl.text = "🎩 MONOPOLY 40 CASILLAS"
+	title_lbl.add_theme_font_size_override("font_size", 20)
+	title_lbl.add_theme_color_override("font_color", Color(0.95, 0.85, 0.3))
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_bar.add_child(title_lbl)
+
+	var btn_rules = Button.new()
+	btn_rules.text = "📖 Reglas"
+	btn_rules.custom_minimum_size = Vector2(90, 36)
+	btn_rules.pressed.connect(func(): rules_popup.show_for_game("monopoly"))
+	top_bar.add_child(btn_rules)
+
+	turn_indicator = TurnIndicator.new()
+	turn_indicator.name = "TurnIndicator"
+	turn_indicator.position = Vector2(60, 75)
+	add_child(turn_indicator)
+
+	# Center Game Controls & HUD
+	center_panel = Panel.new()
+	center_panel.name = "CenterPanel"
+	center_panel.position = Vector2(board_rect.position.x + corner_size + 10, board_rect.position.y + corner_size + 10)
+	center_panel.size = Vector2(board_rect.size.x - (corner_size * 2) - 20, board_rect.size.y - (corner_size * 2) - 20)
+	add_child(center_panel)
+
+	var center_vbox = VBoxContainer.new()
+	center_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center_vbox.offset_left = 15
+	center_vbox.offset_top = 15
+	center_vbox.offset_right = -15
+	center_vbox.offset_bottom = -15
+	center_vbox.add_theme_constant_override("separation", 10)
+	center_panel.add_child(center_vbox)
+
+	# Monopoly Center Logo
+	var logo_lbl = Label.new()
+	logo_lbl.text = "🎩 M O N O P O L Y"
+	logo_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	logo_lbl.add_theme_font_size_override("font_size", 22)
+	logo_lbl.add_theme_color_override("font_color", Color(0.9, 0.25, 0.25))
+	center_vbox.add_child(logo_lbl)
+
+	# Players Money HUD Cards
+	var hud_hbox = HBoxContainer.new()
+	hud_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hud_hbox.add_theme_constant_override("separation", 12)
+	center_vbox.add_child(hud_hbox)
+
+	p1_hud = _create_player_hud_card(P1, "Jugador 1 (Rojo)")
+	hud_hbox.add_child(p1_hud)
+
+	p2_hud = _create_player_hud_card(P2, "Jugador 2 (Azul)")
+	hud_hbox.add_child(p2_hud)
+
+	# Dice Display
+	dice_display_lbl = Label.new()
+	dice_display_lbl.text = "🎲 Dados: [ ⚂ ]  [ ⚃ ]  (Total: 7)"
+	dice_display_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dice_display_lbl.add_theme_font_size_override("font_size", 16)
+	center_vbox.add_child(dice_display_lbl)
+
+	# Card / Game Event Banner
+	card_event_banner = PanelContainer.new()
+	card_event_banner.custom_minimum_size = Vector2(0, 42)
+	var ev_style = StyleBoxFlat.new()
+	ev_style.bg_color = Color(0.1, 0.2, 0.35, 0.9)
+	ev_style.set_corner_radius_all(8)
+	ev_style.content_margin_left = 10
+	ev_style.content_margin_right = 10
+	ev_style.content_margin_top = 4
+	ev_style.content_margin_bottom = 4
+	card_event_banner.add_theme_stylebox_override("panel", ev_style)
+
+	card_event_label = Label.new()
+	card_event_label.text = "Bienvenido a Monopoly. ¡Tira los dados para comenzar!"
+	card_event_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	card_event_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	card_event_label.add_theme_font_size_override("font_size", 12)
+	card_event_banner.add_child(card_event_label)
+	center_vbox.add_child(card_event_banner)
+
+	# Roll & Action Buttons
+	var actions_hbox = HBoxContainer.new()
+	actions_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions_hbox.add_theme_constant_override("separation", 15)
+	center_vbox.add_child(actions_hbox)
+
 	roll_button = Button.new()
-	roll_button.position = Vector2(250, 250)
-	roll_button.custom_minimum_size = Vector2(160, 50)
+	roll_button.name = "RollButton"
+	roll_button.custom_minimum_size = Vector2(160, 44)
 	roll_button.text = "🎲 Tirar y Mover"
-	roll_button.add_theme_font_size_override("font_size", 18)
+	roll_button.add_theme_font_size_override("font_size", 16)
 	roll_button.pressed.connect(_on_roll_pressed)
-	add_child(roll_button)
-	
-	# Money display panel
-	money_label = Label.new()
-	money_label.position = Vector2(200, 180)
-	money_label.size = Vector2(260, 60)
-	money_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	money_label.add_theme_font_size_override("font_size", 18)
-	add_child(money_label)
-	
-	# Player tokens
+	actions_hbox.add_child(roll_button)
+
+	pay_jail_btn = Button.new()
+	pay_jail_btn.name = "PayJailButton"
+	pay_jail_btn.custom_minimum_size = Vector2(140, 44)
+	pay_jail_btn.text = "🔓 Fianza ($50)"
+	pay_jail_btn.visible = false
+	pay_jail_btn.pressed.connect(_on_pay_jail_pressed)
+	actions_hbox.add_child(pay_jail_btn)
+
+	# Player Token Sprites
 	for p in [P1, P2]:
 		var token = Control.new()
-		token.size = Vector2(24, 24)
-		token.pivot_offset = Vector2(12, 12)
-		
-		var img = Image.create(24, 24, false, Image.FORMAT_RGBA8)
+		token.size = Vector2(22, 22)
+		token.pivot_offset = Vector2(11, 11)
+
+		var img = Image.create(22, 22, false, Image.FORMAT_RGBA8)
 		var p_col = PLAYER_COLORS[p]
-		for x in range(24):
-			for y in range(24):
-				if Vector2(x - 12, y - 12).length() <= 10:
+		for x in range(22):
+			for y in range(22):
+				var dist = Vector2(x - 11, y - 11).length()
+				if dist <= 8.5:
 					img.set_pixel(x, y, p_col)
-				elif Vector2(x - 12, y - 12).length() <= 11:
+				elif dist <= 10.0:
 					img.set_pixel(x, y, Color.BLACK)
 				else:
 					img.set_pixel(x, y, Color(0, 0, 0, 0))
-					
+
 		var tex = TextureRect.new()
 		tex.texture = ImageTexture.create_from_image(img)
-		tex.size = Vector2(24, 24)
+		tex.size = Vector2(22, 22)
 		token.add_child(tex)
-		
 		add_child(token)
 		player_tokens[p] = token
-		
-	# Purchase Dialog Overlay
-	purchase_dialog = Panel.new()
-	purchase_dialog.position = Vector2(180, 310)
-	purchase_dialog.size = Vector2(300, 160)
-	purchase_dialog.visible = false
-	
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.15, 0.15, 0.2, 0.95)
-	style.set_corner_radius_all(12)
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	style.border_color = Color(0.9, 0.8, 0.2)
-	purchase_dialog.add_theme_stylebox_override("panel", style)
-	
-	purchase_label = Label.new()
-	purchase_label.position = Vector2(10, 15)
-	purchase_label.size = Vector2(280, 70)
-	purchase_label.text = "¿Deseas comprar esta propiedad?"
-	purchase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	purchase_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	purchase_label.add_theme_font_size_override("font_size", 16)
-	purchase_dialog.add_child(purchase_label)
-	
-	var buy_btn = Button.new()
-	buy_btn.position = Vector2(20, 95)
-	buy_btn.size = Vector2(120, 45)
-	buy_btn.text = "Comprar"
-	buy_btn.pressed.connect(func(): _send_buy_decision(true))
-	purchase_dialog.add_child(buy_btn)
-	
-	var pass_btn = Button.new()
-	pass_btn.position = Vector2(160, 95)
-	pass_btn.size = Vector2(120, 45)
-	pass_btn.text = "Pasar"
-	pass_btn.pressed.connect(func(): _send_buy_decision(false))
-	purchase_dialog.add_child(pass_btn)
-	
-	add_child(purchase_dialog)
 
-func _get_space_position(space_idx: int) -> Vector2:
-	# 16 spaces around a 5x5 board perimeter (110px step)
-	# Space 0: Bottom-Left (60, 520)
-	# Spaces 0..4: Bottom edge left-to-right
-	# Spaces 4..8: Right edge bottom-to-top
-	# Spaces 8..12: Top edge right-to-left
-	# Spaces 12..15: Left edge top-to-bottom
-	var origin_x = 60.0
-	var origin_y = 520.0
-	var step = 135.0
-	
-	var i = space_idx % 16
-	if i <= 4:
-		return Vector2(origin_x + i * step, origin_y)
-	elif i <= 8:
-		return Vector2(origin_x + 4 * step, origin_y - (i - 4) * step)
-	elif i <= 12:
-		return Vector2(origin_x + (12 - i) * step, origin_y - 4 * step)
+	_setup_purchase_modal()
+	_setup_auction_modal()
+
+	rules_popup = RulesPopup.new()
+	rules_popup.visible = false
+	rules_popup.position = Vector2(100, 80)
+	add_child(rules_popup)
+
+	_apply_theme_styling()
+
+func _create_player_hud_card(p_id: int, p_name: String) -> PanelContainer:
+	var panel = PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size = Vector2(160, 70)
+
+	var sb = StyleBoxFlat.new()
+	sb.bg_color = Color(0.12, 0.15, 0.22, 0.9)
+	sb.border_color = PLAYER_COLORS[p_id]
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(8)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	panel.add_theme_stylebox_override("panel", sb)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+	panel.add_child(vbox)
+
+	var title = Label.new()
+	title.text = p_name
+	title.add_theme_font_size_override("font_size", 13)
+	title.add_theme_color_override("font_color", PLAYER_COLORS[p_id])
+	vbox.add_child(title)
+
+	var m_lbl = Label.new()
+	m_lbl.text = "💰 Dinero: $1500"
+	m_lbl.add_theme_font_size_override("font_size", 13)
+	vbox.add_child(m_lbl)
+
+	var p_lbl = Label.new()
+	p_lbl.text = "🏠 Propiedades: 0"
+	p_lbl.add_theme_font_size_override("font_size", 11)
+	p_lbl.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+	vbox.add_child(p_lbl)
+
+	if p_id == P1:
+		p1_money_lbl = m_lbl
+		p1_props_lbl = p_lbl
 	else:
-		return Vector2(origin_x, origin_y - (16 - i) * step)
+		p2_money_lbl = m_lbl
+		p2_props_lbl = p_lbl
+
+	return panel
+
+# -------------------------------------------------------------------------
+# TITLE DEED PURCHASE MODAL (d)
+# -------------------------------------------------------------------------
+func _setup_purchase_modal() -> void:
+	buy_modal = PanelContainer.new()
+	buy_modal.position = Vector2(180, 240)
+	buy_modal.custom_minimum_size = Vector2(340, 270)
+	buy_modal.visible = false
+	buy_modal.z_index = 25
+
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.12, 0.15, 0.22, 0.98)
+	style.border_color = Color(0.95, 0.85, 0.3)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 10
+	style.content_margin_bottom = 12
+	buy_modal.add_theme_stylebox_override("panel", style)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	buy_modal.add_child(vbox)
+
+	buy_header_bar = ColorRect.new()
+	buy_header_bar.custom_minimum_size = Vector2(0, 18)
+	buy_header_bar.color = Color("#8B4513")
+	vbox.add_child(buy_header_bar)
+
+	buy_title_lbl = Label.new()
+	buy_title_lbl.text = "TÍTULO DE PROPIEDAD"
+	buy_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	buy_title_lbl.add_theme_font_size_override("font_size", 16)
+	buy_title_lbl.add_theme_color_override("font_color", Color.WHITE)
+	vbox.add_child(buy_title_lbl)
+
+	buy_price_lbl = Label.new()
+	buy_price_lbl.text = "PRECIO: $200"
+	buy_price_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	buy_price_lbl.add_theme_font_size_override("font_size", 15)
+	buy_price_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 0.5))
+	vbox.add_child(buy_price_lbl)
+
+	buy_rent_info_lbl = Label.new()
+	buy_rent_info_lbl.text = "Renta Base: $10\nRenta con Grupo Completo: $20\nCasa 1: $50 | Casa 2: $150 | Hotel: $450"
+	buy_rent_info_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	buy_rent_info_lbl.add_theme_font_size_override("font_size", 12)
+	buy_rent_info_lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
+	vbox.add_child(buy_rent_info_lbl)
+
+	var btns_hbox = HBoxContainer.new()
+	btns_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	btns_hbox.add_theme_constant_override("separation", 15)
+	vbox.add_child(btns_hbox)
+
+	buy_btn_confirm = Button.new()
+	buy_btn_confirm.custom_minimum_size = Vector2(130, 40)
+	buy_btn_confirm.text = "🟢 Comprar"
+	buy_btn_confirm.pressed.connect(func(): _send_buy_decision(true))
+	btns_hbox.add_child(buy_btn_confirm)
+
+	buy_btn_auction = Button.new()
+	buy_btn_auction.custom_minimum_size = Vector2(130, 40)
+	buy_btn_auction.text = "🔨 Subastar"
+	buy_btn_auction.pressed.connect(func(): _send_buy_decision(false))
+	btns_hbox.add_child(buy_btn_auction)
+
+	add_child(buy_modal)
+
+# -------------------------------------------------------------------------
+# AUCTION MODAL DIALOG (d)
+# -------------------------------------------------------------------------
+func _setup_auction_modal() -> void:
+	auction_modal = PanelContainer.new()
+	auction_modal.position = Vector2(180, 240)
+	auction_modal.custom_minimum_size = Vector2(340, 250)
+	auction_modal.visible = false
+	auction_modal.z_index = 25
+
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.12, 0.22, 0.98)
+	style.border_color = Color(0.9, 0.6, 0.2)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 10
+	style.content_margin_bottom = 12
+	auction_modal.add_theme_stylebox_override("panel", style)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	auction_modal.add_child(vbox)
+
+	auction_title_lbl = Label.new()
+	auction_title_lbl.text = "🏛️ SUBASTA DE PROPIEDAD"
+	auction_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	auction_title_lbl.add_theme_font_size_override("font_size", 16)
+	auction_title_lbl.add_theme_color_override("font_color", Color(0.95, 0.75, 0.3))
+	vbox.add_child(auction_title_lbl)
+
+	auction_current_bid_lbl = Label.new()
+	auction_current_bid_lbl.text = "Puja actual: $0\nLíder: Ninguno"
+	auction_current_bid_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	auction_current_bid_lbl.add_theme_font_size_override("font_size", 13)
+	vbox.add_child(auction_current_bid_lbl)
+
+	var input_hbox = HBoxContainer.new()
+	input_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_child(input_hbox)
+
+	var lbl_bid = Label.new()
+	lbl_bid.text = "Tu Oferta: $"
+	lbl_bid.add_theme_font_size_override("font_size", 14)
+	input_hbox.add_child(lbl_bid)
+
+	auction_bid_input = SpinBox.new()
+	auction_bid_input.min_value = 10
+	auction_bid_input.max_value = 2000
+	auction_bid_input.step = 10
+	auction_bid_input.value = 50
+	input_hbox.add_child(auction_bid_input)
+
+	var btns_hbox = HBoxContainer.new()
+	btns_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	btns_hbox.add_theme_constant_override("separation", 15)
+	vbox.add_child(btns_hbox)
+
+	auction_btn_bid = Button.new()
+	auction_btn_bid.custom_minimum_size = Vector2(130, 40)
+	auction_btn_bid.text = "🔨 Ofertar"
+	auction_btn_bid.pressed.connect(_on_send_bid_pressed)
+	btns_hbox.add_child(auction_btn_bid)
+
+	auction_btn_pass = Button.new()
+	auction_btn_pass.custom_minimum_size = Vector2(130, 40)
+	auction_btn_pass.text = "❌ Pasar"
+	auction_btn_pass.pressed.connect(_on_pass_bid_pressed)
+	btns_hbox.add_child(auction_btn_pass)
+
+	add_child(auction_modal)
+
+# -------------------------------------------------------------------------
+# PERIMETER COORDINATE MAPPING (a)
+# -------------------------------------------------------------------------
+func _get_space_rect(space_idx: int) -> Rect2:
+	var idx = space_idx % 40
+	var ox = board_rect.position.x
+	var oy = board_rect.position.y
+	var bw = board_rect.size.x
+	var bh = board_rect.size.y
+	var cs = corner_size
+	var step = (bw - (cs * 2.0)) / 9.0
+
+	# Side 0: Bottom row (0..10) from Right to Left
+	if idx == 0:
+		return Rect2(ox + bw - cs, oy + bh - cs, cs, cs)
+	elif idx < 10:
+		var k = idx
+		return Rect2(ox + bw - cs - (k * step), oy + bh - cs, step, cs)
+	elif idx == 10:
+		return Rect2(ox, oy + bh - cs, cs, cs)
+
+	# Side 1: Left column (11..19) from Bottom to Top
+	elif idx < 20:
+		var k = idx - 10
+		return Rect2(ox, oy + bh - cs - (k * step), cs, step)
+	elif idx == 20:
+		return Rect2(ox, oy, cs, cs)
+
+	# Side 2: Top row (21..29) from Left to Right
+	elif idx < 30:
+		var k = idx - 20
+		return Rect2(ox + cs + ((k - 1) * step), oy, step, cs)
+	elif idx == 30:
+		return Rect2(ox + bw - cs, oy, cs, cs)
+
+	# Side 3: Right column (31..39) from Top to Bottom
+	else:
+		var k = idx - 30
+		return Rect2(ox + bw - cs, oy + cs + ((k - 1) * step), cs, step)
+
+func _get_space_center(space_idx: int) -> Vector2:
+	var r = _get_space_rect(space_idx)
+	return r.position + (r.size * 0.5)
 
 func _update_token_positions() -> void:
 	for p in [P1, P2]:
 		var pos_idx = positions[p]
-		var base_pos = _get_space_position(pos_idx)
-		var offset = Vector2(-12, -12) if p == P1 else Vector2(12, 12)
-		player_tokens[p].position = base_pos + offset
+		var base_pos = _get_space_center(pos_idx)
+		var offset = Vector2(-10, -10) if p == P1 else Vector2(10, 10)
+		player_tokens[p].position = base_pos + offset - Vector2(11, 11)
 
 func _animate_player_move(p: int, target_space: int) -> void:
 	positions[p] = target_space
-	var base_pos = _get_space_position(target_space)
-	var offset = Vector2(-12, -12) if p == P1 else Vector2(12, 12)
-	var target_pos = base_pos + offset
-	
+	var base_pos = _get_space_center(target_space)
+	var offset = Vector2(-10, -10) if p == P1 else Vector2(10, 10)
+	var target_pos = base_pos + offset - Vector2(11, 11)
+
 	var tween = create_tween()
-	tween.tween_property(player_tokens[p], "position", target_pos, 0.3)
+	tween.tween_property(player_tokens[p], "position", target_pos, 0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.finished.connect(func(): _check_pending_purchase(p, target_space))
 
 func _check_pending_purchase(p: int, space: int) -> void:
-	var prop = PROPERTY_INFO[space]
+	if space < 0 or space >= SPACES.size():
+		return
+	var prop = SPACES[space]
 	if prop["price"] > 0 and not property_owners.has(space):
 		if p == current:
-			purchase_label.text = "¿Comprar %s por $%d?" % [prop["name"], prop["price"]]
-			purchase_dialog.visible = true
+			pending_buy_space = space
+			buy_title_lbl.text = prop["name"]
+			buy_header_bar.color = GROUP_COLORS.get(prop["group"], Color.DARK_GRAY)
+			buy_price_lbl.text = "PRECIO: $%d  (Tu saldo: $%d)" % [prop["price"], money[p]]
+			var base_r = prop["rent"]
+			buy_rent_info_lbl.text = "Renta Base: $%d\nRenta con Grupo Completo: $%d\nCon 1-4 Casas: $%d - $%d\nCon Hotel: $%d" % [
+				base_r, base_r * 2, base_r * 4, base_r * 12, base_r * 20
+			]
+			buy_btn_confirm.disabled = (money[p] < prop["price"])
+			buy_modal.visible = true
 
 func _send_buy_decision(buy: bool) -> void:
-	purchase_dialog.visible = false
+	buy_modal.visible = false
 	var cmd = {
 		"command_type": "BuyPropertyCommand",
 		"player": current,
 		"buy": buy
 	}
 	bridge.send_command_json(current, JSON.stringify(cmd))
+	pending_buy_space = -1
+
+func _on_send_bid_pressed() -> void:
+	var bid_val = int(auction_bid_input.value)
+	var cmd = {
+		"command_type": "AuctionBidCommand",
+		"player": current,
+		"amount": bid_val
+	}
+	bridge.send_command_json(current, JSON.stringify(cmd))
+
+func _on_pass_bid_pressed() -> void:
+	var cmd = {
+		"command_type": "AuctionBidCommand",
+		"player": current,
+		"amount": 0
+	}
+	bridge.send_command_json(current, JSON.stringify(cmd))
+	auction_modal.visible = false
 
 func _on_roll_pressed() -> void:
-	if winner != -1 or purchase_dialog.visible:
+	if winner != -1 or buy_modal.visible or auction_modal.visible:
 		return
 	var cmd = {"command_type": "RollAndMoveCommand", "player": current}
 	bridge.send_command_json(current, JSON.stringify(cmd))
 
-func _update_money_display() -> void:
-	money_label.text = "💰 P1 (Rojo): $%d\n💰 P2 (Azul): $%d" % [money[P1], money[P2]]
+func _on_pay_jail_pressed() -> void:
+	if winner != -1:
+		return
+	var cmd = {"command_type": "PayJailFeeCommand", "player": current}
+	bridge.send_command_json(current, JSON.stringify(cmd))
+
+func _update_hud_display() -> void:
+	var p1_count = 0
+	var p2_count = 0
+	for sp in property_owners:
+		if property_owners[sp] == P1: p1_count += 1
+		elif property_owners[sp] == P2: p2_count += 1
+
+	if p1_money_lbl: p1_money_lbl.text = "💰 Dinero: $%d" % money[P1]
+	if p1_props_lbl: p1_props_lbl.text = "🏠 Propiedades: %d" % p1_count
+	if p2_money_lbl: p2_money_lbl.text = "💰 Dinero: $%d" % money[P2]
+	if p2_props_lbl: p2_props_lbl.text = "🏠 Propiedades: %d" % p2_count
+
+	# Update Jail Fee button visibility
+	if pay_jail_btn:
+		var in_jail = (jailed_players.get(current, 0) > 0)
+		pay_jail_btn.visible = in_jail
+
+	# Update Dice Unicode display
+	var dice_icons = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
+	var d1_idx = clampi(last_dice_1 - 1, 0, 5)
+	var d2_idx = clampi(last_dice_2 - 1, 0, 5)
+	if dice_display_lbl:
+		dice_display_lbl.text = "🎲 Dados: [ %s ]  [ %s ]  (Total: %d)%s" % [
+			dice_icons[d1_idx], dice_icons[d2_idx], last_dice_1 + last_dice_2,
+			" - ¡DOBLE!" if last_roll_doubles else ""
+		]
 
 func _on_event_json(json_str: String) -> void:
 	var parser = JSON.new()
@@ -221,72 +700,225 @@ func _on_event_json(json_str: String) -> void:
 			if event_type == "PlayerMovedEvent":
 				var p = int(event.get("player", current))
 				var new_pos = int(event.get("new_position", 0))
+				last_dice_1 = int(event.get("d1", 1))
+				last_dice_2 = int(event.get("d2", 1))
+				last_roll_doubles = bool(event.get("is_doubles", false))
+
 				if event.get("passed_go", false):
 					money[p] += 200
+					card_event_label.text = "Jugador %d pasó por la Salida (+ $200)" % p
+
 				_animate_player_move(p, new_pos)
+
 			elif event_type == "PropertyPurchasedEvent":
 				var p = int(event.get("player", current))
 				var sp = int(event.get("space", 0))
 				var pr = int(event.get("price", 0))
 				property_owners[sp] = p
 				money[p] -= pr
+				card_event_label.text = "Jugador %d compró %s por $%d" % [p, SPACES[sp]["name"], pr]
+				_check_monopoly_houses(sp, p)
+
 			elif event_type == "RentPaidEvent":
 				var payer = int(event.get("payer", 0))
 				var owner = int(event.get("owner", 0))
 				var amt = int(event.get("amount", 0))
+				var sp = int(event.get("space", 0))
 				if money.has(payer): money[payer] -= amt
 				if money.has(owner): money[owner] += amt
+				card_event_label.text = "Jugador %d pagó $%d de renta a Jugador %d en %s" % [payer, amt, owner, SPACES[sp]["name"]]
+
+			elif event_type == "TaxPaidEvent":
+				var p = int(event.get("player", current))
+				var amt = int(event.get("amount", 0))
+				var t_name = str(event.get("name", "Impuesto"))
+				money[p] -= amt
+				card_event_label.text = "Jugador %d pagó $%d en %s" % [p, amt, t_name]
+
+			elif event_type == "ChanceCardDrawnEvent":
+				var p = int(event.get("player", current))
+				var desc = str(event.get("description", "Carta de Suerte"))
+				card_event_label.text = "❓ SUERTE (P%d): %s" % [p, desc]
+
+			elif event_type == "CommunityChestCardDrawnEvent":
+				var p = int(event.get("player", current))
+				var desc = str(event.get("description", "Arca Comunal"))
+				card_event_label.text = "🎁 ARCA COMUNAL (P%d): %s" % [p, desc]
+
+			elif event_type == "JailedEvent":
+				var p = int(event.get("player", current))
+				jailed_players[p] = 3
+				card_event_label.text = "🚔 ¡Jugador %d fue enviado a la Cárcel!" % p
+
+			elif event_type == "AuctionStartedEvent":
+				var sp = int(event.get("space", 0))
+				current_auction_space = sp
+				current_auction_bid = 0
+				highest_bidder = 0
+				auction_title_lbl.text = "🏛️ SUBASTA: %s" % SPACES[sp]["name"]
+				auction_current_bid_lbl.text = "Puja Inicial: $0 | Líder: Ninguno"
+				auction_bid_input.value = 20
+				auction_modal.visible = true
+
+			elif event_type == "AuctionWonEvent":
+				var p = int(event.get("player", current))
+				var sp = int(event.get("space", 0))
+				var pr = int(event.get("price", 0))
+				property_owners[sp] = p
+				money[p] -= pr
+				auction_modal.visible = false
+				card_event_label.text = "🏆 ¡Jugador %d ganó la subasta de %s por $%d!" % [p, SPACES[sp]["name"], pr]
+				_check_monopoly_houses(sp, p)
+
+			elif event_type == "BankruptcyEvent":
+				var p = int(event.get("player", 0))
+				card_event_label.text = "💥 ¡Jugador %d cayó en BANCARROTA!" % p
+
 			elif event_type == "GameOverEvent":
 				var w = event.get("winner", -1)
 				if w == null: w = 0
 				_on_game_over(int(w))
-				
+
 	current = bridge.current_player()
-	_update_money_display()
+	_update_hud_display()
 	_update_status()
 	queue_redraw()
+
+func _check_monopoly_houses(new_space: int, player_id: int) -> void:
+	# Group check to add houses/hotel indicators
+	var grp = SPACES[new_space]["group"]
+	if grp in ["Especial", "Ferrocarril", "Suministros", "Impuesto"]:
+		return
+
+	var all_in_grp = []
+	for i in range(SPACES.size()):
+		if SPACES[i]["group"] == grp:
+			all_in_grp.append(i)
+
+	var owns_all = true
+	for sp_idx in all_in_grp:
+		if property_owners.get(sp_idx, -1) != player_id:
+			owns_all = false
+			break
+
+	if owns_all:
+		for sp_idx in all_in_grp:
+			# Auto-tier houses when full monopoly is achieved
+			if not property_houses.has(sp_idx):
+				property_houses[sp_idx] = 2 # 2 houses initially on full set
+
+func _on_turn_changed(player_id: int) -> void:
+	current = player_id
+	_update_hud_display()
+	_update_status()
+	if turn_indicator != null:
+		turn_indicator.current_player_id = player_id
 
 func _on_game_over(w: int) -> void:
 	winner = w
 	_update_status()
-	var overlay = preload("res://game_over_overlay.tscn").instantiate()
-	add_child(overlay)
-	overlay.show_winner(w)
+	if ResourceLoader.exists("res://game_over_overlay.tscn"):
+		var overlay = preload("res://game_over_overlay.tscn").instantiate()
+		add_child(overlay)
+		if overlay.has_method("show_winner"):
+			overlay.call("show_winner", w)
 
 func _on_move_rejected(reason: String) -> void:
-	status.text = "Movimiento inválido: %s" % reason
+	if status != null:
+		status.text = "Movimiento rechazado: %s" % reason
 
+func _on_layout_changed(layout: int) -> void:
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
+
+	if layout == 2: # PHONE
+		board_rect = Rect2(10, 80, 355, 355)
+		corner_size = 46.0
+	else: # DESKTOP or TABLET
+		board_rect = Rect2(60, 130, 580, 580)
+		corner_size = 70.0
+
+	if center_panel:
+		center_panel.position = Vector2(board_rect.position.x + corner_size + 8, board_rect.position.y + corner_size + 8)
+		center_panel.size = Vector2(board_rect.size.x - (corner_size * 2) - 16, board_rect.size.y - (corner_size * 2) - 16)
+
+	_update_token_positions()
+	queue_redraw()
+
+# -------------------------------------------------------------------------
+# DRAWING: PERIMETER TILES, COLOR BARS (b), HOUSES/HOTELS (c)
+# -------------------------------------------------------------------------
 func _draw() -> void:
-	# Draw perimeter property boxes (16 spaces)
+	# Draw board background
+	var bg_color = current_theme.board_color if current_theme else Color("#0D1B2A")
+	draw_rect(board_rect, bg_color)
+	draw_rect(board_rect, current_theme.line_color if current_theme else Color("#415A77"), false, 3.0)
+
+	var tile_bg = Color(0.96, 0.96, 0.92)
+	var border_col = Color(0.2, 0.2, 0.25)
+
+	# Draw 40 perimeter spaces
 	for i in range(TOTAL_SPACES):
-		var pos = _get_space_position(i)
-		var box_rect = Rect2(pos.x - 45, pos.y - 45, 90, 90)
-		var prop = PROPERTY_INFO[i]
-		
-		# Box background
-		draw_rect(box_rect, Color(0.96, 0.96, 0.92))
-		draw_rect(box_rect, Color.BLACK, false, 2.0)
-		
-		# Color banner
-		if prop["price"] > 0:
-			var banner_rect = Rect2(box_rect.position.x, box_rect.position.y, 90, 20)
-			draw_rect(banner_rect, prop["color"])
-			
-		# Ownership indicator
+		var rect = _get_space_rect(i)
+		var prop = SPACES[i]
+		var grp = prop["group"]
+
+		# Tile background
+		draw_rect(rect, tile_bg)
+		draw_rect(rect, border_col, false, 1.2)
+
+		# Color Bar (b) based on orientation
+		var grp_color = GROUP_COLORS.get(grp, Color.TRANSPARENT)
+		if grp_color != Color.TRANSPARENT and grp not in ["Especial", "Impuesto"]:
+			var bar_rect: Rect2
+			if i < 10: # Bottom row: color bar on top
+				bar_rect = Rect2(rect.position.x, rect.position.y, rect.size.x, 14.0)
+			elif i < 20: # Left col: color bar on right
+				bar_rect = Rect2(rect.position.x + rect.size.x - 14.0, rect.position.y, 14.0, rect.size.y)
+			elif i < 30: # Top row: color bar on bottom
+				bar_rect = Rect2(rect.position.x, rect.position.y + rect.size.y - 14.0, rect.size.x, 14.0)
+			else: # Right col: color bar on left
+				bar_rect = Rect2(rect.position.x, rect.position.y, 14.0, rect.size.y)
+
+			draw_rect(bar_rect, grp_color)
+
+			# House / Hotel Tokens (c)
+			if property_houses.has(i):
+				var h_count = property_houses[i]
+				if h_count == 5: # Hotel (Red Block)
+					var h_center = bar_rect.position + (bar_rect.size * 0.5)
+					draw_rect(Rect2(h_center.x - 6, h_center.y - 5, 12, 10), Color.RED)
+					draw_rect(Rect2(h_center.x - 6, h_center.y - 5, 12, 10), Color.WHITE, false, 1.0)
+				else: # Houses (1..4 Green Blocks)
+					for h in range(h_count):
+						var h_pos = bar_rect.position + Vector2(4 + h * 9, 2)
+						if i in [11, 12, 13, 14, 15, 16, 17, 18, 19, 31, 32, 33, 34, 35, 36, 37, 38, 39]:
+							h_pos = bar_rect.position + Vector2(2, 4 + h * 9)
+						draw_rect(Rect2(h_pos.x, h_pos.y, 7, 7), Color(0.1, 0.8, 0.2))
+
+		# Property Ownership Badge
 		if property_owners.has(i):
 			var owner_p = property_owners[i]
-			var owner_color = PLAYER_COLORS.get(owner_p, Color.WHITE)
-			draw_circle(pos + Vector2(25, -25), 8.0, owner_color)
-			
-		# Space Name & Price text
-		var name_pos = Vector2(box_rect.position.x + 5, box_rect.position.y + 35)
-		draw_string(ThemeDB.fallback_font, name_pos, prop["name"], HORIZONTAL_ALIGNMENT_LEFT, 80, 11, Color.BLACK)
-		if prop["price"] > 0:
-			var price_pos = Vector2(box_rect.position.x + 5, box_rect.position.y + 75)
-			draw_string(ThemeDB.fallback_font, price_pos, "$%d" % prop["price"], HORIZONTAL_ALIGNMENT_LEFT, 80, 12, Color(0.2, 0.5, 0.2))
+			var owner_col = PLAYER_COLORS.get(owner_p, Color.WHITE)
+			var badge_pos = rect.position + Vector2(rect.size.x - 8, 8)
+			draw_circle(badge_pos, 5.0, owner_col)
+			draw_circle(badge_pos, 5.0, Color.WHITE, false, 1.0)
+
+		# Space Icon / Glyph
+		var icon_str = prop.get("icon", "")
+		if icon_str != "":
+			var icon_pos = rect.position + (rect.size * 0.5) + Vector2(-6, 4)
+			draw_string(ThemeDB.fallback_font, icon_pos, icon_str, HORIZONTAL_ALIGNMENT_CENTER, 20, 12, Color.BLACK)
+
+		# Price tag for purchasable spaces
+		if prop["price"] > 0 and not property_owners.has(i):
+			var pr_pos = rect.position + Vector2(2, rect.size.y - 3)
+			draw_string(ThemeDB.fallback_font, pr_pos, "$%d" % prop["price"], HORIZONTAL_ALIGNMENT_CENTER, int(rect.size.x - 4), 9, Color(0.1, 0.5, 0.1))
 
 func _update_status() -> void:
+	if status == null:
+		return
 	if winner != -1:
 		status.text = "¡Bancarrota! Ganó el jugador %s (Monopoly)" % winner
 	else:
-		status.text = "Turno: Jugador %s (Monopoly)" % current
+		status.text = "Turno: Jugador %s (Monopoly 40 Casillas)" % current
