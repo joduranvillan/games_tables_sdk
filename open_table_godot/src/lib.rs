@@ -841,6 +841,18 @@ impl OpenTableBridge {
     }
 
     #[func]
+    fn start_local_match_chinese_checkers_n_players(&mut self, num_players: i64) {
+        self.current_game_type = "chinese_checkers".to_string();
+        let count = num_players.clamp(2, 6) as u32;
+        let players: Vec<PlayerId> = (1..=count).map(PlayerId).collect();
+        let session = new_chinese_checkers_session(SessionId(1), 1, players);
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
+    }
+
+    #[func]
     fn start_local_match_mille_bornes(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "mille_bornes".to_string();
         let session =
@@ -2138,6 +2150,108 @@ impl OpenTableBridge {
                         deck.distance.get(&p_id).copied().unwrap_or(0) as i64
                     } else {
                         0
+                    }
+                } else {
+                    0
+                }
+            }
+            _ => 0,
+        }
+    }
+
+    #[func]
+    pub fn get_crisis_territory_owner(&self, territory_id: i64) -> i64 {
+        let t_id = crisis_game::TerritoryId(territory_id.clamp(0, 29) as u8);
+        match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::Replay { session, .. }
+            | BridgeMode::Tournament { session, .. } => {
+                if let Some(res) = session
+                    .world()
+                    .get_resource::<crisis_game::TerritoryStateResource>()
+                {
+                    res.owners.get(&t_id).map(|p| p.0 as i64).unwrap_or(0)
+                } else {
+                    0
+                }
+            }
+            _ => 0,
+        }
+    }
+
+    #[func]
+    pub fn get_crisis_territory_armies(&self, territory_id: i64) -> i64 {
+        let t_id = crisis_game::TerritoryId(territory_id.clamp(0, 29) as u8);
+        match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::Replay { session, .. }
+            | BridgeMode::Tournament { session, .. } => {
+                if let Some(res) = session
+                    .world()
+                    .get_resource::<crisis_game::TerritoryStateResource>()
+                {
+                    res.armies.get(&t_id).copied().unwrap_or(0) as i64
+                } else {
+                    0
+                }
+            }
+            _ => 0,
+        }
+    }
+
+    #[func]
+    pub fn get_crisis_turn_phase(&self) -> GString {
+        match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::Replay { session, .. }
+            | BridgeMode::Tournament { session, .. } => {
+                if let Some(res) = session
+                    .world()
+                    .get_resource::<crisis_game::TurnStateResource>()
+                {
+                    match &res.phase {
+                        crisis_game::TurnPhase::PlaceArmies { armies_remaining } => {
+                            GString::from(format!("PlaceArmies:{}", armies_remaining))
+                        }
+                        crisis_game::TurnPhase::Attack => GString::from("Attack"),
+                        crisis_game::TurnPhase::Fortify => GString::from("Fortify"),
+                        crisis_game::TurnPhase::EndTurn => GString::from("EndTurn"),
+                    }
+                } else {
+                    GString::from("")
+                }
+            }
+            _ => GString::from(""),
+        }
+    }
+
+    #[func]
+    pub fn get_crisis_remaining_armies(&self) -> i64 {
+        match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::Replay { session, .. }
+            | BridgeMode::Tournament { session, .. } => {
+                if let Some(res) = session
+                    .world()
+                    .get_resource::<crisis_game::TurnStateResource>()
+                {
+                    match &res.phase {
+                        crisis_game::TurnPhase::PlaceArmies { armies_remaining } => {
+                            *armies_remaining as i64
+                        }
+                        _ => 0,
                     }
                 } else {
                     0
