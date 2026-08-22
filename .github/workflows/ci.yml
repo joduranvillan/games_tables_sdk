@@ -159,6 +159,8 @@ jobs:
 
           echo "Compiling Swift plugin for iOS Device (arm64)..."
           swiftc -parse-as-library \
+            -module-name OpenTableMultipeer \
+            -whole-module-optimization \
             -target arm64-apple-ios15.0 \
             -sdk "$IPHONEOS_SDK" \
             -emit-object \
@@ -169,6 +171,8 @@ jobs:
 
           echo "Compiling Swift plugin for iOS Simulator (arm64)..."
           swiftc -parse-as-library \
+            -module-name OpenTableMultipeer \
+            -whole-module-optimization \
             -target arm64-apple-ios15.0-simulator \
             -sdk "$IPHONESIM_SDK" \
             -emit-object \
