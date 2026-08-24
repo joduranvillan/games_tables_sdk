@@ -114,6 +114,7 @@ pub fn derive_game_resource(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl ::open_table_core::resource::Resource for #ident {}
+        impl ::bevy_ecs::component::Component for #ident {}
         impl ::bevy_ecs::resource::Resource for #ident {}
     };
 
