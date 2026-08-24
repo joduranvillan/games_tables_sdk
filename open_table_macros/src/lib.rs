@@ -111,14 +111,15 @@ pub fn derive_game_event(input: TokenStream) -> TokenStream {
 pub fn derive_game_resource(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     let expanded = quote! {
-        impl ::open_table_core::resource::Resource for #ident {}
-        impl ::bevy_ecs::component::Component for #ident {
+        impl #impl_generics ::open_table_core::resource::Resource for #ident #ty_generics #where_clause {}
+        impl #impl_generics ::bevy_ecs::component::Component for #ident #ty_generics #where_clause {
             const STORAGE_TYPE: ::bevy_ecs::component::StorageType = ::bevy_ecs::component::StorageType::SparseSet;
             type Mutability = ::bevy_ecs::component::Mutable;
         }
-        impl ::bevy_ecs::resource::Resource for #ident {}
+        impl #impl_generics ::bevy_ecs::resource::Resource for #ident #ty_generics #where_clause {}
     };
 
     expanded.into()
@@ -131,10 +132,11 @@ pub fn derive_game_resource(input: TokenStream) -> TokenStream {
 pub fn derive_game_component(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     let expanded = quote! {
-        impl ::open_table_core::component::Component for #ident {}
-        impl ::bevy_ecs::component::Component for #ident {
+        impl #impl_generics ::open_table_core::component::Component for #ident #ty_generics #where_clause {}
+        impl #impl_generics ::bevy_ecs::component::Component for #ident #ty_generics #where_clause {
             const STORAGE_TYPE: ::bevy_ecs::component::StorageType = ::bevy_ecs::component::StorageType::Table;
             type Mutability = ::bevy_ecs::component::Mutable;
         }
