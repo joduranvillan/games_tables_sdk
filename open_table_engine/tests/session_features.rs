@@ -34,7 +34,7 @@ impl Event for DummyEvent {
     }
 }
 
-#[derive(bevy_ecs::system::Resource, Clone, Debug, PartialEq, Eq)]
+#[derive(bevy_ecs::prelude::Resource, Clone, Debug, PartialEq, Eq)]
 struct StateResource {
     pub value: u32,
     pub version: u32,

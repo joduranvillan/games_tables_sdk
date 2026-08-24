@@ -24,7 +24,7 @@ use bevy_ecs::world::World as BevyWorld;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use open_table_core::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;

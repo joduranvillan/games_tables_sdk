@@ -105,7 +105,7 @@ pub fn derive_game_event(input: TokenStream) -> TokenStream {
 }
 
 /// `#[derive(GameResource)]`: implementa tanto `open_table_core::Resource`
-/// (el marcador del SDK) como `bevy_ecs::system::Resource` (lo que
+/// (el marcador del SDK) como `bevy_ecs::resource::Resource` (lo que
 /// `Session`/`RuleEngine` necesitan para poder insertarlo en el `World`).
 #[proc_macro_derive(GameResource)]
 pub fn derive_game_resource(input: TokenStream) -> TokenStream {
@@ -114,18 +114,15 @@ pub fn derive_game_resource(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl ::open_table_core::resource::Resource for #ident {}
-        impl ::bevy_ecs::system::Resource for #ident {}
+        impl ::bevy_ecs::resource::Resource for #ident {}
     };
 
     expanded.into()
 }
 
 /// `#[derive(GameComponent)]`: implementa tanto `open_table_core::Component`
-/// como `bevy_ecs::component::Component` (con `Storage = TableStorage`,
-/// la estrategia por defecto - suficiente para el 95% de los componentes
-/// de un juego de mesa; si algún día hace falta `SparseStorage` para un
-/// componente muy disperso, esa struct puede implementar el trait a mano
-/// en lugar de usar el derive).
+/// como `bevy_ecs::component::Component` (con la estrategia de almacenamiento
+/// TableStorage por defecto).
 #[proc_macro_derive(GameComponent)]
 pub fn derive_game_component(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -133,9 +130,7 @@ pub fn derive_game_component(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl ::open_table_core::component::Component for #ident {}
-        impl ::bevy_ecs::component::Component for #ident {
-            type Storage = ::bevy_ecs::component::TableStorage;
-        }
+        impl ::bevy_ecs::component::Component for #ident {}
     };
 
     expanded.into()

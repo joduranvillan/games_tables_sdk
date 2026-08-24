@@ -6,6 +6,7 @@
 //! enum y lo registre con `#[derive(GameResource)]` de `open_table_macros`
 //! (ya tenés ese mecanismo, no hace falta nada nuevo en el core para eso).
 
+use bevy_ecs::prelude::Resource;
 use open_table_core::ids::PlayerId;
 use serde::{Deserialize, Serialize};
 
@@ -93,5 +94,5 @@ impl TurnOrder {
 /// Recurso de bevy_ecs que envuelve `TurnOrder`. Mismo patrón que
 /// `RandomResource`: la lógica vive en el tipo puro (`TurnOrder`), acá
 /// solo se agrega el `#[derive(Resource)]` que bevy_ecs exige.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, bevy_ecs::system::Resource)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Resource)]
 pub struct TurnResource(pub TurnOrder);
