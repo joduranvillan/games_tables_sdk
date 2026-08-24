@@ -19,6 +19,7 @@
 use std::io::{Read, Write};
 use std::time::{Duration, Instant};
 
+use bevy_ecs::prelude::Resource;
 use bevy_ecs::world::World as BevyWorld;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
@@ -34,7 +35,7 @@ use crate::rule_engine::RuleEngine;
 use crate::turn::{TurnOrder, TurnResource};
 
 /// Recurso de bevy_ecs que indica el ganador de la partida.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, bevy_ecs::system::Resource)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Resource)]
 pub struct WinnerResource(pub Option<PlayerId>);
 
 /// Modo de sesión: Local (un solo dispositivo) u Online (red).
@@ -58,21 +59,21 @@ impl Event for ForfeitEvent {
 }
 
 /// Recurso para rastrear timeouts de reconexión por jugador.
-#[derive(Debug, Clone, bevy_ecs::system::Resource)]
+#[derive(Debug, Clone, Resource)]
 pub struct ReconnectionTimeoutResource {
     pub timeouts: std::collections::HashMap<PlayerId, (Instant, Duration)>,
 }
 
 /// Recurso de bevy_ecs que envuelve `RandomService`.
-#[derive(Debug, Clone, Serialize, Deserialize, bevy_ecs::system::Resource)]
+#[derive(Debug, Clone, Serialize, Deserialize, Resource)]
 pub struct RandomResource(pub RandomService);
 
 /// Recurso de bevy_ecs que indica si la partida ha terminado.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, bevy_ecs::system::Resource)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Resource)]
 pub struct GameOverResource(pub bool);
 
 /// Recurso de bevy_ecs que envuelve la `GameVariant`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, bevy_ecs::system::Resource)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Resource)]
 pub struct GameVariantResource(pub GameVariant);
 
 /// Metadatos de la sesión.
@@ -84,26 +85,26 @@ pub struct SessionMetadata {
 }
 
 /// Recurso de bevy_ecs que almacena los metadatos de la sesión.
-#[derive(Debug, Clone, Serialize, Deserialize, bevy_ecs::system::Resource)]
+#[derive(Debug, Clone, Serialize, Deserialize, Resource)]
 pub struct SessionMetadataResource(pub SessionMetadata);
 
 type EventHandlerFn = std::sync::Arc<dyn Fn(&dyn Event) + Send + Sync + 'static>;
 
 /// Handler callbacks para eventos suscriptos via `on_event`.
-#[derive(Default, bevy_ecs::system::Resource)]
+#[derive(Default, Resource)]
 pub struct EventHandlersResource {
     pub handlers: Vec<(std::any::TypeId, EventHandlerFn)>,
 }
 
 /// Recurso para limitar la tasa de comandos por jugador.
-#[derive(Debug, Clone, bevy_ecs::system::Resource)]
+#[derive(Debug, Clone, Resource)]
 pub struct RateLimitResource {
     pub max_commands_per_second: u32,
     pub history: std::collections::HashMap<PlayerId, Vec<Instant>>,
 }
 
 /// Recurso de bevy_ecs que gestiona el temporizador de turno.
-#[derive(Debug, Clone, bevy_ecs::system::Resource)]
+#[derive(Debug, Clone, Resource)]
 pub struct TimerResource {
     pub start: Instant,
     pub duration: Duration,
@@ -147,16 +148,13 @@ pub trait ResourceWatcher: Send + Sync {
     fn check_and_notify(&mut self, world: &BevyWorld);
 }
 
-struct TypedResourceWatcher<
-    R: bevy_ecs::system::Resource + Clone + 'static,
-    F: Fn(&R) + Send + Sync + 'static,
-> {
+struct TypedResourceWatcher<R: Resource + Clone + 'static, F: Fn(&R) + Send + Sync + 'static> {
     handler: F,
     _phantom: std::marker::PhantomData<R>,
 }
 
-impl<R: bevy_ecs::system::Resource + Clone + 'static, F: Fn(&R) + Send + Sync + 'static>
-    ResourceWatcher for TypedResourceWatcher<R, F>
+impl<R: Resource + Clone + 'static, F: Fn(&R) + Send + Sync + 'static> ResourceWatcher
+    for TypedResourceWatcher<R, F>
 {
     fn check_and_notify(&mut self, world: &BevyWorld) {
         if world.is_resource_changed::<R>() {
@@ -181,7 +179,7 @@ pub trait LegalMoveGenerator: Send + Sync + 'static {
     }
 }
 
-#[derive(bevy_ecs::system::Resource, Clone)]
+#[derive(Resource, Clone)]
 pub struct LegalMoveGeneratorResource(pub std::sync::Arc<dyn LegalMoveGenerator>);
 
 pub struct Session {
@@ -285,7 +283,7 @@ impl Session {
         self.middlewares.push(Box::new(mw));
     }
 
-    pub fn watch<R: bevy_ecs::system::Resource + Clone + 'static>(
+    pub fn watch<R: Resource + Clone + 'static>(
         &mut self,
         handler: impl Fn(&R) + Send + Sync + 'static,
     ) {
