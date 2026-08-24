@@ -40,7 +40,24 @@ pub fn new_backgammon_session(
         vec![increasing, decreasing],
         build_backgammon_rules(),
     );
-    let setup = move |world: &mut BevyWorld| {
+    session
+        .world_mut()
+        .insert_resource(BoardResource::standard_setup(increasing, decreasing));
+    session.world_mut().insert_resource(Sides {
+        increasing,
+        decreasing,
+    });
+    session
+        .world_mut()
+        .insert_resource(PendingDiceResource::default());
+    session
+        .world_mut()
+        .insert_resource(DoublingCubeResource::default());
+    session
+        .world_mut()
+        .insert_resource(MatchStateResource::default());
+
+    session.set_initial_setup(move |world| {
         world.insert_resource(BoardResource::standard_setup(increasing, decreasing));
         world.insert_resource(Sides {
             increasing,
@@ -49,8 +66,7 @@ pub fn new_backgammon_session(
         world.insert_resource(PendingDiceResource::default());
         world.insert_resource(DoublingCubeResource::default());
         world.insert_resource(MatchStateResource::default());
-    };
-    setup(session.world_mut());
-    session.set_initial_setup(setup);
+    });
+
     session
 }
