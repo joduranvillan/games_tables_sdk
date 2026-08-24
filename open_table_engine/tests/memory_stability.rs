@@ -1,7 +1,6 @@
 use checkers_game::commands::MovePieceCommand;
 use checkers_game::{new_checkers_session, Position};
 use open_table_core::ids::{PlayerId, SessionId};
-use open_table_engine::prelude::*;
 
 #[cfg(target_os = "linux")]
 fn get_rss_bytes() -> usize {
@@ -40,7 +39,7 @@ fn test_memory_stability_10k_commands() {
     // If we just use `process_command` with a MovePieceCommand, it will get rejected by rules
     // (e.g. invalid move) but it exercises the engine's command processing pipeline.
 
-    let invalid_move = Box::new(MovePieceCommand {
+    let _invalid_move = Box::new(MovePieceCommand {
         player: p1,
         from: Position::new(0, 0),
         to: Position::new(0, 0), // obviously invalid in checkers

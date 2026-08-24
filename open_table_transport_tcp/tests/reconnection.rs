@@ -319,7 +319,7 @@ fn test_reconexion_con_eventos_reales_de_checkers() {
 
     let (mut p1_transport, p1, p1_token) =
         TcpClientTransport::connect_as_new_player(addr, "Player1").unwrap();
-    let (mut p2_transport, p2, _p2_token) =
+    let (_p2_transport, p2, _p2_token) =
         TcpClientTransport::connect_as_new_player(addr, "Player2").unwrap();
 
     let _ = wait_for_data(
@@ -351,7 +351,7 @@ fn test_reconexion_con_eventos_reales_de_checkers() {
     p1_transport.disconnect().unwrap();
     drop(p1_transport);
 
-    let disconnect_event = wait_until(
+    let _disconnect_event = wait_until(
         || {
             host_transport
                 .poll_connection_events()
@@ -363,7 +363,7 @@ fn test_reconexion_con_eventos_reales_de_checkers() {
 
     let mut p1_transport = TcpClientTransport::reconnect(addr, p1, p1_token).unwrap();
 
-    let reconnect_event = wait_until(
+    let _reconnect_event = wait_until(
         || {
             host_transport
                 .poll_connection_events()
@@ -407,7 +407,7 @@ fn test_reconexion_con_eventos_reales_de_chess() {
 
     let (mut p1_transport, p1, p1_token) =
         TcpClientTransport::connect_as_new_player(addr, "Player1").unwrap();
-    let (mut p2_transport, p2, _p2_token) =
+    let (_p2_transport, p2, _p2_token) =
         TcpClientTransport::connect_as_new_player(addr, "Player2").unwrap();
 
     let _ = wait_for_data(
@@ -439,7 +439,7 @@ fn test_reconexion_con_eventos_reales_de_chess() {
     p1_transport.disconnect().unwrap();
     drop(p1_transport);
 
-    let disconnect_event = wait_until(
+    let _disconnect_event = wait_until(
         || {
             host_transport
                 .poll_connection_events()
@@ -451,7 +451,7 @@ fn test_reconexion_con_eventos_reales_de_chess() {
 
     let mut p1_transport = TcpClientTransport::reconnect(addr, p1, p1_token).unwrap();
 
-    let reconnect_event = wait_until(
+    let _reconnect_event = wait_until(
         || {
             host_transport
                 .poll_connection_events()
@@ -495,7 +495,7 @@ fn test_reconexion_con_eventos_reales_de_go() {
 
     let (mut p1_transport, p1, p1_token) =
         TcpClientTransport::connect_as_new_player(addr, "Player1").unwrap();
-    let (mut p2_transport, p2, _p2_token) =
+    let (_p2_transport, p2, _p2_token) =
         TcpClientTransport::connect_as_new_player(addr, "Player2").unwrap();
 
     let _ = wait_for_data(
@@ -527,7 +527,7 @@ fn test_reconexion_con_eventos_reales_de_go() {
     p1_transport.disconnect().unwrap();
     drop(p1_transport);
 
-    let disconnect_event = wait_until(
+    let _disconnect_event = wait_until(
         || {
             host_transport
                 .poll_connection_events()
@@ -539,7 +539,7 @@ fn test_reconexion_con_eventos_reales_de_go() {
 
     let mut p1_transport = TcpClientTransport::reconnect(addr, p1, p1_token).unwrap();
 
-    let reconnect_event = wait_until(
+    let _reconnect_event = wait_until(
         || {
             host_transport
                 .poll_connection_events()
