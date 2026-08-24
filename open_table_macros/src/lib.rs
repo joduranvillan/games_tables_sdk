@@ -114,7 +114,10 @@ pub fn derive_game_resource(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl ::open_table_core::resource::Resource for #ident {}
-        impl ::bevy_ecs::component::Component for #ident {}
+        impl ::bevy_ecs::component::Component for #ident {
+            const STORAGE_TYPE: ::bevy_ecs::component::StorageType = ::bevy_ecs::component::StorageType::Table;
+            type Mutability = ::bevy_ecs::component::Mutable;
+        }
         impl ::bevy_ecs::resource::Resource for #ident {}
     };
 
@@ -131,7 +134,10 @@ pub fn derive_game_component(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl ::open_table_core::component::Component for #ident {}
-        impl ::bevy_ecs::component::Component for #ident {}
+        impl ::bevy_ecs::component::Component for #ident {
+            const STORAGE_TYPE: ::bevy_ecs::component::StorageType = ::bevy_ecs::component::StorageType::Table;
+            type Mutability = ::bevy_ecs::component::Mutable;
+        }
     };
 
     expanded.into()
