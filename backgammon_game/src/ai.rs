@@ -234,6 +234,9 @@ mod tests {
     fn test_backgammon_ai_saca_ficha_de_barra_cuando_puede() {
         let mut session = new_backgammon_session(SessionId(1), 1, P1, P2);
 
+        // Set P1 as current player
+        session.world_mut().resource_mut::<TurnResource>().current_player = P1;
+
         // Colocar ficha en la barra para P1
         session
             .world_mut()
@@ -261,6 +264,9 @@ mod tests {
     #[test]
     fn test_backgammon_ai_prefiere_crear_bloque_sobre_dejar_blot() {
         let mut session = new_backgammon_session(SessionId(1), 1, P1, P2);
+
+        // Set P1 as current player
+        session.world_mut().resource_mut::<TurnResource>().current_player = P1;
 
         // Limpiamos el tablero para configurar una posición controlada
         {
