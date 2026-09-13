@@ -107,6 +107,13 @@ pub fn derive_game_event(input: TokenStream) -> TokenStream {
 /// `#[derive(GameResource)]`: implementa tanto `open_table_core::Resource`
 /// (el marcador del SDK) como `bevy_ecs::resource::Resource` (lo que
 /// `Session`/`RuleEngine` necesitan para poder insertarlo en el `World`).
+///
+/// En bevy_ecs 0.19+, Resource es un subtrait de Component. El `#[derive(Resource)]`
+/// de bevy genera:
+/// - Component con `StorageType::SparseSet`
+/// - `register_required_components` que registra `IsResource` (sin esto, `resource_mut`
+///   no puede localizar el recurso en el World en tiempo de ejecución)
+/// - Resource como marcador vacío
 #[proc_macro_derive(GameResource)]
 pub fn derive_game_resource(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -115,10 +122,30 @@ pub fn derive_game_resource(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl #impl_generics ::open_table_core::resource::Resource for #ident #ty_generics #where_clause {}
+
         impl #impl_generics ::bevy_ecs::component::Component for #ident #ty_generics #where_clause {
-            const STORAGE_TYPE: ::bevy_ecs::component::StorageType = ::bevy_ecs::component::StorageType::Table;
+            const STORAGE_TYPE: ::bevy_ecs::component::StorageType =
+                ::bevy_ecs::component::StorageType::SparseSet;
             type Mutability = ::bevy_ecs::component::Mutable;
+
+            fn register_required_components(
+                _requiree: ::bevy_ecs::component::ComponentId,
+                required_components: &mut ::bevy_ecs::component::RequiredComponentsRegistrator,
+            ) {
+                let resource_component_id =
+                    if let ::std::option::Option::Some(id) =
+                        required_components.components_registrator().component_id::<#ident #ty_generics>()
+                    {
+                        id
+                    } else {
+                        required_components.components_registrator().register_component::<#ident #ty_generics>()
+                    };
+                required_components.register_required::<::bevy_ecs::resource::IsResource>(
+                    move || ::bevy_ecs::resource::IsResource::new(resource_component_id),
+                );
+            }
         }
+
         impl #impl_generics ::bevy_ecs::resource::Resource for #ident #ty_generics #where_clause {}
     };
 

@@ -398,7 +398,7 @@ pub struct OpenTableBridge {
     mode: BridgeMode,
     current_game_type: String,
     undone_commands: Vec<(PlayerId, String)>,
-    recent_events: Vec<Dictionary>,
+    recent_events: Vec<Dictionary<Variant, Variant>>,
     chess_ai_depth: u8,
 }
 
@@ -490,8 +490,8 @@ impl OpenTableBridge {
     fn attack_resolved(
         from_id: i64,
         to_id: i64,
-        attacker_rolls: VariantArray,
-        defender_rolls: VariantArray,
+        attacker_rolls: Array<Variant>,
+        defender_rolls: Array<Variant>,
         attacker_losses: i64,
         defender_losses: i64,
     );
@@ -518,7 +518,7 @@ impl OpenTableBridge {
     fn tournament_match_ended(winner: i64, round: i64);
 
     #[signal]
-    fn tournament_over(standings: Dictionary);
+    fn tournament_over(standings: Dictionary<Variant, Variant>);
 
     // ------------------------------------------------------------------
     // LOCAL (hotseat)
@@ -744,7 +744,7 @@ impl OpenTableBridge {
     fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
         if let Ok(arr) = players.try_to::<Array<i64>>() {
             arr.iter_shared().map(|p| PlayerId(p as u32)).collect()
-        } else if let Ok(arr) = players.try_to::<VariantArray>() {
+        } else if let Ok(arr) = players.try_to::<Array<Variant>>() {
             arr.iter_shared()
                 .filter_map(|p| p.try_to::<i64>().ok())
                 .map(|p| PlayerId(p as u32))
@@ -1139,7 +1139,7 @@ impl OpenTableBridge {
                 .and_then(|(_, s)| s.export_chess_pgn()),
             _ => None,
         };
-        GString::from(pgn_opt.unwrap_or_default())
+        GString::from(pgn_opt.unwrap_or_default().as_str())
     }
 
     // ------------------------------------------------------------------
@@ -1177,7 +1177,7 @@ impl OpenTableBridge {
             game_type: game_type.to_string(),
         };
         match open_table_qr::generate_join_qr_svg(&payload) {
-            Ok(svg) => GString::from(svg),
+            Ok(svg) => GString::from(svg.as_str()),
             Err(_) => GString::from(""),
         }
     }
@@ -1661,7 +1661,7 @@ impl OpenTableBridge {
     }
 
     #[func]
-    pub fn get_legal_moves(&self, player_id: i64) -> Array<Dictionary> {
+    pub fn get_legal_moves(&self, player_id: i64) -> Array<Dictionary<Variant, Variant>> {
         let player = PlayerId(player_id as u32);
         let moves_json = match &self.mode {
             BridgeMode::Local { session, .. }
@@ -1681,7 +1681,7 @@ impl OpenTableBridge {
         for val in moves_json {
             if let Ok(json_str) = serde_json::to_string(&val) {
                 let parsed_var = godot::classes::Json::parse_string(&GString::from(&json_str));
-                if let Ok(dict) = parsed_var.try_to::<Dictionary>() {
+                if let Ok(dict) = parsed_var.try_to::<Dictionary<Variant, Variant>>() {
                     godot_array.push(&dict);
                 }
             }
@@ -2066,7 +2066,7 @@ impl OpenTableBridge {
     }
 
     #[func]
-    pub fn get_recent_events(&self) -> Array<Dictionary> {
+    pub fn get_recent_events(&self) -> Array<Dictionary<Variant, Variant>> {
         let mut arr = Array::new();
         for dict in &self.recent_events {
             arr.push(dict);
@@ -2220,7 +2220,7 @@ impl OpenTableBridge {
                 {
                     match &res.phase {
                         crisis_game::TurnPhase::PlaceArmies { armies_remaining } => {
-                            GString::from(format!("PlaceArmies:{}", armies_remaining))
+                            GString::from(format!("PlaceArmies:{}", armies_remaining).as_str())
                         }
                         crisis_game::TurnPhase::Attack => GString::from("Attack"),
                         crisis_game::TurnPhase::Fortify => GString::from("Fortify"),
@@ -2750,7 +2750,7 @@ impl OpenTableBridge {
             if let Ok(json) = serde_json::to_string(event) {
                 self.emit_bridge_signal("event_json", &[Variant::from(json.clone())]);
                 let parsed_var = godot::classes::Json::parse_string(&GString::from(&json));
-                if let Ok(dict) = parsed_var.try_to::<Dictionary>() {
+                if let Ok(dict) = parsed_var.try_to::<Dictionary<Variant, Variant>>() {
                     self.recent_events.push(dict);
                     if self.recent_events.len() > 100 {
                         self.recent_events.remove(0);
@@ -2854,11 +2854,11 @@ impl OpenTableBridge {
             }
 
             if let Some(c_attack) = event.as_any().downcast_ref::<AttackResolvedEvent>() {
-                let mut att_rolls = VariantArray::new();
+                let mut att_rolls = Array::<Variant>::new();
                 for &r in &c_attack.attacker_rolls {
                     att_rolls.push(&Variant::from(r as i64));
                 }
-                let mut def_rolls = VariantArray::new();
+                let mut def_rolls = Array::<Variant>::new();
                 for &r in &c_attack.defender_rolls {
                     def_rolls.push(&Variant::from(r as i64));
                 }
@@ -2962,9 +2962,9 @@ impl OpenTableBridge {
                     let p2 = next_m.player2.0 as i64;
                     let r = next_m.round as i64;
                     let turn = session.current_player().0 as i64;
-                    (round, Some((p1, p2, r, turn)), false, Dictionary::new())
+                    (round, Some((p1, p2, r, turn)), false, Dictionary::<i64, i64>::new())
                 } else {
-                    let mut dict = Dictionary::new();
+                    let mut dict = Dictionary::<i64, i64>::new();
                     for (pid, score) in scores.iter() {
                         let _ = dict.insert(pid.0 as i64, *score as i64);
                     }

@@ -30,6 +30,7 @@ pub use resources::{
     PlayersResource, TerritoryMapResource, TerritoryStateResource, TurnPhase, TurnPhaseResource,
     TurnStateResource,
 };
+use open_table_engine::turn::TurnResource;
 pub use rules::{build_crisis_rules, is_valid_card_set};
 
 use open_table_engine::prelude::*;
@@ -78,7 +79,11 @@ pub fn new_crisis_session(
     session
         .world_mut()
         .insert_resource(PlayersResource::new(players));
-    session.world_mut().insert_resource(territory_state);
+    // Insertar explícitamente como el tipo que el test espera.
+    session.world_mut().insert_resource(territory_state.clone());
+    // Probamos a registrarlo específicamente bajo el alias, esperando que Bevy lo gestione correctamente.
+    session.world_mut().insert_resource::<TerritoryMapResource>(territory_state);
+    
     session.world_mut().insert_resource(TurnStateResource {
         phase: TurnPhase::PlaceArmies {
             armies_remaining: extra_armies,
@@ -99,7 +104,16 @@ pub fn new_crisis_session(
         .insert_resource(PlayerCardsResource::default());
     session
         .world_mut()
+        .insert_resource(TurnResource(TurnOrder::new(players.to_vec())));
+    session
+        .world_mut()
         .insert_resource(PlayerObjectivesResource::default());
+    session
+        .world_mut()
+        .insert_resource(GameOverResource(false));
+    session
+        .world_mut()
+        .insert_resource(WinnerResource(None));
 
     Ok(session)
 }

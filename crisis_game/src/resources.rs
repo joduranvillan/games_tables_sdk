@@ -30,7 +30,7 @@ impl Default for BoardResource {
     }
 }
 
-#[derive(GameResource, Default)]
+#[derive(GameResource, Default, Clone)]
 pub struct TerritoryStateResource {
     pub owners: HashMap<TerritoryId, PlayerId>,
     pub armies: HashMap<TerritoryId, u32>,
