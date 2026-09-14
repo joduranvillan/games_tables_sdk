@@ -423,6 +423,7 @@ impl INode for OpenTableBridge {
 #[godot_api]
 impl OpenTableBridge {
     // --- SIGNALS ---
+    #[allow(clippy::too_many_arguments)]
     #[signal]
     fn piece_moved(
         player: i64,
@@ -1202,7 +1203,7 @@ impl OpenTableBridge {
 
     #[func]
     pub fn connect_to_host(&mut self, host: GString, port: i64, player_name: GString) -> bool {
-        let addr = format!("{}:{}", host.to_string(), port);
+        let addr = format!("{}:{}", host, port);
         match TcpClientTransport::connect_as_new_player(&addr, &player_name.to_string()) {
             Ok((transport, player_id, reconnect_token)) => {
                 self.mode = BridgeMode::Client {
@@ -1233,7 +1234,7 @@ impl OpenTableBridge {
         arg3: Variant,
         arg4: Variant,
     ) -> bool {
-        let addr = format!("{}:{}", host.to_string(), port);
+        let addr = format!("{}:{}", host, port);
         let mut player_id = PlayerId(2);
         let mut token = String::new();
 
@@ -1953,7 +1954,7 @@ impl OpenTableBridge {
         }
 
         if let Some((_, _, cmd)) = last_logged {
-            let sender = cmd.issuer().unwrap_or_else(|| PlayerId(1));
+            let sender = cmd.issuer().unwrap_or(PlayerId(1));
             if let Ok(json_str) = serde_json::to_string(&cmd) {
                 self.undone_commands.push((sender, json_str));
             }

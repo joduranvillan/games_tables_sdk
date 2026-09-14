@@ -4,7 +4,6 @@ use crate::board::{BoardResource, Sides, POINTS};
 use crate::commands::MoveCheckerCommand;
 use crate::dice::PendingDiceResource;
 use crate::resources::{DoublingCubeResource, MatchStateResource};
-use crate::build_backgammon_rules;
 
 /// Clona el estado actual de la sesión de Backgammon para evaluar jugadas candidatas.
 pub fn clone_backgammon_session(session: &Session) -> Session {
@@ -226,6 +225,7 @@ pub fn backgammon_ai_pick_move(session: &Session, player: PlayerId) -> Option<Mo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::build_backgammon_rules;
     use crate::new_backgammon_session;
 
     const P1: PlayerId = PlayerId(1);

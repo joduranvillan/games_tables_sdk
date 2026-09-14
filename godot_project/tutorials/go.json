@@ -1,0 +1,6 @@
+[
+  {"text": "Go is played on a grid. Players place stones on intersections."},
+  {"text": "Surround opponent stones to capture them."},
+  {"text": "The goal is to control more territory than your opponent."},
+  {"text": "The game ends when no more legal moves can be made."}
+]
