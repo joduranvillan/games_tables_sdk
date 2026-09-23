@@ -69,7 +69,32 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
 - [x] **346.** UI de Ludo mejorada: fichas numeradas, camino casilla a casilla, casillas seguras y animación de dado (`ludo_board.gd`)
 - [x] **347.** UI de Go mejorada: puntos hoshi, animación de escala, contador de capturas y territorio final (`go_board.gd`)
 
-## 5. Para publicación en crates.io
+## 5. Cierre Gráfico y Usabilidad (PROMPTS7)
+
+- [x] **375.** Conexión de IA de Go (9x9) en el Menú Principal (`main_menu.gd`)
+- [x] **376.** Conexión de IA de Ludo en el Menú Principal (`main_menu.gd`)
+- [x] **377.** Popup y botón de Reglas en Ajedrez (`chess_board.gd`)
+- [x] **378.** Popup y botón de Reglas en Go (`go_board.gd`)
+- [x] **379.** Popup y botón de Reglas en Shogi (`shogi_board.gd`)
+- [x] **380.** Popup y botón de Reglas en Batalla Naval (`battleship_board.gd`)
+- [x] **381.** Integración del Menú de Pausa (`pause_menu.tscn`) en los 13 tableros de juego
+- [x] **382.** Fila de Multijugador (Crear partida en red y Unirse con QR) en el Menú Principal (`main_menu.gd`)
+- [x] **384.** Notificación de fin de partida a `AchievementManager` (`game_over_overlay.gd`)
+- [x] **385.** Smoke test ampliado para IA de Go y Ludo (`tests/ai_local_smoke.gd`)
+- [x] **386.** Smoke test de menú de pausa (`tests/pause_menu_smoke.gd`)
+- [x] **387.** Verificación de métodos de hosting y conexión de red en bridge (`tests/multi_session_smoke.gd`)
+- [x] **388.** Escena de menú de pausa (`pause_menu.tscn`)
+- [x] **389.** Escena de lobby de red (`host_lobby.tscn`)
+
+## 6. Para versión 1.0.0 — Pendiente Gráfico
+- [ ] Pantalla de créditos / "Acerca de"
+- [ ] Temas visuales aplicables per-game (no solo global)
+- [ ] Modo espectador con UI dedicada (actualmente solo datos, sin tablero dedicado)
+- [ ] Soporte full-screen y escalado adaptativo en resoluciones 4K
+- [ ] Plugin Android compilado y test en dispositivo físico
+- [ ] iOS: OpenTableMultipeer compilado con Xcode
+
+## 7. Para publicación en crates.io
 
 - [x] Doubling cube Backgammon (prompt 310) — ✅ Implementado
 - [x] Jump-in UNO (prompt 311) — ✅ Implementado
@@ -78,7 +103,7 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
 - [ ] Versión semántica 0.1.0 en todos los `Cargo.toml`
 - [ ] Documentación pública en `docs.rs` (verificar `cargo doc --workspace --no-deps`)
 
-## 6. Deuda Técnica Conocida
+## 8. Deuda Técnica Conocida
 
 - **0 TODOs activos** en el código fuente de los crates de Rust y GDScript.
 - **Plugins nativos móviles (`platform_plugins/`)**: `OpenTableNearby` (Android) y `OpenTableMultipeer` (iOS) probados en arquitectura mock/unit-test; requieren compilación nativa en Android Studio / Xcode.

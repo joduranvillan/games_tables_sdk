@@ -99,6 +99,7 @@ var captured_black_pieces: Array = []
 
 var current_theme: BoardTheme
 var rules_popup: RulesPopup
+var _pause_menu: CanvasLayer
 
 @onready var status: Label = $Status
 
@@ -136,6 +137,17 @@ func _ready() -> void:
 	current = bridge.current_player()
 	_update_status()
 	queue_redraw()
+
+	if not OS.has_feature("headless"):
+		_pause_menu = load("res://pause_menu.tscn").instantiate()
+		_pause_menu.connect("quit_game_requested", _on_quit_to_menu)
+		add_child(_pause_menu)
+
+func _on_quit_to_menu() -> void:
+	if has_node("/root/SceneManager"):
+		get_node("/root/SceneManager").transition_to("res://main.tscn")
+	else:
+		get_tree().change_scene_to_file("res://main.tscn")
 
 func _on_theme_changed(theme: BoardTheme) -> void:
 	current_theme = theme

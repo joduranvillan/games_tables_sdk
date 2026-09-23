@@ -291,6 +291,7 @@ var rules_popup: RulesPopup
 var dice_popup: PopupPanel
 var dice_label: Label
 var dice_widget: DiceWidget
+var _pause_menu: CanvasLayer
 
 # Pulse animation timer
 var pulse_time: float = 0.0
@@ -343,6 +344,17 @@ func _ready() -> void:
 	_sync_all_from_bridge()
 	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
 	_update_ui_state()
+
+	if not OS.has_feature("headless"):
+		_pause_menu = load("res://pause_menu.tscn").instantiate()
+		_pause_menu.connect("quit_game_requested", _on_quit_to_menu)
+		add_child(_pause_menu)
+
+func _on_quit_to_menu() -> void:
+	if has_node("/root/SceneManager"):
+		get_node("/root/SceneManager").transition_to("res://main.tscn")
+	else:
+		get_tree().change_scene_to_file("res://main.tscn")
 
 func _process(delta: float) -> void:
 	pulse_time += delta * 4.0

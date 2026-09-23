@@ -58,6 +58,14 @@ func get_viewport_rect() -> Rect2:
 	return Rect2(0, 0, 1024, 600)
 
 func show_result(winner_id: int, is_draw: bool) -> void:
+	# Notificar logros
+	if has_node("/root/AchievementManager"):
+		var am := get_node("/root/AchievementManager")
+		if not is_draw and am.has_method("on_game_won"):
+			am.on_game_won(winner_id, GameManager.get_active_game())
+		elif is_draw and am.has_method("on_game_draw"):
+			am.on_game_draw(GameManager.get_active_game())
+
 	if is_draw:
 		if title_label:
 			title_label.text = "¡Empate!"

@@ -711,3 +711,20 @@ versión 1.0.0. Documentar cualquier decisión de diseño tomada durante la impl
 
 *Total acumulado: 392 prompts (PROMPTS1–7).*
 *Total PROMPTS7: 18 prompts (375–392).*
+
+---
+
+## 8. Estado Final (cierre)
+
+Todos los prompts de PROMPTS7 (375–392) han sido completados:
+
+| Componente | Estado | Detalle |
+|---|:---:|---|
+| **IA Go en menú** | ✅ | Enlazado a `start_local_match_go_vs_ai(1, 2, 9)` con selector de modo |
+| **IA Ludo en menú** | ✅ | Enlazado a `start_local_match_ludo_vs_ai(1, 2)` con tirada de dado |
+| **Popup de reglas** | ✅ | Integrado con botón `?` en Chess, Go, Shogi, Battleship y Checkers |
+| **Menú de pausa** | ✅ | Escena `pause_menu.tscn` instanciada en los 13 tableros con guard headless |
+| **Lobby multijugador** | ✅ | Escena `host_lobby.tscn` conectada a `main_menu.gd` con botones Crear y QR |
+| **Logros en game over** | ✅ | `AchievementManager` notificado en victorias y empates desde `game_over_overlay.gd` |
+| **Smoke tests Godot** | ✅ | Tests de IA (Go/Ludo), pausa y métodos de red integrados |
+

@@ -77,6 +77,7 @@ var p2_safeties_label: Label
 var turn_indicator: TurnIndicator
 var rules_popup: RulesPopup
 var current_theme: BoardTheme
+var _pause_menu: CanvasLayer
 
 @onready var status: Label = $Status if has_node("Status") else null
 
@@ -113,6 +114,17 @@ func _ready() -> void:
 	_update_hand_ui()
 	_update_tableaus()
 	_update_status()
+
+	if not OS.has_feature("headless"):
+		_pause_menu = load("res://pause_menu.tscn").instantiate()
+		_pause_menu.connect("quit_game_requested", _on_quit_to_menu)
+		add_child(_pause_menu)
+
+func _on_quit_to_menu() -> void:
+	if has_node("/root/SceneManager"):
+		get_node("/root/SceneManager").transition_to("res://main.tscn")
+	else:
+		get_tree().change_scene_to_file("res://main.tscn")
 
 func _create_default_theme() -> void:
 	current_theme = BoardTheme.new()

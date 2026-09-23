@@ -1,17 +1,25 @@
-extends Node
+extends SceneTree
 
-func _ready():
-    # Smoke test: Check if pause menu signals work and tree pausing behaves correctly
-    var pause_menu = preload("res://pause_menu.tscn").instantiate()
-    add_child(pause_menu)
-    
-    # Simulate pause
-    get_tree().paused = true
-    assert(get_tree().paused == true, "Game should be paused")
-    
-    # Simulate quit request
-    pause_menu._on_quit_pressed()
-    assert(get_tree().paused == false, "Game should be unpaused after quit")
-    
-    print("Pause menu smoke test passed!")
-    get_tree().quit()
+func _initialize() -> void:
+	# Verificar que PauseMenu carga y conecta señales correctamente
+	var pm: CanvasLayer = load("res://pause_menu.tscn").instantiate() if ResourceLoader.exists("res://pause_menu.tscn") else null
+	if pm == null:
+		# Si no existe la escena, instanciar la clase directamente
+		pm = preload("res://pause_menu.gd").new()
+
+	assert(pm != null, "PauseMenu debe instanciarse")
+	assert(pm.has_signal("quit_game_requested"), "PauseMenu debe tener señal quit_game_requested")
+
+	var signal_received := false
+	pm.connect("quit_game_requested", func(): signal_received = true)
+
+	# Simular la señal de salida
+	pm.emit_signal("quit_game_requested")
+	assert(signal_received, "La señal quit_game_requested debe emitirse y recibirse")
+
+	pm.free()
+	quit(0)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		quit(1)

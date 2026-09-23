@@ -19,14 +19,14 @@ const GAMES = [
 	{ "id": "chess", "name": "Ajedrez (Chess)", "method": "start_local_match_chess", "ai_method": "start_local_match_chess_vs_ai", "scene": "res://chess_board.tscn", "color": Color(0.35, 0.35, 0.75) },
 	{ "id": "shogi", "name": "Shogi", "method": "start_local_match_shogi", "ai_method": "start_local_match_shogi_vs_ai", "scene": "res://shogi_board.tscn", "color": Color(0.85, 0.65, 0.25) },
 	{ "id": "xiangqi", "name": "Xiangqi", "method": "start_local_match_xiangqi", "ai_method": "start_local_match_xiangqi_vs_ai", "scene": "res://xiangqi_board.tscn", "color": Color(0.85, 0.35, 0.15) },
-	{ "id": "go", "name": "Go", "method": "start_local_match_go", "ai_method": "", "scene": "res://go_board.tscn", "color": Color(0.25, 0.65, 0.45) },
+	{ "id": "go", "name": "Go", "method": "start_local_match_go", "ai_method": "start_local_match_go_vs_ai", "scene": "res://go_board.tscn", "color": Color(0.25, 0.65, 0.45) },
 	{ "id": "uno", "name": "Uno", "method": "start_local_match_uno", "ai_method": "", "scene": "res://uno_board.tscn", "color": Color(0.95, 0.25, 0.45) },
 	{ "id": "crisis", "name": "Crisis", "method": "start_local_match_crisis", "ai_method": "", "scene": "res://crisis_board.tscn", "color": Color(0.65, 0.25, 0.75) },
 	{ "id": "chinese_checkers", "name": "Damas Chinas", "method": "start_local_match_chinese_checkers", "ai_method": "", "scene": "res://chinese_checkers_board.tscn", "color": Color(0.25, 0.75, 0.75) },
 	{ "id": "mille_bornes", "name": "Mille Bornes", "method": "start_local_match_mille_bornes", "ai_method": "", "scene": "res://mille_bornes_board.tscn", "color": Color(0.45, 0.75, 0.25) },
 	{ "id": "backgammon", "name": "Backgammon", "method": "start_local_match_backgammon", "ai_method": "start_local_match_backgammon_vs_ai", "scene": "res://backgammon_board.tscn", "color": Color(0.75, 0.45, 0.25) },
 	{ "id": "monopoly", "name": "Monopoly", "method": "start_local_match_monopoly", "ai_method": "", "scene": "res://monopoly_board.tscn", "color": Color(0.25, 0.65, 0.85) },
-	{ "id": "ludo", "name": "Ludo", "method": "start_local_match_ludo", "ai_method": "", "scene": "res://ludo_board.tscn", "color": Color(0.85, 0.85, 0.25) },
+	{ "id": "ludo", "name": "Ludo", "method": "start_local_match_ludo", "ai_method": "start_local_match_ludo_vs_ai", "scene": "res://ludo_board.tscn", "color": Color(0.85, 0.85, 0.25) },
 	{ "id": "battleship", "name": "Batalla Naval", "method": "start_local_match_battleship", "ai_method": "", "scene": "res://battleship_board.tscn", "color": Color(0.25, 0.45, 0.85) }
 ]
 
@@ -39,6 +39,7 @@ func _ready() -> void:
 
 	_setup_buttons()
 	_play_entry_animation()
+	_setup_multiplayer_row()
 
 func _process(delta: float) -> void:
 	if not is_attract_mode:
@@ -563,6 +564,9 @@ func _launch_game(game: Dictionary, mode: String, depth: int = 2) -> void:
 			if game["id"] == "checkers":
 				if bridge.has_method(ai_method):
 					bridge.call(ai_method, 42, 1, 2)
+			elif game["id"] == "go":
+				if bridge.has_method(ai_method):
+					bridge.call(ai_method, 1, 2, 9)
 			elif bridge.has_method(ai_method):
 				bridge.call(ai_method, 1, 2)
 	else:
@@ -579,4 +583,93 @@ func _launch_game(game: Dictionary, mode: String, depth: int = 2) -> void:
 		get_node("/root/SceneManager").transition_to(game["scene"])
 	else:
 		get_tree().change_scene_to_file(game["scene"])
+
+func _setup_multiplayer_row() -> void:
+	var hbox := HBoxContainer.new()
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.add_theme_constant_override("separation", 16)
+	hbox.position = Vector2(30, get_viewport_rect().size.y - 70)
+	hbox.size = Vector2(get_viewport_rect().size.x - 60, 50)
+	add_child(hbox)
+
+	var host_btn := Button.new()
+	host_btn.text = "🌐 Crear partida en red"
+	host_btn.custom_minimum_size = Vector2(220, 44)
+	host_btn.add_theme_font_size_override("font_size", 15)
+	_apply_button_theme(host_btn, Color(0.25, 0.45, 0.75))
+	host_btn.pressed.connect(_on_host_pressed)
+	hbox.add_child(host_btn)
+
+	var join_btn := Button.new()
+	join_btn.text = "📷 Unirse (código QR)"
+	join_btn.custom_minimum_size = Vector2(220, 44)
+	join_btn.add_theme_font_size_override("font_size", 15)
+	_apply_button_theme(join_btn, Color(0.35, 0.55, 0.35))
+	join_btn.pressed.connect(_on_join_pressed)
+	hbox.add_child(join_btn)
+
+func _on_host_pressed() -> void:
+	_show_game_selector_for_network()
+
+func _on_join_pressed() -> void:
+	var scanner := QRScanner.new()
+	scanner.setup(bridge)
+	scanner.connect("qr_scanned", func(ip: String, port: int):
+		scanner.close()
+		scanner.queue_free()
+		bridge.call("connect_to_host", ip, port, 2)
+		if has_node("/root/SceneManager"):
+			get_node("/root/SceneManager").transition_to("res://checkers_board.tscn")
+		else:
+			get_tree().change_scene_to_file("res://checkers_board.tscn")
+	)
+	scanner.connect("closed", func():
+		scanner.queue_free()
+	)
+	add_child(scanner)
+	scanner.open(bridge)
+
+func _show_game_selector_for_network() -> void:
+	var overlay := CanvasLayer.new()
+	overlay.layer = 10
+	add_child(overlay)
+
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(300, 400)
+	overlay.add_child(panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	panel.add_child(vbox)
+
+	var lbl := Label.new()
+	lbl.text = "¿Qué juego quieres hostear?"
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(lbl)
+
+	for game in GAMES:
+		var btn := Button.new()
+		btn.text = game["name"]
+		btn.custom_minimum_size = Vector2(0, 36)
+		var gid: String = game["id"]
+		btn.pressed.connect(func():
+			overlay.queue_free()
+			_launch_host_lobby(gid)
+		)
+		vbox.add_child(btn)
+
+	var cancel := Button.new()
+	cancel.text = "Cancelar"
+	cancel.pressed.connect(func(): overlay.queue_free())
+	vbox.add_child(cancel)
+
+func _launch_host_lobby(game_id: String) -> void:
+	GameManager.set_active_game(game_id)
+	GameManager.set_game_mode("host")
+	if has_node("/root/SceneManager"):
+		get_node("/root/SceneManager").transition_to("res://host_lobby.tscn")
+	else:
+		get_tree().change_scene_to_file("res://host_lobby.tscn")
+
 
