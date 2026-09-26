@@ -71,7 +71,18 @@ func _ready() -> void:
 	bridge = OpenTableBridge.new()
 	bridge.name = "Bridge"
 	add_child(bridge)
-	network_hud.bind_bridge(bridge)
+
+	# HUD de red — solo en modo Host/Client, nunca en headless
+	if not OS.has_feature("headless"):
+		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
+			var hud_script := load("res://network_status_hud.gd")
+			if hud_script:
+				var hud: Node = hud_script.new()
+				if hud.has_method("setup"):
+					hud.setup(bridge)
+				elif hud.has_method("bind_bridge"):
+					hud.bind_bridge(bridge)
+				add_child(hud)
 
 	# Señales del motor -> actualizaciones de la vista.
 	bridge.connect("piece_moved", _on_piece_moved)
@@ -128,10 +139,6 @@ func _setup_ui_layers() -> void:
 	turn_indicator.name = "TurnIndicator"
 	turn_indicator.position = Vector2(10, BOARD * CELL + 45)
 	add_child(turn_indicator)
-
-	network_hud = NetworkStatusHUD.new()
-	network_hud.name = "NetworkStatusHUD"
-	add_child(network_hud)
 
 	var btn_rules = Button.new()
 	btn_rules.text = " ? "

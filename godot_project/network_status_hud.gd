@@ -46,6 +46,9 @@ func _build_ui() -> void:
 
 	add_child(panel)
 
+func setup(p_bridge: Node) -> void:
+	bind_bridge(p_bridge)
+
 func bind_bridge(bridge: Node) -> void:
 	if bridge == null: return
 	

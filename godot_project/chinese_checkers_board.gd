@@ -183,8 +183,18 @@ func start_match(p_count: int = 2) -> void:
 		bridge.start_local_match_chinese_checkers(1, 2)
 
 	current = bridge.current_player()
-	if network_hud != null:
-		network_hud.bind_bridge(bridge)
+
+	# HUD de red — solo en modo Host/Client, nunca en headless
+	if not OS.has_feature("headless"):
+		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
+			var hud_script := load("res://network_status_hud.gd")
+			if hud_script:
+				var hud: Node = hud_script.new()
+				if hud.has_method("setup"):
+					hud.setup(bridge)
+				elif hud.has_method("bind_bridge"):
+					hud.bind_bridge(bridge)
+				add_child(hud)
 
 	_update_peg_visuals()
 	_update_status()
@@ -195,10 +205,6 @@ func _setup_ui_layers() -> void:
 	turn_indicator.name = "TurnIndicator"
 	turn_indicator.position = Vector2(20, 20)
 	add_child(turn_indicator)
-
-	network_hud = NetworkStatusHUD.new()
-	network_hud.name = "NetworkStatusHUD"
-	add_child(network_hud)
 
 	var btn_rules = Button.new()
 	btn_rules.text = " ? "

@@ -63,8 +63,17 @@ func _ready() -> void:
 	bridge.name = "Bridge"
 	add_child(bridge)
 
-	if network_hud != null:
-		network_hud.bind_bridge(bridge)
+	# HUD de red — solo en modo Host/Client, nunca en headless
+	if not OS.has_feature("headless"):
+		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
+			var hud_script := load("res://network_status_hud.gd")
+			if hud_script:
+				var hud: Node = hud_script.new()
+				if hud.has_method("setup"):
+					hud.setup(bridge)
+				elif hud.has_method("bind_bridge"):
+					hud.bind_bridge(bridge)
+				add_child(hud)
 
 	bridge.connect("shot_result", _on_shot_result)
 	bridge.connect("event_json", _on_event_json)
@@ -231,9 +240,6 @@ func _setup_ui() -> void:
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 120)
 	add_child(turn_indicator)
-
-	network_hud = NetworkStatusHUD.new()
-	add_child(network_hud)
 
 func _draw() -> void:
 	var font: Font = null

@@ -54,8 +54,18 @@ func _ready() -> void:
 	bridge = OpenTableBridge.new()
 	bridge.name = "Bridge"
 	add_child(bridge)
-	if network_hud != null:
-		network_hud.bind_bridge(bridge)
+
+	# HUD de red — solo en modo Host/Client, nunca en headless
+	if not OS.has_feature("headless"):
+		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
+			var hud_script := load("res://network_status_hud.gd")
+			if hud_script:
+				var hud: Node = hud_script.new()
+				if hud.has_method("setup"):
+					hud.setup(bridge)
+				elif hud.has_method("bind_bridge"):
+					hud.bind_bridge(bridge)
+				add_child(hud)
 	
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
@@ -143,11 +153,6 @@ func _setup_ui() -> void:
 	turn_indicator.name = "TurnIndicator"
 	turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 48)
 	add_child(turn_indicator)
-
-	# Network Status HUD
-	network_hud = NetworkStatusHUD.new()
-	network_hud.name = "NetworkStatusHUD"
-	add_child(network_hud)
 
 func _update_captured_score() -> void:
 	if captures_label_b != null:

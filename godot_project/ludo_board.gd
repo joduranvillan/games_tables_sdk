@@ -72,12 +72,21 @@ func _ready() -> void:
 	bridge.name = "Bridge"
 	add_child(bridge)
 	
+	# HUD de red — solo en modo Host/Client, nunca en headless
+	if not OS.has_feature("headless"):
+		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
+			var hud_script := load("res://network_status_hud.gd")
+			if hud_script:
+				var hud: Node = hud_script.new()
+				if hud.has_method("setup"):
+					hud.setup(bridge)
+				elif hud.has_method("bind_bridge"):
+					hud.bind_bridge(bridge)
+				add_child(hud)
+
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
-	
-	if network_hud != null:
-		network_hud.bind_bridge(bridge)
 
 	bridge.start_local_match_ludo(1, 2)
 	current_p = bridge.current_player()
@@ -152,11 +161,6 @@ func _setup_ui() -> void:
 	turn_indicator.name = "TurnIndicator"
 	turn_indicator.position = Vector2(20, 595)
 	add_child(turn_indicator)
-
-	# Network Status HUD
-	network_hud = NetworkStatusHUD.new()
-	network_hud.name = "NetworkStatusHUD"
-	add_child(network_hud)
 	
 	# Create token circular buttons for players 1..4
 	for p in range(1, 5):
