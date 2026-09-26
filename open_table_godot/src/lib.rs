@@ -3009,6 +3009,7 @@ impl OpenTableBridge {
                     if is_ai_turn
                         || self.current_game_type == "shogi"
                         || self.current_game_type == "xiangqi"
+                        || self.current_game_type == "go"
                     {
                         let cmd: Option<Box<dyn Command>> = match self.current_game_type.as_str() {
                             "chess" if is_ai_turn => {
@@ -3018,10 +3019,10 @@ impl OpenTableBridge {
                             "shogi" => shogi_game::shogi_ai_pick_move(session, curr_p),
                             "xiangqi" => xiangqi_game::xiangqi_ai_pick_move(session, curr_p)
                                 .map(|c| Box::new(c) as Box<dyn Command>),
-                            "go" if is_ai_turn => go_game::go_ai_pick_move(session, *ai_p)
+                            "go" => go_game::go_ai_pick_move(session, curr_p)
                                 .map(|c| Box::new(c) as Box<dyn Command>)
                                 .or_else(|| {
-                                    Some(Box::new(go_game::PassCommand { player: *ai_p })
+                                    Some(Box::new(go_game::PassCommand { player: curr_p })
                                         as Box<dyn Command>)
                                 }),
                             "backgammon" if is_ai_turn => {
