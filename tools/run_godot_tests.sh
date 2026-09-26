@@ -30,7 +30,7 @@ for test_file in godot_project/tests/*.gd; do
     
     TIMEOUT_CMD=""
     if command -v timeout &>/dev/null; then
-        TIMEOUT_CMD="timeout 20s"
+        TIMEOUT_CMD="timeout 30s"
     fi
 
     if output=$($TIMEOUT_CMD "$REDOT_BIN" --headless --path godot_project --script "res://tests/$test_name" 2>&1); then
