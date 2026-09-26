@@ -31,22 +31,37 @@ func _search_bridge(node: Node) -> Node:
 	return null
 
 func bind_bridge(p_bridge: Node) -> void:
-	if bridge_node != null and bridge_node.is_connected("game_over", _on_game_over):
-		bridge_node.disconnect("game_over", _on_game_over)
+	if bridge_node != null:
+		if bridge_node.is_connected("game_over", _on_game_over):
+			bridge_node.disconnect("game_over", _on_game_over)
+		if bridge_node.has_signal("game_ended") and bridge_node.is_connected("game_ended", _on_game_ended):
+			bridge_node.disconnect("game_ended", _on_game_ended)
 	bridge_node = p_bridge
 	if bridge_node != null:
 		if not bridge_node.is_connected("game_over", _on_game_over):
 			bridge_node.connect("game_over", _on_game_over)
+		_connect_bridge(bridge_node)
 
-func _on_game_over(winner_id: int) -> void:
-	if winner_id == -1:
+func _connect_bridge(b: Node) -> void:
+	if b == null:
 		return
+	if b.has_signal("game_ended"):
+		if not b.is_connected("game_ended", _on_game_ended):
+			b.connect("game_ended", _on_game_ended)
 
-	var game_type = "chess"
-	if has_node("/root/GameManager"):
+func _on_game_ended(winner: int, loser: int) -> void:
+	var active_game: String = GameManager.get_active_game() if has_node("/root/GameManager") else "chess"
+	update_elo(winner, loser, active_game)
+
+func update_elo(winner: int, loser: int, game_type: String = "") -> void:
+	if game_type == "" and has_node("/root/GameManager"):
 		var gm = get_node("/root/GameManager")
-		if gm.get("current_game") != null:
+		if gm.has_method("get_active_game"):
+			game_type = gm.get_active_game()
+		elif gm.get("current_game") != null:
 			game_type = str(gm.current_game)
+	if game_type == "":
+		game_type = "chess"
 
 	var p1_name = "Player 1"
 	var p2_name = "Player 2"
@@ -56,38 +71,51 @@ func _on_game_over(winner_id: int) -> void:
 			p1_name = gm.get_player_name(1)
 			p2_name = gm.get_player_name(2)
 
+	var winner_name = p1_name if winner == 1 else p2_name
+	var loser_name = p2_name if winner == 1 else p1_name
+	var winner_p_id = winner
+	var loser_p_id = loser if loser > 0 else (2 if winner == 1 else 1)
+
+	var winner_elo = get_elo(winner_name, game_type)
+	var loser_elo = get_elo(loser_name, game_type)
+
+	var winner_games = get_total_games(winner_name, game_type)
+	var loser_games = get_total_games(loser_name, game_type)
+
+	var k_factor = 32.0
+	if winner_games >= 30 or loser_games >= 30:
+		k_factor = 16.0
+
+	var new_winner_elo = winner_elo
+	var new_loser_elo = loser_elo
+
+	if bridge_node != null and bridge_node.has_method("compute_elo_delta"):
+		var res = bridge_node.compute_elo_delta(winner_p_id, loser_p_id, winner_elo, loser_elo, k_factor)
+		if res is Array and res.size() >= 2:
+			new_winner_elo = float(res[0])
+			new_loser_elo = float(res[1])
+	else:
+		var e_w = 1.0 / (1.0 + pow(10.0, (loser_elo - winner_elo) / 400.0))
+		var e_l = 1.0 / (1.0 + pow(10.0, (winner_elo - loser_elo) / 400.0))
+		new_winner_elo = winner_elo + k_factor * (1.0 - e_w)
+		new_loser_elo = loser_elo + k_factor * (0.0 - e_l)
+
+	record_match(winner_name, game_type, true, new_winner_elo)
+	record_match(loser_name, game_type, false, new_loser_elo)
+
+func _on_game_over(winner_id: int) -> void:
+	if winner_id == -1:
+		return
 	if winner_id == 1 or winner_id == 2:
-		var winner_name = p1_name if winner_id == 1 else p2_name
-		var loser_name = p2_name if winner_id == 1 else p1_name
-		var winner_p_id = winner_id
-		var loser_p_id = 2 if winner_id == 1 else 1
-
-		var winner_elo = get_elo(winner_name, game_type)
-		var loser_elo = get_elo(loser_name, game_type)
-
-		var winner_games = get_total_games(winner_name, game_type)
-		var loser_games = get_total_games(loser_name, game_type)
-
-		var k_factor = 32.0
-		if winner_games >= 30 or loser_games >= 30:
-			k_factor = 16.0
-
-		var new_winner_elo = winner_elo
-		var new_loser_elo = loser_elo
-
-		if bridge_node != null and bridge_node.has_method("compute_elo_delta"):
-			var res = bridge_node.compute_elo_delta(winner_p_id, loser_p_id, winner_elo, loser_elo, k_factor)
-			if res is Array and res.size() >= 2:
-				new_winner_elo = float(res[0])
-				new_loser_elo = float(res[1])
-		else:
-			var e_w = 1.0 / (1.0 + pow(10.0, (loser_elo - winner_elo) / 400.0))
-			var e_l = 1.0 / (1.0 + pow(10.0, (winner_elo - loser_elo) / 400.0))
-			new_winner_elo = winner_elo + k_factor * (1.0 - e_w)
-			new_loser_elo = loser_elo + k_factor * (0.0 - e_l)
-
-		record_match(winner_name, game_type, true, new_winner_elo)
-		record_match(loser_name, game_type, false, new_loser_elo)
+		var loser_id = 2 if winner_id == 1 else 1
+		var game_type = "chess"
+		if has_node("/root/GameManager"):
+			var gm = get_node("/root/GameManager")
+			if gm.has_method("get_active_game"):
+				game_type = gm.get_active_game()
+			elif gm.get("current_game") != null:
+				game_type = str(gm.current_game)
+		update_elo(winner_id, loser_id, game_type)
 
 func get_elo(player_name: String, game_type: String) -> float:
 	if scores.has(player_name) and scores[player_name].has(game_type):

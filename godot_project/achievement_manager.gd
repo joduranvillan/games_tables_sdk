@@ -153,6 +153,12 @@ func _show_notification(title: String, description: String) -> void:
 		tween.tween_property(panel, "position:x", start_x, 0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 		tween.tween_callback(panel.queue_free)
 
+func on_game_won(winner_id: int, game_name: String = "") -> void:
+	_on_game_over(winner_id, game_name)
+
+func on_game_draw(_game_name: String = "") -> void:
+	pass
+
 # Conecta las señales de game_over y eventos JSON de una partida al manager
 func register_bridge(bridge: Node, game_name: String = "") -> void:
 	if bridge.has_signal("game_over"):
