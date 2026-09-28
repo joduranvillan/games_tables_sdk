@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ejecución: ./tools/run_godot_tests.sh [test_name.gd]
+# Incluye smoke tests de juegos, networking, UI y credits_spectator_smoke.gd
+
 REDOT_BIN="${REDOT_BIN:-redot}"
 
 echo "=== Compilando open_table_godot bridge ==="
@@ -23,7 +26,22 @@ PASSED_TESTS=()
 FAILED_TESTS=()
 OVERALL_FAILED=0
 
-for test_file in godot_project/tests/*.gd; do
+TEST_FILES=()
+if [ $# -gt 0 ]; then
+    for arg in "$@"; do
+        if [ -f "$arg" ]; then
+            TEST_FILES+=("$arg")
+        elif [ -f "godot_project/tests/$arg" ]; then
+            TEST_FILES+=("godot_project/tests/$arg")
+        else
+            echo "Aviso: test $arg no encontrado"
+        fi
+    done
+else
+    TEST_FILES=(godot_project/tests/*.gd)
+fi
+
+for test_file in "${TEST_FILES[@]}"; do
     [ -e "$test_file" ] || continue
     test_name=$(basename "$test_file")
     echo "--- Corriendo test: $test_name ---"

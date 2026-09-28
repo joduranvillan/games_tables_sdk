@@ -1,6 +1,6 @@
 [package]
 name = "open_table_macros"
-version = "0.2.0"
+version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
 description = "Proc-macros derive para reducir el boilerplate de open_table_core/open_table_engine: GameCommand, GameEvent, GameResource, GameComponent."
@@ -15,8 +15,10 @@ quote = "1"
 proc-macro2 = "1"
 
 [dev-dependencies]
-open_table_core = { path = "../open_table_core" }
-open_table_engine = { path = "../open_table_engine" }
+open_table_core = { path = "../open_table_core", version = "0.1.0" }
+
+open_table_engine = { path = "../open_table_engine", version = "0.1.0" }
+
 bevy_ecs = "0.19"
 serde = { version = "1", features = ["derive"] }
 typetag = "0.2"

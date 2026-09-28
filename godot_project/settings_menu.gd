@@ -8,6 +8,7 @@ signal settings_saved()
 var sfx_slider: HSlider
 var sfx_checkbox: CheckBox
 var anim_checkbox: CheckBox
+var fullscreen_check: CheckButton
 var font_size_slider: HSlider
 var font_size_label: Label
 var theme_option: OptionButton
@@ -168,6 +169,22 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	anim_checkbox.text = "Habilitar animaciones visuales"
 	anim_checkbox.button_pressed = true
 	parent.add_child(anim_checkbox)
+
+	# Fullscreen CheckButton
+	fullscreen_check = CheckButton.new()
+	fullscreen_check.text = "Pantalla completa"
+	var is_fs: bool = false
+	if DisplayServer.has_method("window_get_mode"):
+		is_fs = (DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN)
+	fullscreen_check.button_pressed = is_fs
+	fullscreen_check.toggled.connect(func(on: bool):
+		if DisplayServer.has_method("window_set_mode"):
+			if on:
+				DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+			else:
+				DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	)
+	parent.add_child(fullscreen_check)
 	
 	# Theme option button
 	var theme_label = Label.new()
@@ -323,6 +340,9 @@ func _load_current_settings() -> void:
 	sfx_slider.value = settings["sfx_volume"]
 	sfx_checkbox.button_pressed = settings.get("sfx_enabled", true)
 	anim_checkbox.button_pressed = settings.get("animations_enabled", true)
+	if fullscreen_check != null:
+		var fs_val: bool = settings.get("fullscreen", false)
+		fullscreen_check.button_pressed = fs_val
 	font_size_slider.value = settings.get("font_size_tier", 1)
 	font_size_label.text = "Tamaño de fuente: %s" % FONT_TIER_NAMES[int(font_size_slider.value)]
 	
@@ -354,6 +374,7 @@ static func get_saved_settings() -> Dictionary:
 			"sfx_volume": 0.8,
 			"sfx_enabled": true,
 			"animations_enabled": true,
+			"fullscreen": false,
 			"font_size_tier": 1,
 			"board_theme": "wood",
 			"player1_name": "Jugador 1",
@@ -365,6 +386,7 @@ static func get_saved_settings() -> Dictionary:
 		"sfx_volume": cfg.get_value("audio", "sfx_volume", 0.8),
 		"sfx_enabled": cfg.get_value("audio", "sfx_enabled", true),
 		"animations_enabled": cfg.get_value("display", "animations_enabled", true),
+		"fullscreen": cfg.get_value("display", "fullscreen", false),
 		"font_size_tier": cfg.get_value("display", "font_size_tier", 1),
 		"board_theme": cfg.get_value("theme", "board_theme", "wood"),
 		"player1_name": cfg.get_value("players", "player1_name", "Jugador 1"),
@@ -377,6 +399,7 @@ func _on_save_pressed() -> void:
 	var sfx_vol = sfx_slider.value
 	var sfx_on = sfx_checkbox.button_pressed
 	var anim_on = anim_checkbox.button_pressed
+	var is_fs = fullscreen_check.button_pressed if fullscreen_check != null else false
 	var font_tier = int(font_size_slider.value)
 	var theme_idx = theme_option.selected
 	var theme_key = THEME_KEYS[theme_idx]["key"] if theme_idx >= 0 and theme_idx < THEME_KEYS.size() else "wood"
@@ -390,6 +413,7 @@ func _on_save_pressed() -> void:
 	cfg.set_value("audio", "sfx_volume", sfx_vol)
 	cfg.set_value("audio", "sfx_enabled", sfx_on)
 	cfg.set_value("display", "animations_enabled", anim_on)
+	cfg.set_value("display", "fullscreen", is_fs)
 	cfg.set_value("display", "font_size_tier", font_tier)
 	cfg.set_value("theme", "board_theme", theme_key)
 	cfg.set_value("players", "player1_name", p1_name)
@@ -397,6 +421,13 @@ func _on_save_pressed() -> void:
 	cfg.set_value("locale", "language", lang_code)
 	cfg.set_value("gameplay", "highlight_moves", highlight_moves)
 	cfg.save("user://settings.cfg")
+	
+	if DisplayServer.has_method("window_set_mode"):
+		if is_fs:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		else:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+
 	
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Master"), linear_to_db(sfx_vol if sfx_on else 0.0))
 	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), not sfx_on)

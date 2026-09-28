@@ -40,7 +40,9 @@ func bind_bridge(p_bridge: Node) -> void:
 	if bridge_node != null:
 		if not bridge_node.is_connected("game_over", _on_game_over):
 			bridge_node.connect("game_over", _on_game_over)
-		_connect_bridge(bridge_node)
+		if bridge_node.has_signal("game_ended"):
+			if not bridge_node.is_connected("game_ended", _on_game_ended):
+				bridge_node.connect("game_ended", _on_game_ended)
 
 func _connect_bridge(b: Node) -> void:
 	if b == null:
@@ -50,8 +52,8 @@ func _connect_bridge(b: Node) -> void:
 			b.connect("game_ended", _on_game_ended)
 
 func _on_game_ended(winner: int, loser: int) -> void:
-	var active_game: String = GameManager.get_active_game() if has_node("/root/GameManager") else "chess"
-	update_elo(winner, loser, active_game)
+	var game_type: String = GameManager.get_active_game() if has_node("/root/GameManager") else "unknown"
+	update_elo(winner, loser, game_type)
 
 func update_elo(winner: int, loser: int, game_type: String = "") -> void:
 	if game_type == "" and has_node("/root/GameManager"):

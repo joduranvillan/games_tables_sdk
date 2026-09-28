@@ -7,12 +7,46 @@ signal sfx_toggled(enabled: bool)
 @warning_ignore("unused_signal")
 signal animations_toggled(enabled: bool)
 
+# Overrides de color primario por juego (se mezclan sobre el tema global)
+const GAME_COLOR_OVERRIDES := {
+	"chess":            Color(0.20, 0.20, 0.35),
+	"go":               Color(0.20, 0.45, 0.30),
+	"shogi":            Color(0.55, 0.40, 0.15),
+	"xiangqi":          Color(0.65, 0.20, 0.10),
+	"checkers":         Color(0.65, 0.15, 0.15),
+	"backgammon":       Color(0.55, 0.30, 0.10),
+	"battleship":       Color(0.10, 0.25, 0.55),
+	"ludo":             Color(0.60, 0.60, 0.10),
+	"mille_bornes":     Color(0.30, 0.55, 0.15),
+	"monopoly":         Color(0.10, 0.45, 0.65),
+	"uno":              Color(0.75, 0.10, 0.25),
+	"crisis":           Color(0.45, 0.10, 0.55),
+	"chinese_checkers": Color(0.10, 0.55, 0.55),
+}
+
 var themes: Dictionary = {}
 var current_theme_key: String = "wood"
 var current_theme: BoardTheme
 var current_font_tier: int = 1 # 0: Pequeño, 1: Mediano, 2: Grande
 var sfx_enabled: bool = true
 var animations_enabled: bool = true
+
+func get_theme_for_game(game_id: String) -> Theme:
+	var th := Theme.new()
+	if GAME_COLOR_OVERRIDES.has(game_id):
+		var col: Color = GAME_COLOR_OVERRIDES[game_id]
+		th.set_color("font_color", "Panel", col.lightened(0.6))
+		th.set_color("bg_color", "PanelContainer", col.darkened(0.5))
+	return th
+
+func apply_game_theme(game_id: String) -> void:
+	var base := get_theme_for_game(game_id)
+	if get_tree() != null:
+		if get_tree().has_method("set_theme"):
+			get_tree().call("set_theme", base)
+		if get_tree().root != null:
+			get_tree().root.theme = base
+
 
 func _init() -> void:
 	_create_presets()

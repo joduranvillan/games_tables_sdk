@@ -1,6 +1,6 @@
 [package]
 name = "open_table_engine"
-version = "0.2.0"
+version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
 description = "Motor de OpenTable Engine: bevy_ecs + scheduler + rule engine sobre los contratos de open_table_core."
@@ -10,7 +10,8 @@ keywords = ["game-engine", "board-games", "ecs", "opentable", "rules"]
 categories = ["game-engines", "games"]
 
 [dependencies]
-open_table_core = { path = "../open_table_core" }
+open_table_core = { path = "../open_table_core", version = "0.1.0" }
+
 bevy_ecs = "0.19"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -22,18 +23,29 @@ sha2 = "0.11.0"
 [dev-dependencies]
 criterion = "0.8"
 bincode = { version = "2.0.1" , features = ["serde"] }
-backgammon_game = { path = "../backgammon_game" }
-checkers_game = { path = "../checkers_game" }
-chess_game = { path = "../chess_game" }
-chinese_checkers_game = { path = "../chinese_checkers_game" }
-crisis_game = { path = "../crisis_game" }
-go_game = { path = "../go_game" }
-ludo_game = { path = "../ludo_game" }
-mille_bornes_game = { path = "../mille_bornes_game" }
-monopoly_game = { path = "../monopoly_game" }
-shogi_game = { path = "../shogi_game" }
-uno_game = { path = "../uno_game" }
-xiangqi_game = { path = "../xiangqi_game" }
+backgammon_game = { path = "../backgammon_game", version = "0.1.0" }
+
+checkers_game = { path = "../checkers_game", version = "0.1.0" }
+
+chess_game = { path = "../chess_game", version = "0.1.0" }
+
+chinese_checkers_game = { path = "../chinese_checkers_game", version = "0.1.0" }
+
+crisis_game = { path = "../crisis_game", version = "0.1.0" }
+
+go_game = { path = "../go_game", version = "0.1.0" }
+
+ludo_game = { path = "../ludo_game", version = "0.1.0" }
+
+mille_bornes_game = { path = "../mille_bornes_game", version = "0.1.0" }
+
+monopoly_game = { path = "../monopoly_game", version = "0.1.0" }
+
+shogi_game = { path = "../shogi_game", version = "0.1.0" }
+
+uno_game = { path = "../uno_game", version = "0.1.0" }
+
+xiangqi_game = { path = "../xiangqi_game", version = "0.1.0" }
 
 [[bench]]
 name = "session_throughput"

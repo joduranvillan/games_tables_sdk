@@ -579,6 +579,11 @@ func _launch_game(game: Dictionary, mode: String, depth: int = 2) -> void:
 		elif bridge.has_method("start_local_match"):
 			bridge.call("start_local_match", 1, 2)
 
+	if has_node("/root/ThemeManager"):
+		get_node("/root/ThemeManager").apply_game_theme(game["id"])
+	elif Engine.has_singleton("ThemeManager"):
+		ThemeManager.apply_game_theme(game["id"])
+
 	if has_node("/root/SceneManager"):
 		get_node("/root/SceneManager").transition_to(game["scene"])
 	else:
@@ -607,6 +612,19 @@ func _setup_multiplayer_row() -> void:
 	_apply_button_theme(join_btn, Color(0.35, 0.55, 0.35))
 	join_btn.pressed.connect(_on_join_pressed)
 	hbox.add_child(join_btn)
+
+	var about_btn := Button.new()
+	about_btn.text = "ℹ️ Acerca de"
+	about_btn.custom_minimum_size = Vector2(160, 44)
+	about_btn.add_theme_font_size_override("font_size", 15)
+	_apply_button_theme(about_btn, Color(0.45, 0.35, 0.65))
+	about_btn.pressed.connect(func():
+		if has_node("/root/SceneManager"):
+			get_node("/root/SceneManager").transition_to("res://credits_screen.tscn")
+		else:
+			get_tree().change_scene_to_file("res://credits_screen.tscn")
+	)
+	hbox.add_child(about_btn)
 
 func _on_host_pressed() -> void:
 	_show_game_selector_for_network()

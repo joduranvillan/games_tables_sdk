@@ -1,6 +1,6 @@
 [package]
 name = "crisis_game-fuzz"
-version = "0.2.0"
+version = "0.1.0"
 publish = false
 edition = "2021"
 rust-version = "1.82"
@@ -11,8 +11,9 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 serde_json = "1.0"
-open_table_core = { path = "../open_table_core" }
-crisis_game = { path = "../crisis_game" }
+open_table_core = { path = "../open_table_core", version = "0.1.0" }
+
+crisis_game = { path = "../crisis_game", version = "0.1.0" }
 
 [[bin]]
 name = "fuzz_crisis"

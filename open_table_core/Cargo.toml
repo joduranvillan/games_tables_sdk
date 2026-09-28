@@ -1,6 +1,6 @@
 [package]
 name = "open_table_core"
-version = "0.2.0"
+version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
 description = "Tipos y contratos fundacionales de OpenTable Engine. Sin dependencias de motor (ECS, red, Godot)."

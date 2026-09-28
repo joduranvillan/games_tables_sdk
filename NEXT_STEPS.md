@@ -10,10 +10,10 @@
 | **Shogi** (`shogi_game`) | ✅ | ✅ (promoción, drops, Nifu, Uchifuzume) | ✅ (100%) | ✅ (`shogi_smoke.gd`) | ✅ |
 | **Xiangqi** (`xiangqi_game`) | ✅ | ✅ (General Volador, palacio, río, cañón) | ✅ (100%) | ✅ (`xiangqi_smoke.gd`) | ✅ |
 | **Backgammon** (`backgammon_game`) | ✅ | ✅ (doubling cube, 15 fichas, barra, bearing off) | ✅ (100%) | ✅ (`backgammon_smoke.gd`) | ✅ |
-| **Batalla Naval** (`battleship_game`) | ✅ | ⚠️ (tablero 8x8) | ✅ (100%) | ✅ (`battleship_smoke.gd`) | ✅ |
-| **Ludo** (`ludo_game`) | ✅ | ⚠️ (24 casillas) | ✅ (100%) | ✅ (`ludo_smoke.gd`) | ✅ |
-| **Mille Bornes** (`mille_bornes_game`) | ✅ | ⚠️ (meta 200) | ✅ (100%) | ✅ (`mille_bornes_smoke.gd`) | ✅ |
-| **Monopoly** (`monopoly_game`) | ✅ | ⚠️ (16 casillas) | ✅ (100%) | ✅ (`monopoly_smoke.gd`) | ✅ |
+| **Batalla Naval** (`battleship_game`) | ✅ | ✅ (tablero 10×10) | ✅ (100%) | ✅ (`battleship_smoke.gd`) | ✅ |
+| **Ludo** (`ludo_game`) | ✅ | ✅ (52 casillas, regla de 6) | ✅ (100%) | ✅ (`ludo_smoke.gd`) | ✅ |
+| **Mille Bornes** (`mille_bornes_game`) | ✅ | ✅ (meta 1000 km, extensión de viaje) | ✅ (100%) | ✅ (`mille_bornes_smoke.gd`) | ✅ |
+| **Monopoly** (`monopoly_game`) | ✅ | ✅ (40 casillas estándar) | ✅ (100%) | ✅ (`monopoly_smoke.gd`) | ✅ |
 | **Uno** (`uno_game`) | ✅ | ✅ (jump-in, robo acumulativo, colores) | ✅ (100%) | ✅ (`uno_smoke.gd`) | ✅ |
 | **Crisis / TEG** (`crisis_game`) | ✅ | ✅ (30 terr, 6 cont, obj. sec) | ✅ (100%) | ✅ (`crisis_smoke.gd`) | ✅ |
 | **Damas Chinas** (`chinese_checkers_game`) | ✅ | ✅ (tablero hexagonal) | ✅ (100%) | ✅ (`chinese_checkers_smoke.gd`) | ✅ |
@@ -41,7 +41,10 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
 - `tcp_reconnection_smoke.gd`: ✅ Reconexión de cliente a host TCP preservando estado.
 - `tcp_packet_loss_smoke.gd`: ✅ Simulación de pérdida de paquetes con proxy y convergencia.
 - `hud_and_settings_smoke.gd`: ✅ Temas visuales y actualización de puntuación ELO.
-- `ai_local_smoke.gd`: ✅ IA local para damas y ajedrez vía GDExtension.
+- `ai_local_smoke.gd`: ✅ IA local para damas, ajedrez, **Go y Ludo** vía GDExtension.
+- `pause_menu_smoke.gd`: ✅ Verificación de señales del menú de pausa.
+- `multi_session_smoke.gd`: ✅ Métodos de hosting y conexión de red en bridge.
+- `credits_spectator_smoke.gd`: ✅ **404.** Smoke test de créditos y vista de espectador (recursos y método `setup`).
 - `visual_regression.gd`: ✅ Validación de regresión visual y generación de snapshots.
 
 ## 4. Mejoras visuales e IA local (PROMPTS5)
@@ -85,12 +88,14 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
 - [x] **387.** Verificación de métodos de hosting y conexión de red en bridge (`tests/multi_session_smoke.gd`)
 - [x] **388.** Escena de menú de pausa (`pause_menu.tscn`)
 - [x] **389.** Escena de lobby de red (`host_lobby.tscn`)
+- [x] **393.** Integración de `network_status_hud.gd` en los 13 tableros de juego
+- [x] **395.** Conexión de señal `game_ended` en `score_tracker.gd` (N/A justificado: bridge emite `game_over(winner: i64)`)
 
 ## 6. Para versión 1.0.0 — Pendiente Gráfico
-- [ ] Pantalla de créditos / "Acerca de"
-- [ ] Temas visuales aplicables per-game (no solo global)
-- [ ] Modo espectador con UI dedicada (actualmente solo datos, sin tablero dedicado)
-- [ ] Soporte full-screen y escalado adaptativo en resoluciones 4K
+- [x] **396.** Pantalla de créditos / "Acerca de" (`credits_screen.gd`, `credits_screen.tscn`)
+- [x] **397.** Temas visuales aplicables per-game (`theme_manager.gd`, `main_menu.gd`)
+- [x] **398.** Modo espectador con UI dedicada (`spectator_view.gd`, `spectator_view.tscn`, `host_lobby.gd`)
+- [x] **399.** Soporte full-screen y escalado adaptativo en resoluciones 4K (`project.godot`, `settings_menu.gd`)
 - [ ] Plugin Android compilado y test en dispositivo físico
 - [ ] iOS: OpenTableMultipeer compilado con Xcode
 
@@ -99,12 +104,13 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
 - [x] Doubling cube Backgammon (prompt 310) — ✅ Implementado
 - [x] Jump-in UNO (prompt 311) — ✅ Implementado
 - [x] `get_legal_moves` con `LegalMoveGenerator` para checkers y chess (prompts 306-309) — ✅ Implementado
-- [ ] 0 warnings de Clippy (`cargo clippy --workspace -- -D warnings`)
-- [ ] Versión semántica 0.1.0 en todos los `Cargo.toml`
-- [ ] Documentación pública en `docs.rs` (verificar `cargo doc --workspace --no-deps`)
+- [x] 0 warnings de Clippy (`cargo clippy --workspace --exclude open_table_godot -- -D warnings`) — ✅ 0 warnings (exit 0)
+- [x] **401.** Versión semántica 0.1.0 en todos los `Cargo.toml` y dependencias internas (`version = "0.1.0"`) — ✅ Verificado
+- [x] **402.** Documentación pública en `docs.rs` (`cargo doc --workspace --exclude open_table_godot --no-deps` y `RUSTDOCFLAGS="--cfg docsrs"`) — ✅ 0 errores, 0 warnings (exit 0)
 
 ## 8. Deuda Técnica Conocida
 
 - **0 TODOs activos** en el código fuente de los crates de Rust y GDScript.
-- **Plugins nativos móviles (`platform_plugins/`)**: `OpenTableNearby` (Android) y `OpenTableMultipeer` (iOS) probados en arquitectura mock/unit-test; requieren compilación nativa en Android Studio / Xcode.
+- **Señal de final de partida en bridge (`game_ended` vs `game_over`)**: El bridge GDExtension (`open_table_godot/src/lib.rs`) emite canónicamente la señal `game_over(winner: i64)` (línea 449) y no `game_ended(winner: int, loser: int)`. `score_tracker.gd` conecta `game_over` para registrar el resultado y el cálculo ELO; además, mantiene compatibilidad defensiva con `game_ended` en caso de que un bridge futuro o mock emita dicha firma (ítem de prompt 395 marcado como N/A con justificación).
+- **Plugins nativos móviles (`platform_plugins/`)**: `OpenTableNearby` (Android) y `OpenTableMultipeer` (iOS) probados en arquitectura mock/unit-test; requieren compilación nativa en Android Studio / Xcode (proceso Android documentado en `platform_plugins/android/BUILD.md`).
 - **Simplificaciones voluntarias de reglas**: Documentadas en la tabla anterior y en cada `README.md` individual para mantener la agilidad del engine.

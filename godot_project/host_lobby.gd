@@ -122,6 +122,13 @@ func _setup_ui() -> void:
 	scan_btn.pressed.connect(_on_scan_qr_pressed)
 	hbox.add_child(scan_btn)
 
+	var spec_btn = Button.new()
+	spec_btn.text = "👁 Espectador"
+	spec_btn.custom_minimum_size = Vector2(140, 44)
+	spec_btn.add_theme_font_size_override("font_size", 15)
+	spec_btn.pressed.connect(_on_spectator_pressed)
+	hbox.add_child(spec_btn)
+
 	start_game_button = Button.new()
 	start_game_button.text = "🚀 Iniciar Partida"
 	start_game_button.custom_minimum_size = Vector2(160, 44)
@@ -135,6 +142,15 @@ func _get_local_ip() -> String:
 		if not ip.begins_with("127.") and not ip.contains(":") and ip.count(".") == 3:
 			return ip
 	return "127.0.0.1"
+
+func _on_spectator_pressed() -> void:
+	if bridge != null and bridge.has_method("join_as_spectator"):
+		bridge.call("join_as_spectator")
+	if has_node("/root/SceneManager"):
+		get_node("/root/SceneManager").transition_to("res://spectator_view.tscn")
+	else:
+		get_tree().change_scene_to_file("res://spectator_view.tscn")
+
 
 func _on_scan_qr_pressed() -> void:
 	var scanner = QRScanner.new()
