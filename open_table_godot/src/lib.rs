@@ -2963,7 +2963,12 @@ impl OpenTableBridge {
                     let p2 = next_m.player2.0 as i64;
                     let r = next_m.round as i64;
                     let turn = session.current_player().0 as i64;
-                    (round, Some((p1, p2, r, turn)), false, Dictionary::<i64, i64>::new())
+                    (
+                        round,
+                        Some((p1, p2, r, turn)),
+                        false,
+                        Dictionary::<i64, i64>::new(),
+                    )
                 } else {
                     let mut dict = Dictionary::<i64, i64>::new();
                     for (pid, score) in scores.iter() {

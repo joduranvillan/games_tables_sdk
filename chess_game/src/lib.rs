@@ -47,7 +47,9 @@ pub fn new_chess_session(
     let initial_hash = board.compute_hash(white);
     session.world_mut().insert_resource(board);
     session.world_mut().insert_resource(Sides { white, black });
-    session.world_mut().insert_resource(TurnResource(TurnOrder::new(vec![white, black])));
+    session
+        .world_mut()
+        .insert_resource(TurnResource(TurnOrder::new(vec![white, black])));
     session
         .world_mut()
         .insert_resource(DrawOfferedResource::default());

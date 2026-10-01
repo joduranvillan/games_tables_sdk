@@ -241,25 +241,35 @@ mod tests {
         );
 
         // Inicializar TurnResource
-        session.world_mut().insert_resource(TurnResource(TurnOrder::new(vec![P1, P2])));
-        session.world_mut().resource_mut::<TurnResource>().0.set_current_player(P1);
+        session
+            .world_mut()
+            .insert_resource(TurnResource(TurnOrder::new(vec![P1, P2])));
+        session
+            .world_mut()
+            .resource_mut::<TurnResource>()
+            .0
+            .set_current_player(P1);
 
         // Aplicamos el setup manualmente
         {
             let world = session.world_mut();
             world.insert_resource(BoardResource::standard_setup(P1, P2));
-            world.insert_resource(Sides { increasing: P1, decreasing: P2 });
+            world.insert_resource(Sides {
+                increasing: P1,
+                decreasing: P2,
+            });
             world.insert_resource(PendingDiceResource::default());
-            
+
             // Colocar ficha en la barra para P1
             world.resource_mut::<BoardResource>().bar.insert(P1, 1);
-            
+
             // Dados pendientes para P1: [3, 5]
-            world.resource_mut::<PendingDiceResource>()
+            world
+                .resource_mut::<PendingDiceResource>()
                 .pending
                 .insert(P1, vec![3, 5]);
         }
-        
+
         let chosen = backgammon_ai_pick_move(&session, P1);
         assert!(chosen.is_some(), "La IA debe encontrar una jugada legal");
         let mv = chosen.unwrap();
@@ -273,10 +283,16 @@ mod tests {
     #[test]
     fn test_backgammon_ai_prefiere_crear_bloque_sobre_dejar_blot() {
         let mut session = new_backgammon_session(SessionId(1), 1, P1, P2);
-        
+
         // Inicializar TurnResource
-        session.world_mut().insert_resource(TurnResource(TurnOrder::new(vec![P1, P2])));
-        session.world_mut().resource_mut::<TurnResource>().0.set_current_player(P1);
+        session
+            .world_mut()
+            .insert_resource(TurnResource(TurnOrder::new(vec![P1, P2])));
+        session
+            .world_mut()
+            .resource_mut::<TurnResource>()
+            .0
+            .set_current_player(P1);
 
         // Limpiamos el tablero para configurar una posición controlada
         {
@@ -293,7 +309,8 @@ mod tests {
         }
 
         // Dados pendientes: [2]
-        session.world_mut()
+        session
+            .world_mut()
             .resource_mut::<PendingDiceResource>()
             .pending
             .insert(P1, vec![2]);
