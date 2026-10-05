@@ -179,7 +179,8 @@ func _setup_ui() -> void:
 				for y in range(32):
 					var dist = Vector2(x - 16, y - 16).length()
 					if dist <= 12:
-						img.set_pixel(x, y, p_col)
+						var pattern_hit := _is_colorblind_pattern_pixel(p, x, y)
+						img.set_pixel(x, y, p_col.lightened(0.38) if pattern_hit else p_col)
 					elif dist <= 14:
 						img.set_pixel(x, y, Color.BLACK)
 					else:
@@ -201,6 +202,23 @@ func _setup_ui() -> void:
 			btn.pressed.connect(func(): _on_token_pressed(pid, tid))
 			add_child(btn)
 			token_buttons[p].append(btn)
+
+func _is_colorblind_pattern_pixel(player_id: int, x: int, y: int) -> bool:
+	match player_id:
+		1:
+			# Trama de líneas horizontales
+			return (y % 4) == 0
+		2:
+			# Trama de líneas verticales
+			return (x % 4) == 0
+		3:
+			# Trama de puntos
+			return (x % 4 == 0) and (y % 4 == 0)
+		4:
+			# Trama diagonal / cruzada
+			return ((x + y) % 5) == 0
+		_:
+			return false
 
 func _on_roll_dice_pressed() -> void:
 	_sfx_dice_roll()

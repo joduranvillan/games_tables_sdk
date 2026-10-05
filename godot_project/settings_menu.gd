@@ -17,6 +17,7 @@ var p1_line: LineEdit
 var p2_line: LineEdit
 var lang_option: OptionButton
 var highlight_checkbox: CheckBox
+var colorblind_checkbox: CheckBox
 var save_button: Button
 var close_button: Button
 var title_label: Label
@@ -247,6 +248,16 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	highlight_checkbox = CheckBox.new()
 	highlight_checkbox.text = "Resaltar movimientos válidos"
 	parent.add_child(highlight_checkbox)
+
+	colorblind_checkbox = CheckBox.new()
+	colorblind_checkbox.text = "Modo Accesibilidad Daltónicos"
+	colorblind_checkbox.toggled.connect(func(on: bool):
+		if has_node("/root/ThemeManager"):
+			var tm = get_node("/root/ThemeManager")
+			if tm.has_method("set_colorblind_mode"):
+				tm.call("set_colorblind_mode", on)
+	)
+	parent.add_child(colorblind_checkbox)
 
 	parent.add_child(HSeparator.new())
 	var save_load_lbl = Label.new()

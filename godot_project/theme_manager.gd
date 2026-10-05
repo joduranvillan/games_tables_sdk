@@ -6,6 +6,7 @@ signal font_size_changed(tier: int)
 signal sfx_toggled(enabled: bool)
 @warning_ignore("unused_signal")
 signal animations_toggled(enabled: bool)
+signal colorblind_mode_toggled(enabled: bool)
 
 # Overrides de color primario por juego (se mezclan sobre el tema global)
 const GAME_COLOR_OVERRIDES := {
@@ -30,6 +31,36 @@ var current_theme: BoardTheme
 var current_font_tier: int = 1 # 0: Pequeño, 1: Mediano, 2: Grande
 var sfx_enabled: bool = true
 var animations_enabled: bool = true
+var colorblind_mode: bool = false
+
+const UNO_COLORBLIND_SYMBOLS := {
+	"Red": "●",
+	"Blue": "■",
+	"Green": "▲",
+	"Yellow": "★",
+	"Wild": "◆",
+	"WildColor": "◆",
+}
+
+func set_colorblind_mode(enabled: bool) -> void:
+	colorblind_mode = enabled
+	colorblind_mode_toggled.emit(colorblind_mode)
+	if current_theme != null:
+		theme_changed.emit(current_theme)
+
+func is_colorblind_mode() -> bool:
+	return colorblind_mode
+
+func get_uno_color_symbol(color_name: String) -> String:
+	return UNO_COLORBLIND_SYMBOLS.get(color_name, "◆")
+
+func get_player_pattern_type(player_id: int) -> String:
+	match player_id:
+		1: return "stripes_h"
+		2: return "stripes_v"
+		3: return "dots"
+		4: return "cross"
+		_: return "ring"
 
 func get_theme_for_game(game_id: String) -> Theme:
 	var th := Theme.new()

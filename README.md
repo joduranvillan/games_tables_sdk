@@ -47,7 +47,9 @@ falta compilarlos con Android Studio / Xcode.
 
 ## Quick Start / Guía de Integración
 
-Para integrar OpenTable SDK en un proyecto externo de Rust o en Godot Engine, consulta la **[`Guía de Integración`](./docs/integration_guide.md)** con ejemplos completos de código para Rust y GDScript.
+> 🚀 **[Guía Rápida de 15 Minutos (`docs/SDK_QUICKSTART.md`)](./docs/SDK_QUICKSTART.md)**: Aprende a crear tu propio juego de mesa desde cero (ejemplo completo de *Tres en Línea / Tic-Tac-Toe* en menos de 100 líneas de Rust con `GameEngine`, `State`, `Action`, `PlayerId`, registro en `open_table_engine::Session` y señales en Godot).
+
+Para integrar OpenTable SDK en un proyecto externo de Rust o en Godot Engine, consulta también la **[`Guía de Integración`](./docs/integration_guide.md)** con ejemplos completos de código para Rust y GDScript.
 
 ## Logros, Rating ELO y Oponente de IA Local
 

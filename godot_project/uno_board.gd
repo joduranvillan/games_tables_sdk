@@ -671,21 +671,25 @@ func _create_card_visual(card: Dictionary, is_playable: bool = true, is_large: b
 
 	oval.add_child(center_lbl)
 
-	# Mini Indices (Top-Left and Bottom-Right)
+	# Mini Indices (Top-Left and Bottom-Right) + Símbolo de Accesibilidad Daltónicos
 	var mini_sym = _get_card_mini_symbol(c_val)
+	var cb_sym = _get_colorblind_symbol(c_color)
+	var cb_active: bool = true
+	if has_node("/root/ThemeManager") and get_node("/root/ThemeManager").has_method("is_colorblind_mode"):
+		cb_active = true # Siempre disponible con realce extra cuando colorblind_mode está activo
 
 	var tl_lbl = Label.new()
-	tl_lbl.text = mini_sym
+	tl_lbl.text = "%s %s" % [mini_sym, cb_sym] if cb_active and not cb_sym.is_empty() else mini_sym
 	tl_lbl.position = Vector2(6, 4)
-	tl_lbl.add_theme_font_size_override("font_size", 14)
+	tl_lbl.add_theme_font_size_override("font_size", 13)
 	tl_lbl.add_theme_color_override("font_color", Color.WHITE)
 	tl_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card_panel.add_child(tl_lbl)
 
 	var br_lbl = Label.new()
-	br_lbl.text = mini_sym
-	br_lbl.position = Vector2(width - 24, height - 24)
-	br_lbl.add_theme_font_size_override("font_size", 14)
+	br_lbl.text = "%s %s" % [cb_sym, mini_sym] if cb_active and not cb_sym.is_empty() else mini_sym
+	br_lbl.position = Vector2(width - 38, height - 24)
+	br_lbl.add_theme_font_size_override("font_size", 13)
 	br_lbl.add_theme_color_override("font_color", Color.WHITE)
 	br_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card_panel.add_child(br_lbl)
@@ -736,6 +740,14 @@ func _create_card_back_visual() -> Control:
 	oval.add_child(lbl)
 
 	return card_panel
+
+func _get_colorblind_symbol(c_color: String) -> String:
+	match c_color:
+		"Red": return "●"
+		"Blue": return "■"
+		"Green": return "▲"
+		"Yellow": return "★"
+		_: return "◆"
 
 func _get_card_display_symbol(val: String) -> String:
 	match val:

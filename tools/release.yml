@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-matrix:
+    name: Build Release (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            archive_ext: tar.gz
+          - os: windows-latest
+            platform: windows-x86_64
+            archive_ext: zip
+          - os: macos-latest
+            platform: macos-universal
+            archive_ext: tar.gz
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust GDExtension & Relay Server (Release)
+        shell: bash
+        env:
+          GODOT4_GDEXTENSION_JSON: ${{ github.workspace }}/extension_api.json
+        run: |
+          cargo build --release -p open_table_godot
+          cargo build --release -p open_table_relay
+
+      - name: Install Redot / Godot 4 (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p ~/redot
+          cd ~/redot
+          wget -q -O redot.zip https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip || true
+          if [ -s redot.zip ]; then
+            unzip -q redot.zip
+            REDOT_EXEC=$(find ~/redot -type f ! -name "*.zip" | head -n 1)
+            chmod +x "$REDOT_EXEC"
+            sudo ln -sf "$REDOT_EXEC" /usr/bin/redot
+            sudo ln -sf "$REDOT_EXEC" /usr/bin/godot
+          fi
+
+      - name: Package Platform Distribution & Godot 4 Export
+        shell: bash
+        run: |
+          PKG_NAME="opentable-${{ matrix.platform }}"
+          PKG_DIR="dist/${PKG_NAME}"
+          mkdir -p "${PKG_DIR}/bin" "${PKG_DIR}/addons" "${PKG_DIR}/assets"
+
+          # Copy compiled native libraries and relay executable
+          find target/release -maxdepth 1 \( -name "*.so" -o -name "*.dll" -o -name "*.dylib" -o -name "open_table_relay*" \) -exec cp -f {} "${PKG_DIR}/bin/" \;
+
+          # Copy Godot Addon and Assets
+          cp -r godot_project/addons/open_table "${PKG_DIR}/addons/"
+          cp -r godot_project/assets/. "${PKG_DIR}/assets/"
+          cp -f README.md CHANGELOG.md "${PKG_DIR}/"
+
+          # Export Godot 4 / Redot project if binary is available
+          if command -v redot >/dev/null 2>&1; then
+            redot --headless --path godot_project --export-release "Linux/X11" "${PKG_DIR}/opentable.x86_64" || true
+          fi
+
+          cd dist
+          if [ "${{ matrix.archive_ext }}" = "zip" ]; then
+            7z a -tzip "${PKG_NAME}.zip" "${PKG_NAME}"
+          else
+            tar -czf "${PKG_NAME}.tar.gz" "${PKG_NAME}"
+          fi
+
+      - name: Upload Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: dist/opentable-${{ matrix.platform }}.${{ matrix.archive_ext }}
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_assets
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS.txt and Changelog
+        shell: bash
+        run: |
+          cd release_assets
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          cd ..
+          chmod +x tools/generate_changelog.sh
+          ./tools/generate_changelog.sh > RELEASE_NOTES.md || cp CHANGELOG.md RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release_assets/*
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: true
+          draft: false
+          prerelease: false

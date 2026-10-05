@@ -367,6 +367,7 @@ func _gui_input(event: InputEvent) -> void:
 	_handle_unified_input(event)
 
 func _input(event: InputEvent) -> void:
+	_handle_gamepad_input(event)
 	_handle_unified_input(event)
 
 func _handle_unified_input(event: InputEvent) -> void:
@@ -572,6 +573,65 @@ func _draw() -> void:
 	for move_pos in valid_moves:
 		var center = Vector2(move_pos.y * CELL + CELL / 2.0, move_pos.x * CELL + CELL / 2.0)
 		draw_circle(center, 20.0, Color(1.0, 1.0, 1.0, 0.5))
+
+	# Cursor virtual de Gamepad / Steam Deck
+	if gamepad_cursor_active and gamepad_cursor.x >= 0 and gamepad_cursor.x < BOARD and gamepad_cursor.y >= 0 and gamepad_cursor.y < BOARD:
+		var cur_rect := Rect2(gamepad_cursor.y * CELL + 3.0, gamepad_cursor.x * CELL + 3.0, CELL - 6.0, CELL - 6.0)
+		draw_rect(cur_rect, Color(0.2, 0.95, 1.0, 0.95), false, 3.0)
+
+# --- Soporte de Gamepad y Steam Deck con cursor virtual ---
+var gamepad_cursor: Vector2i = Vector2i(5, 0)
+var gamepad_cursor_active: bool = false
+
+func move_gamepad_cursor(delta: Vector2i) -> void:
+	gamepad_cursor_active = true
+	gamepad_cursor.x = clampi(gamepad_cursor.x + delta.x, 0, BOARD - 1)
+	gamepad_cursor.y = clampi(gamepad_cursor.y + delta.y, 0, BOARD - 1)
+	_sfx_piece_slide()
+	queue_redraw()
+
+func gamepad_select_current_cell() -> void:
+	gamepad_cursor_active = true
+	var center_pos := Vector2(gamepad_cursor.y * CELL + CELL / 2.0, gamepad_cursor.x * CELL + CELL / 2.0)
+	_handle_click(center_pos)
+
+func gamepad_cancel_selection() -> void:
+	_reset_all_piece_scales()
+	selected = null
+	valid_moves.clear()
+	queue_redraw()
+
+func gamepad_open_pause_menu() -> void:
+	if ResourceLoader.exists("res://pause_menu.tscn"):
+		var pm = load("res://pause_menu.tscn").instantiate()
+		add_child(pm)
+		if pm.has_method("toggle_pause"):
+			pm.call("toggle_pause")
+
+func _handle_gamepad_input(event: InputEvent) -> void:
+	if InputMap.has_action("ui_gamepad_up") and event.is_action_pressed("ui_gamepad_up"):
+		move_gamepad_cursor(Vector2i(-1, 0))
+	elif InputMap.has_action("ui_gamepad_down") and event.is_action_pressed("ui_gamepad_down"):
+		move_gamepad_cursor(Vector2i(1, 0))
+	elif InputMap.has_action("ui_gamepad_left") and event.is_action_pressed("ui_gamepad_left"):
+		move_gamepad_cursor(Vector2i(0, -1))
+	elif InputMap.has_action("ui_gamepad_right") and event.is_action_pressed("ui_gamepad_right"):
+		move_gamepad_cursor(Vector2i(0, 1))
+	elif InputMap.has_action("ui_gamepad_select") and event.is_action_pressed("ui_gamepad_select"):
+		gamepad_select_current_cell()
+	elif InputMap.has_action("ui_gamepad_cancel") and event.is_action_pressed("ui_gamepad_cancel"):
+		gamepad_cancel_selection()
+	elif InputMap.has_action("ui_gamepad_start") and event.is_action_pressed("ui_gamepad_start"):
+		gamepad_open_pause_menu()
+	elif event is InputEventJoypadButton and event.pressed:
+		match event.button_index:
+			JOY_BUTTON_DPAD_UP: move_gamepad_cursor(Vector2i(-1, 0))
+			JOY_BUTTON_DPAD_DOWN: move_gamepad_cursor(Vector2i(1, 0))
+			JOY_BUTTON_DPAD_LEFT: move_gamepad_cursor(Vector2i(0, -1))
+			JOY_BUTTON_DPAD_RIGHT: move_gamepad_cursor(Vector2i(0, 1))
+			JOY_BUTTON_A: gamepad_select_current_cell()
+			JOY_BUTTON_B: gamepad_cancel_selection()
+			JOY_BUTTON_START: gamepad_open_pause_menu()
 
 func _update_status() -> void:
 	if winner != -1:
