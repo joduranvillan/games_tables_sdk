@@ -937,7 +937,7 @@ func _animate_card_to_discard(card_dict: Dictionary, start_global_pos: Vector2) 
 		_update_discard_display()
 		_update_active_color_indicator()
 		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_move()
+			get_node("/root/AudioManager").play_card_flip()
 		flying_card.queue_free()
 	)
 
@@ -993,12 +993,13 @@ func _execute_play_card(idx: int, start_pos: Vector2, chosen_col: String) -> voi
 		]
 
 		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_move()
+			get_node("/root/AudioManager").play_card_flip()
 
 		_animate_card_to_discard(played_card, start_pos)
 		_update_ui()
 
 func _on_draw_pile_pressed() -> void:
+	_sfx_card_flip()
 	if winner != -1 or wild_picker_modal.visible:
 		return
 
@@ -1017,7 +1018,7 @@ func _on_draw_pile_pressed() -> void:
 		event_banner_label.text = "Jugador %d robó una carta del mazo" % current
 
 		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_move()
+			get_node("/root/AudioManager").play_card_flip()
 
 		_update_ui(drawn_idx)
 
@@ -1087,7 +1088,7 @@ func _on_game_over(w: int) -> void:
 	winner = w
 	_update_status()
 	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_game_over()
+		get_node("/root/AudioManager").play_victory_fanfare()
 	if ResourceLoader.exists("res://game_over_overlay.tscn"):
 		var overlay = preload("res://game_over_overlay.tscn").instantiate()
 		add_child(overlay)
@@ -1100,7 +1101,7 @@ func _on_move_rejected(reason: String) -> void:
 	if event_banner_label != null:
 		event_banner_label.text = "❌ Movimiento no permitido: %s" % reason
 	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_invalid()
+		get_node("/root/AudioManager").play_error_buzz()
 
 func _on_layout_changed(layout: int) -> void:
 	if has_node("/root/ThemeManager"):
@@ -1140,3 +1141,53 @@ func _update_status() -> void:
 		status.text = "Turno: Jugador %s (UNO)" % current
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, p_name, p_col)
+
+# --- Conexión de eventos sonoros procedurales (AudioManager) ---
+func _sfx_piece_slide() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_slide()
+
+func _sfx_piece_place() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_place()
+
+func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_place(2.0)
+	var particles := CPUParticles2D.new()
+	particles.position = world_pos
+	particles.emitting = true
+	particles.one_shot = true
+	particles.amount = 18
+	particles.lifetime = 0.45
+	particles.explosiveness = 0.9
+	particles.spread = 180.0
+	particles.initial_velocity_min = 45.0
+	particles.initial_velocity_max = 110.0
+	particles.color = Color(1.0, 0.85, 0.3, 0.9)
+	add_child(particles)
+	if is_inside_tree():
+		get_tree().create_timer(0.6).timeout.connect(func():
+			if is_instance_valid(particles):
+				particles.queue_free()
+		)
+
+func _sfx_dice_roll() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_dice_roll()
+
+func _sfx_card_flip() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_card_flip()
+
+func _sfx_check_alert() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_check_alert()
+
+func _sfx_victory_fanfare() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_victory_fanfare()
+
+func _sfx_error_buzz() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_error_buzz()

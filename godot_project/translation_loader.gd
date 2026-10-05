@@ -30,6 +30,42 @@ func load_all_translations() -> void:
 						translation.add_message(key, val)
 				TranslationServer.add_translation(translation)
 
+	_load_multilingual_csv("res://assets/translations/translations.csv")
+
+func _load_multilingual_csv(csv_path: String) -> void:
+	if not FileAccess.file_exists(csv_path):
+		return
+	var file := FileAccess.open(csv_path, FileAccess.READ)
+	if file == null:
+		return
+	var header: PackedStringArray = file.get_csv_line()
+	if header.size() < 2:
+		file.close()
+		return
+	var translations_by_col: Dictionary = {}
+	for col_idx in range(1, header.size()):
+		var lang_code := header[col_idx].strip_edges()
+		if not lang_code.is_empty():
+			var tr_obj := Translation.new()
+			tr_obj.locale = lang_code
+			translations_by_col[col_idx] = tr_obj
+
+	while not file.eof_reached():
+		var row: PackedStringArray = file.get_csv_line()
+		if row.size() < 2:
+			continue
+		var key := row[0].strip_edges()
+		if key.is_empty():
+			continue
+		for col_idx in translations_by_col.keys():
+			if col_idx < row.size():
+				var tr_obj: Translation = translations_by_col[col_idx]
+				tr_obj.add_message(key, row[col_idx].strip_edges())
+	file.close()
+
+	for col_idx in translations_by_col.keys():
+		TranslationServer.add_translation(translations_by_col[col_idx])
+
 func _set_default_locale() -> void:
 	var cfg = ConfigFile.new()
 	var err = cfg.load("user://settings.cfg")

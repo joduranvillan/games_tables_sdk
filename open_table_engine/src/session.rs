@@ -788,6 +788,11 @@ impl Session {
             .map_err(|e| EngineError::Replay(format!("no se pudo exportar el log: {e}")))
     }
 
+    /// Genera un snapshot binario determinista del estado de la sesión apto para persistencia.
+    pub fn serialize_state(&self) -> EngineResult<Vec<u8>> {
+        self.export_log()
+    }
+
     /// Guarda el log de comandos de la sesión en un archivo en el disco.
     pub fn save_to_file(&self, path: &str) -> EngineResult<()> {
         let bytes = self.export_log()?;

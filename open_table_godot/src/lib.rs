@@ -36,6 +36,7 @@ use open_table_transport_native_bridge::{
     HandshakeStatus, NativeClientTransport, NativeHostTransport, RawByteLink, RawLinkEvent,
 };
 use open_table_transport_tcp::{ConnectionEvent, TcpClientTransport, TcpHostTransport};
+use open_table_transport_websocket::{RelayClientEvent, WsRelayClient};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
@@ -203,6 +204,13 @@ enum BridgeMode {
     MultiSession {
         sessions: Vec<(String, Session)>,
         active: usize,
+    },
+    RelayHost {
+        session: Session,
+    },
+    RelayClient {
+        player_id: PlayerId,
+        client_current_player: i64,
     },
 }
 
@@ -396,6 +404,7 @@ fn parse_command_json(
 pub struct OpenTableBridge {
     base: Base<Node>,
     mode: BridgeMode,
+    relay_client: Option<WsRelayClient>,
     current_game_type: String,
     undone_commands: Vec<(PlayerId, String)>,
     recent_events: Vec<Dictionary<Variant, Variant>>,
@@ -408,6 +417,7 @@ impl INode for OpenTableBridge {
         Self {
             base,
             mode: BridgeMode::None,
+            relay_client: None,
             current_game_type: String::from("checkers"),
             undone_commands: Vec::new(),
             recent_events: Vec::new(),
@@ -520,6 +530,12 @@ impl OpenTableBridge {
 
     #[signal]
     fn tournament_over(standings: Dictionary<Variant, Variant>);
+
+    #[signal]
+    fn room_created(code: GString);
+
+    #[signal]
+    fn room_joined(success: bool, player_id: i64);
 
     // ------------------------------------------------------------------
     // LOCAL (hotseat)
@@ -1128,19 +1144,78 @@ impl OpenTableBridge {
     }
 
     #[func]
+    fn export_chess_fen(&self) -> GString {
+        let fen_str = match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::RelayHost { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::Tournament { session, .. } => chess_game::export_session_fen(session),
+            BridgeMode::MultiSession { sessions, active } => sessions
+                .get(*active)
+                .map(|(_, s)| chess_game::export_session_fen(s))
+                .unwrap_or_default(),
+            _ => String::new(),
+        };
+        GString::from(fen_str.as_str())
+    }
+
+    #[func]
     fn export_chess_pgn(&self) -> GString {
         let pgn_opt = match &self.mode {
             BridgeMode::Local { session, .. }
             | BridgeMode::Host { session, .. }
+            | BridgeMode::RelayHost { session, .. }
             | BridgeMode::NativeHost { session, .. }
             | BridgeMode::MultipeerHost { session, .. }
-            | BridgeMode::Tournament { session, .. } => session.export_chess_pgn(),
+            | BridgeMode::Tournament { session, .. } => Some(chess_game::export_to_pgn(session)),
             BridgeMode::MultiSession { sessions, active } => sessions
                 .get(*active)
-                .and_then(|(_, s)| s.export_chess_pgn()),
+                .map(|(_, s)| chess_game::export_to_pgn(s)),
             _ => None,
         };
         GString::from(pgn_opt.unwrap_or_default().as_str())
+    }
+
+    #[func]
+    fn export_chess_pgn_named(&self, white: GString, black: GString) -> GString {
+        let w = white.to_string();
+        let b = black.to_string();
+        let pgn_str = match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::RelayHost { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::Tournament { session, .. } => {
+                chess_game::export_session_pgn(session, &w, &b)
+            }
+            BridgeMode::MultiSession { sessions, active } => sessions
+                .get(*active)
+                .map(|(_, s)| chess_game::export_session_pgn(s, &w, &b))
+                .unwrap_or_default(),
+            _ => String::new(),
+        };
+        GString::from(pgn_str.as_str())
+    }
+
+    #[func]
+    fn export_go_sgf(&self) -> GString {
+        let sgf_str = match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::RelayHost { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::Tournament { session, .. } => go_game::export_to_sgf(session),
+            BridgeMode::MultiSession { sessions, active } => sessions
+                .get(*active)
+                .map(|(_, s)| go_game::export_to_sgf(s))
+                .unwrap_or_default(),
+            _ => String::new(),
+        };
+        GString::from(sgf_str.as_str())
     }
 
     // ------------------------------------------------------------------
@@ -1269,18 +1344,140 @@ impl OpenTableBridge {
 
     #[func]
     pub fn is_connected_to_host(&self) -> bool {
-        matches!(self.mode, BridgeMode::Client { .. })
+        matches!(
+            self.mode,
+            BridgeMode::Client { .. } | BridgeMode::RelayClient { .. }
+        )
     }
 
     #[func]
     pub fn disconnect_from_host(&mut self) {
+        if let Some(relay) = &mut self.relay_client {
+            let _ = relay.leave_room();
+        }
+        self.relay_client = None;
         if matches!(
             self.mode,
-            BridgeMode::Client { .. } | BridgeMode::Spectator { .. }
+            BridgeMode::Client { .. }
+                | BridgeMode::Spectator { .. }
+                | BridgeMode::RelayHost { .. }
+                | BridgeMode::RelayClient { .. }
         ) {
             self.mode = BridgeMode::None;
             self.base_mut().emit_signal("disconnected", &[]);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // RELAY WEBSOCKET
+    // ------------------------------------------------------------------
+    #[func]
+    pub fn connect_to_relay(&mut self, relay_url: GString) {
+        let url = relay_url.to_string();
+        let target_url = if url.trim().is_empty() {
+            "ws://127.0.0.1:8080".to_string()
+        } else {
+            url
+        };
+        self.relay_client = Some(WsRelayClient::connect(&target_url));
+    }
+
+    #[func]
+    pub fn create_relay_room(&mut self, game_id: GString) -> GString {
+        let gid = game_id.to_string();
+        let effective_game = if gid.trim().is_empty() {
+            "checkers".to_string()
+        } else {
+            gid
+        };
+        self.current_game_type = effective_game.clone();
+
+        if self.relay_client.is_none() {
+            self.relay_client = Some(WsRelayClient::connect("ws://127.0.0.1:8080"));
+        }
+
+        let code = if let Some(relay) = &mut self.relay_client {
+            let c = relay.create_room(&effective_game).unwrap_or_default();
+            // Consumir RoomCreated de la cola interna porque emitimos la señal directamente aquí
+            let _ = relay.poll_relay_events();
+            c
+        } else {
+            String::new()
+        };
+
+        let session = create_initial_session(&effective_game)
+            .unwrap_or_else(|| new_checkers_session(SessionId(1), 1, PlayerId(1), PlayerId(2)));
+        self.mode = BridgeMode::RelayHost { session };
+
+        let code_gstr = GString::from(&code);
+        self.base_mut()
+            .emit_signal("room_created", &[Variant::from(code_gstr.clone())]);
+        code_gstr
+    }
+
+    #[func]
+    pub fn join_relay_room(&mut self, code: GString) {
+        if self.relay_client.is_none() {
+            self.relay_client = Some(WsRelayClient::connect("ws://127.0.0.1:8080"));
+        }
+
+        let join_result = if let Some(relay) = &mut self.relay_client {
+            let res = relay.join_room(&code.to_string());
+            let _ = relay.poll_relay_events();
+            res
+        } else {
+            Err(EngineError::Network("Relay client not initialized".into()))
+        };
+
+        match join_result {
+            Ok(player_id) => {
+                if let Some(relay) = &mut self.relay_client {
+                    let sync_req = SyncProtocolMessage::RequestSync;
+                    if let Ok(serialized) = serde_json::to_vec(&sync_req) {
+                        let _ = relay.send_relay_data(&serialized);
+                    }
+                }
+                self.mode = BridgeMode::RelayClient {
+                    player_id,
+                    client_current_player: 1,
+                };
+                let pid = player_id.0 as i64;
+                self.base_mut()
+                    .emit_signal("room_joined", &[Variant::from(true), Variant::from(pid)]);
+                self.base_mut()
+                    .emit_signal("connected", &[Variant::from(pid)]);
+            }
+            Err(_) => {
+                self.base_mut().emit_signal(
+                    "room_joined",
+                    &[Variant::from(false), Variant::from(-1_i64)],
+                );
+            }
+        }
+    }
+
+    #[func]
+    pub fn leave_relay_room(&mut self) {
+        if let Some(relay) = &mut self.relay_client {
+            let _ = relay.leave_room();
+        }
+        if matches!(
+            self.mode,
+            BridgeMode::RelayHost { .. } | BridgeMode::RelayClient { .. }
+        ) {
+            self.mode = BridgeMode::None;
+            self.base_mut().emit_signal("disconnected", &[]);
+        }
+    }
+
+    #[func]
+    pub fn get_relay_room_code(&self) -> GString {
+        if let Some(relay) = &self.relay_client {
+            if let Some(code) = relay.room_code() {
+                return GString::from(code);
+            }
+        }
+        GString::from("")
     }
 
     #[func]
@@ -1305,6 +1502,8 @@ impl OpenTableBridge {
             BridgeMode::Client { player_id, .. } => player_id.0 as i64,
             BridgeMode::NativeClient { player_id, .. } => player_id.0 as i64,
             BridgeMode::MultipeerClient { player_id, .. } => player_id.0 as i64,
+            BridgeMode::RelayHost { .. } => 1,
+            BridgeMode::RelayClient { player_id, .. } => player_id.0 as i64,
             _ => -1,
         }
     }
@@ -1327,6 +1526,7 @@ impl OpenTableBridge {
     fn send_move_client(&mut self, from_row: i64, from_col: i64, to_row: i64, to_col: i64) {
         let command_parts = match &self.mode {
             BridgeMode::Client { player_id, .. } => Some(*player_id),
+            BridgeMode::RelayClient { player_id, .. } => Some(*player_id),
             BridgeMode::NativeClient {
                 player_id,
                 handshake_complete,
@@ -1353,6 +1553,11 @@ impl OpenTableBridge {
             match &mut self.mode {
                 BridgeMode::Client { transport, .. } => {
                     let _ = transport.send(open_table_transport_tcp::HOST_PLAYER_ID, &serialized);
+                }
+                BridgeMode::RelayClient { .. } => {
+                    if let Some(relay) = &mut self.relay_client {
+                        let _ = relay.send_relay_data(&serialized);
+                    }
                 }
                 BridgeMode::NativeClient { transport, .. } => {
                     let _ = transport.send(
@@ -1567,6 +1772,11 @@ impl OpenTableBridge {
                 let res = session.process_command(sender, command);
                 (prev, res)
             }
+            BridgeMode::RelayHost { session } => {
+                let prev = session.current_player();
+                let res = session.process_command(sender, command);
+                (prev, res)
+            }
             BridgeMode::Replay { session, .. } => {
                 let prev = session.current_player();
                 let res = session.process_command(sender, command);
@@ -1603,6 +1813,7 @@ impl OpenTableBridge {
                     BridgeMode::Host { session, .. } => session.current_player(),
                     BridgeMode::NativeHost { session, .. } => session.current_player(),
                     BridgeMode::MultipeerHost { session, .. } => session.current_player(),
+                    BridgeMode::RelayHost { session } => session.current_player(),
                     BridgeMode::Replay { session, .. } => session.current_player(),
                     BridgeMode::Tournament { session, .. } => session.current_player(),
                     BridgeMode::MultiSession { sessions, active } => sessions
@@ -1641,6 +1852,15 @@ impl OpenTableBridge {
             }
         };
 
+        if let BridgeMode::RelayClient { .. } = &self.mode {
+            if let Some(relay) = &mut self.relay_client {
+                if let Ok(serialized) = serde_json::to_vec(&command) {
+                    let _ = relay.send_relay_data(&serialized);
+                }
+            }
+            return;
+        }
+
         if let Ok(events) = self.process_and_emit(pid, command) {
             match &mut self.mode {
                 BridgeMode::Host { transport, .. } => {
@@ -1654,6 +1874,12 @@ impl OpenTableBridge {
                 BridgeMode::MultipeerHost { transport, .. } => {
                     let serialized = serde_json::to_vec(&events).unwrap_or_default();
                     let _ = transport.broadcast(&serialized);
+                }
+                BridgeMode::RelayHost { .. } => {
+                    if let Some(relay) = &mut self.relay_client {
+                        let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                        let _ = relay.send_relay_data(&serialized);
+                    }
                 }
                 _ => {}
             }
@@ -1719,6 +1945,15 @@ impl OpenTableBridge {
             to: Position::new(to_row as u8, to_col as u8),
         });
 
+        if let BridgeMode::RelayClient { .. } = &self.mode {
+            if let Some(relay) = &mut self.relay_client {
+                if let Ok(serialized) = serde_json::to_vec(&command) {
+                    let _ = relay.send_relay_data(&serialized);
+                }
+            }
+            return;
+        }
+
         if let Ok(events) = self.process_and_emit(player_id, command) {
             match &mut self.mode {
                 BridgeMode::Host { transport, .. } => {
@@ -1732,6 +1967,12 @@ impl OpenTableBridge {
                 BridgeMode::MultipeerHost { transport, .. } => {
                     let serialized = serde_json::to_vec(&events).unwrap_or_default();
                     let _ = transport.broadcast(&serialized);
+                }
+                BridgeMode::RelayHost { .. } => {
+                    if let Some(relay) = &mut self.relay_client {
+                        let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                        let _ = relay.send_relay_data(&serialized);
+                    }
                 }
                 _ => {}
             }
@@ -1813,6 +2054,7 @@ impl OpenTableBridge {
         let log_bytes = match &self.mode {
             BridgeMode::Local { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::Host { session, .. } => session.export_log().unwrap_or_default(),
+            BridgeMode::RelayHost { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::NativeHost { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::MultipeerHost { session, .. } => session.export_log().unwrap_or_default(),
             BridgeMode::Replay { session, .. } => session.export_log().unwrap_or_default(),
@@ -1827,6 +2069,40 @@ impl OpenTableBridge {
             packed.push(b);
         }
         packed
+    }
+
+    #[func]
+    pub fn serialize_state(&self) -> PackedByteArray {
+        let state_bytes = match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::RelayHost { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::Replay { session, .. }
+            | BridgeMode::Tournament { session, .. } => {
+                session.serialize_state().unwrap_or_default()
+            }
+            BridgeMode::MultiSession { sessions, active } => sessions
+                .get(*active)
+                .and_then(|(_, s)| s.serialize_state().ok())
+                .unwrap_or_default(),
+            _ => vec![],
+        };
+        let mut packed = PackedByteArray::new();
+        for b in state_bytes {
+            packed.push(b);
+        }
+        packed
+    }
+
+    #[func]
+    pub fn restore_state(&mut self, state_bytes: PackedByteArray, game_type: GString) -> bool {
+        if !self.load_replay(state_bytes, game_type) {
+            return false;
+        }
+        while self.step_replay() {}
+        true
     }
 
     #[func]
@@ -1893,6 +2169,8 @@ impl OpenTableBridge {
                 | BridgeMode::NativeClient { .. }
                 | BridgeMode::MultipeerHost { .. }
                 | BridgeMode::MultipeerClient { .. }
+                | BridgeMode::RelayHost { .. }
+                | BridgeMode::RelayClient { .. }
                 | BridgeMode::Spectator { .. }
         )
     }
@@ -2299,13 +2577,123 @@ impl OpenTableBridge {
             BridgeMode::NativeClient { .. } => self.poll_native_client_events(),
             BridgeMode::MultipeerHost { .. } => self.poll_multipeer_host_events(),
             BridgeMode::MultipeerClient { .. } => self.poll_multipeer_client_events(),
+            BridgeMode::RelayHost { .. } | BridgeMode::RelayClient { .. } => {
+                self.poll_relay_events();
+            }
             BridgeMode::Local { .. } => self.process_ai_turn_if_needed(),
             BridgeMode::None
             | BridgeMode::Replay { .. }
             | BridgeMode::Tournament { .. }
-            | BridgeMode::MultiSession { .. } => {}
+            | BridgeMode::MultiSession { .. } => {
+                if self.relay_client.is_some() {
+                    self.poll_relay_events();
+                }
+            }
         }
         self.flush_native_outgoing();
+    }
+
+    fn poll_relay_events(&mut self) {
+        let events = match &mut self.relay_client {
+            Some(relay) => relay.poll_relay_events(),
+            None => return,
+        };
+
+        for ev in events {
+            match ev {
+                RelayClientEvent::RoomCreated { room_code } => {
+                    self.base_mut()
+                        .emit_signal("room_created", &[Variant::from(GString::from(&room_code))]);
+                }
+                RelayClientEvent::RoomJoined {
+                    success, player_id, ..
+                } => {
+                    let pid = if success { player_id.0 as i64 } else { -1 };
+                    self.base_mut()
+                        .emit_signal("room_joined", &[Variant::from(success), Variant::from(pid)]);
+                }
+                RelayClientEvent::PeerJoined { player_id } => {
+                    let pid = player_id.0 as i64;
+                    self.base_mut()
+                        .emit_signal("peer_joined", &[Variant::from(pid)]);
+                    self.base_mut()
+                        .emit_signal("player_joined", &[Variant::from(pid)]);
+                }
+                RelayClientEvent::PeerLeft { player_id } => {
+                    let pid = player_id.0 as i64;
+                    self.base_mut()
+                        .emit_signal("peer_disconnected", &[Variant::from(pid)]);
+                }
+                RelayClientEvent::PayloadReceived { from, data } => match &mut self.mode {
+                    BridgeMode::RelayHost { session } => {
+                        if let Ok(SyncProtocolMessage::RequestSync) =
+                            serde_json::from_slice::<SyncProtocolMessage>(&data)
+                        {
+                            let log_bytes = session.export_log().unwrap_or_default();
+                            let sync_msg = SyncProtocolMessage::SyncLog {
+                                game_type: self.current_game_type.clone(),
+                                log_bytes,
+                            };
+                            if let Ok(serialized) = serde_json::to_vec(&sync_msg) {
+                                if let Some(relay) = &mut self.relay_client {
+                                    let _ = relay.send_relay_data(&serialized);
+                                }
+                            }
+                            continue;
+                        }
+
+                        let cmd_str = String::from_utf8_lossy(&data);
+                        if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
+                            let sender = if from.0 == 0 { PlayerId(2) } else { from };
+                            if let Ok(game_events) = self.process_and_emit(sender, command) {
+                                if let Some(relay) = &mut self.relay_client {
+                                    let serialized =
+                                        serde_json::to_vec(&game_events).unwrap_or_default();
+                                    let _ = relay.send_relay_data(&serialized);
+                                }
+                            }
+                        }
+                    }
+                    BridgeMode::RelayClient { .. } => {
+                        if let Ok(SyncProtocolMessage::SyncLog {
+                            game_type,
+                            log_bytes,
+                        }) = serde_json::from_slice::<SyncProtocolMessage>(&data)
+                        {
+                            let gtype = if !game_type.is_empty() {
+                                game_type
+                            } else {
+                                self.current_game_type.clone()
+                            };
+                            let (id, seed, players, rules) =
+                                get_session_init_params(&gtype, PlayerId(1), PlayerId(2));
+                            if let Ok((loaded_session, game_events)) =
+                                Session::replay_collecting_events(
+                                    id, seed, players, rules, &log_bytes,
+                                )
+                            {
+                                let current_p = loaded_session.current_player().0 as i64;
+                                self.emit_game_events(&game_events);
+                                self.base_mut()
+                                    .emit_signal("turn_changed", &[Variant::from(current_p)]);
+                            }
+                            continue;
+                        }
+
+                        if let Ok(game_events) =
+                            serde_json::from_slice::<Vec<Box<dyn Event>>>(&data)
+                        {
+                            self.emit_game_events(&game_events);
+                        }
+                    }
+                    _ => {}
+                },
+                RelayClientEvent::Disconnected => {
+                    self.base_mut().emit_signal("disconnected", &[]);
+                }
+                RelayClientEvent::PongReceived | RelayClientEvent::Error { .. } => {}
+            }
+        }
     }
 
     fn poll_host_events(&mut self) {

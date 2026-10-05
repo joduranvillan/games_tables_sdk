@@ -5,6 +5,7 @@ signal settings_saved()
 
 @export var close_on_save: bool = true
 
+var music_slider: HSlider
 var sfx_slider: HSlider
 var sfx_checkbox: CheckBox
 var anim_checkbox: CheckBox
@@ -18,14 +19,21 @@ var lang_option: OptionButton
 var highlight_checkbox: CheckBox
 var save_button: Button
 var close_button: Button
+var title_label: Label
+var lang_label: Label
+var music_label: Label
+var sfx_label: Label
+var theme_label: Label
+var p1_label: Label
+var p2_label: Label
 
 const LANG_KEYS = [
-	{"code": "es", "name": "Español"},
 	{"code": "en", "name": "English"},
-	{"code": "de", "name": "Deutsch"},
-	{"code": "fr", "name": "Français"},
-	{"code": "it", "name": "Italiano"},
+	{"code": "es", "name": "Español"},
 	{"code": "pt", "name": "Português"},
+	{"code": "fr", "name": "Français"},
+	{"code": "de", "name": "Deutsch"},
+	{"code": "it", "name": "Italiano"},
 	{"code": "zh", "name": "中文"},
 	{"code": "ja", "name": "日本語"},
 	{"code": "ko", "name": "한국어"}
@@ -77,11 +85,11 @@ func _setup_ui() -> void:
 	vbox.add_theme_constant_override("separation", 10)
 	margin.add_child(vbox)
 	
-	var title = Label.new()
-	title.text = tr("LABEL_SETTINGS_TITLE")
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 22)
-	vbox.add_child(title)
+	title_label = Label.new()
+	title_label.text = tr("LABEL_SETTINGS_TITLE")
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 22)
+	vbox.add_child(title_label)
 	
 	vbox.add_child(HSeparator.new())
 	
@@ -124,7 +132,7 @@ func _setup_ui() -> void:
 
 func _setup_settings_tab(parent: VBoxContainer) -> void:
 	# Language option button
-	var lang_label = Label.new()
+	lang_label = Label.new()
 	lang_label.text = tr("LABEL_LANGUAGE")
 	parent.add_child(lang_label)
 	
@@ -147,8 +155,25 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	font_size_slider.value_changed.connect(_on_font_size_changed)
 	parent.add_child(font_size_slider)
 	
-	# Audio settings & SFX Checkbox
-	var sfx_label = Label.new()
+	# Audio settings: Música & SFX independientes (en decibelios)
+	music_label = Label.new()
+	music_label.text = tr("LABEL_MUSIC_VOLUME")
+	parent.add_child(music_label)
+
+	music_slider = HSlider.new()
+	music_slider.min_value = 0.0
+	music_slider.max_value = 1.0
+	music_slider.step = 0.05
+	music_slider.value = 0.7
+	music_slider.value_changed.connect(func(v: float):
+		if has_node("/root/AudioManager"):
+			var am = get_node("/root/AudioManager")
+			if am.has_method("set_music_volume_linear"):
+				am.call("set_music_volume_linear", v)
+	)
+	parent.add_child(music_slider)
+
+	sfx_label = Label.new()
 	sfx_label.text = tr("LABEL_SFX_VOLUME")
 	parent.add_child(sfx_label)
 	
@@ -157,6 +182,12 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	sfx_slider.max_value = 1.0
 	sfx_slider.step = 0.05
 	sfx_slider.value = 0.8
+	sfx_slider.value_changed.connect(func(v: float):
+		if has_node("/root/AudioManager"):
+			var am = get_node("/root/AudioManager")
+			if am.has_method("set_sfx_volume_linear"):
+				am.call("set_sfx_volume_linear", v)
+	)
 	parent.add_child(sfx_slider)
 
 	sfx_checkbox = CheckBox.new()
@@ -187,7 +218,7 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	parent.add_child(fullscreen_check)
 	
 	# Theme option button
-	var theme_label = Label.new()
+	theme_label = Label.new()
 	theme_label.text = tr("LABEL_BOARD_THEME")
 	parent.add_child(theme_label)
 	
@@ -197,7 +228,7 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	parent.add_child(theme_option)
 	
 	# Player names
-	var p1_label = Label.new()
+	p1_label = Label.new()
 	p1_label.text = tr("LABEL_PLAYER_1")
 	parent.add_child(p1_label)
 	
@@ -205,7 +236,7 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	p1_line.text = "Jugador 1"
 	parent.add_child(p1_line)
 	
-	var p2_label = Label.new()
+	p2_label = Label.new()
 	p2_label.text = tr("LABEL_PLAYER_2")
 	parent.add_child(p2_label)
 	
@@ -324,8 +355,40 @@ func _setup_stats_tab(parent: VBoxContainer) -> void:
 
 func _on_lang_selected(index: int) -> void:
 	if index >= 0 and index < LANG_KEYS.size():
-		var code = LANG_KEYS[index]["code"]
-		TranslationServer.set_locale(code)
+		var selected_locale: String = LANG_KEYS[index]["code"]
+		TranslationServer.set_locale(selected_locale)
+		var cfg := ConfigFile.new()
+		cfg.load("user://settings.cfg")
+		cfg.set_value("locale", "language", selected_locale)
+		cfg.save("user://settings.cfg")
+		_refresh_localized_texts()
+
+func _refresh_localized_texts() -> void:
+	if title_label != null:
+		title_label.text = tr("LABEL_SETTINGS_TITLE")
+	if lang_label != null:
+		lang_label.text = tr("LABEL_LANGUAGE")
+	if music_label != null:
+		music_label.text = tr("LABEL_MUSIC_VOLUME")
+	if sfx_label != null:
+		sfx_label.text = tr("LABEL_SFX_VOLUME")
+	if theme_label != null:
+		theme_label.text = tr("LABEL_BOARD_THEME")
+	if p1_label != null:
+		p1_label.text = tr("LABEL_PLAYER_1")
+	if p2_label != null:
+		p2_label.text = tr("LABEL_PLAYER_2")
+	if close_button != null:
+		close_button.text = tr("BTN_CLOSE")
+	if save_button != null:
+		save_button.text = tr("BTN_SAVE")
+	if theme_option != null:
+		var sel := theme_option.selected
+		theme_option.clear()
+		for item in THEME_KEYS:
+			theme_option.add_item(tr(item["name"]))
+		if sel >= 0 and sel < THEME_KEYS.size():
+			theme_option.selected = sel
 
 func _on_font_size_changed(value: float) -> void:
 	var tier = int(value)
@@ -337,6 +400,8 @@ func _on_font_size_changed(value: float) -> void:
 
 func _load_current_settings() -> void:
 	var settings = get_saved_settings()
+	if music_slider != null:
+		music_slider.value = settings.get("music_volume", 0.7)
 	sfx_slider.value = settings["sfx_volume"]
 	sfx_checkbox.button_pressed = settings.get("sfx_enabled", true)
 	anim_checkbox.button_pressed = settings.get("animations_enabled", true)
@@ -396,6 +461,7 @@ static func get_saved_settings() -> Dictionary:
 	}
 
 func _on_save_pressed() -> void:
+	var music_vol = music_slider.value if music_slider != null else 0.7
 	var sfx_vol = sfx_slider.value
 	var sfx_on = sfx_checkbox.button_pressed
 	var anim_on = anim_checkbox.button_pressed
@@ -410,6 +476,7 @@ func _on_save_pressed() -> void:
 	var highlight_moves = highlight_checkbox.button_pressed
 	
 	var cfg = ConfigFile.new()
+	cfg.set_value("audio", "music_volume", music_vol)
 	cfg.set_value("audio", "sfx_volume", sfx_vol)
 	cfg.set_value("audio", "sfx_enabled", sfx_on)
 	cfg.set_value("display", "animations_enabled", anim_on)
@@ -428,7 +495,13 @@ func _on_save_pressed() -> void:
 		else:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 
-	
+	if has_node("/root/AudioManager"):
+		var am = get_node("/root/AudioManager")
+		if am.has_method("set_music_volume_db"):
+			am.call("set_music_volume_db", linear_to_db(music_vol) if music_vol > 0.0001 else -80.0)
+		if am.has_method("set_sfx_volume_db"):
+			am.call("set_sfx_volume_db", linear_to_db(sfx_vol) if (sfx_on and sfx_vol > 0.0001) else -80.0)
+
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Master"), linear_to_db(sfx_vol if sfx_on else 0.0))
 	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), not sfx_on)
 	TranslationServer.set_locale(lang_code)

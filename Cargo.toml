@@ -18,6 +18,7 @@ members = [
     "open_table_transport_tcp",
     "open_table_transport_websocket",
     "open_table_transport_native_bridge",
+    "open_table_relay",
     "open_table_godot",
     "checkers_game",
     "battleship_game",

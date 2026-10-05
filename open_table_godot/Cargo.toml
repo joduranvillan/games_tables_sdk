@@ -21,6 +21,8 @@ open_table_qr = { path = "../open_table_qr", version = "0.1.0" }
 
 open_table_transport_tcp = { path = "../open_table_transport_tcp", version = "0.1.0" }
 
+open_table_transport_websocket = { path = "../open_table_transport_websocket", version = "0.1.0" }
+
 open_table_transport_native_bridge = { path = "../open_table_transport_native_bridge", version = "0.1.0" }
 
 checkers_game = { path = "../checkers_game", version = "0.1.0" }

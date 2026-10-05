@@ -42,6 +42,8 @@ var current_theme: BoardTheme
 var network_hud: NetworkStatusHUD
 var mode_option_button: OptionButton
 var opening_option_button: OptionButton
+var export_game_button: Button
+var export_toast_label: Label
 var _rules_popup: RulesPopup
 var _pause_menu: CanvasLayer
 
@@ -219,6 +221,53 @@ func _setup_ui() -> void:
 	opening_option_button.item_selected.connect(_on_opening_selected)
 	add_child(opening_option_button)
 
+	# Botón Exportar Partida (PGN / FEN)
+	export_game_button = Button.new()
+	export_game_button.name = "ExportGameButton"
+	export_game_button.text = "Exportar Partida"
+	export_game_button.position = Vector2(325, BOARD_SIZE * CELL_SIZE + 10)
+	export_game_button.custom_minimum_size = Vector2(160, 32)
+	export_game_button.pressed.connect(_on_export_game_pressed)
+	add_child(export_game_button)
+
+	export_toast_label = Label.new()
+	export_toast_label.name = "ExportToastLabel"
+	export_toast_label.text = ""
+	export_toast_label.visible = false
+	export_toast_label.position = Vector2(325, BOARD_SIZE * CELL_SIZE + 48)
+	export_toast_label.add_theme_font_size_override("font_size", 14)
+	export_toast_label.add_theme_color_override("font_color", Color(0.45, 0.95, 0.55))
+	add_child(export_toast_label)
+
+func _on_export_game_pressed() -> void:
+	var pgn_text := ""
+	var fen_text := ""
+	if bridge != null:
+		if bridge.has_method("export_chess_pgn"):
+			pgn_text = str(bridge.call("export_chess_pgn"))
+		if bridge.has_method("export_chess_fen"):
+			fen_text = str(bridge.call("export_chess_fen"))
+	var payload := pgn_text
+	if not fen_text.is_empty():
+		payload = "%s\n[FEN \"%s\"]" % [pgn_text, fen_text] if not pgn_text.is_empty() else fen_text
+	DisplayServer.clipboard_set(payload)
+	_show_clipboard_notification("Copiado al portapapeles")
+
+func _show_clipboard_notification(msg: String = "Copiado al portapapeles") -> void:
+	if export_toast_label != null:
+		export_toast_label.text = msg
+		export_toast_label.visible = true
+	if has_node("/root/NotificationManager"):
+		var nm = get_node("/root/NotificationManager")
+		if nm.has_method("show_toast"):
+			nm.call("show_toast", msg)
+	if is_inside_tree():
+		var timer := get_tree().create_timer(2.0)
+		timer.timeout.connect(func():
+			if is_instance_valid(export_toast_label):
+				export_toast_label.visible = false
+		)
+
 func _on_mode_selected(index: int) -> void:
 	in_opening_practice = false
 	current_opening_key = ""
@@ -306,6 +355,7 @@ func _bounce_piece(r: int, c: int) -> void:
 		tw.tween_property(sprite, "scale", Vector2(1.0, 1.0), 0.08)
 
 func _on_drag_started(from_cell: Vector2i) -> void:
+	_sfx_piece_slide()
 	if winner != -1 or animating: return
 	var r = from_cell.x
 	var c = from_cell.y
@@ -714,10 +764,10 @@ func _on_piece_moved_signal(player: int, from_r: int, from_c: int, to_r: int, to
 	var is_capture = (cap_r >= 0 and cap_c >= 0) or (piece_sprites[to_r][to_c] != null)
 	if is_capture:
 		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_capture()
+			get_node("/root/AudioManager").play_piece_place(2.0)
 	else:
 		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_move()
+			get_node("/root/AudioManager").play_piece_place()
 
 	_move_piece_sprite(from_r, from_c, to_r, to_c, prom)
 	current = bridge.current_player()
@@ -782,7 +832,7 @@ func _on_game_over(w: int) -> void:
 	_update_status()
 	queue_redraw()
 	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_game_over()
+		get_node("/root/AudioManager").play_victory_fanfare()
 	var overlay = preload("res://game_over_overlay.tscn").instantiate()
 	add_child(overlay)
 	overlay.show_winner(w)
@@ -790,7 +840,7 @@ func _on_game_over(w: int) -> void:
 func _on_move_rejected(reason: String) -> void:
 	status.text = "Movimiento inválido: %s" % reason
 	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_invalid()
+		get_node("/root/AudioManager").play_error_buzz()
 		
 	if selected_pos != null:
 		rejected_cell = selected_pos
@@ -908,3 +958,53 @@ func _update_status() -> void:
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, p_name, p_col)
 			turn_indicator.set_active(true)
+
+# --- Conexión de eventos sonoros procedurales (AudioManager) ---
+func _sfx_piece_slide() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_slide()
+
+func _sfx_piece_place() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_place()
+
+func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_place(2.0)
+	var particles := CPUParticles2D.new()
+	particles.position = world_pos
+	particles.emitting = true
+	particles.one_shot = true
+	particles.amount = 18
+	particles.lifetime = 0.45
+	particles.explosiveness = 0.9
+	particles.spread = 180.0
+	particles.initial_velocity_min = 45.0
+	particles.initial_velocity_max = 110.0
+	particles.color = Color(1.0, 0.85, 0.3, 0.9)
+	add_child(particles)
+	if is_inside_tree():
+		get_tree().create_timer(0.6).timeout.connect(func():
+			if is_instance_valid(particles):
+				particles.queue_free()
+		)
+
+func _sfx_dice_roll() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_dice_roll()
+
+func _sfx_card_flip() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_card_flip()
+
+func _sfx_check_alert() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_check_alert()
+
+func _sfx_victory_fanfare() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_victory_fanfare()
+
+func _sfx_error_buzz() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_error_buzz()

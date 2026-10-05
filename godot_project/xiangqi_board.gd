@@ -487,7 +487,7 @@ func _handle_intersection_click(row: int, col: int) -> void:
 			selected_pos = Vector2i(row, col)
 			valid_moves = _calculate_legal_moves(row, col)
 			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_move()
+				get_node("/root/AudioManager").play_piece_place()
 			queue_redraw()
 	else:
 		# Deselección al tocar la misma pieza
@@ -503,7 +503,7 @@ func _handle_intersection_click(row: int, col: int) -> void:
 			selected_pos = Vector2i(row, col)
 			valid_moves = _calculate_legal_moves(row, col)
 			if has_node("/root/AudioManager"):
-				get_node("/root/AudioManager").play_move()
+				get_node("/root/AudioManager").play_piece_place()
 			queue_redraw()
 			return
 
@@ -540,10 +540,10 @@ func _move_piece_node(from_r: int, from_c: int, to_r: int, to_c: int) -> void:
 		_animate_piece_capture(target_node)
 		piece_nodes[to_r][to_c] = null
 		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_capture()
+			get_node("/root/AudioManager").play_piece_place(2.0)
 	else:
 		if has_node("/root/AudioManager"):
-			get_node("/root/AudioManager").play_move()
+			get_node("/root/AudioManager").play_piece_place()
 
 	board[to_r][to_c] = piece_data
 	board[from_r][from_c] = null
@@ -775,7 +775,7 @@ func _on_game_over(w: int) -> void:
 	_update_status()
 	queue_redraw()
 	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_game_over()
+		get_node("/root/AudioManager").play_victory_fanfare()
 	if ResourceLoader.exists("res://game_over_overlay.tscn"):
 		var overlay = preload("res://game_over_overlay.tscn").instantiate()
 		add_child(overlay)
@@ -785,7 +785,7 @@ func _on_game_over(w: int) -> void:
 func _on_move_rejected(reason: String) -> void:
 	event_label.text = "❌ Movimiento no permitido: %s" % reason
 	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_invalid()
+		get_node("/root/AudioManager").play_error_buzz()
 
 func _on_mode_selected(index: int) -> void:
 	winner = -1
@@ -1010,3 +1010,53 @@ func _draw_intersection_star(row: int, col: int, col_line: Color) -> void:
 	if col < BOARD_COLS - 1:
 		draw_line(center + Vector2(d, d), center + Vector2(d + len, d), col_line, 1.2)
 		draw_line(center + Vector2(d, d), center + Vector2(d, d + len), col_line, 1.2)
+
+# --- Conexión de eventos sonoros procedurales (AudioManager) ---
+func _sfx_piece_slide() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_slide()
+
+func _sfx_piece_place() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_place()
+
+func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_place(2.0)
+	var particles := CPUParticles2D.new()
+	particles.position = world_pos
+	particles.emitting = true
+	particles.one_shot = true
+	particles.amount = 18
+	particles.lifetime = 0.45
+	particles.explosiveness = 0.9
+	particles.spread = 180.0
+	particles.initial_velocity_min = 45.0
+	particles.initial_velocity_max = 110.0
+	particles.color = Color(1.0, 0.85, 0.3, 0.9)
+	add_child(particles)
+	if is_inside_tree():
+		get_tree().create_timer(0.6).timeout.connect(func():
+			if is_instance_valid(particles):
+				particles.queue_free()
+		)
+
+func _sfx_dice_roll() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_dice_roll()
+
+func _sfx_card_flip() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_card_flip()
+
+func _sfx_check_alert() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_check_alert()
+
+func _sfx_victory_fanfare() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_victory_fanfare()
+
+func _sfx_error_buzz() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_error_buzz()

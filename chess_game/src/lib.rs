@@ -24,7 +24,7 @@ pub use commands::{AcceptDrawCommand, MovePieceCommand, OfferDrawCommand, Resign
 pub use events::{GameOverEvent, PieceMovedEvent};
 pub use fen::{from_fen, load_chess_position_from_fen, parse_fen_with_player};
 pub use legal_moves::ChessLegalMoveGenerator;
-pub use pgn::export_to_pgn;
+pub use pgn::{export_session_fen, export_session_pgn, export_to_pgn, ChessNotationExport};
 pub use position::{Piece, PieceKind, Position};
 pub use rules::build_chess_rules;
 

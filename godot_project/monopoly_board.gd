@@ -677,6 +677,7 @@ func _on_pass_bid_pressed() -> void:
 	auction_modal.visible = false
 
 func _on_roll_pressed() -> void:
+	_sfx_dice_roll()
 	if winner != -1 or buy_modal.visible or auction_modal.visible:
 		return
 	var cmd = {"command_type": "RollAndMoveCommand", "player": current}
@@ -839,6 +840,7 @@ func _on_turn_changed(player_id: int) -> void:
 		turn_indicator.current_player_id = player_id
 
 func _on_game_over(w: int) -> void:
+	_sfx_victory_fanfare()
 	winner = w
 	_update_status()
 	if ResourceLoader.exists("res://game_over_overlay.tscn"):
@@ -848,6 +850,7 @@ func _on_game_over(w: int) -> void:
 			overlay.call("show_winner", w)
 
 func _on_move_rejected(reason: String) -> void:
+	_sfx_error_buzz()
 	if status != null:
 		status.text = "Movimiento rechazado: %s" % reason
 
@@ -946,3 +949,53 @@ func _update_status() -> void:
 		status.text = "¡Bancarrota! Ganó el jugador %s (Monopoly)" % winner
 	else:
 		status.text = "Turno: Jugador %s (Monopoly 40 Casillas)" % current
+
+# --- Conexión de eventos sonoros procedurales (AudioManager) ---
+func _sfx_piece_slide() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_slide()
+
+func _sfx_piece_place() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_place()
+
+func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_place(2.0)
+	var particles := CPUParticles2D.new()
+	particles.position = world_pos
+	particles.emitting = true
+	particles.one_shot = true
+	particles.amount = 18
+	particles.lifetime = 0.45
+	particles.explosiveness = 0.9
+	particles.spread = 180.0
+	particles.initial_velocity_min = 45.0
+	particles.initial_velocity_max = 110.0
+	particles.color = Color(1.0, 0.85, 0.3, 0.9)
+	add_child(particles)
+	if is_inside_tree():
+		get_tree().create_timer(0.6).timeout.connect(func():
+			if is_instance_valid(particles):
+				particles.queue_free()
+		)
+
+func _sfx_dice_roll() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_dice_roll()
+
+func _sfx_card_flip() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_card_flip()
+
+func _sfx_check_alert() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_check_alert()
+
+func _sfx_victory_fanfare() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_victory_fanfare()
+
+func _sfx_error_buzz() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_error_buzz()

@@ -1315,6 +1315,7 @@ dependencies = [
  "open_table_qr",
  "open_table_transport_native_bridge",
  "open_table_transport_tcp",
+ "open_table_transport_websocket",
  "serde",
  "serde_json",
  "shogi_game",
@@ -1345,6 +1346,18 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "open_table_relay"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "getrandom 0.4.3",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
 ]
 
 [[package]]

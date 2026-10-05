@@ -3,6 +3,7 @@ pub mod board;
 pub mod commands;
 pub mod events;
 pub mod rules;
+pub mod sgf;
 
 use open_table_engine::prelude::*;
 
@@ -14,6 +15,7 @@ pub use commands::{
 };
 pub use events::{GameOverEvent, PassedEvent, StonePlacedEvent, StonesCapturedEvent};
 pub use rules::build_go_rules;
+pub use sgf::{export_session_sgf, export_to_sgf, GoSgfExport};
 
 pub fn new_go_session(
     session_id: SessionId,

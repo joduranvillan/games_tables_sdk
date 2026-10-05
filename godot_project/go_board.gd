@@ -32,6 +32,8 @@ var drag_layer: DragDropLayer
 var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
 var network_hud: NetworkStatusHUD
+var export_game_button: Button
+var export_toast_label: Label
 var _rules_popup: RulesPopup
 var _pause_menu: CanvasLayer
 
@@ -154,6 +156,48 @@ func _setup_ui() -> void:
 	turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 48)
 	add_child(turn_indicator)
 
+	# Botón Exportar Partida (SGF)
+	export_game_button = Button.new()
+	export_game_button.name = "ExportGameButton"
+	export_game_button.text = "Exportar Partida"
+	export_game_button.position = Vector2(360, BOARD_SIZE * CELL_SIZE + 10)
+	export_game_button.custom_minimum_size = Vector2(160, 32)
+	export_game_button.pressed.connect(_on_export_game_pressed)
+	add_child(export_game_button)
+
+	export_toast_label = Label.new()
+	export_toast_label.name = "ExportToastLabel"
+	export_toast_label.text = ""
+	export_toast_label.visible = false
+	export_toast_label.position = Vector2(360, BOARD_SIZE * CELL_SIZE + 48)
+	export_toast_label.add_theme_font_size_override("font_size", 14)
+	export_toast_label.add_theme_color_override("font_color", Color(0.45, 0.95, 0.55))
+	add_child(export_toast_label)
+
+func _on_export_game_pressed() -> void:
+	var sgf_text := ""
+	if bridge != null and bridge.has_method("export_go_sgf"):
+		sgf_text = str(bridge.call("export_go_sgf"))
+	if sgf_text.is_empty():
+		sgf_text = "(;GM[1]FF[4]CA[UTF-8]AP[OpenTable]SZ[%d]KM[6.5]PB[Black]PW[White])" % BOARD_SIZE
+	DisplayServer.clipboard_set(sgf_text)
+	_show_clipboard_notification("Copiado al portapapeles")
+
+func _show_clipboard_notification(msg: String = "Copiado al portapapeles") -> void:
+	if export_toast_label != null:
+		export_toast_label.text = msg
+		export_toast_label.visible = true
+	if has_node("/root/NotificationManager"):
+		var nm = get_node("/root/NotificationManager")
+		if nm.has_method("show_toast"):
+			nm.call("show_toast", msg)
+	if is_inside_tree():
+		var timer := get_tree().create_timer(2.0)
+		timer.timeout.connect(func():
+			if is_instance_valid(export_toast_label):
+				export_toast_label.visible = false
+		)
+
 func _update_captured_score() -> void:
 	if captures_label_b != null:
 		captures_label_b.text = "Capturas B: %d" % white_captured
@@ -173,6 +217,7 @@ func _on_layout_changed(_layout: int) -> void:
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 func _on_cell_clicked(cell: Vector2i) -> void:
+	_sfx_piece_slide()
 	if winner != -1: return
 	var row = cell.x
 	var col = cell.y
@@ -284,11 +329,11 @@ func _place_stone(row: int, col: int, player: int) -> void:
 	tween.tween_property(stone, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	
 	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_move()
+		get_node("/root/AudioManager").play_piece_place()
 
 func _animate_captures(captured_coords: Array) -> void:
 	if captured_coords.size() > 0 and has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_capture()
+		get_node("/root/AudioManager").play_piece_place(2.0)
 		
 	for coord in captured_coords:
 		var r = coord.x
@@ -352,7 +397,7 @@ func _on_game_over(w: int) -> void:
 	_update_captured_score()
 	queue_redraw()
 	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_game_over()
+		get_node("/root/AudioManager").play_victory_fanfare()
 	var overlay = preload("res://game_over_overlay.tscn").instantiate()
 	add_child(overlay)
 	overlay.show_winner(w)
@@ -423,7 +468,7 @@ func _calculate_territory() -> void:
 func _on_move_rejected(reason: String) -> void:
 	status.text = "Movimiento inválido: %s" % reason
 	if has_node("/root/AudioManager"):
-		get_node("/root/AudioManager").play_invalid()
+		get_node("/root/AudioManager").play_error_buzz()
 
 func _draw() -> void:
 	var bg_col = current_theme.board_color if current_theme else COL_BOARD
@@ -491,3 +536,53 @@ func _update_status() -> void:
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, who, p_col)
 			turn_indicator.set_active(true)
+
+# --- Conexión de eventos sonoros procedurales (AudioManager) ---
+func _sfx_piece_slide() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_slide()
+
+func _sfx_piece_place() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_place()
+
+func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_place(2.0)
+	var particles := CPUParticles2D.new()
+	particles.position = world_pos
+	particles.emitting = true
+	particles.one_shot = true
+	particles.amount = 18
+	particles.lifetime = 0.45
+	particles.explosiveness = 0.9
+	particles.spread = 180.0
+	particles.initial_velocity_min = 45.0
+	particles.initial_velocity_max = 110.0
+	particles.color = Color(1.0, 0.85, 0.3, 0.9)
+	add_child(particles)
+	if is_inside_tree():
+		get_tree().create_timer(0.6).timeout.connect(func():
+			if is_instance_valid(particles):
+				particles.queue_free()
+		)
+
+func _sfx_dice_roll() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_dice_roll()
+
+func _sfx_card_flip() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_card_flip()
+
+func _sfx_check_alert() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_check_alert()
+
+func _sfx_victory_fanfare() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_victory_fanfare()
+
+func _sfx_error_buzz() -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_error_buzz()

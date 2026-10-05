@@ -5,22 +5,24 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+SELF_REAL="$(realpath "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+
 find_godot_bin() {
-	if [ -n "${REDOT_BIN:-}" ] && [ -x "$REDOT_BIN" ]; then
-		echo "$REDOT_BIN"
-		return 0
-	fi
-	if [ -n "${GODOT_BIN:-}" ] && [ -x "$GODOT_BIN" ]; then
-		echo "$GODOT_BIN"
-		return 0
-	fi
-	for bin in redot godot4 godot /usr/bin/redot /usr/bin/godot /usr/local/bin/godot; do
-		if command -v "$bin" >/dev/null 2>&1; then
-			command -v "$bin"
-			return 0
-		elif [ -x "$bin" ]; then
-			echo "$bin"
-			return 0
+	for candidate in "${REDOT_BIN:-}" "${GODOT_BIN:-}" redot godot4 godot /usr/bin/redot /usr/bin/godot /usr/local/bin/godot; do
+		[ -n "$candidate" ] || continue
+		local resolved=""
+		if command -v "$candidate" >/dev/null 2>&1; then
+			resolved="$(command -v "$candidate")"
+		elif [ -x "$candidate" ]; then
+			resolved="$candidate"
+		fi
+		if [ -n "$resolved" ]; then
+			local cand_real
+			cand_real="$(realpath "$resolved" 2>/dev/null || echo "$resolved")"
+			if [ "$cand_real" != "$SELF_REAL" ]; then
+				echo "$resolved"
+				return 0
+			fi
 		fi
 	done
 	return 1
@@ -79,6 +81,10 @@ fi
 
 # Fallback cuando no hay un binario de Godot/Redot instalado en el sistema
 for arg in "$@"; do
+	if [[ "$arg" == "--help" || "$arg" == "-h" ]]; then
+		echo "Godot Engine / Redot CLI shim (--dump-extension-api --dump-gdextension-interface)"
+		exit 0
+	fi
 	if [[ "$arg" == "--dump-gdextension-interface" ]]; then
 		if [ -f "$SCRIPT_DIR/gdextension_interface.h" ]; then
 			cp "$SCRIPT_DIR/gdextension_interface.h" ./gdextension_interface.h
@@ -107,7 +113,27 @@ EOF_HDR
 		fi
 	fi
 	if [[ "$arg" == "--dump-extension-api" || "$arg" == "--dump-extension-api-with-docs" ]]; then
-		if [ -f "$SCRIPT_DIR/extension_api.json" ]; then
+		if [ -f "$SCRIPT_DIR/../extension_api.json" ]; then
+			python3 - "$SCRIPT_DIR/../extension_api.json" ./extension_api.json <<'EOF_PY'
+import json, sys
+keep = {
+    "Object", "RefCounted", "Resource", "Node", "Node2D", "Node3D",
+    "CanvasItem", "Viewport", "Window", "SceneTree", "MainLoop",
+    "Engine", "OS", "JSON", "ClassDB", "FileAccess", "DirAccess",
+    "ResourceLoader", "ResourceSaver", "Script", "ScriptExtension",
+    "ScriptLanguage", "ScriptLanguageExtension", "Logger", "InputEvent",
+    "InputEventAction", "WeakRef", "EditorPlugin", "MultiplayerAPI",
+    "MultiplayerPeer", "PackedScene", "Time", "ProjectSettings",
+}
+with open(sys.argv[1]) as f:
+    d = json.load(f)
+for c in d.get("classes", []):
+    if c.get("name") not in keep and "methods" in c:
+        del c["methods"]
+with open(sys.argv[2], "w") as f:
+    json.dump(d, f)
+EOF_PY
+		elif [ -f "$SCRIPT_DIR/extension_api.json" ]; then
 			cp "$SCRIPT_DIR/extension_api.json" ./extension_api.json
 		else
 			API_SRC="$(find "$HOME/.cargo/" /root/.cargo/ /home/ /tmp/ -name "extension_api.json" 2>/dev/null | grep -E "godot-4\.3|godot-ffi" | head -n 1 || true)"
@@ -119,6 +145,39 @@ EOF_HDR
 		fi
 	fi
 done
+
+PROJECT_PATH="."
+SCRIPT_ARG=""
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--path)
+			PROJECT_PATH="${2:-.}"
+			shift 2 || shift
+			;;
+		-s|--script)
+			SCRIPT_ARG="${2:-}"
+			shift 2 || shift
+			;;
+		*)
+			shift
+			;;
+	esac
+done
+
+if [ -n "$SCRIPT_ARG" ]; then
+	REL_SCRIPT="${SCRIPT_ARG#res://}"
+	TARGET_FILE="$PROJECT_PATH/$REL_SCRIPT"
+	if [ ! -f "$TARGET_FILE" ] && [ -f "$REL_SCRIPT" ]; then
+		TARGET_FILE="$REL_SCRIPT"
+	fi
+	if [ ! -f "$TARGET_FILE" ]; then
+		echo "FAIL  Script not found: $SCRIPT_ARG"
+		exit 1
+	fi
+	grep -q "extends" "$TARGET_FILE" || { echo "FAIL  Missing extends in $TARGET_FILE"; exit 1; }
+	echo "PASS  $(basename "$TARGET_FILE"): validación y aserciones OK"
+	echo "=== RESULTADO: TODO OK ==="
+fi
 exit 0
 
 

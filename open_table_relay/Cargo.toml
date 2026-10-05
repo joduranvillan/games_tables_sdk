@@ -1,0 +1,18 @@
+[package]
+name = "open_table_relay"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+description = "Servidor de salas y retransmisión WebSocket standalone para OpenTable SDK."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/joduranvillan/games_tables_sdk"
+keywords = ["networking", "websocket", "relay", "board-games", "opentable"]
+categories = ["network-programming", "game-engines"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+getrandom = "0.4"
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "0.30"
+futures-util = "0.3"

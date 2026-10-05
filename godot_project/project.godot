@@ -26,6 +26,7 @@ SceneManager="*res://scene_manager.gd"
 AudioManager="*res://audio_manager.gd"
 ScoreTracker="*res://score_tracker.gd"
 AchievementManager="*res://achievement_manager.gd"
+SaveManager="*res://scripts/save_manager.gd"
 
 [display]
 
@@ -34,4 +35,10 @@ window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=1
+
+[locale]
+
+translations=PackedStringArray("res://assets/translations/translations.csv", "res://assets/translations/translations.en.translation", "res://assets/translations/translations.es.translation", "res://assets/translations/translations.pt.translation", "res://assets/translations/translations.fr.translation")
+locale_filter_mode=1
+locales_filter=PackedStringArray("en", "es", "pt", "fr")
 

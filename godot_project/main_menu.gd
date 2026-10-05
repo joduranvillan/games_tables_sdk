@@ -296,9 +296,9 @@ func _setup_buttons() -> void:
 	settings_btn.pressed.connect(_on_settings_pressed)
 	grid_container.add_child(settings_btn)
 
-	# Replay button
+	# Repeticiones button
 	var replay_btn = Button.new()
-	replay_btn.text = "🎬 Ver Replay"
+	replay_btn.text = "🎬 Repeticiones"
 	_apply_button_theme(replay_btn, Color(0.25, 0.50, 0.55))
 	replay_btn.custom_minimum_size = Vector2(310, 60)
 	replay_btn.pivot_offset = Vector2(155, 30)
@@ -605,9 +605,17 @@ func _setup_multiplayer_row() -> void:
 	host_btn.pressed.connect(_on_host_pressed)
 	hbox.add_child(host_btn)
 
+	var join_code_btn := Button.new()
+	join_code_btn.text = "🔑 Unirse con Código"
+	join_code_btn.custom_minimum_size = Vector2(200, 44)
+	join_code_btn.add_theme_font_size_override("font_size", 15)
+	_apply_button_theme(join_code_btn, Color(0.25, 0.60, 0.55))
+	join_code_btn.pressed.connect(_on_join_code_pressed)
+	hbox.add_child(join_code_btn)
+
 	var join_btn := Button.new()
 	join_btn.text = "📷 Unirse (código QR)"
-	join_btn.custom_minimum_size = Vector2(220, 44)
+	join_btn.custom_minimum_size = Vector2(200, 44)
 	join_btn.add_theme_font_size_override("font_size", 15)
 	_apply_button_theme(join_btn, Color(0.35, 0.55, 0.35))
 	join_btn.pressed.connect(_on_join_pressed)
@@ -628,6 +636,31 @@ func _setup_multiplayer_row() -> void:
 
 func _on_host_pressed() -> void:
 	_show_game_selector_for_network()
+
+func _on_join_code_pressed() -> void:
+	var dialog_script = load("res://join_dialog.gd")
+	if dialog_script == null:
+		return
+	var dialog: Control = dialog_script.new()
+	add_child(dialog)
+	dialog.setup(bridge)
+	dialog.connect("join_completed", func(success: bool, _player_id: int):
+		if success:
+			dialog.close()
+			dialog.queue_free()
+			var active_id: String = GameManager.active_game if "active_game" in GameManager and not String(GameManager.active_game).is_empty() else "checkers"
+			var scene_path := "res://%s_board.tscn" % active_id
+			if not ResourceLoader.exists(scene_path):
+				scene_path = "res://checkers_board.tscn"
+			if has_node("/root/SceneManager"):
+				get_node("/root/SceneManager").transition_to(scene_path)
+			else:
+				get_tree().change_scene_to_file(scene_path)
+	)
+	dialog.connect("closed", func():
+		dialog.queue_free()
+	)
+	dialog.open(bridge)
 
 func _on_join_pressed() -> void:
 	var scanner := QRScanner.new()

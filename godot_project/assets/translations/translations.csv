@@ -1,0 +1,48 @@
+key,en,es,pt,fr
+MENU_PLAY,Play,Jugar,Jogar,Jouer
+MENU_LOCAL,Local Match (2P),Partida Local (2J),Partida Local (2J),Partie Locale (2J)
+MENU_VS_AI,Play vs AI,Jugar contra IA,Jogar contra IA,Jouer contre l'IA
+MENU_ONLINE,Online Multiplayer,Multijugador en Línea,Multijogador Online,Multijoueur en Ligne
+MENU_SETTINGS,Settings,Ajustes,Configurações,Paramètres
+MENU_CREDITS,Credits,Créditos,Créditos,Crédits
+MENU_EXIT,Exit,Salir,Sair,Quitter
+MENU_REPLAYS,Replays,Repeticiones,Repetições,Rediffusions
+MENU_ACHIEVEMENTS,Achievements,Logros,Conquistas,Succès
+STATUS_CHECK,Check!,¡Jaque!,Xeque!,Échec !
+STATUS_CHECKMATE,Checkmate!,¡Jaque Mate!,Xeque-mate!,Échec et mat !
+STATUS_YOUR_TURN,Your Turn,Tu Turno,Sua Vez,Votre Tour
+STATUS_WAITING_OPPONENT,Waiting for opponent...,Esperando al oponente...,Aguardando oponente...,En attente de l'adversaire...
+STATUS_CONNECTED,Connected,Conectado,Conectado,Connecté
+STATUS_DISCONNECTED,Disconnected,Desconectado,Desconectado,Déconnecté
+STATUS_RECONNECTING,Reconnecting...,Reconectando...,Reconectando...,Reconnexion...
+STATUS_VICTORY,Victory!,¡Victoria!,Vitória!,Victoire !
+STATUS_DEFEAT,Defeat,Derrota,Derrota,Défaite
+STATUS_DRAW,Draw,Empate,Empate,Match nul
+GAME_CHECKERS,Checkers,Damas,Damas,Dames
+GAME_CHESS,Chess,Ajedrez,Xadrez,Échecs
+GAME_SHOGI,Shogi,Shogi,Shogi,Shogi
+GAME_XIANGQI,Xiangqi (Chinese Chess),Xiangqi (Ajedrez Chino),Xiangqi (Xadrez Chinês),Xiangqi (Échecs Chinois)
+GAME_GO,Go (Weiqi),Go (Weiqi),Go (Weiqi),Go (Weiqi)
+GAME_UNO,Uno,Uno,Uno,Uno
+GAME_CRISIS,Crisis (Global Strategy),Crisis (Estrategia Global),Crisis (Estratégia Global),Crisis (Stratégie Globale)
+GAME_CHINESE_CHECKERS,Chinese Checkers,Damas Chinas,Damas Chinesas,Dames Chinoises
+GAME_MILLE_BORNES,Mille Bornes,Mille Bornes,Mille Bornes,Mille Bornes
+GAME_BACKGAMMON,Backgammon,Backgammon,Gamão,Backgammon
+GAME_MONOPOLY,Monopoly,Monopoly,Banco Imobiliário,Monopoly
+GAME_LUDO,Ludo (Pachisi),Ludo (Parchís),Ludo,Ludo (Petits Chevaux)
+GAME_BATTLESHIP,Battleship,Batalla Naval,Batalha Naval,Bataille Navale
+BTN_SETTINGS,Settings,Ajustes,Configurações,Paramètres
+BTN_CLOSE,Close,Cerrar,Fechar,Fermer
+BTN_SAVE,Save,Guardar,Salvar,Enregistrer
+LABEL_SETTINGS_TITLE,Game Settings,Ajustes del Juego,Configurações do Jogo,Paramètres du Jeu
+LABEL_LANGUAGE,Language,Idioma,Idioma,Langue
+LABEL_SFX_VOLUME,SFX Volume,Volumen de Efectos (SFX),Volume de Efeitos (SFX),Volume des Effets (SFX)
+LABEL_MUSIC_VOLUME,Music Volume,Volumen de Música,Volume da Música,Volume de la Musique
+LABEL_BOARD_THEME,Board Theme,Tema del Tablero,Tema do Tabuleiro,Thème du Plateau
+LABEL_PLAYER_1,Player 1,Jugador 1,Jogador 1,Joueur 1
+LABEL_PLAYER_2,Player 2,Jugador 2,Jogador 2,Joueur 2
+THEME_WOOD,Classic Wood,Madera Clásica,Madeira Clássica,Bois Classique
+THEME_MINIMAL,Minimalist,Minimalista,Minimalista,Minimaliste
+THEME_STONE,Carved Stone,Piedra Tallada,Pedra Esculpida,Pierre Sculptée
+THEME_NIGHT,Night Mode,Modo Nocturno,Modo Noturno,Mode Nuit
+THEME_JADE,Imperial Jade,Jade Imperial,Jade Imperial,Jade Impérial

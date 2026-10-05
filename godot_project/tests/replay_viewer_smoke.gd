@@ -50,6 +50,21 @@ func _initialize() -> void:
 	var step4_ok: bool = viewer.bridge.step_replay() if viewer.bridge else true
 	results.append(["step_replay() retorna false al final del replay", not step4_ok])
 
+	# 7. Verificar controles interactivos (Inicio, Anterior, Siguiente, Fin, 1x/2x/4x, lista lateral)
+	viewer._on_start_pressed()
+	results.append(["⏮ Inicio reinicia current_step a 0", viewer.current_step == 0])
+	viewer._on_next_pressed()
+	results.append(["▶ Paso Siguiente avanza current_step a 1", viewer.current_step == 1])
+	viewer._on_end_pressed()
+	results.append(["⏭ Fin lleva current_step a total_steps (3)", viewer.current_step == 3])
+	viewer._on_prev_pressed()
+	results.append(["◀ Paso Anterior retrocede current_step a 2", viewer.current_step == 2])
+	viewer._on_speed_selected(1)
+	results.append(["Selector de velocidad 2x ajusta playback_speed a 2.0", is_equal_approx(viewer.playback_speed, 2.0)])
+	viewer._on_speed_selected(2)
+	results.append(["Selector de velocidad 4x ajusta playback_speed a 4.0", is_equal_approx(viewer.playback_speed, 4.0)])
+	results.append(["Panel lateral contiene las 3 jugadas con scroll automático", viewer.move_row_nodes.size() == 3])
+
 	var ok := true
 	for r in results:
 		var status = "PASS" if r[1] else "FAIL"

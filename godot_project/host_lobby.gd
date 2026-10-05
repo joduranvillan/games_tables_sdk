@@ -1,23 +1,43 @@
 extends Control
 
+enum ConnectionMode {
+	LOCAL_LAN = 0,
+	ONLINE_RELAY = 1,
+}
+
 @export var port: int = 9090
-@export var join_code: String = "LOBBY1"
+@export var join_code: String = "ABCD"
 @export var host_name: String = "HostPlayer"
 @export var game_type: String = "checkers"
+@export var relay_url: String = "ws://127.0.0.1:8080"
 
 var bridge
+var connection_mode: int = ConnectionMode.LOCAL_LAN
+var room_code: String = "ABCD"
 var player_count: int = 1  # Host counts as 1 initial player
 var connected_players: Array = [1] # Array of player_ids
 
+var mode_selector: OptionButton
+var room_code_container: HBoxContainer
+var room_code_label: Label
+var copy_code_button: Button
+var copy_feedback_label: Label
 var qr_texture_rect: TextureRect
 var qr_fallback_label: Label
 var ip_port_label: Label
 var player_count_label: Label
 var player_list_vbox: VBoxContainer
 var start_game_button: Button
+var join_room_button: Button
 var status_label: Label
+var join_dialog: Control = null
 
 func _ready() -> void:
+	if has_node("/root/GameManager"):
+		var gm = get_node("/root/GameManager")
+		if "active_game" in gm and not String(gm.active_game).is_empty():
+			game_type = String(gm.active_game)
+
 	if bridge == null:
 		if ClassDB.class_exists("OpenTableBridge"):
 			bridge = ClassDB.instantiate("OpenTableBridge")
@@ -30,44 +50,101 @@ func _ready() -> void:
 	elif bridge.has_signal("peer_joined"):
 		bridge.connect("peer_joined", _on_player_joined)
 
+	if bridge.has_signal("peer_disconnected"):
+		bridge.connect("peer_disconnected", _on_peer_disconnected)
+
+	if bridge.has_signal("room_created"):
+		bridge.connect("room_created", _on_room_created)
+
+	if bridge.has_signal("room_joined"):
+		bridge.connect("room_joined", _on_room_joined)
+
 	_setup_ui()
-
-	if bridge.has_method("start_hosting"):
-		bridge.start_hosting(port, 1, 2)
-		if status_label:
-			status_label.text = "Hosting en puerto %d | Código: %s" % [port, join_code]
-
+	_apply_connection_mode(connection_mode)
 	_update_player_list()
 	_display_qr_code()
 
 func _setup_ui() -> void:
 	anchor_right = 1.0
 	anchor_bottom = 1.0
-	
+
 	var bg = ColorRect.new()
 	bg.color = Color(0.12, 0.14, 0.18, 1.0)
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
-	
+
 	var center = CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
-	
+
 	var vbox = VBoxContainer.new()
-	vbox.custom_minimum_size = Vector2(400, 600)
-	vbox.add_theme_constant_override("separation", 14)
+	vbox.custom_minimum_size = Vector2(460, 640)
+	vbox.add_theme_constant_override("separation", 12)
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	center.add_child(vbox)
-	
+
 	var title = Label.new()
-	title.text = "🌐 Sala LAN Multiplayer"
+	title.name = "TitleLabel"
+	title.text = "🌐 Sala Multiplayer"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 26)
 	vbox.add_child(title)
-	
+
+	# Selector de modo de conexión: "Local (LAN / Direct IP)" o "En Línea (Código de Sala)"
+	var mode_hbox = HBoxContainer.new()
+	mode_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	mode_hbox.add_theme_constant_override("separation", 10)
+	vbox.add_child(mode_hbox)
+
+	var mode_lbl = Label.new()
+	mode_lbl.text = "Modo:"
+	mode_lbl.add_theme_font_size_override("font_size", 16)
+	mode_hbox.add_child(mode_lbl)
+
+	mode_selector = OptionButton.new()
+	mode_selector.name = "ModeSelector"
+	mode_selector.custom_minimum_size = Vector2(260, 38)
+	mode_selector.add_item("Local (LAN / Direct IP)", ConnectionMode.LOCAL_LAN)
+	mode_selector.add_item("En Línea (Código de Sala)", ConnectionMode.ONLINE_RELAY)
+	mode_selector.selected = connection_mode
+	mode_selector.item_selected.connect(_on_mode_selected)
+	mode_hbox.add_child(mode_selector)
+
+	# Etiqueta destacada con fuente grande y espaciada: SALA: ABCD + botón Copiar Código
+	room_code_container = HBoxContainer.new()
+	room_code_container.name = "RoomCodeContainer"
+	room_code_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	room_code_container.add_theme_constant_override("separation", 14)
+	vbox.add_child(room_code_container)
+
+	room_code_label = Label.new()
+	room_code_label.name = "RoomCodeLabel"
+	room_code_label.text = "SALA: %s" % room_code
+	room_code_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	room_code_label.add_theme_font_size_override("font_size", 32)
+	room_code_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.32))
+	room_code_container.add_child(room_code_label)
+
+	copy_code_button = Button.new()
+	copy_code_button.name = "CopyCodeButton"
+	copy_code_button.text = "Copiar Código"
+	copy_code_button.custom_minimum_size = Vector2(130, 40)
+	copy_code_button.add_theme_font_size_override("font_size", 15)
+	copy_code_button.pressed.connect(_on_copy_code_pressed)
+	room_code_container.add_child(copy_code_button)
+
+	copy_feedback_label = Label.new()
+	copy_feedback_label.name = "CopyFeedbackLabel"
+	copy_feedback_label.text = ""
+	copy_feedback_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	copy_feedback_label.add_theme_font_size_override("font_size", 14)
+	copy_feedback_label.add_theme_color_override("font_color", Color(0.45, 0.95, 0.55))
+	vbox.add_child(copy_feedback_label)
+
 	# Large IP:Port text label
 	var local_ip = _get_local_ip()
 	ip_port_label = Label.new()
+	ip_port_label.name = "IpPortLabel"
 	ip_port_label.text = "IP: %s  |  Puerto: %d" % [local_ip, port]
 	ip_port_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ip_port_label.add_theme_font_size_override("font_size", 20)
@@ -75,6 +152,7 @@ func _setup_ui() -> void:
 	vbox.add_child(ip_port_label)
 
 	status_label = Label.new()
+	status_label.name = "StatusLabel"
 	status_label.text = "Hosting en puerto %d" % port
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.add_theme_font_size_override("font_size", 15)
@@ -82,17 +160,17 @@ func _setup_ui() -> void:
 
 	# QR Code Container
 	var qr_panel = PanelContainer.new()
-	qr_panel.custom_minimum_size = Vector2(200, 200)
+	qr_panel.custom_minimum_size = Vector2(180, 180)
 	vbox.add_child(qr_panel)
 
 	qr_texture_rect = TextureRect.new()
-	qr_texture_rect.custom_minimum_size = Vector2(200, 200)
+	qr_texture_rect.custom_minimum_size = Vector2(180, 180)
 	qr_texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	qr_texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	qr_panel.add_child(qr_texture_rect)
 
 	qr_fallback_label = Label.new()
-	qr_fallback_label.custom_minimum_size = Vector2(200, 200)
+	qr_fallback_label.custom_minimum_size = Vector2(180, 180)
 	qr_fallback_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	qr_fallback_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	qr_fallback_label.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -106,36 +184,123 @@ func _setup_ui() -> void:
 	vbox.add_child(player_count_label)
 
 	player_list_vbox = VBoxContainer.new()
-	player_list_vbox.custom_minimum_size = Vector2(300, 80)
+	player_list_vbox.custom_minimum_size = Vector2(300, 70)
 	vbox.add_child(player_list_vbox)
 
 	# Action buttons
 	var hbox = HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 16)
+	hbox.add_theme_constant_override("separation", 12)
 	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_child(hbox)
 
+	join_room_button = Button.new()
+	join_room_button.name = "JoinRoomButton"
+	join_room_button.text = "🔑 Unirse con Código"
+	join_room_button.custom_minimum_size = Vector2(150, 44)
+	join_room_button.add_theme_font_size_override("font_size", 15)
+	join_room_button.pressed.connect(_on_open_join_dialog_pressed)
+	hbox.add_child(join_room_button)
+
 	var scan_btn = Button.new()
 	scan_btn.text = "📷 Escanear QR"
-	scan_btn.custom_minimum_size = Vector2(140, 44)
+	scan_btn.custom_minimum_size = Vector2(130, 44)
 	scan_btn.add_theme_font_size_override("font_size", 15)
 	scan_btn.pressed.connect(_on_scan_qr_pressed)
 	hbox.add_child(scan_btn)
 
 	var spec_btn = Button.new()
 	spec_btn.text = "👁 Espectador"
-	spec_btn.custom_minimum_size = Vector2(140, 44)
+	spec_btn.custom_minimum_size = Vector2(130, 44)
 	spec_btn.add_theme_font_size_override("font_size", 15)
 	spec_btn.pressed.connect(_on_spectator_pressed)
 	hbox.add_child(spec_btn)
 
 	start_game_button = Button.new()
+	start_game_button.name = "StartGameButton"
 	start_game_button.text = "🚀 Iniciar Partida"
-	start_game_button.custom_minimum_size = Vector2(160, 44)
+	start_game_button.custom_minimum_size = Vector2(150, 44)
 	start_game_button.add_theme_font_size_override("font_size", 16)
 	start_game_button.disabled = true
 	start_game_button.pressed.connect(_on_start_game_pressed)
 	hbox.add_child(start_game_button)
+
+func set_connection_mode(mode_index: int) -> void:
+	if mode_selector != null:
+		mode_selector.selected = mode_index
+	_on_mode_selected(mode_index)
+
+func _on_mode_selected(index: int) -> void:
+	connection_mode = index
+	_apply_connection_mode(index)
+
+func _apply_connection_mode(index: int) -> void:
+	if index == ConnectionMode.ONLINE_RELAY:
+		if ip_port_label != null:
+			ip_port_label.text = "Relay: %s" % relay_url
+		if bridge != null:
+			if bridge.has_method("connect_to_relay"):
+				bridge.call("connect_to_relay", relay_url)
+			if bridge.has_method("create_relay_room"):
+				var created_code: String = str(bridge.call("create_relay_room", game_type))
+				if not created_code.is_empty():
+					_set_room_code(created_code)
+		if status_label != null:
+			status_label.text = "En Línea | SALA: %s" % room_code
+	else:
+		var local_ip = _get_local_ip()
+		if ip_port_label != null:
+			ip_port_label.text = "IP: %s  |  Puerto: %d" % [local_ip, port]
+		if bridge != null and bridge.has_method("start_hosting"):
+			bridge.start_hosting(port, 1, 2)
+		_set_room_code(join_code)
+		if status_label != null:
+			status_label.text = "Hosting en puerto %d | Código: %s" % [port, join_code]
+
+func _set_room_code(code: String) -> void:
+	room_code = code.strip_edges().to_upper()
+	join_code = room_code
+	if room_code_label != null:
+		room_code_label.text = "SALA: %s" % room_code
+
+func _on_room_created(code: String) -> void:
+	_set_room_code(code)
+	if status_label != null:
+		status_label.text = "En Línea | SALA: %s" % room_code
+	_display_qr_code()
+
+func _on_room_joined(success: bool, player_id: int) -> void:
+	if success:
+		_on_player_joined(player_id)
+		if status_label != null:
+			status_label.text = "Unido a sala %s como Jugador %d" % [room_code, player_id]
+	else:
+		if status_label != null:
+			status_label.text = "Error al unirse a la sala"
+
+func _on_copy_code_pressed() -> void:
+	DisplayServer.clipboard_set(room_code)
+	if copy_code_button != null:
+		copy_code_button.text = "¡Copiado!"
+	if copy_feedback_label != null:
+		copy_feedback_label.text = "¡Copiado!"
+	if is_inside_tree():
+		var timer := get_tree().create_timer(2.0)
+		timer.timeout.connect(func():
+			if is_instance_valid(copy_code_button):
+				copy_code_button.text = "Copiar Código"
+			if is_instance_valid(copy_feedback_label):
+				copy_feedback_label.text = ""
+		)
+
+func _on_open_join_dialog_pressed() -> void:
+	if join_dialog == null or not is_instance_valid(join_dialog):
+		var dialog_script = load("res://join_dialog.gd")
+		if dialog_script != null:
+			join_dialog = dialog_script.new()
+			add_child(join_dialog)
+			join_dialog.setup(bridge, relay_url)
+	if join_dialog != null:
+		join_dialog.open(bridge)
 
 func _get_local_ip() -> String:
 	for ip in IP.get_local_addresses():
@@ -150,7 +315,6 @@ func _on_spectator_pressed() -> void:
 		get_node("/root/SceneManager").transition_to("res://spectator_view.tscn")
 	else:
 		get_tree().change_scene_to_file("res://spectator_view.tscn")
-
 
 func _on_scan_qr_pressed() -> void:
 	var scanner = QRScanner.new()
@@ -233,6 +397,12 @@ func _render_svg(svg_str: String) -> Texture2D:
 func _on_player_joined(player_id: int) -> void:
 	if not connected_players.has(player_id):
 		connected_players.append(player_id)
+		player_count = connected_players.size()
+		_update_player_list()
+
+func _on_peer_disconnected(player_id: int) -> void:
+	if connected_players.has(player_id):
+		connected_players.erase(player_id)
 		player_count = connected_players.size()
 		_update_player_list()
 
