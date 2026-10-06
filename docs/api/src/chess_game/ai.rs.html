@@ -306,7 +306,7 @@
 <a href=#306 id=306 data-nosnippet>306</a>    }
 <a href=#307 id=307 data-nosnippet>307</a>    <span class="kw">if </span>difficulty == AiDifficulty::Easy {
 <a href=#308 id=308 data-nosnippet>308</a>        <span class="kw">let </span>candidates = generate_candidates(session, player);
-<a href=#309 id=309 data-nosnippet>309</a>        <span class="kw">if </span>candidates.len() &gt; <span class="number">1 </span>&amp;&amp; session.current_tick().<span class="number">0</span>.is_multiple_of(<span class="number">4</span>) {
+<a href=#309 id=309 data-nosnippet>309</a>        <span class="kw">if </span>candidates.len() &gt; <span class="number">1 </span>&amp;&amp; (session.current_tick().<span class="number">0 </span>&amp; <span class="number">3</span>) == <span class="number">0 </span>{
 <a href=#310 id=310 data-nosnippet>310</a>            <span class="kw">return </span>candidates.last().cloned();
 <a href=#311 id=311 data-nosnippet>311</a>        }
 <a href=#312 id=312 data-nosnippet>312</a>    }

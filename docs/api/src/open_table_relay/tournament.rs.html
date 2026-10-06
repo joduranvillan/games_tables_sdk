@@ -146,7 +146,7 @@
 <a href=#146 id=146 data-nosnippet>146</a>        <span class="kw">if </span>round + <span class="number">1 </span>&lt; <span class="self">self</span>.rounds.len() {
 <a href=#147 id=147 data-nosnippet>147</a>            <span class="kw">let </span>next_match_idx = match_index / <span class="number">2</span>;
 <a href=#148 id=148 data-nosnippet>148</a>            <span class="kw">let </span>next_match = <span class="kw-2">&amp;mut </span><span class="self">self</span>.rounds[round + <span class="number">1</span>][next_match_idx];
-<a href=#149 id=149 data-nosnippet>149</a>            <span class="kw">if </span>match_index % <span class="number">2 </span>== <span class="number">0 </span>{
+<a href=#149 id=149 data-nosnippet>149</a>            <span class="kw">if </span>(match_index &amp; <span class="number">1</span>) == <span class="number">0 </span>{
 <a href=#150 id=150 data-nosnippet>150</a>                next_match.player1 = <span class="prelude-val">Some</span>(winner.to_string());
 <a href=#151 id=151 data-nosnippet>151</a>            } <span class="kw">else </span>{
 <a href=#152 id=152 data-nosnippet>152</a>                next_match.player2 = <span class="prelude-val">Some</span>(winner.to_string());
