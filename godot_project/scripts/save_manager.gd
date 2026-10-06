@@ -103,8 +103,17 @@ func save_game(
 	var f := FileAccess.open(file_path, FileAccess.WRITE)
 	if f == null:
 		return ""
-	f.store_string(JSON.stringify(save_payload, "\t"))
+	var serialized_json := JSON.stringify(save_payload, "\t")
+	f.store_string(serialized_json)
 	f.close()
+
+	if has_node("/root/SteamManager"):
+		var sm = get_node("/root/SteamManager")
+		if sm.has_method("is_steam_available") and sm.call("is_steam_available"):
+			var raw_utf8 := serialized_json.to_utf8_buffer()
+			sm.call("sync_save", save_id, raw_utf8)
+			if not slot_name.strip_edges().is_empty():
+				sm.call("sync_save", slot_name.strip_edges(), raw_utf8)
 
 	game_saved.emit(save_id, save_payload)
 	return save_id
@@ -123,7 +132,17 @@ func load_game(save_id: String, p_bridge: Node = null) -> Dictionary:
 				break
 
 	if not FileAccess.file_exists(file_path):
-		return {}
+		if has_node("/root/SteamManager"):
+			var sm = get_node("/root/SteamManager")
+			if sm.has_method("is_steam_available") and sm.call("is_steam_available"):
+				var cloud_bytes: PackedByteArray = sm.call("load_save", target_id)
+				if cloud_bytes.size() > 0:
+					var cf := FileAccess.open(file_path, FileAccess.WRITE)
+					if cf != null:
+						cf.store_buffer(cloud_bytes)
+						cf.close()
+		if not FileAccess.file_exists(file_path):
+			return {}
 
 	var f := FileAccess.open(file_path, FileAccess.READ)
 	if f == null:

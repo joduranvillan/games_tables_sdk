@@ -27,6 +27,8 @@ AudioManager="*res://audio_manager.gd"
 ScoreTracker="*res://score_tracker.gd"
 AchievementManager="*res://achievement_manager.gd"
 SaveManager="*res://scripts/save_manager.gd"
+SteamManager="*res://scripts/steam_manager.gd"
+TutorialManager="*res://scripts/tutorial_manager.gd"
 
 [display]
 

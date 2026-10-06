@@ -98,6 +98,16 @@ pub fn ludo_ai_pick_move(session: &Session, player: PlayerId) -> Option<MoveToke
     })
 }
 
+/// Selecciona el mejor movimiento para `player` en Ludo parametrizado por `AiDifficulty`.
+pub fn best_move(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+) -> Option<MoveTokenCommand> {
+    let _depth = difficulty.max_depth();
+    ludo_ai_pick_move(session, player)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -210,6 +210,15 @@ func _setup_ui() -> void:
 	turn_indicator.position = Vector2(320, BOARD_SIZE * CELL_SIZE + 35)
 	add_child(turn_indicator)
 
+	# Botón Tutorial Interactivo de Shogi (5 pasos)
+	var tutorial_btn := Button.new()
+	tutorial_btn.name = "ShogiTutorialButton"
+	tutorial_btn.text = "🎓 Tutorial"
+	tutorial_btn.position = Vector2(540, BOARD_SIZE * CELL_SIZE + 35)
+	tutorial_btn.custom_minimum_size = Vector2(140, 32)
+	tutorial_btn.pressed.connect(start_shogi_tutorial)
+	add_child(tutorial_btn)
+
 	_setup_hand_panels()
 
 func _setup_hand_panels() -> void:
@@ -404,7 +413,20 @@ func _calculate_valid_drops() -> Array:
 				drops.append(Vector2i(r, c))
 	return drops
 
+func cell_to_pixel(cell: Vector2i) -> Vector2:
+	return Vector2(120.0 + cell.x * CELL_SIZE, 20.0 + cell.y * CELL_SIZE)
+
+func start_shogi_tutorial() -> void:
+	var ShogiTut = load("res://scripts/tutorials/shogi_tutorial.gd")
+	if ShogiTut != null:
+		ShogiTut.start_on_board(self)
+
 func _handle_board_click(row: int, col: int) -> void:
+	if has_node("/root/TutorialManager"):
+		var tm = get_node("/root/TutorialManager")
+		if tm.get("is_running") == true:
+			if not tm.call("notify_cell_action", Vector2i(col, row)):
+				return
 	# 1. Drop piece from hand
 	if selected_hand_piece != "":
 		var drop_kind = selected_hand_piece

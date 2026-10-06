@@ -1,0 +1,28 @@
+[h1]OpenTable — 13 Jogos de Tabuleiro Clássicos + Motor Multijogador Determinístico[/h1]
+
+[b]OpenTable[/b] reúne 13 jogos clássicos de tabuleiro e estratégia em uma coleção multiplataforma rápida e determinística desenvolvida em Rust (`bevy_ecs`) e Godot/Redot. Jogue contra a IA Minimax offline, no modo local compartilhado, via rede LAN/P2P ou online com ranking ELO e replays completos.
+
+[h2]13 Jogos de Tabuleiro Incluídos[/h2]
+[list]
+[*][b]Xadrez (Chess)[/b] — Regras completas da FIDE (roque, en passant, promoção, xeque-mate, regra dos 50 lances e tripla repetição) com exportação PGN e FEN.
+[*][b]Go (19×19)[/b] — Contagem de liberdades, captura de grupos, regra de Ko e exportação SGF.
+[*][b]Shogi (9×9)[/b] — Reentrada de peças capturadas, zonas de promoção e validação de Nifu e Uchifuzume.
+[*][b]Xiangqi (9×10)[/b] — Palácio, Rio, bloqueio de Cavalo, Canhão e regra do General Voador.
+[*][b]Damas (8×8)[/b] — Captura obrigatória, saltos múltiplos em cadeia e coroação de Dama.
+[*][b]Damas Chinesas[/b] — Tabuleiro estrela de 121 casas com saltos encadeados.
+[*][b]Gamão (Backgammon)[/b] — 24 pontos, barra central, Bearing Off e Dado de Dobra (Doubling Cube 2..64).
+[*][b]Batalha Naval[/b] — Posicionamento de frota e disparos táticos com detecção de navios afundados.
+[*][b]Ludo[/b] — Corrida para 4 jogadores com casas seguras, capturas e chegada exata à meta.
+[*][b]Mille Bornes[/b] — Clássico jogo de cartas de estrada com obstáculos, remédios e Coup-Fourré.
+[*][b]Monopoly[/b] — Compra de propriedades, casas/hotéis, leilões, hipotecas e falência.
+[*][b]Uno[/b] — Cartas de ação, curingas +4 e símbolos geométricos para daltonismo.
+[*][b]Crisis / TEG[/b] — 30 territórios, 6 continentes, troca de cartas e objetivos secretos.
+[/list]
+
+[h2]Destaques[/h2]
+[list]
+[*][b]Multijogador Offline e Online[/b]: Hotseat local, IA Minimax em 3 níveis, LAN TCP, P2P móvel e salas online via WebSocket Relay.
+[*][b]Steam Deck e Controle[/b]: Cursor virtual para gamepad, zoom por pinça em telas sensíveis ao toque e modo de alto contraste para daltônicos.
+[*][b]Replays, Desfazer/Refazer e Steam Cloud[/b]: Salve partidas em qualquer turno e sincronize na nuvem.
+[*][b]SDK para Desenvolvedores[/b]: Inclui o addon `addons/open_table/` para criar novos jogos de tabuleiro em Rust + Godot 4.
+[/list]

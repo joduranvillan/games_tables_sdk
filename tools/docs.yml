@@ -1,0 +1,42 @@
+name: Deploy Documentation (mdBook + rustdoc)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-docs:
+    name: Build & Publish mdBook to GitHub Pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install mdBook
+        uses: peaceiris/actions-mdbook@v2
+        with:
+          mdbook-version: 'latest'
+
+      - name: Build mdBook documentation
+        run: mdbook build docs/
+
+      - name: Generate rustdoc API reference
+        run: |
+          cargo doc --workspace --exclude open_table_godot --no-deps
+          cp -r target/doc docs/book/api/
+
+      - name: Deploy docs/book/ to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/book
+          destination_dir: docs
+          keep_files: true

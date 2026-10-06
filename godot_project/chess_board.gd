@@ -230,6 +230,15 @@ func _setup_ui() -> void:
 	export_game_button.pressed.connect(_on_export_game_pressed)
 	add_child(export_game_button)
 
+	# Botón Tutorial Interactivo (8 pasos)
+	var tutorial_btn := Button.new()
+	tutorial_btn.name = "ChessTutorialButton"
+	tutorial_btn.text = "🎓 Tutorial"
+	tutorial_btn.position = Vector2(325, BOARD_SIZE * CELL_SIZE + 50)
+	tutorial_btn.custom_minimum_size = Vector2(160, 32)
+	tutorial_btn.pressed.connect(start_chess_tutorial)
+	add_child(tutorial_btn)
+
 	export_toast_label = Label.new()
 	export_toast_label.name = "ExportToastLabel"
 	export_toast_label.text = ""
@@ -637,7 +646,20 @@ func _handle_unified_input(event: InputEvent) -> void:
 		touch_start_cell = Vector2i(-1, -1)
 		is_touch_dragging = false
 
+func cell_to_pixel(cell: Vector2i) -> Vector2:
+	return Vector2(cell.x * CELL_SIZE, cell.y * CELL_SIZE)
+
+func start_chess_tutorial() -> void:
+	var ChessTut = load("res://scripts/tutorials/chess_tutorial.gd")
+	if ChessTut != null:
+		ChessTut.start_on_board(self)
+
 func _handle_cell_click(row: int, col: int) -> void:
+	if has_node("/root/TutorialManager"):
+		var tm = get_node("/root/TutorialManager")
+		if tm.get("is_running") == true:
+			if not tm.call("notify_cell_action", Vector2i(col, row)):
+				return
 	if animating:
 		return
 

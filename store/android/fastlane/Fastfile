@@ -1,0 +1,23 @@
+default_platform(:android)
+
+platform :android do
+  desc "Build and upload OpenTable SDK APK/AAB to Google Play Internal Track"
+  lane :internal do
+    upload_to_play_store(
+      track: "internal",
+      apk: "dist/opentable.apk",
+      skip_upload_metadata: false,
+      skip_upload_images: false,
+      skip_upload_screenshots: false
+    )
+  end
+
+  desc "Promote Internal build to Production"
+  lane :production do
+    upload_to_play_store(
+      track: "internal",
+       track_promote_to: "production",
+      skip_upload_changelogs: false
+    )
+  end
+end

@@ -1,0 +1,22 @@
+OpenTable reúne 13 juegos clásicos de mesa y estrategia para Android en una colección rápida y determinista impulsada por Rust y Godot/Redot.
+
+13 Juegos Incluidos:
+• Ajedrez (Reglas FIDE completas, exportación PGN/FEN y práctica de aperturas)
+• Go (Tablero 19×19, regla de Ko y exportación SGF)
+• Shogi (Tablero 9×9, reingreso de piezas capturadas y promoción)
+• Xiangqi (Tablero 9×10, Palacio, Río y General Volador)
+• Damas (8×8 con captura obligatoria y saltos encadenados)
+• Damas Chinas (Estrella de 121 casillas)
+• Backgammon (24 picos, barra central, Bearing Off y Dado de Doblaje)
+• Batalla Naval (Despliegue de flota y disparos tácticos)
+• Ludo (Carrera para 4 jugadores con casillas seguras)
+• Mil Millas / Mille Bornes (Cartas de ruta, ataques, defensas y Coup-Fourré)
+• Monopoly (Propiedades, casas/hoteles, subastas e hipotecas)
+• Uno (Cartas de acción, comodines +4 e iconos para daltónicos)
+• Crisis / TEG (30 territorios, 6 continentes y objetivos secretos)
+
+Características Principales:
+• Modo Offline contra IA Minimax (3 niveles) o multijugador local en un mismo dispositivo.
+• Multijugador P2P cercano (Nearby Connections) y salas online WebSocket Relay.
+• Controles táctiles Pinch-to-Zoom y Modo de Accesibilidad para Daltónicos.
+• Repetición completa de partidas, Deshacer/Rehacer y guardado local.

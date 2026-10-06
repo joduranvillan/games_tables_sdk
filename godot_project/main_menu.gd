@@ -314,6 +314,52 @@ func _setup_buttons() -> void:
 	replay_btn.pressed.connect(_on_ver_replay_pressed)
 	grid_container.add_child(replay_btn)
 
+	# Clasificación Global ELO button
+	var leaderboard_btn = Button.new()
+	leaderboard_btn.text = "🏆 Clasificación"
+	_apply_button_theme(leaderboard_btn, Color(0.70, 0.52, 0.15))
+	leaderboard_btn.custom_minimum_size = Vector2(310, 60)
+	leaderboard_btn.pivot_offset = Vector2(155, 30)
+	leaderboard_btn.add_theme_font_size_override("font_size", 18)
+	leaderboard_btn.mouse_entered.connect(func():
+		var tw = leaderboard_btn.create_tween()
+		tw.tween_property(leaderboard_btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	)
+	leaderboard_btn.mouse_exited.connect(func():
+		var tw = leaderboard_btn.create_tween()
+		tw.tween_property(leaderboard_btn, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	)
+	leaderboard_btn.pressed.connect(func():
+		if has_node("/root/SceneManager"):
+			get_node("/root/SceneManager").transition_to("res://scenes/leaderboard.tscn")
+		else:
+			get_tree().change_scene_to_file("res://scenes/leaderboard.tscn")
+	)
+	grid_container.add_child(leaderboard_btn)
+
+	# Torneo button
+	var tournament_btn = Button.new()
+	tournament_btn.text = "🏟 Torneo"
+	_apply_button_theme(tournament_btn, Color(0.65, 0.25, 0.35))
+	tournament_btn.custom_minimum_size = Vector2(310, 60)
+	tournament_btn.pivot_offset = Vector2(155, 30)
+	tournament_btn.add_theme_font_size_override("font_size", 18)
+	tournament_btn.mouse_entered.connect(func():
+		var tw = tournament_btn.create_tween()
+		tw.tween_property(tournament_btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	)
+	tournament_btn.mouse_exited.connect(func():
+		var tw = tournament_btn.create_tween()
+		tw.tween_property(tournament_btn, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	)
+	tournament_btn.pressed.connect(func():
+		if has_node("/root/SceneManager"):
+			get_node("/root/SceneManager").transition_to("res://scenes/tournament_lobby.tscn")
+		else:
+			get_tree().change_scene_to_file("res://scenes/tournament_lobby.tscn")
+	)
+	grid_container.add_child(tournament_btn)
+
 func _play_entry_animation() -> void:
 	var buttons = grid_container.get_children()
 	for i in range(buttons.size()):
@@ -369,6 +415,18 @@ func _save_settings_json(data: Dictionary) -> void:
 	var f = FileAccess.open("user://settings.json", FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify(existing, "  "))
+
+func _load_ai_difficulty_cfg() -> int:
+	var cfg := ConfigFile.new()
+	if cfg.load("user://settings.cfg") == OK:
+		return clampi(int(cfg.get_value("ai", "difficulty", 1)), 0, 3)
+	return 1
+
+func _save_ai_difficulty_cfg(difficulty_level: int) -> void:
+	var cfg := ConfigFile.new()
+	cfg.load("user://settings.cfg")
+	cfg.set_value("ai", "difficulty", clampi(difficulty_level, 0, 3))
+	cfg.save("user://settings.cfg")
 
 func _show_mode_popup(game: Dictionary) -> void:
 	if is_instance_valid(current_popup_overlay):
@@ -474,30 +532,31 @@ func _show_mode_popup(game: Dictionary) -> void:
 	)
 	vbox.add_child(hotseat_btn)
 
-	# Button vs AI & Difficulty for chess
+	# Button vs AI & Selector de Dificultad (Fácil | Normal | Difícil | Experto)
 	var has_ai: bool = (game.get("ai_method", "") != "")
-	var chess_diff_option: OptionButton = null
+	var diff_option: OptionButton = null
+	var saved_diff_level: int = _load_ai_difficulty_cfg()
 
-	if game["id"] == "chess" and has_ai:
+	if has_ai:
 		var diff_hbox = HBoxContainer.new()
 		diff_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 		diff_hbox.add_theme_constant_override("separation", 10)
 		vbox.add_child(diff_hbox)
 
 		var diff_lbl = Label.new()
-		diff_lbl.text = "Dificultad IA:"
+		diff_lbl.text = "Dificultad:"
 		diff_lbl.add_theme_font_size_override("font_size", 14)
 		diff_lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
 		diff_hbox.add_child(diff_lbl)
 
-		chess_diff_option = OptionButton.new()
-		chess_diff_option.custom_minimum_size = Vector2(190, 32)
-		chess_diff_option.add_item("Fácil (Profundidad 1)", 1)
-		chess_diff_option.add_item("Medio (Profundidad 2)", 2)
-		chess_diff_option.add_item("Difícil (Profundidad 3)", 3)
-		var sel_idx = clampi(saved_depth - 1, 0, 2)
-		chess_diff_option.selected = sel_idx
-		diff_hbox.add_child(chess_diff_option)
+		diff_option = OptionButton.new()
+		diff_option.custom_minimum_size = Vector2(190, 32)
+		diff_option.add_item("Fácil", 0)
+		diff_option.add_item("Normal", 1)
+		diff_option.add_item("Difícil", 2)
+		diff_option.add_item("Experto", 3)
+		diff_option.selected = clampi(saved_diff_level, 0, 3)
+		diff_hbox.add_child(diff_option)
 
 	var ai_btn = Button.new()
 	ai_btn.custom_minimum_size = Vector2(0, 48)
@@ -507,13 +566,12 @@ func _show_mode_popup(game: Dictionary) -> void:
 		ai_btn.text = "🤖 vs IA"
 		_apply_button_theme(ai_btn, Color(0.70, 0.35, 0.35))
 		ai_btn.pressed.connect(func():
-			var depth = 2
-			if chess_diff_option != null:
-				depth = chess_diff_option.selected + 1
-				_save_settings_json({"default_mode": "vs_ai", "chess_ai_depth": depth})
-			else:
-				_save_settings_json({"default_mode": "vs_ai"})
-			_launch_game(game, "vs_ai", depth)
+			var difficulty_level := 1
+			if diff_option != null:
+				difficulty_level = clampi(diff_option.selected, 0, 3)
+			_save_ai_difficulty_cfg(difficulty_level)
+			_save_settings_json({"default_mode": "vs_ai", "chess_ai_depth": difficulty_level + 1, "ai_difficulty": difficulty_level})
+			_launch_game(game, "vs_ai", difficulty_level)
 		)
 	else:
 		ai_btn.text = "🤖 vs IA (No disponible)"
@@ -549,24 +607,32 @@ func _close_mode_popup() -> void:
 	if has_node("Title"):
 		get_node("Title").modulate.a = 1.0
 
-func _launch_game(game: Dictionary, mode: String, depth: int = 2) -> void:
+func _launch_game(game: Dictionary, mode: String, difficulty_level: int = 1) -> void:
 	_close_mode_popup()
 	GameManager.set_active_game(game["id"])
 	GameManager.set_game_mode(mode)
 
 	if mode == "vs_ai":
+		var board_size: int = 9
+		GameManager.set_chess_ai_depth(difficulty_level + 1)
+		if bridge.has_method("set_ai_difficulty"):
+			bridge.call("set_ai_difficulty", difficulty_level)
 		if game["id"] == "chess":
-			GameManager.set_chess_ai_depth(depth)
 			if bridge.has_method("start_local_match_chess_vs_ai"):
-				bridge.call("start_local_match_chess_vs_ai", 1, 2, depth)
+				bridge.call("start_local_match_chess_vs_ai", 1, 2, difficulty_level)
 		elif game.get("ai_method", "") != "":
 			var ai_method: String = game["ai_method"]
 			if game["id"] == "checkers":
 				if bridge.has_method(ai_method):
 					bridge.call(ai_method, 42, 1, 2)
 			elif game["id"] == "go":
+				if bridge.has_method("start_local_match_go_vs_ai_ext"):
+					bridge.call(ai_method, 1, 2, board_size, difficulty_level)
+				elif bridge.has_method(ai_method):
+					bridge.call(ai_method, 1, 2, difficulty_level)
+			elif game["id"] == "shogi":
 				if bridge.has_method(ai_method):
-					bridge.call(ai_method, 1, 2, 9)
+					bridge.call(ai_method, 1, 2, difficulty_level)
 			elif bridge.has_method(ai_method):
 				bridge.call(ai_method, 1, 2)
 	else:

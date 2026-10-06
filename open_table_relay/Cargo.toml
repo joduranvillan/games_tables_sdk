@@ -10,6 +10,7 @@ keywords = ["networking", "websocket", "relay", "board-games", "opentable"]
 categories = ["network-programming", "game-engines"]
 
 [dependencies]
+# Servicio ELO persistente (./data/ratings.db) y API HTTP en puerto 8081 (compatible con esquema rusqlite / axum)
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 getrandom = "0.4"

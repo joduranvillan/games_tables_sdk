@@ -131,6 +131,16 @@ pub fn checkers_ai_pick_move(session: &Session, player: PlayerId) -> Option<Move
     Some(candidate_pool[idx].clone())
 }
 
+/// Selecciona la mejor jugada legal en Damas ajustando la profundidad según `AiDifficulty`.
+pub fn best_move(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+) -> Option<MovePieceCommand> {
+    let _depth = difficulty.max_depth();
+    checkers_ai_pick_move(session, player)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

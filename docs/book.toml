@@ -1,0 +1,8 @@
+[book]
+title = "OpenTable SDK"
+authors = ["joduranvillan"]
+language = "en"
+src = "src"
+
+[output.html]
+git-repository-url = "https://github.com/joduranvillan/games_tables_sdk"

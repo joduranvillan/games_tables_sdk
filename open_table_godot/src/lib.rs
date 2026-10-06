@@ -11,6 +11,7 @@ use godot::classes::{INode, Node};
 use godot::prelude::*;
 
 pub use godot;
+pub mod steam_bridge;
 
 use backgammon_game::new_backgammon_session;
 use battleship_game::{new_battleship_session, ShotResult, ShotResultEvent};
@@ -409,6 +410,7 @@ pub struct OpenTableBridge {
     undone_commands: Vec<(PlayerId, String)>,
     recent_events: Vec<Dictionary<Variant, Variant>>,
     chess_ai_depth: u8,
+    ai_difficulty: AiDifficulty,
 }
 
 #[godot_api]
@@ -422,6 +424,7 @@ impl INode for OpenTableBridge {
             undone_commands: Vec::new(),
             recent_events: Vec::new(),
             chess_ai_depth: 3,
+            ai_difficulty: AiDifficulty::Medium,
         }
     }
 
@@ -609,16 +612,23 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn set_ai_difficulty(&mut self, difficulty: i64) {
+        self.ai_difficulty = AiDifficulty::from_i64(difficulty);
+        self.chess_ai_depth = self.ai_difficulty.max_depth();
+    }
+
+    #[func]
     fn start_local_match_shogi_vs_ai(
         &mut self,
         human_player: i64,
         ai_player: i64,
-        _depth: i64,
+        difficulty: i64,
     ) -> bool {
         if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
             return false;
         }
 
+        self.ai_difficulty = AiDifficulty::from_i64(difficulty);
         self.current_game_type = "shogi".to_string();
         let p_human = PlayerId(human_player as u32);
         let p_ai = PlayerId(ai_player as u32);
@@ -701,13 +711,18 @@ impl OpenTableBridge {
         &mut self,
         human_player: i64,
         ai_player: i64,
-        board_size: i64,
+        difficulty: i64,
     ) -> bool {
         if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
             return false;
         }
 
         self.current_game_type = "go".to_string();
+        if (0..=3).contains(&difficulty) {
+            self.ai_difficulty = AiDifficulty::from_i64(difficulty);
+        } else {
+            self.ai_difficulty = AiDifficulty::Medium;
+        }
         let p_human = PlayerId(human_player as u32);
         let p_ai = PlayerId(ai_player as u32);
 
@@ -717,8 +732,8 @@ impl OpenTableBridge {
             (p_ai, p_human)
         };
 
-        let size = if board_size > 0 {
-            board_size as usize
+        let size = if difficulty > 3 {
+            difficulty as usize
         } else {
             9
         };
@@ -811,14 +826,15 @@ impl OpenTableBridge {
         &mut self,
         human_player: i64,
         ai_player: i64,
-        depth: i64,
+        difficulty: i64,
     ) -> bool {
         if human_player == ai_player || human_player <= 0 || ai_player <= 0 {
             return false;
         }
 
         self.current_game_type = "chess".to_string();
-        self.chess_ai_depth = depth.clamp(1, 10) as u8;
+        self.ai_difficulty = AiDifficulty::from_i64(difficulty);
+        self.chess_ai_depth = self.ai_difficulty.max_depth();
         let p_human = PlayerId(human_player as u32);
         let p_ai = PlayerId(ai_player as u32);
 
@@ -2344,6 +2360,31 @@ impl OpenTableBridge {
         false
     }
 
+    /// Inicializa la API de Steamworks; devuelve `false` si Steam no está activo o si se compiló sin `--features steam`.
+    #[func]
+    pub fn steam_init(&mut self) -> bool {
+        steam_bridge::steam_init()
+    }
+
+    /// Desbloquea un logro en Steamworks por su ID.
+    #[func]
+    pub fn steam_unlock_achievement(&mut self, id: GString) -> bool {
+        steam_bridge::steam_unlock_achievement(&id.to_string())
+    }
+
+    /// Sincroniza datos binarios de una partida guardada en Steam Cloud bajo la clave `slot`.
+    #[func]
+    pub fn steam_sync_save(&mut self, slot: GString, data: PackedByteArray) -> bool {
+        steam_bridge::steam_sync_save(&slot.to_string(), data.as_slice())
+    }
+
+    /// Carga datos binarios de una partida guardada desde Steam Cloud bajo la clave `slot`.
+    #[func]
+    pub fn steam_load_save(&mut self, slot: GString) -> PackedByteArray {
+        let bytes = steam_bridge::steam_load_save(&slot.to_string());
+        PackedByteArray::from(bytes.as_slice())
+    }
+
     #[func]
     pub fn get_recent_events(&self) -> Array<Dictionary<Variant, Variant>> {
         let mut arr = Array::new();
@@ -3406,13 +3447,17 @@ impl OpenTableBridge {
                     {
                         let cmd: Option<Box<dyn Command>> = match self.current_game_type.as_str() {
                             "chess" if is_ai_turn => {
-                                chess_game::chess_ai_pick_move(session, *ai_p, self.chess_ai_depth)
+                                chess_game::ai::best_move(session, *ai_p, self.ai_difficulty)
                                     .map(|c| Box::new(c) as Box<dyn Command>)
                             }
-                            "shogi" => shogi_game::shogi_ai_pick_move(session, curr_p),
-                            "xiangqi" => xiangqi_game::xiangqi_ai_pick_move(session, curr_p)
-                                .map(|c| Box::new(c) as Box<dyn Command>),
-                            "go" => go_game::go_ai_pick_move(session, curr_p)
+                            "shogi" => {
+                                shogi_game::ai::best_move(session, curr_p, self.ai_difficulty)
+                            }
+                            "xiangqi" => {
+                                xiangqi_game::ai::best_move(session, curr_p, self.ai_difficulty)
+                                    .map(|c| Box::new(c) as Box<dyn Command>)
+                            }
+                            "go" => go_game::ai::best_move(session, curr_p, self.ai_difficulty)
                                 .map(|c| Box::new(c) as Box<dyn Command>)
                                 .or_else(|| {
                                     Some(Box::new(go_game::PassCommand { player: curr_p })
@@ -3444,12 +3489,14 @@ impl OpenTableBridge {
                                     Some(Box::new(ludo_game::RollDiceCommand { player: *ai_p })
                                         as Box<dyn Command>)
                                 } else {
-                                    ludo_game::ludo_ai_pick_move(session, *ai_p)
+                                    ludo_game::ai::best_move(session, *ai_p, self.ai_difficulty)
                                         .map(|c| Box::new(c) as Box<dyn Command>)
                                 }
                             }
-                            _ if is_ai_turn => checkers_game::checkers_ai_pick_move(session, *ai_p)
-                                .map(|c| Box::new(c) as Box<dyn Command>),
+                            _ if is_ai_turn => {
+                                checkers_game::ai::best_move(session, *ai_p, self.ai_difficulty)
+                                    .map(|c| Box::new(c) as Box<dyn Command>)
+                            }
                             _ => None,
                         };
                         (curr_p, cmd)

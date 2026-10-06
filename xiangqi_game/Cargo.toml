@@ -10,11 +10,11 @@ keywords = ["game", "board-game", "xiangqi", "chinese-chess", "rules"]
 categories = ["game-engines", "games"]
 
 [dependencies]
-open_table_core = { path = "../open_table_core", version = "0.1.0" }
+open_table_core = { path = "../open_table_core", version = "1.0.0" }
 
-open_table_engine = { path = "../open_table_engine", version = "0.1.0" }
+open_table_engine = { version = "1.0.0", path = "../open_table_engine" }
 
-open_table_macros = { path = "../open_table_macros", version = "0.1.0" }
+open_table_macros = { version = "1.0.0", path = "../open_table_macros" }
 
 serde = { version = "1", features = ["derive"] }
 typetag = "0.2"

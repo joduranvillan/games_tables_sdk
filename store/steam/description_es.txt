@@ -1,0 +1,28 @@
+[h1]OpenTable — 13 Juegos de Mesa Clásicos + Motor Multijugador Determinista[/h1]
+
+[b]OpenTable[/b] reúne 13 juegos clásicos de mesa y estrategia en una colección multiplataforma ultrarrápida y determinista construida en Rust (`bevy_ecs`) y Godot/Redot. Juega en solitario contra la IA Minimax local, en modo local compartido (Hotseat), en red LAN/P2P o en línea mediante salas WebSocket con clasificación ELO y repetición completa de partidas.
+
+[h2]13 Juegos de Mesa Incluidos[/h2]
+[list]
+[*][b]Ajedrez[/b] — Reglas completas FIDE (enroque, captura al paso, coronación, jaque mate, regla de 50 movimientos y triple repetición) con exportación PGN y FEN.
+[*][b]Go (19×19)[/b] — Conteo de libertades, capturas de cadenas, regla de Ko y exportación en formato SGF.
+[*][b]Shogi (9×9)[/b] — Reingreso de piezas capturadas (drops), zonas de promoción y validación de Nifu y Uchifuzume.
+[*][b]Xiangqi (9×10)[/b] — Palacio, Río, pantallas de Cañón, bloqueo de Caballo y regla del General Volador.
+[*][b]Damas (8×8)[/b] — Captura obligatoria, saltos múltiples encadenados y coronación de Dama.
+[*][b]Damas Chinas[/b] — Tablero estrella de 121 casillas con saltos encadenados.
+[*][b]Backgammon[/b] — 24 picos, barra central, Bearing Off y Dado de Doblaje (Doubling Cube 2..64).
+[*][b]Batalla Naval[/b] — Despliegue de flota y fase táctica de disparo con detección de hundimientos.
+[*][b]Ludo[/b] — Carrera para 4 jugadores con casillas seguras, capturas y llegada exacta a la meta.
+[*][b]Mil Millas (Mille Bornes)[/b] — Clásico juego de cartas de ruta con ataques, defensas, escudos y Coup-Fourré.
+[*][b]Monopoly[/b] — Compra de propiedades, casas y hoteles, subastas, hipotecas y bancarrota.
+[*][b]Uno[/b] — Cartas de acción, comodines +4 e iconos geométricos de accesibilidad para daltónicos.
+[*][b]Crisis / TEG[/b] — 30 territorios, 6 continentes, canje de tarjetas y objetivos secretos de victoria.
+[/list]
+
+[h2]Características Clave[/h2]
+[list]
+[*][b]Multijugador Offline y Online[/b]: Modo local, IA offline con 3 niveles de dificultad, LAN TCP, P2P móvil (Nearby / Multipeer) y salas WebSocket Relay con códigos de 6 caracteres.
+[*][b]Soporte para Steam Deck y Gamepad[/b]: Retículo de cursor virtual para mando, gestos táctiles Pinch-to-Zoom y modo de accesibilidad para daltónicos.
+[*][b]Repeticiones, Deshacer/Rehacer y Steam Cloud[/b]: Guarda y restaura partidas en cualquier turno y revisa jugadas paso a paso.
+[*][b]SDK Abierto para Desarrolladores[/b]: Incluye el addon `addons/open_table/` para Godot 4 / Redot para crear nuevos juegos por turnos en Rust.
+[/list]

@@ -1,0 +1,11 @@
+[h1]OpenTable SDK — 13 Classic Board Games in One Deterministic Engine[/h1]
+
+Play **Chess, Go, Shogi, Xiangqi, Checkers, Backgammon, Ludo, Uno, Monopoly, Crisis, Mille Bornes, Chinese Checkers, and Battleship** locally, against parametric AI (Easy to Expert with ECO Opening Book & MCTS), over LAN/P2P, or online with global ELO rankings and single-elimination tournaments!
+
+[h2]Key Features[/h2]
+[list]
+[*] [b]13 Complete Board Games[/b] powered by an authoritative Rust ECS engine (`open_table_core` & `open_table_engine`).
+[*] [b]Competitive Online Relay[/b]: Persistent SQLite ELO leaderboards and 4/8/16-player tournament brackets.
+[*] [b]Parametric AI & Interactive Tutorials[/b]: Step-by-step interactive tutorials for Chess, Go, and Shogi, plus 4 AI difficulty levels.
+[*] [b]Cross-Platform & Accessible[/b]: Steam Deck / Gamepad cursor support, Colorblind Accessibility Mode, PGN/FEN/SGF export, and deterministic replays.
+[/list]

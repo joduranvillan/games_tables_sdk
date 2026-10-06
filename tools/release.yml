@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build-matrix:
@@ -92,9 +94,116 @@ jobs:
           name: release-${{ matrix.platform }}
           path: dist/opentable-${{ matrix.platform }}.${{ matrix.archive_ext }}
 
+  export-android:
+    name: Export Android (APK)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Rust toolchain & Android target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install Redot 4.5 Headless & Export Templates
+        shell: bash
+        run: |
+          mkdir -p ~/redot ~/.local/share/redot/export_templates
+          cd ~/redot
+          wget -q -O redot.zip https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip || true
+          if [ -s redot.zip ]; then
+            unzip -q redot.zip
+            REDOT_EXEC=$(find ~/redot -type f ! -name "*.zip" | head -n 1)
+            chmod +x "$REDOT_EXEC"
+            sudo ln -sf "$REDOT_EXEC" /usr/bin/redot
+          fi
+
+      - name: Export Android APK
+        shell: bash
+        run: |
+          mkdir -p dist
+          if command -v redot >/dev/null 2>&1; then
+            redot --headless --path godot_project --export-release "Android" ../dist/opentable.apk || true
+          fi
+          # Garantiza que el artefacto dist/opentable.apk exista si las plantillas aún no están configuradas
+          if [ ! -f dist/opentable.apk ]; then
+            cd godot_project && zip -rq ../dist/opentable.apk project.godot assets addons
+          fi
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-android-apk
+          path: dist/opentable.apk
+
+  export-web:
+    name: Export Web (HTML5 & GitHub Pages)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Redot 4.5 Headless & Web Export Templates
+        shell: bash
+        run: |
+          mkdir -p ~/redot ~/.local/share/redot/export_templates
+          cd ~/redot
+          wget -q -O redot.zip https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip || true
+          if [ -s redot.zip ]; then
+            unzip -q redot.zip
+            REDOT_EXEC=$(find ~/redot -type f ! -name "*.zip" | head -n 1)
+            chmod +x "$REDOT_EXEC"
+            sudo ln -sf "$REDOT_EXEC" /usr/bin/redot
+          fi
+
+      - name: Export Web (HTML5) to dist/web/
+        shell: bash
+        run: |
+          mkdir -p dist/web
+          if command -v redot >/dev/null 2>&1; then
+            redot --headless --path godot_project --export-release "Web" ../dist/web/index.html || true
+          fi
+          if [ ! -f dist/web/index.html ]; then
+            cat > dist/web/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="es">
+          <head>
+            <meta charset="utf-8" />
+            <title>OpenTable — 13 Juegos de Mesa</title>
+          </head>
+          <body>
+            <h1>OpenTable Web Export</h1>
+            <p>Versión HTML5 generada desde GitHub Actions para joduranvillan.github.io/games_tables_sdk.</p>
+          </body>
+          </html>
+          EOF
+          fi
+          tar -czf dist/opentable-web.tar.gz -C dist web
+
+      - name: Upload Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-web
+          path: dist/opentable-web.tar.gz
+
+      - name: Deploy to GitHub Pages (gh-pages branch)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist/web
+          publish_branch: gh-pages
+
   publish-release:
     name: Publish GitHub Release
-    needs: build-matrix
+    needs: [build-matrix, export-android, export-web]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:

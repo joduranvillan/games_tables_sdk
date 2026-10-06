@@ -198,6 +198,15 @@ pub fn minimax(
 
 /// Selecciona la mejor jugada legal para `player` en `session` usando Minimax a depth=2.
 pub fn xiangqi_ai_pick_move(session: &Session, player: PlayerId) -> Option<MovePieceCommand> {
+    best_move(session, player, AiDifficulty::Medium)
+}
+
+/// Selecciona la mejor jugada legal para `player` en `session` usando `difficulty.max_depth()`.
+pub fn best_move(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+) -> Option<MovePieceCommand> {
     if session
         .world()
         .get_resource::<GameOverResource>()
@@ -225,7 +234,7 @@ pub fn xiangqi_ai_pick_move(session: &Session, player: PlayerId) -> Option<MoveP
         }
     });
 
-    let depth = 2;
+    let depth = difficulty.max_depth().clamp(1, 2);
     let mut best_move = None;
     let mut best_score = f32::NEG_INFINITY;
     let mut alpha = f32::NEG_INFINITY;

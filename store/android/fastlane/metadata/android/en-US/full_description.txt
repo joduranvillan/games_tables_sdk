@@ -1,0 +1,22 @@
+OpenTable brings 13 timeless tabletop and strategy games to Android in a fast, deterministic package powered by Rust and Godot/Redot.
+
+Included Games:
+• Chess (Full FIDE rules, PGN/FEN export, Opening Practice)
+• Go (19×19 board, Ko rule, SGF export)
+• Shogi (9×9 board, piece drops, promotions)
+• Xiangqi (9×10 board, Palace, River & Flying General)
+• Checkers (8×8 mandatory captures & multi-jump chains)
+• Chinese Checkers (121-cell star board)
+• Backgammon (24 points, Bar, Bearing Off & Doubling Cube)
+• Battleship (Fleet placement & tactical salvo grid)
+• Ludo (4-player race with safe stars & captures)
+• Mille Bornes (Road-race card game with Coup-Fourré)
+• Monopoly (Properties, houses/hotels, auctions & mortgages)
+• Uno (Action cards, Wild +4 & colorblind geometric icons)
+• Crisis / TEG (30 territories, 6 continents & secret objectives)
+
+Key Features:
+• Play Offline vs Local Minimax AI (Easy, Medium, Hard) or Pass-and-Play on one device.
+• Nearby Connections P2P & Online WebSocket Relay rooms (6-character room codes).
+• Touch Pinch-to-Zoom & Panning on dense boards, plus Colorblind Accessibility Mode.
+• Full Match Replays, Undo/Redo, and Local Save Slots.

@@ -165,6 +165,15 @@ func _setup_ui() -> void:
 	export_game_button.pressed.connect(_on_export_game_pressed)
 	add_child(export_game_button)
 
+	# Botón Tutorial Interactivo de Go (5 pasos)
+	var tutorial_btn := Button.new()
+	tutorial_btn.name = "GoTutorialButton"
+	tutorial_btn.text = "🎓 Tutorial"
+	tutorial_btn.position = Vector2(360, BOARD_SIZE * CELL_SIZE + 48)
+	tutorial_btn.custom_minimum_size = Vector2(160, 32)
+	tutorial_btn.pressed.connect(start_go_tutorial)
+	add_child(tutorial_btn)
+
 	export_toast_label = Label.new()
 	export_toast_label.name = "ExportToastLabel"
 	export_toast_label.text = ""
@@ -216,7 +225,20 @@ func _on_layout_changed(_layout: int) -> void:
 	if has_node("/root/ThemeManager"):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
+func cell_to_pixel(cell: Vector2i) -> Vector2:
+	return Vector2(cell.x * CELL_SIZE, cell.y * CELL_SIZE)
+
+func start_go_tutorial() -> void:
+	var GoTut = load("res://scripts/tutorials/go_tutorial.gd")
+	if GoTut != null:
+		GoTut.start_on_board(self)
+
 func _on_cell_clicked(cell: Vector2i) -> void:
+	if has_node("/root/TutorialManager"):
+		var tm = get_node("/root/TutorialManager")
+		if tm.get("is_running") == true:
+			if not tm.call("notify_cell_action", Vector2i(cell.y, cell.x)):
+				return
 	_sfx_piece_slide()
 	if winner != -1: return
 	var row = cell.x

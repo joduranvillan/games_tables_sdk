@@ -287,6 +287,32 @@ pub fn chess_ai_pick_move(
     best_move
 }
 
+/// Selecciona la jugada de IA en Ajedrez parametrizada por `AiDifficulty`.
+///
+/// - En `Hard` y `Expert` (`difficulty.use_opening_book() == true`), consulta primero `OpeningBook`.
+/// - Usa `difficulty.max_depth()` para Minimax.
+/// - En `AiDifficulty::Easy`, comete un error subóptimo pero legal 1 de cada 4 jugadas (`tick % 4 == 0`).
+pub fn best_move(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+) -> Option<MovePieceCommand> {
+    if difficulty.use_opening_book() {
+        if let Some(book_cmd) =
+            crate::opening_book::OpeningBook::lookup_session(session, player, difficulty)
+        {
+            return Some(book_cmd);
+        }
+    }
+    if difficulty == AiDifficulty::Easy {
+        let candidates = generate_candidates(session, player);
+        if candidates.len() > 1 && session.current_tick().0.is_multiple_of(4) {
+            return candidates.last().cloned();
+        }
+    }
+    chess_ai_pick_move(session, player, difficulty.max_depth())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -295,6 +321,15 @@ mod tests {
 
     const P1: PlayerId = PlayerId(1);
     const P2: PlayerId = PlayerId(2);
+
+    #[test]
+    fn test_chess_ai_best_move_con_dificultades() {
+        let session = new_chess_session(SessionId(1), 42, P1, P2);
+        for diff in [AiDifficulty::Easy, AiDifficulty::Medium, AiDifficulty::Hard] {
+            let mv = best_move(&session, P1, diff);
+            assert!(mv.is_some());
+        }
+    }
 
     #[test]
     fn test_chess_ai_devuelve_movimiento_en_posicion_inicial() {

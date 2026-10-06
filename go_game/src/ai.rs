@@ -96,6 +96,15 @@ pub fn count_territory(board: &BoardResource) -> (usize, usize) {
 
 /// Selecciona el mejor movimiento para `player` en `session` usando Monte Carlo con presupuesto de 200 rollouts.
 pub fn go_ai_pick_move(session: &Session, player: PlayerId) -> Option<PlaceStoneCommand> {
+    best_move(session, player, AiDifficulty::Hard)
+}
+
+/// Selecciona el mejor movimiento para `player` en `session` usando `difficulty.rollouts()` simulaciones MCTS.
+pub fn best_move(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+) -> Option<PlaceStoneCommand> {
     if session
         .world()
         .get_resource::<GameOverResource>()
@@ -114,7 +123,7 @@ pub fn go_ai_pick_move(session: &Session, player: PlayerId) -> Option<PlaceStone
         return None;
     }
 
-    let total_budget: usize = 200;
+    let total_budget: usize = difficulty.rollouts();
     let n = candidates.len();
     let rollouts_per_candidate = (total_budget / n).max(5);
 

@@ -1,16 +1,18 @@
 [package]
 name = "open_table_engine"
-version = "0.1.0"
+version = "1.0.0"
+authors = ["joduranvillan"]
 edition = "2021"
 rust-version = "1.82"
 description = "Motor de OpenTable Engine: bevy_ecs + scheduler + rule engine sobre los contratos de open_table_core."
-license = "MIT OR Apache-2.0"
+license = "MIT"
 repository = "https://github.com/joduranvillan/games_tables_sdk"
-keywords = ["game-engine", "board-games", "ecs", "opentable", "rules"]
-categories = ["game-engines", "games"]
+keywords = ["board-game", "game-engine", "ecs", "sdk", "rules"]
+categories = ["game-engines", "game-development"]
 
 [dependencies]
-open_table_core = { path = "../open_table_core", version = "0.1.0" }
+open_table_core = { version = "1.0.0", path = "../open_table_core" }
+open_table_macros = { version = "1.0.0", path = "../open_table_macros" }
 
 bevy_ecs = "0.19"
 serde = { version = "1", features = ["derive"] }
@@ -23,29 +25,18 @@ sha2 = "0.11.0"
 [dev-dependencies]
 criterion = "0.8"
 bincode = { version = "2.0.1" , features = ["serde"] }
-backgammon_game = { path = "../backgammon_game", version = "0.1.0" }
-
-checkers_game = { path = "../checkers_game", version = "0.1.0" }
-
-chess_game = { path = "../chess_game", version = "0.1.0" }
-
-chinese_checkers_game = { path = "../chinese_checkers_game", version = "0.1.0" }
-
-crisis_game = { path = "../crisis_game", version = "0.1.0" }
-
-go_game = { path = "../go_game", version = "0.1.0" }
-
-ludo_game = { path = "../ludo_game", version = "0.1.0" }
-
-mille_bornes_game = { path = "../mille_bornes_game", version = "0.1.0" }
-
-monopoly_game = { path = "../monopoly_game", version = "0.1.0" }
-
-shogi_game = { path = "../shogi_game", version = "0.1.0" }
-
-uno_game = { path = "../uno_game", version = "0.1.0" }
-
-xiangqi_game = { path = "../xiangqi_game", version = "0.1.0" }
+backgammon_game = { path = "../backgammon_game" }
+checkers_game = { path = "../checkers_game" }
+chess_game = { path = "../chess_game" }
+chinese_checkers_game = { path = "../chinese_checkers_game" }
+crisis_game = { path = "../crisis_game" }
+go_game = { path = "../go_game" }
+ludo_game = { path = "../ludo_game" }
+mille_bornes_game = { path = "../mille_bornes_game" }
+monopoly_game = { path = "../monopoly_game" }
+shogi_game = { path = "../shogi_game" }
+uno_game = { path = "../uno_game" }
+xiangqi_game = { path = "../xiangqi_game" }
 
 [[bench]]
 name = "session_throughput"
