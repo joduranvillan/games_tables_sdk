@@ -195,7 +195,14 @@ pub async fn run_relay_server_with_store(
         let tournaments_clone = Arc::clone(&tournaments);
 
         tokio::spawn(async move {
-            handle_connection(stream, conn_id, manager_clone, store_clone, tournaments_clone).await;
+            handle_connection(
+                stream,
+                conn_id,
+                manager_clone,
+                store_clone,
+                tournaments_clone,
+            )
+            .await;
         });
     }
 }
@@ -592,7 +599,13 @@ mod tests {
             .await
             .unwrap();
 
-        let resp_txt = ws_client.next().await.unwrap().unwrap().into_text().unwrap();
+        let resp_txt = ws_client
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .into_text()
+            .unwrap();
         let resp_val: Value = serde_json::from_str(&resp_txt).unwrap();
         assert_eq!(resp_val["op"], "result_reported");
         assert_eq!(resp_val["winner_elo"], 1216);

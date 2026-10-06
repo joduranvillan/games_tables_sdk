@@ -74,7 +74,10 @@ impl Tournament {
     }
 
     /// Inscribe a un jugador y genera automáticamente el bracket cuando se alcanza `max_players`.
-    pub fn add_participant(&mut self, player_id: impl Into<String>) -> Result<bool, TournamentError> {
+    pub fn add_participant(
+        &mut self,
+        player_id: impl Into<String>,
+    ) -> Result<bool, TournamentError> {
         if self.started || self.participants.len() >= self.max_players {
             return Err(TournamentError::TournamentFull);
         }
