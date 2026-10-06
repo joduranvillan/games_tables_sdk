@@ -306,7 +306,7 @@ pub fn best_move(
     }
     if difficulty == AiDifficulty::Easy {
         let candidates = generate_candidates(session, player);
-        if candidates.len() > 1 && session.current_tick().0.is_multiple_of(4) {
+        if candidates.len() > 1 && (session.current_tick().0 & 3) == 0 {
             return candidates.last().cloned();
         }
     }

@@ -146,7 +146,7 @@ impl Tournament {
         if round + 1 < self.rounds.len() {
             let next_match_idx = match_index / 2;
             let next_match = &mut self.rounds[round + 1][next_match_idx];
-            if match_index % 2 == 0 {
+            if (match_index & 1) == 0 {
                 next_match.player1 = Some(winner.to_string());
             } else {
                 next_match.player2 = Some(winner.to_string());

@@ -142,9 +142,13 @@ impl OpeningBook {
         }
 
         // 2. Poblar líneas ECO principales (A00-E99) sobre el hash Zobrist canónico del motor
+        type EcoCoord = [u8; 2];
+        type EcoMovePair = (EcoCoord, EcoCoord);
+        type EcoLine<'a> = (&'a [EcoMovePair], u16);
+
         let p1 = PlayerId(1);
         let p2 = PlayerId(2);
-        let eco_lines: &[(&[([u8; 2], [u8; 2])], u16)] = &[
+        let eco_lines: &[EcoLine<'_>] = &[
             // C50 Giuoco Piano / Italiana: 1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5
             (
                 &[
