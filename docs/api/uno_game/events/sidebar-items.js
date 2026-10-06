@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["CardPlayedEvent","CardsDrawnEvent","DrewAndPlayedEvent","GameOverEvent","InterceptedEvent","PlayerSkippedEvent","TurnReversedEvent"]};

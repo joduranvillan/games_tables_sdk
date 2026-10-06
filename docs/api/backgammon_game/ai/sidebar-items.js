@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["backgammon_ai_pick_move","clone_backgammon_session"]};

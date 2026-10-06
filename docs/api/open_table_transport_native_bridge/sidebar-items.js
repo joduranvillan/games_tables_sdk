@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["HOST_PLAYER_ID"],"enum":["ConnectionEvent","HandshakeRequest","HandshakeResponse","HandshakeStatus","RawLinkEvent"],"fn":["generate_token"],"struct":["NativeClientTransport","NativeHostTransport"],"trait":["RawByteLink"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["HEARTBEAT_INTERVAL","HOST_PLAYER_ID","PROTOCOL_VERSION"],"enum":["ConnectionEvent","HandshakeRequest","HandshakeResponse","RelayClientEvent"],"struct":["WsClientTransport","WsHostTransport","WsRelayClient"]};

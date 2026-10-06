@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["AuctionStartedEvent","AuctionWonEvent","BankruptcyEvent","ChanceCardDrawnEvent","CommunityChestCardDrawnEvent","GameOverEvent","JailedEvent","PlayerMovedEvent","PropertyPurchasedEvent","RailroadRentPaidEvent","RentPaidEvent","TaxPaidEvent","UtilityRentPaidEvent"]};

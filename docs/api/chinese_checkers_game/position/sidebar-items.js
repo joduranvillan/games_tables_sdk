@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["BOARD_RADIUS","DIRECTIONS"],"fn":["corner_cells","home_cells_a","home_cells_b","rotate_60"],"struct":["Position"]};

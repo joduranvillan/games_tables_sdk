@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["CoupFourreCommand","DiscardCardCommand","DrawCardCommand","PlayCardCommand","PlayDistanceCommand","PlayHazardCommand","PlaySafetyCommand","SetupDeckCommand"]};

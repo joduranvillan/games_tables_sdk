@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["ROOM_CODE_ALPHABET","ROOM_CODE_LEN"],"enum":["RoomError"],"fn":["generate_room_code","is_valid_room_code"],"struct":["Participant","Room","RoomManager"],"type":["ClientSender","ConnectionId","RoomPlayerId"]};

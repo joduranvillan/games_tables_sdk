@@ -1,0 +1,9 @@
+(function() {
+    const implementors = Object.fromEntries([["open_table_core",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.99.0/core/cmp/trait.PartialOrd.html\" title=\"trait core::cmp::PartialOrd\">PartialOrd</a> for <a class=\"struct\" href=\"open_table_core/ids/struct.PlayerId.html\" title=\"struct open_table_core::ids::PlayerId\">PlayerId</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.99.0/core/cmp/trait.PartialOrd.html\" title=\"trait core::cmp::PartialOrd\">PartialOrd</a> for <a class=\"struct\" href=\"open_table_core/ids/struct.SpectatorId.html\" title=\"struct open_table_core::ids::SpectatorId\">SpectatorId</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.99.0/core/cmp/trait.PartialOrd.html\" title=\"trait core::cmp::PartialOrd\">PartialOrd</a> for <a class=\"struct\" href=\"open_table_core/ids/struct.Tick.html\" title=\"struct open_table_core::ids::Tick\">Tick</a>",0]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":59,"fragment_lengths":[891]}

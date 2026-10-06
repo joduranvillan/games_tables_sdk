@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["new_mille_bornes_session"],"mod":["card","commands","deck","events","rules"]};

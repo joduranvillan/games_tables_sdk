@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["new_shogi_session"],"mod":["ai","board","commands","events","movement","rules"]};

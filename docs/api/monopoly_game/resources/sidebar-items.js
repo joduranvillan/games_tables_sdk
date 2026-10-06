@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["AuctionResource","AuctionState","BoardResource","JailResource","PendingDecision","PendingPurchaseResource","PlayersResource"]};

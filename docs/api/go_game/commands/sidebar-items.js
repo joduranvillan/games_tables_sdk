@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["ConfirmDeadCommand","MarkDeadCommand","PassCommand","PlaceHandicapCommand","PlaceStoneCommand","ResignCommand"]};

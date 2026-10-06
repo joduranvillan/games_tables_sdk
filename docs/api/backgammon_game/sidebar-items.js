@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["new_backgammon_session"],"mod":["ai","board","commands","dice","events","resources","rules"]};

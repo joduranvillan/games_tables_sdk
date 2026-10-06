@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["CheckerMovedEvent","DiceRolledEvent","DoubleAcceptedEvent","DoubleOfferedEvent","DoubleRejectedEvent","GameOverEvent","NoValidMovesEvent"]};

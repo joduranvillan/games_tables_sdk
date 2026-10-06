@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["TurnPhase"],"struct":["BoardResource","EliminatedPlayersResource","ExchangeCountResource","PendingAttack","PendingAttackResource","PlayerCardsResource","PlayerObjectivesResource","PlayersResource","TerritoryStateResource","TurnStateResource"],"type":["PlayerHandResource","TerritoryMapResource","TurnPhaseResource"]};
