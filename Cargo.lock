@@ -1352,10 +1352,16 @@ dependencies = [
 name = "open_table_relay"
 version = "0.1.0"
 dependencies = [
+ "checkers_game",
+ "chess_game",
  "futures-util",
  "getrandom 0.4.3",
+ "hmac",
+ "open_table_core",
+ "open_table_engine",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "tokio-tungstenite",
 ]

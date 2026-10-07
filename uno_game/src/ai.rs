@@ -100,7 +100,12 @@ fn is_legally_playable(state: &UnoState, hand: &[Card], card: &Card) -> bool {
     true
 }
 
-fn make_play_command(ai: PlayerId, card_index: usize, card: &Card, preferred_color: CardColor) -> UnoCommand {
+fn make_play_command(
+    ai: PlayerId,
+    card_index: usize,
+    card: &Card,
+    preferred_color: CardColor,
+) -> UnoCommand {
     let chosen_color = if card.color == CardColor::WildColor {
         Some(preferred_color)
     } else {
@@ -164,16 +169,10 @@ pub fn best_move<S: UnoStateAccess>(
 
     // 2) Carta que cambia color al color propio más frecuente
     if dominant_color != uno.active_color {
-        if let Some(&(idx, card)) = playable
-            .iter()
-            .find(|(_, c)| c.color == dominant_color)
-        {
+        if let Some(&(idx, card)) = playable.iter().find(|(_, c)| c.color == dominant_color) {
             return Some(make_play_command(ai, idx, &card, dominant_color));
         }
-        if let Some(&(idx, card)) = playable
-            .iter()
-            .find(|(_, c)| c.value == CardValue::Wild)
-        {
+        if let Some(&(idx, card)) = playable.iter().find(|(_, c)| c.value == CardValue::Wild) {
             return Some(make_play_command(ai, idx, &card, dominant_color));
         }
     }
@@ -184,10 +183,7 @@ pub fn best_move<S: UnoStateAccess>(
         .iter()
         .any(|(&p, h)| p != ai && (h.len() <= hand.len() || h.len() <= 3));
     if rival_leading {
-        if let Some(&(idx, card)) = playable
-            .iter()
-            .find(|(_, c)| c.value == CardValue::DrawTwo)
-        {
+        if let Some(&(idx, card)) = playable.iter().find(|(_, c)| c.value == CardValue::DrawTwo) {
             return Some(make_play_command(ai, idx, &card, dominant_color));
         }
     }
@@ -241,8 +237,7 @@ mod tests {
 
         // En Hard/Medium, la IA detecta que Azul es su color más frecuente (3 cartas vs 1 Roja)
         // y juega la carta en índice 1 (5 Azul) para cambiar estratégicamente el color activo a Azul.
-        let hard_cmd = best_move(&session, P1, AiDifficulty::Hard)
-            .expect("Hard AI debe devolver jugada");
+        let hard_cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
         assert_eq!(
             hard_cmd,
             UnoCommand::PlayCard(PlayCardCommand {
@@ -253,8 +248,7 @@ mod tests {
         );
 
         // En Easy, juega la primera carta válida sin considerar estrategia (índice 0: 2 Rojo)
-        let easy_cmd = best_move(&session, P1, AiDifficulty::Easy)
-            .expect("Easy AI debe devolver la primera carta válida");
+        let easy_cmd = best_move(&session, P1, AiDifficulty::Easy).unwrap();
         assert_eq!(
             easy_cmd,
             UnoCommand::PlayCard(PlayCardCommand {

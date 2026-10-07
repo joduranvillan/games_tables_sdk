@@ -221,8 +221,7 @@ mod tests {
             );
         }
 
-        let cmd = best_move(&session, P1, AiDifficulty::Hard)
-            .expect("La IA debe emitir una decisión de compra");
+        let cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
         assert_eq!(
             cmd,
             MonopolyCommand::BuyProperty(BuyPropertyCommand {
@@ -236,8 +235,7 @@ mod tests {
             let mut players = session.world_mut().resource_mut::<PlayersResource>();
             players.money.insert(P1, 100);
         }
-        let reject_cmd = best_move(&session, P1, AiDifficulty::Hard)
-            .expect("La IA debe emitir una decisión de compra");
+        let reject_cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
         assert_eq!(
             reject_cmd,
             MonopolyCommand::BuyProperty(BuyPropertyCommand {
@@ -251,8 +249,7 @@ mod tests {
             let mut players = session.world_mut().resource_mut::<PlayersResource>();
             players.properties.insert(3, P1);
         }
-        let group_cmd = best_move(&session, P1, AiDifficulty::Hard)
-            .expect("La IA debe comprar cuando completa grupo de color");
+        let group_cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
         assert_eq!(
             group_cmd,
             MonopolyCommand::BuyProperty(BuyPropertyCommand {
@@ -280,8 +277,7 @@ mod tests {
                 passed: HashSet::new(),
             });
         }
-        let bid_cmd = best_move(&session, P1, AiDifficulty::Hard)
-            .expect("La IA debe ofertar en la subasta cuando current_bid < 80%");
+        let bid_cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
         assert_eq!(
             bid_cmd,
             MonopolyCommand::AuctionBid(AuctionBidCommand {

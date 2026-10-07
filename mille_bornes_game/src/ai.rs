@@ -11,7 +11,7 @@
 use open_table_engine::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::card::{Card, Hazard, Safety};
+use crate::card::{Card, Hazard};
 use crate::commands::{
     DiscardCardCommand, DrawCardCommand, PlayCardCommand, PlayDistanceCommand, PlayHazardCommand,
     PlaySafetyCommand,
@@ -264,6 +264,7 @@ pub fn best_move(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::card::Safety;
     use crate::new_mille_bornes_session;
 
     const P1: PlayerId = PlayerId(1);
@@ -288,8 +289,7 @@ mod tests {
         }
 
         // En dificultad Hard/Medium, la prioridad 1 es jugar la carta Safety (índice 2)
-        let hard_cmd = best_move(&session, P1, AiDifficulty::Hard)
-            .expect("Hard AI debe escoger una jugada");
+        let hard_cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
         assert_eq!(
             hard_cmd,
             MilleBornesCommand::PlayCard(PlayCardCommand {
@@ -299,8 +299,7 @@ mod tests {
         );
 
         // En dificultad Easy, ignora las prioridades 1 (Safety) y 3 (Hazard) y juega la mayor Distance (200 en índice 3)
-        let easy_cmd = best_move(&session, P1, AiDifficulty::Easy)
-            .expect("Easy AI debe escoger una jugada");
+        let easy_cmd = best_move(&session, P1, AiDifficulty::Easy).unwrap();
         assert_eq!(
             easy_cmd,
             MilleBornesCommand::PlayCard(PlayCardCommand {

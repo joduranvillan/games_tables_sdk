@@ -17,6 +17,7 @@ pub mod steam_bridge;
 pub use native_link::{
     GodotMultipeerLink, GodotNearbyLink, GodotRawByteLink, NativeBridgeTransport, SharedLinkQueue,
 };
+pub use open_table_transport_native_bridge::RawByteLink;
 
 use backgammon_game::new_backgammon_session;
 use battleship_game::{new_battleship_session, ShotResult, ShotResultEvent};
@@ -39,7 +40,7 @@ use xiangqi_game::new_xiangqi_session;
 
 use open_table_engine::prelude::*;
 use open_table_transport_native_bridge::{
-    HandshakeStatus, NativeClientTransport, NativeHostTransport, RawByteLink, RawLinkEvent,
+    HandshakeStatus, NativeClientTransport, NativeHostTransport, RawLinkEvent,
 };
 use open_table_transport_tcp::{ConnectionEvent, TcpClientTransport, TcpHostTransport};
 use open_table_transport_websocket::{RelayClientEvent, WsRelayClient};

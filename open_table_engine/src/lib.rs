@@ -9,6 +9,7 @@ pub mod turn;
 
 pub use elo::{update_elo, update_elo_draw, EloRating};
 pub use history::format_command;
+pub use session::Session;
 pub use turn::TurnResource;
 
 pub mod prelude {

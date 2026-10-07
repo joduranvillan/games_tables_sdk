@@ -173,7 +173,7 @@ pub fn best_move(
     let mut total_scores = vec![0.0f64; pool.len()];
 
     for r in 0..rollouts {
-        let idx = (r as usize) % pool.len();
+        let idx = r % pool.len();
         let candidate = &pool[idx];
 
         let mut sim_pegs = board.pegs.clone();
@@ -252,13 +252,10 @@ mod tests {
             total_distance_to_goal(board, P1)
         };
 
-        let cmd = best_move(&session, P1, AiDifficulty::Medium)
-            .expect("La IA de Damas Chinas debe encontrar un movimiento legal");
+        let cmd = best_move(&session, P1, AiDifficulty::Medium).unwrap();
         assert_eq!(cmd.player, P1);
 
-        session
-            .process_command(P1, Box::new(cmd))
-            .expect("El movimiento elegido por la IA debe ser válido según RuleEngine");
+        session.process_command(P1, Box::new(cmd)).unwrap();
 
         let dist_after = {
             let board = session.world().resource::<BoardResource>();

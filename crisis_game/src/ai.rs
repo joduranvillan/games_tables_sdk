@@ -196,12 +196,7 @@ pub fn advances_secret_objective(
 
 /// Ejecuta `rollouts` simulaciones Monte Carlo de un asalto desde `att_armies` contra `def_armies`
 /// y devuelve el valor esperado de éxito (probabilidad de conquista + supervivencia media).
-fn mcts_evaluate_attack(
-    att_armies: u32,
-    def_armies: u32,
-    rollouts: u32,
-    seed: u64,
-) -> f64 {
+fn mcts_evaluate_attack(att_armies: u32, def_armies: u32, rollouts: usize, seed: u64) -> f64 {
     let sims = rollouts.max(1);
     let mut rng = FastRng::new(seed);
     let mut total_score = 0.0;
@@ -250,10 +245,7 @@ fn mcts_evaluate_attack(
 }
 
 /// Busca un trío válido de tarjetas para canjear si el jugador tiene al menos 3 tarjetas.
-fn find_valid_card_exchange(
-    state: &CrisisState,
-    ai: PlayerId,
-) -> Option<[usize; 3]> {
+fn find_valid_card_exchange(state: &CrisisState, ai: PlayerId) -> Option<[usize; 3]> {
     let cards_res = state.world().get_resource::<PlayerCardsResource>()?;
     let hand = cards_res.cards.get(&ai)?;
     if hand.len() < 3 {
@@ -353,9 +345,7 @@ pub fn best_move(
             if let Some(pending_res) = state.world().get_resource::<PendingAttackResource>() {
                 if let Some(pending) = &pending_res.attack {
                     if pending.attacker == ai {
-                        return Some(CrisisCommand::RollAttack(RollAttackCommand {
-                            player: ai,
-                        }));
+                        return Some(CrisisCommand::RollAttack(RollAttackCommand { player: ai }));
                     }
                 }
             }
@@ -447,10 +437,10 @@ pub fn best_move(
 
             // Ordenar territorios fronterizos del más débil al más fuerte
             let mut sorted_borders = border_territories;
-            sorted_borders.sort_by(|a, b| {
-                a.1.partial_cmp(&b.1)
+            sorted_borders.sort_by(|(ta, ra), (tb, rb)| {
+                ra.partial_cmp(rb)
                     .unwrap_or(std::cmp::Ordering::Equal)
-                    .then_with(|| a.0 .0.cmp(&b.0 .0))
+                    .then_with(|| ta.0.cmp(&tb.0))
             });
 
             // Buscar ejércitos excedentes para mover al territorio fronterizo más débil conectado
@@ -526,8 +516,7 @@ mod tests {
 
     #[test]
     fn crisis_ai_reinforces_threatened_territory() {
-        let mut session =
-            new_crisis_session(SessionId(1), 42, &[P1, P2]).expect("Sesión válida de Crisis");
+        let mut session = new_crisis_session(SessionId(1), 42, &[P1, P2]).unwrap();
 
         {
             let mut map = session.world_mut().resource_mut::<TerritoryStateResource>();
@@ -549,8 +538,7 @@ mod tests {
             };
         }
 
-        let cmd = best_move(&session, P1, AiDifficulty::Hard)
-            .expect("La IA debe devolver un comando de colocación");
+        let cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
 
         match cmd {
             CrisisCommand::PlaceArmies(place) => {
@@ -568,8 +556,7 @@ mod tests {
 
     #[test]
     fn crisis_ai_attacks_when_superior() {
-        let mut session =
-            new_crisis_session(SessionId(2), 99, &[P1, P2]).expect("Sesión válida de Crisis");
+        let mut session = new_crisis_session(SessionId(2), 99, &[P1, P2]).unwrap();
 
         {
             let mut map = session.world_mut().resource_mut::<TerritoryStateResource>();
@@ -584,8 +571,7 @@ mod tests {
             turn_state.phase = TurnPhase::Attack;
         }
 
-        let cmd = best_move(&session, P1, AiDifficulty::Medium)
-            .expect("La IA debe decidir una acción en fase de ataque");
+        let cmd = best_move(&session, P1, AiDifficulty::Medium).unwrap();
 
         assert_eq!(
             cmd,
@@ -605,15 +591,13 @@ mod tests {
             map.set_owner_and_armies(TerritoryId(1), P2, 2);
         }
 
-        let cmd_medium = best_move(&session, P1, AiDifficulty::Medium)
-            .expect("En Medium debe finalizar fase si no supera 1.5x");
+        let cmd_medium = best_move(&session, P1, AiDifficulty::Medium).unwrap();
         assert_eq!(
             cmd_medium,
             CrisisCommand::EndPhase(EndPhaseCommand { player: P1 })
         );
 
-        let cmd_expert = best_move(&session, P1, AiDifficulty::Expert)
-            .expect("En Expert debe atacar cuando supera 1.2x");
+        let cmd_expert = best_move(&session, P1, AiDifficulty::Expert).unwrap();
         assert_eq!(
             cmd_expert,
             CrisisCommand::DeclareAttack(DeclareAttackCommand {
@@ -627,8 +611,7 @@ mod tests {
 
     #[test]
     fn crisis_ai_expert_prioritizes_secret_objective_and_fortifies() {
-        let mut session =
-            new_crisis_session(SessionId(3), 77, &[P1, P2]).expect("Sesión válida de Crisis");
+        let mut session = new_crisis_session(SessionId(3), 77, &[P1, P2]).unwrap();
 
         {
             let mut map = session.world_mut().resource_mut::<TerritoryStateResource>();
@@ -646,13 +629,15 @@ mod tests {
                 .world_mut()
                 .resource_mut::<PlayerObjectivesResource>()
                 .objectives
-                .insert(P1, ObjectiveCard::ConquerContinent( crate::board::CONTINENT_NORTH_AMERICA ));
+                .insert(
+                    P1,
+                    ObjectiveCard::ConquerContinent(crate::board::CONTINENT_NORTH_AMERICA),
+                );
 
             session.world_mut().resource_mut::<TurnStateResource>().phase = TurnPhase::Attack;
         }
 
-        let attack_cmd = best_move(&session, P1, AiDifficulty::Expert)
-            .expect("Expert debe atacar priorizando objetivo secreto");
+        let attack_cmd = best_move(&session, P1, AiDifficulty::Expert).unwrap();
         assert_eq!(
             attack_cmd,
             CrisisCommand::DeclareAttack(DeclareAttackCommand {
@@ -678,8 +663,7 @@ mod tests {
             turn_state.fortified = false;
         }
 
-        let fortify_cmd = best_move(&session, P1, AiDifficulty::Hard)
-            .expect("Debe fortificar la frontera más débil desde el interior");
+        let fortify_cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
         assert_eq!(
             fortify_cmd,
             CrisisCommand::Fortify(FortifyCommand {

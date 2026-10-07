@@ -1,12 +1,12 @@
 //! Validación Anti-Cheat autoritativa de movimientos en el servidor Relay para `chess` y `checkers`.
 //!
 //! Cuando una sala se crea con `"game_id": "chess"` o `"game_id": "checkers"`, el Relay
-//! mantiene una instancia local de `open_table_engine::Session` y verifica cada movimiento
+//! mantiene una instancia local de `open_table_engine::session::Session` y verifica cada movimiento
 //! antes de retransmitirlo a los demás participantes.
 
 use open_table_core::command::Command;
 use open_table_core::ids::{PlayerId, SessionId};
-use open_table_engine::Session;
+use open_table_engine::session::Session;
 use serde_json::Value;
 use std::fmt;
 
@@ -68,8 +68,9 @@ impl AntiCheatSession {
         let sender = cmd_val
             .get("player")
             .and_then(|v| v.as_u64())
+            .and_then(|v| u32::try_from(v).ok())
             .map(PlayerId)
-            .unwrap_or(PlayerId(u64::from(sender_room_player_id)));
+            .unwrap_or(PlayerId(sender_room_player_id));
 
         let cmd_box: Box<dyn Command> = match self.game_id.as_str() {
             "chess" => parse_chess_command(&cmd_val, sender).ok_or("illegal_move")?,
@@ -94,6 +95,7 @@ fn parse_chess_command(val: &Value, default_player: PlayerId) -> Option<Box<dyn 
     let player = val
         .get("player")
         .and_then(|v| v.as_u64())
+        .and_then(|v| u32::try_from(v).ok())
         .map(PlayerId)
         .unwrap_or(default_player);
 
@@ -129,6 +131,7 @@ fn parse_checkers_command(val: &Value, default_player: PlayerId) -> Option<Box<d
     let player = val
         .get("player")
         .and_then(|v| v.as_u64())
+        .and_then(|v| u32::try_from(v).ok())
         .map(PlayerId)
         .unwrap_or(default_player);
 

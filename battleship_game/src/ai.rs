@@ -295,8 +295,8 @@ pub fn best_move(
 
     // Semilla determinista derivada del estado actual para selecciones en Easy/Medium
     let touched_count = (BOARD_SIZE as usize * BOARD_SIZE as usize) - untouched.len();
-    let seed = (state.id.0 ^ ((ai_player.0 as u64) << 32) ^ (touched_count as u64).wrapping_mul(0x517cc1b727220a95))
-        .max(1);
+    let mix = (touched_count as u64).wrapping_mul(0x517cc1b727220a95);
+    let seed = (state.id.0 ^ ((ai_player.0 as u64) << 32) ^ mix).max(1);
     let mut rng = FastRng::new(seed);
 
     let target = match difficulty {
@@ -381,8 +381,7 @@ mod tests {
             }
         }
 
-        let cmd = best_move(&session, P1, AiDifficulty::Easy)
-            .expect("Easy AI debe encontrar la única celda no disparada");
+        let cmd = best_move(&session, P1, AiDifficulty::Easy).unwrap();
         assert_eq!(cmd.player, P1);
         assert_eq!(cmd.target, untouched_target);
     }
@@ -409,8 +408,7 @@ mod tests {
             shots.record_shot(P1, hit_pos);
         }
 
-        let cmd = best_move(&session, P1, AiDifficulty::Medium)
-            .expect("Medium AI debe elegir una celda adyacente al impacto sin hundir");
+        let cmd = best_move(&session, P1, AiDifficulty::Medium).unwrap();
 
         let expected_neighbors = [
             Position::new(4, 5),
@@ -442,16 +440,10 @@ mod tests {
             "La celda aislada (0,0) no puede alojar ningún barco de tamaño >= 2"
         );
 
-        let cmd = best_move(&session, P1, AiDifficulty::Hard)
-            .expect("Hard AI debe devolver el disparo de máxima densidad");
+        let cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
 
         let chosen_density = density[cmd.target.row as usize][cmd.target.col as usize];
-        let max_density = density
-            .iter()
-            .flatten()
-            .copied()
-            .max()
-            .unwrap_or(0);
+        let max_density = density.iter().flatten().copied().max().unwrap_or(0);
 
         assert_eq!(
             chosen_density, max_density,
