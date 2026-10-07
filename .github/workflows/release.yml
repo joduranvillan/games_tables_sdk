@@ -229,7 +229,7 @@ jobs:
           ./tools/generate_changelog.sh > RELEASE_NOTES.md || cp CHANGELOG.md RELEASE_NOTES.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             release_assets/*
