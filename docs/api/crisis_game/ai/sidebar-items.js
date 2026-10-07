@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["CrisisCommand"],"fn":["adjacent_territories","advances_secret_objective","are_connected_by_owner","attack_ratio_threshold","best_move","enemy_neighbor_armies","threat_ratio"],"type":["CrisisState"]};

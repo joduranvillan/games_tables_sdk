@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_RETRY_AFTER_MS","IP_BAN_DURATION_SECS","IP_RATE_LIMIT_PER_SEC","MAX_VIOLATIONS_BEFORE_BAN","ROOM_RATE_LIMIT_PER_SEC","VIOLATION_WINDOW_SECS"],"enum":["RateLimitDecision"],"struct":["RelayRateLimiter","SlidingSecondBucket"]};

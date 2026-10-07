@@ -2,38 +2,43 @@
 <a href=#2 id=2 data-nosnippet>2</a>//! Maneja información oculta (ubicación de barcos), fase de colocación
 <a href=#3 id=3 data-nosnippet>3</a>//! de flotas y disparos por turnos.
 <a href=#4 id=4 data-nosnippet>4</a>
-<a href=#5 id=5 data-nosnippet>5</a></span><span class="kw">pub mod </span>board;
-<a href=#6 id=6 data-nosnippet>6</a><span class="kw">pub mod </span>commands;
-<a href=#7 id=7 data-nosnippet>7</a><span class="kw">pub mod </span>events;
-<a href=#8 id=8 data-nosnippet>8</a><span class="kw">pub mod </span>fleet;
-<a href=#9 id=9 data-nosnippet>9</a><span class="kw">pub mod </span>position;
-<a href=#10 id=10 data-nosnippet>10</a><span class="kw">pub mod </span>rules;
-<a href=#11 id=11 data-nosnippet>11</a>
-<a href=#12 id=12 data-nosnippet>12</a><span class="kw">pub use </span>board::BOARD_SIZE;
-<a href=#13 id=13 data-nosnippet>13</a><span class="kw">pub use </span>commands::{FireShotCommand, PlaceFleetCommand, RematchCommand};
-<a href=#14 id=14 data-nosnippet>14</a><span class="kw">pub use </span>events::{FleetPlacedEvent, GameOverEvent, ShotResult, ShotResultEvent, SunkenShipEvent};
-<a href=#15 id=15 data-nosnippet>15</a><span class="kw">pub use </span>fleet::{FleetResource, RematchResource, Ship, ShotsResource, EXPECTED_SHIP_SIZES};
-<a href=#16 id=16 data-nosnippet>16</a><span class="kw">pub use </span>position::Position;
-<a href=#17 id=17 data-nosnippet>17</a><span class="kw">pub use </span>rules::build_battleship_rules;
-<a href=#18 id=18 data-nosnippet>18</a>
-<a href=#19 id=19 data-nosnippet>19</a><span class="kw">use </span>open_table_engine::prelude::<span class="kw-2">*</span>;
-<a href=#20 id=20 data-nosnippet>20</a>
-<a href=#21 id=21 data-nosnippet>21</a><span class="kw">pub fn </span>new_battleship_session(
-<a href=#22 id=22 data-nosnippet>22</a>    session_id: SessionId,
-<a href=#23 id=23 data-nosnippet>23</a>    seed: u64,
-<a href=#24 id=24 data-nosnippet>24</a>    player_a: PlayerId,
-<a href=#25 id=25 data-nosnippet>25</a>    player_b: PlayerId,
-<a href=#26 id=26 data-nosnippet>26</a>) -&gt; Session {
-<a href=#27 id=27 data-nosnippet>27</a>    <span class="kw">let </span><span class="kw-2">mut </span>session = Session::new_with_metadata(
-<a href=#28 id=28 data-nosnippet>28</a>        session_id,
-<a href=#29 id=29 data-nosnippet>29</a>        <span class="string">"Battleship"</span>,
-<a href=#30 id=30 data-nosnippet>30</a>        seed,
-<a href=#31 id=31 data-nosnippet>31</a>        <span class="macro">vec!</span>[player_a, player_b],
-<a href=#32 id=32 data-nosnippet>32</a>        build_battleship_rules(),
-<a href=#33 id=33 data-nosnippet>33</a>    );
-<a href=#34 id=34 data-nosnippet>34</a>    session.world_mut().insert_resource(FleetResource::new());
-<a href=#35 id=35 data-nosnippet>35</a>    session.world_mut().insert_resource(ShotsResource::new());
-<a href=#36 id=36 data-nosnippet>36</a>    session.world_mut().insert_resource(RematchResource::new());
-<a href=#37 id=37 data-nosnippet>37</a>    session
-<a href=#38 id=38 data-nosnippet>38</a>}
+<a href=#5 id=5 data-nosnippet>5</a></span><span class="kw">pub mod </span>ai;
+<a href=#6 id=6 data-nosnippet>6</a><span class="kw">pub mod </span>board;
+<a href=#7 id=7 data-nosnippet>7</a><span class="kw">pub mod </span>commands;
+<a href=#8 id=8 data-nosnippet>8</a><span class="kw">pub mod </span>events;
+<a href=#9 id=9 data-nosnippet>9</a><span class="kw">pub mod </span>fleet;
+<a href=#10 id=10 data-nosnippet>10</a><span class="kw">pub mod </span>position;
+<a href=#11 id=11 data-nosnippet>11</a><span class="kw">pub mod </span>rules;
+<a href=#12 id=12 data-nosnippet>12</a>
+<a href=#13 id=13 data-nosnippet>13</a><span class="kw">pub use </span>ai::{
+<a href=#14 id=14 data-nosnippet>14</a>    best_move, compute_probability_density_map, default_ai_fleet, default_ai_place_fleet_command,
+<a href=#15 id=15 data-nosnippet>15</a>    BattleshipCommand, BattleshipState,
+<a href=#16 id=16 data-nosnippet>16</a>};
+<a href=#17 id=17 data-nosnippet>17</a><span class="kw">pub use </span>board::BOARD_SIZE;
+<a href=#18 id=18 data-nosnippet>18</a><span class="kw">pub use </span>commands::{FireShotCommand, PlaceFleetCommand, RematchCommand};
+<a href=#19 id=19 data-nosnippet>19</a><span class="kw">pub use </span>events::{FleetPlacedEvent, GameOverEvent, ShotResult, ShotResultEvent, SunkenShipEvent};
+<a href=#20 id=20 data-nosnippet>20</a><span class="kw">pub use </span>fleet::{FleetResource, RematchResource, Ship, ShotsResource, EXPECTED_SHIP_SIZES};
+<a href=#21 id=21 data-nosnippet>21</a><span class="kw">pub use </span>position::Position;
+<a href=#22 id=22 data-nosnippet>22</a><span class="kw">pub use </span>rules::build_battleship_rules;
+<a href=#23 id=23 data-nosnippet>23</a>
+<a href=#24 id=24 data-nosnippet>24</a><span class="kw">use </span>open_table_engine::prelude::<span class="kw-2">*</span>;
+<a href=#25 id=25 data-nosnippet>25</a>
+<a href=#26 id=26 data-nosnippet>26</a><span class="kw">pub fn </span>new_battleship_session(
+<a href=#27 id=27 data-nosnippet>27</a>    session_id: SessionId,
+<a href=#28 id=28 data-nosnippet>28</a>    seed: u64,
+<a href=#29 id=29 data-nosnippet>29</a>    player_a: PlayerId,
+<a href=#30 id=30 data-nosnippet>30</a>    player_b: PlayerId,
+<a href=#31 id=31 data-nosnippet>31</a>) -&gt; Session {
+<a href=#32 id=32 data-nosnippet>32</a>    <span class="kw">let </span><span class="kw-2">mut </span>session = Session::new_with_metadata(
+<a href=#33 id=33 data-nosnippet>33</a>        session_id,
+<a href=#34 id=34 data-nosnippet>34</a>        <span class="string">"Battleship"</span>,
+<a href=#35 id=35 data-nosnippet>35</a>        seed,
+<a href=#36 id=36 data-nosnippet>36</a>        <span class="macro">vec!</span>[player_a, player_b],
+<a href=#37 id=37 data-nosnippet>37</a>        build_battleship_rules(),
+<a href=#38 id=38 data-nosnippet>38</a>    );
+<a href=#39 id=39 data-nosnippet>39</a>    session.world_mut().insert_resource(FleetResource::new());
+<a href=#40 id=40 data-nosnippet>40</a>    session.world_mut().insert_resource(ShotsResource::new());
+<a href=#41 id=41 data-nosnippet>41</a>    session.world_mut().insert_resource(RematchResource::new());
+<a href=#42 id=42 data-nosnippet>42</a>    session
+<a href=#43 id=43 data-nosnippet>43</a>}
 </code></pre></div></section></main></body></html>

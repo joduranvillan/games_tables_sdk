@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["new_battleship_session"],"mod":["board","commands","events","fleet","position","rules"]};
+window.SIDEBAR_ITEMS = {"fn":["new_battleship_session"],"mod":["ai","board","commands","events","fleet","position","rules"]};
