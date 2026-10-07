@@ -56,7 +56,8 @@ else
 fi
 
 echo "=== 5. Godot headless tests ==="
-tools/run_godot_tests.sh
+chmod +x tools/run_godot_tests.sh 2>/dev/null || true
+bash tools/run_godot_tests.sh
 
 echo "=== 6. Docker build relay ==="
 if command -v docker &>/dev/null; then

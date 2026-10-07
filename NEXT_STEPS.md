@@ -91,15 +91,49 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
 - [x] **393.** Integración de `network_status_hud.gd` en los 13 tableros de juego
 - [x] **395.** Conexión de señal `game_ended` en `score_tracker.gd` (N/A justificado: bridge emite `game_over(winner: i64)`)
 
-## 6. Para versión 1.0.0 — Pendiente Gráfico
+## 6. Para versión 1.0.0 / 2.1.0 — Estado de Plataforma y Producción
 - [x] **396.** Pantalla de créditos / "Acerca de" (`credits_screen.gd`, `credits_screen.tscn`)
 - [x] **397.** Temas visuales aplicables per-game (`theme_manager.gd`, `main_menu.gd`)
 - [x] **398.** Modo espectador con UI dedicada (`spectator_view.gd`, `spectator_view.tscn`, `host_lobby.gd`)
 - [x] **399.** Soporte full-screen y escalado adaptativo en resoluciones 4K (`project.godot`, `settings_menu.gd`)
-- [ ] Plugin Android compilado y test en dispositivo físico
-- [ ] iOS: OpenTableMultipeer compilado con Xcode
+- [x] **453.** Plugin Android `OpenTableNearby` compilado a `.aar` en CI (`platform_plugins/android/build.gradle.kts`, `.github/workflows/ci.yml`)
+- [x] **454.** Plugin iOS `OpenTableMultipeer` compilado a `.xcframework` en CI macOS (`platform_plugins/ios/Package.swift`, `.github/workflows/ci.yml`)
+- [x] **455–456.** `GodotRawByteLink` real en `open_table_godot` + smoke test P2P nativo (`native_p2p_smoke.gd`)
 
-## 7. Para publicación en crates.io
+## 7. Producción Robusta e IA Completa (PROMPTS11 — v2.1.0)
+
+- [x] **448.** TLS/WSS (`rustls`) y autenticación JWT (`HS256`) en `open_table_relay` (`tls.rs`, `auth.rs`)
+- [x] **449.** Rate limiting por IP (30 msg/s) y por sala (60 msg/s) con bloqueo temporal de IPs abusivas (`rate_limit.rs`)
+- [x] **450.** Validación anti-cheat autoritativa de movimientos en el Relay para Chess y Checkers (`anticheat.rs`)
+- [x] **451.** Containerización Docker multi-stage + proxy reverso `nginx` WSS y guía `DEPLOY.md`
+- [x] **452.** Métricas Prometheus (`GET /metrics`) y dashboard Grafana (`grafana/dashboard.json`)
+- [x] **457–461.** IA completa con 4 dificultades para los 6 juegos restantes (`battleship_game`, `mille_bornes_game`, `uno_game`, `monopoly_game`, `chinese_checkers_game`, `crisis_game`) — **13/13 juegos con IA**
+- [ ] *(Omitido por alcance)* **462–465.** Bloque 4 Social (Amigos, Chat de sala, Perfiles con avatar)
+- [x] **466.** Exportación e importación de replays comprimidos `.otr` (`save_manager.gd`, `replay_viewer.gd`)
+- [x] **467.** Modo espectador en tiempo real para partidas online del Relay (`join_spectator`, límite 10 por sala)
+- [x] **468.** Script de verificación integral `tools/verify_p11.sh`
+
+## 8. Próximos Pasos hacia Lanzamiento Comercial Viable (PROMP12.md / PROMPTS12.md — v3.0.0)
+
+Hoja de ruta detallada en `PROMP12.md` (`PROMPTS12.md`, prompts **469 al 495**):
+1. **Relay Autoritativo v2 y Resiliencia Online (Prompts 469–474)**:
+   - Emisión automática de JWT de invitado (`POST /auth/guest`) + `auth_client.gd`.
+   - Anti-cheat autoritativo extendido a los **13 juegos** y actualización automática de ELO desde el motor (anti-spoofing).
+   - Reconexión a sala activa (`rejoin_room`) con ventana de gracia de 90s y reloj de turno autoritativo (anti-AFK).
+2. **Red Local Cero-Fricción y Conectividad Resiliente (Prompts 475–478)**:
+   - Auto-descubrimiento de partidas LAN por UDP broadcast (`lan_discovery.gd`) sin teclear IPs.
+   - Configuración de URL del Relay en Ajustes con test de latencia (`GET /health`) y reconexión automática con backoff exponencial.
+3. **Empaquetado Comercial y Exportación Multiplataforma (Prompts 479–483)**:
+   - Identidad visual unificada de la suite (`opentable_suite.svg`), manifiesto `.gdextension` para las 6 plataformas y `godot_project/export_presets.cfg` canónico.
+   - Generación de `.aab` para Google Play y scripts SteamPipe (`app_build.vdf`).
+4. **UX Completa en los 13 Tableros (Prompts 484–488)**:
+   - Catálogo de reglas in-game para los 13 juegos (`rules_catalog.gd`), tutoriales adicionales, reloj visual de turno, rendición/tablas, deshacer jugada (`undo`) en modo local/IA y pantalla de estadísticas locales.
+5. **Accesibilidad, Steam Deck y Pulido Móvil (Prompts 489–491)**:
+   - Cursor virtual con Gamepad/Steam Deck, modo daltónico (paleta Okabe-Ito + símbolos), safe-area móvil y vibración háptica.
+6. **Cumplimiento Legal, QA de Carga y Release Gate (Prompts 492–495)**:
+   - `PRIVACY_POLICY.md`, `TERMS_OF_SERVICE.md`, modal de consentimiento offline/online, `THIRD_PARTY_LICENSES.md`, test de carga concurrente del Relay y `tools/verify_p12.sh`.
+
+## 9. Para publicación en crates.io
 
 - [x] Doubling cube Backgammon (prompt 310) — ✅ Implementado
 - [x] Jump-in UNO (prompt 311) — ✅ Implementado
