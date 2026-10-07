@@ -11,50 +11,52 @@
 <a href=#11 id=11 data-nosnippet>11</a><span class="kw">pub mod </span>resources;
 <a href=#12 id=12 data-nosnippet>12</a><span class="kw">pub mod </span>rules;
 <a href=#13 id=13 data-nosnippet>13</a>
-<a href=#14 id=14 data-nosnippet>14</a><span class="kw">pub use </span>ai::{best_move, completes_color_group, space_market_price, MonopolyCommand, MonopolyState};
-<a href=#15 id=15 data-nosnippet>15</a><span class="kw">pub use </span>board::{
-<a href=#16 id=16 data-nosnippet>16</a>    board_layout, ChanceCard, CommunityChestCard, Space, SpaceKind, BOARD_SIZE, GO_BONUS,
-<a href=#17 id=17 data-nosnippet>17</a>    GO_TO_JAIL_SPACE, JAIL_SPACE, STARTING_MONEY,
-<a href=#18 id=18 data-nosnippet>18</a>};
-<a href=#19 id=19 data-nosnippet>19</a><span class="kw">pub use </span>commands::{AuctionBidCommand, BuyPropertyCommand, PayJailFeeCommand, RollAndMoveCommand};
-<a href=#20 id=20 data-nosnippet>20</a><span class="kw">pub use </span>events::{
-<a href=#21 id=21 data-nosnippet>21</a>    AuctionStartedEvent, AuctionWonEvent, BankruptcyEvent, ChanceCardDrawnEvent,
-<a href=#22 id=22 data-nosnippet>22</a>    CommunityChestCardDrawnEvent, GameOverEvent, JailedEvent, PlayerMovedEvent,
-<a href=#23 id=23 data-nosnippet>23</a>    PropertyPurchasedEvent, RailroadRentPaidEvent, RentPaidEvent, TaxPaidEvent,
-<a href=#24 id=24 data-nosnippet>24</a>    UtilityRentPaidEvent,
-<a href=#25 id=25 data-nosnippet>25</a>};
-<a href=#26 id=26 data-nosnippet>26</a><span class="kw">pub use </span>resources::{
-<a href=#27 id=27 data-nosnippet>27</a>    AuctionResource, BoardResource, JailResource, PendingPurchaseResource, PlayersResource,
-<a href=#28 id=28 data-nosnippet>28</a>};
-<a href=#29 id=29 data-nosnippet>29</a><span class="kw">pub use </span>rules::{apply_land_effect, build_monopoly_rules};
-<a href=#30 id=30 data-nosnippet>30</a>
-<a href=#31 id=31 data-nosnippet>31</a><span class="kw">use </span>open_table_engine::prelude::<span class="kw-2">*</span>;
+<a href=#14 id=14 data-nosnippet>14</a><span class="kw">pub use </span>ai::{
+<a href=#15 id=15 data-nosnippet>15</a>    best_move, completes_color_group, space_market_price, MonopolyCommand, MonopolyState,
+<a href=#16 id=16 data-nosnippet>16</a>};
+<a href=#17 id=17 data-nosnippet>17</a><span class="kw">pub use </span>board::{
+<a href=#18 id=18 data-nosnippet>18</a>    board_layout, ChanceCard, CommunityChestCard, Space, SpaceKind, BOARD_SIZE, GO_BONUS,
+<a href=#19 id=19 data-nosnippet>19</a>    GO_TO_JAIL_SPACE, JAIL_SPACE, STARTING_MONEY,
+<a href=#20 id=20 data-nosnippet>20</a>};
+<a href=#21 id=21 data-nosnippet>21</a><span class="kw">pub use </span>commands::{AuctionBidCommand, BuyPropertyCommand, PayJailFeeCommand, RollAndMoveCommand};
+<a href=#22 id=22 data-nosnippet>22</a><span class="kw">pub use </span>events::{
+<a href=#23 id=23 data-nosnippet>23</a>    AuctionStartedEvent, AuctionWonEvent, BankruptcyEvent, ChanceCardDrawnEvent,
+<a href=#24 id=24 data-nosnippet>24</a>    CommunityChestCardDrawnEvent, GameOverEvent, JailedEvent, PlayerMovedEvent,
+<a href=#25 id=25 data-nosnippet>25</a>    PropertyPurchasedEvent, RailroadRentPaidEvent, RentPaidEvent, TaxPaidEvent,
+<a href=#26 id=26 data-nosnippet>26</a>    UtilityRentPaidEvent,
+<a href=#27 id=27 data-nosnippet>27</a>};
+<a href=#28 id=28 data-nosnippet>28</a><span class="kw">pub use </span>resources::{
+<a href=#29 id=29 data-nosnippet>29</a>    AuctionResource, BoardResource, JailResource, PendingPurchaseResource, PlayersResource,
+<a href=#30 id=30 data-nosnippet>30</a>};
+<a href=#31 id=31 data-nosnippet>31</a><span class="kw">pub use </span>rules::{apply_land_effect, build_monopoly_rules};
 <a href=#32 id=32 data-nosnippet>32</a>
-<a href=#33 id=33 data-nosnippet>33</a><span class="kw">pub fn </span>new_monopoly_session(
-<a href=#34 id=34 data-nosnippet>34</a>    session_id: SessionId,
-<a href=#35 id=35 data-nosnippet>35</a>    seed: u64,
-<a href=#36 id=36 data-nosnippet>36</a>    player_a: PlayerId,
-<a href=#37 id=37 data-nosnippet>37</a>    player_b: PlayerId,
-<a href=#38 id=38 data-nosnippet>38</a>) -&gt; Session {
-<a href=#39 id=39 data-nosnippet>39</a>    <span class="kw">let </span>players = <span class="macro">vec!</span>[player_a, player_b];
-<a href=#40 id=40 data-nosnippet>40</a>    <span class="kw">let </span><span class="kw-2">mut </span>session = Session::new_with_metadata(
-<a href=#41 id=41 data-nosnippet>41</a>        session_id,
-<a href=#42 id=42 data-nosnippet>42</a>        <span class="string">"Monopoly"</span>,
-<a href=#43 id=43 data-nosnippet>43</a>        seed,
-<a href=#44 id=44 data-nosnippet>44</a>        players.clone(),
-<a href=#45 id=45 data-nosnippet>45</a>        build_monopoly_rules(),
-<a href=#46 id=46 data-nosnippet>46</a>    );
-<a href=#47 id=47 data-nosnippet>47</a>    session.world_mut().insert_resource(BoardResource::new());
-<a href=#48 id=48 data-nosnippet>48</a>    session
-<a href=#49 id=49 data-nosnippet>49</a>        .world_mut()
-<a href=#50 id=50 data-nosnippet>50</a>        .insert_resource(PlayersResource::new(<span class="kw-2">&amp;</span>players));
-<a href=#51 id=51 data-nosnippet>51</a>    session
-<a href=#52 id=52 data-nosnippet>52</a>        .world_mut()
-<a href=#53 id=53 data-nosnippet>53</a>        .insert_resource(PendingPurchaseResource::default());
-<a href=#54 id=54 data-nosnippet>54</a>    session.world_mut().insert_resource(JailResource::default());
-<a href=#55 id=55 data-nosnippet>55</a>    session
-<a href=#56 id=56 data-nosnippet>56</a>        .world_mut()
-<a href=#57 id=57 data-nosnippet>57</a>        .insert_resource(AuctionResource::default());
-<a href=#58 id=58 data-nosnippet>58</a>    session
-<a href=#59 id=59 data-nosnippet>59</a>}
+<a href=#33 id=33 data-nosnippet>33</a><span class="kw">use </span>open_table_engine::prelude::<span class="kw-2">*</span>;
+<a href=#34 id=34 data-nosnippet>34</a>
+<a href=#35 id=35 data-nosnippet>35</a><span class="kw">pub fn </span>new_monopoly_session(
+<a href=#36 id=36 data-nosnippet>36</a>    session_id: SessionId,
+<a href=#37 id=37 data-nosnippet>37</a>    seed: u64,
+<a href=#38 id=38 data-nosnippet>38</a>    player_a: PlayerId,
+<a href=#39 id=39 data-nosnippet>39</a>    player_b: PlayerId,
+<a href=#40 id=40 data-nosnippet>40</a>) -&gt; Session {
+<a href=#41 id=41 data-nosnippet>41</a>    <span class="kw">let </span>players = <span class="macro">vec!</span>[player_a, player_b];
+<a href=#42 id=42 data-nosnippet>42</a>    <span class="kw">let </span><span class="kw-2">mut </span>session = Session::new_with_metadata(
+<a href=#43 id=43 data-nosnippet>43</a>        session_id,
+<a href=#44 id=44 data-nosnippet>44</a>        <span class="string">"Monopoly"</span>,
+<a href=#45 id=45 data-nosnippet>45</a>        seed,
+<a href=#46 id=46 data-nosnippet>46</a>        players.clone(),
+<a href=#47 id=47 data-nosnippet>47</a>        build_monopoly_rules(),
+<a href=#48 id=48 data-nosnippet>48</a>    );
+<a href=#49 id=49 data-nosnippet>49</a>    session.world_mut().insert_resource(BoardResource::new());
+<a href=#50 id=50 data-nosnippet>50</a>    session
+<a href=#51 id=51 data-nosnippet>51</a>        .world_mut()
+<a href=#52 id=52 data-nosnippet>52</a>        .insert_resource(PlayersResource::new(<span class="kw-2">&amp;</span>players));
+<a href=#53 id=53 data-nosnippet>53</a>    session
+<a href=#54 id=54 data-nosnippet>54</a>        .world_mut()
+<a href=#55 id=55 data-nosnippet>55</a>        .insert_resource(PendingPurchaseResource::default());
+<a href=#56 id=56 data-nosnippet>56</a>    session.world_mut().insert_resource(JailResource::default());
+<a href=#57 id=57 data-nosnippet>57</a>    session
+<a href=#58 id=58 data-nosnippet>58</a>        .world_mut()
+<a href=#59 id=59 data-nosnippet>59</a>        .insert_resource(AuctionResource::default());
+<a href=#60 id=60 data-nosnippet>60</a>    session
+<a href=#61 id=61 data-nosnippet>61</a>}
 </code></pre></div></section></main></body></html>

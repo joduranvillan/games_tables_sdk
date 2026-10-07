@@ -90,76 +90,76 @@
 <a href=#90 id=90 data-nosnippet>90</a>    ai: PlayerId,
 <a href=#91 id=91 data-nosnippet>91</a>) -&gt; bool {
 <a href=#92 id=92 data-nosnippet>92</a>    <span class="kw">let </span>ai_owns_property = players.properties.values().any(|<span class="kw-2">&amp;</span>owner| owner == ai);
-<a href=#93 id=93 data-nosnippet>93</a>    <span class="kw">let </span>unowned_buyable_exists = board_spaces.iter().enumerate().any(|(idx, s)| {
-<a href=#94 id=94 data-nosnippet>94</a>        space_market_price(s).is_some() &amp;&amp; !players.properties.contains_key(<span class="kw-2">&amp;</span>idx)
-<a href=#95 id=95 data-nosnippet>95</a>    });
-<a href=#96 id=96 data-nosnippet>96</a>    ai_owns_property || unowned_buyable_exists
-<a href=#97 id=97 data-nosnippet>97</a>}
-<a href=#98 id=98 data-nosnippet>98</a>
-<a href=#99 id=99 data-nosnippet>99</a><span class="doccomment">/// Selecciona la mejor jugada para `ai` en Monopoly según `difficulty`:
-<a href=#100 id=100 data-nosnippet>100</a>/// - Si hay subasta activa: oferta hasta el 80% del valor de mercado (o 0 para pasar).
-<a href=#101 id=101 data-nosnippet>101</a>/// - Si hay decisión de compra pendiente para `ai`: compra si `cash &gt; price * 2` o si completa grupo de color.
-<a href=#102 id=102 data-nosnippet>102</a>/// - Si está en la cárcel en su turno y hay propiedades no hipotecadas que se puedan desarrollar: paga fianza.
-<a href=#103 id=103 data-nosnippet>103</a>/// - Si es su turno normal: lanza los dados (`RollAndMoveCommand`).
-<a href=#104 id=104 data-nosnippet>104</a></span><span class="kw">pub fn </span>best_move(
-<a href=#105 id=105 data-nosnippet>105</a>    state: <span class="kw-2">&amp;</span>MonopolyState,
-<a href=#106 id=106 data-nosnippet>106</a>    ai: PlayerId,
-<a href=#107 id=107 data-nosnippet>107</a>    difficulty: AiDifficulty,
-<a href=#108 id=108 data-nosnippet>108</a>) -&gt; <span class="prelude-ty">Option</span>&lt;MonopolyCommand&gt; {
-<a href=#109 id=109 data-nosnippet>109</a>    <span class="kw">let </span>board = state.world().get_resource::&lt;BoardResource&gt;()<span class="question-mark">?</span>;
-<a href=#110 id=110 data-nosnippet>110</a>    <span class="kw">let </span>players = state.world().get_resource::&lt;PlayersResource&gt;()<span class="question-mark">?</span>;
-<a href=#111 id=111 data-nosnippet>111</a>
-<a href=#112 id=112 data-nosnippet>112</a>    <span class="kw">if </span>players.bankrupt.contains(<span class="kw-2">&amp;</span>ai) {
-<a href=#113 id=113 data-nosnippet>113</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
-<a href=#114 id=114 data-nosnippet>114</a>    }
-<a href=#115 id=115 data-nosnippet>115</a>
-<a href=#116 id=116 data-nosnippet>116</a>    <span class="kw">let </span>cash = players.money.get(<span class="kw-2">&amp;</span>ai).copied().unwrap_or(<span class="number">0</span>);
-<a href=#117 id=117 data-nosnippet>117</a>
-<a href=#118 id=118 data-nosnippet>118</a>    <span class="comment">// 1. Subasta activa: ofertar hasta el 80% del valor de mercado
-<a href=#119 id=119 data-nosnippet>119</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(auction_res) = state.world().get_resource::&lt;AuctionResource&gt;() {
-<a href=#120 id=120 data-nosnippet>120</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(auction) = <span class="kw-2">&amp;</span>auction_res.state {
-<a href=#121 id=121 data-nosnippet>121</a>            <span class="kw">if </span>!auction.passed.contains(<span class="kw-2">&amp;</span>ai) &amp;&amp; auction.highest_bidder != <span class="prelude-val">Some</span>(ai) {
-<a href=#122 id=122 data-nosnippet>122</a>                <span class="kw">let </span>market_value = board
-<a href=#123 id=123 data-nosnippet>123</a>                    .spaces
-<a href=#124 id=124 data-nosnippet>124</a>                    .get(auction.space)
-<a href=#125 id=125 data-nosnippet>125</a>                    .and_then(space_market_price)
-<a href=#126 id=126 data-nosnippet>126</a>                    .unwrap_or(<span class="number">0</span>);
-<a href=#127 id=127 data-nosnippet>127</a>                <span class="kw">let </span>max_bid = (market_value * <span class="number">80</span>) / <span class="number">100</span>;
-<a href=#128 id=128 data-nosnippet>128</a>
-<a href=#129 id=129 data-nosnippet>129</a>                <span class="kw">if </span>auction.current_bid &lt; max_bid &amp;&amp; cash &gt; auction.current_bid <span class="kw">as </span>i64 {
-<a href=#130 id=130 data-nosnippet>130</a>                    <span class="kw">let </span>step = <span class="kw">match </span>difficulty {
-<a href=#131 id=131 data-nosnippet>131</a>                        AiDifficulty::Easy =&gt; <span class="number">20</span>,
-<a href=#132 id=132 data-nosnippet>132</a>                        <span class="kw">_ </span>=&gt; <span class="number">10</span>,
-<a href=#133 id=133 data-nosnippet>133</a>                    };
-<a href=#134 id=134 data-nosnippet>134</a>                    <span class="kw">let </span>next_bid = (auction.current_bid + step)
-<a href=#135 id=135 data-nosnippet>135</a>                        .min(max_bid)
-<a href=#136 id=136 data-nosnippet>136</a>                        .min(cash.max(<span class="number">0</span>) <span class="kw">as </span>u32);
-<a href=#137 id=137 data-nosnippet>137</a>                    <span class="kw">if </span>next_bid &gt; auction.current_bid {
-<a href=#138 id=138 data-nosnippet>138</a>                        <span class="kw">return </span><span class="prelude-val">Some</span>(MonopolyCommand::AuctionBid(AuctionBidCommand {
-<a href=#139 id=139 data-nosnippet>139</a>                            player: ai,
-<a href=#140 id=140 data-nosnippet>140</a>                            amount: next_bid,
-<a href=#141 id=141 data-nosnippet>141</a>                        }));
-<a href=#142 id=142 data-nosnippet>142</a>                    }
-<a href=#143 id=143 data-nosnippet>143</a>                }
-<a href=#144 id=144 data-nosnippet>144</a>
-<a href=#145 id=145 data-nosnippet>145</a>                <span class="kw">return </span><span class="prelude-val">Some</span>(MonopolyCommand::AuctionBid(AuctionBidCommand {
-<a href=#146 id=146 data-nosnippet>146</a>                    player: ai,
-<a href=#147 id=147 data-nosnippet>147</a>                    amount: <span class="number">0</span>,
-<a href=#148 id=148 data-nosnippet>148</a>                }));
-<a href=#149 id=149 data-nosnippet>149</a>            }
-<a href=#150 id=150 data-nosnippet>150</a>        }
-<a href=#151 id=151 data-nosnippet>151</a>    }
-<a href=#152 id=152 data-nosnippet>152</a>
-<a href=#153 id=153 data-nosnippet>153</a>    <span class="comment">// 2. Decisión de compra pendiente: comprar si cash &gt; price * 2 o si completa un grupo de color
-<a href=#154 id=154 data-nosnippet>154</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pending_res) = state.world().get_resource::&lt;PendingPurchaseResource&gt;() {
-<a href=#155 id=155 data-nosnippet>155</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(decision) = pending_res.pending.get(<span class="kw-2">&amp;</span>ai) {
-<a href=#156 id=156 data-nosnippet>156</a>            <span class="kw">let </span>price = board
-<a href=#157 id=157 data-nosnippet>157</a>                .spaces
-<a href=#158 id=158 data-nosnippet>158</a>                .get(decision.space)
-<a href=#159 id=159 data-nosnippet>159</a>                .and_then(space_market_price)
-<a href=#160 id=160 data-nosnippet>160</a>                .unwrap_or(<span class="number">0</span>);
-<a href=#161 id=161 data-nosnippet>161</a>            <span class="kw">let </span>completes_group =
-<a href=#162 id=162 data-nosnippet>162</a>                completes_color_group(<span class="kw-2">&amp;</span>board.spaces, players, ai, decision.space);
+<a href=#93 id=93 data-nosnippet>93</a>    <span class="kw">let </span>unowned_buyable_exists = board_spaces
+<a href=#94 id=94 data-nosnippet>94</a>        .iter()
+<a href=#95 id=95 data-nosnippet>95</a>        .enumerate()
+<a href=#96 id=96 data-nosnippet>96</a>        .any(|(idx, s)| space_market_price(s).is_some() &amp;&amp; !players.properties.contains_key(<span class="kw-2">&amp;</span>idx));
+<a href=#97 id=97 data-nosnippet>97</a>    ai_owns_property || unowned_buyable_exists
+<a href=#98 id=98 data-nosnippet>98</a>}
+<a href=#99 id=99 data-nosnippet>99</a>
+<a href=#100 id=100 data-nosnippet>100</a><span class="doccomment">/// Selecciona la mejor jugada para `ai` en Monopoly según `difficulty`:
+<a href=#101 id=101 data-nosnippet>101</a>/// - Si hay subasta activa: oferta hasta el 80% del valor de mercado (o 0 para pasar).
+<a href=#102 id=102 data-nosnippet>102</a>/// - Si hay decisión de compra pendiente para `ai`: compra si `cash &gt; price * 2` o si completa grupo de color.
+<a href=#103 id=103 data-nosnippet>103</a>/// - Si está en la cárcel en su turno y hay propiedades no hipotecadas que se puedan desarrollar: paga fianza.
+<a href=#104 id=104 data-nosnippet>104</a>/// - Si es su turno normal: lanza los dados (`RollAndMoveCommand`).
+<a href=#105 id=105 data-nosnippet>105</a></span><span class="kw">pub fn </span>best_move(
+<a href=#106 id=106 data-nosnippet>106</a>    state: <span class="kw-2">&amp;</span>MonopolyState,
+<a href=#107 id=107 data-nosnippet>107</a>    ai: PlayerId,
+<a href=#108 id=108 data-nosnippet>108</a>    difficulty: AiDifficulty,
+<a href=#109 id=109 data-nosnippet>109</a>) -&gt; <span class="prelude-ty">Option</span>&lt;MonopolyCommand&gt; {
+<a href=#110 id=110 data-nosnippet>110</a>    <span class="kw">let </span>board = state.world().get_resource::&lt;BoardResource&gt;()<span class="question-mark">?</span>;
+<a href=#111 id=111 data-nosnippet>111</a>    <span class="kw">let </span>players = state.world().get_resource::&lt;PlayersResource&gt;()<span class="question-mark">?</span>;
+<a href=#112 id=112 data-nosnippet>112</a>
+<a href=#113 id=113 data-nosnippet>113</a>    <span class="kw">if </span>players.bankrupt.contains(<span class="kw-2">&amp;</span>ai) {
+<a href=#114 id=114 data-nosnippet>114</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#115 id=115 data-nosnippet>115</a>    }
+<a href=#116 id=116 data-nosnippet>116</a>
+<a href=#117 id=117 data-nosnippet>117</a>    <span class="kw">let </span>cash = players.money.get(<span class="kw-2">&amp;</span>ai).copied().unwrap_or(<span class="number">0</span>);
+<a href=#118 id=118 data-nosnippet>118</a>
+<a href=#119 id=119 data-nosnippet>119</a>    <span class="comment">// 1. Subasta activa: ofertar hasta el 80% del valor de mercado
+<a href=#120 id=120 data-nosnippet>120</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(auction_res) = state.world().get_resource::&lt;AuctionResource&gt;() {
+<a href=#121 id=121 data-nosnippet>121</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(auction) = <span class="kw-2">&amp;</span>auction_res.state {
+<a href=#122 id=122 data-nosnippet>122</a>            <span class="kw">if </span>!auction.passed.contains(<span class="kw-2">&amp;</span>ai) &amp;&amp; auction.highest_bidder != <span class="prelude-val">Some</span>(ai) {
+<a href=#123 id=123 data-nosnippet>123</a>                <span class="kw">let </span>market_value = board
+<a href=#124 id=124 data-nosnippet>124</a>                    .spaces
+<a href=#125 id=125 data-nosnippet>125</a>                    .get(auction.space)
+<a href=#126 id=126 data-nosnippet>126</a>                    .and_then(space_market_price)
+<a href=#127 id=127 data-nosnippet>127</a>                    .unwrap_or(<span class="number">0</span>);
+<a href=#128 id=128 data-nosnippet>128</a>                <span class="kw">let </span>max_bid = (market_value * <span class="number">80</span>) / <span class="number">100</span>;
+<a href=#129 id=129 data-nosnippet>129</a>
+<a href=#130 id=130 data-nosnippet>130</a>                <span class="kw">if </span>auction.current_bid &lt; max_bid &amp;&amp; cash &gt; auction.current_bid <span class="kw">as </span>i64 {
+<a href=#131 id=131 data-nosnippet>131</a>                    <span class="kw">let </span>step = <span class="kw">match </span>difficulty {
+<a href=#132 id=132 data-nosnippet>132</a>                        AiDifficulty::Easy =&gt; <span class="number">20</span>,
+<a href=#133 id=133 data-nosnippet>133</a>                        <span class="kw">_ </span>=&gt; <span class="number">10</span>,
+<a href=#134 id=134 data-nosnippet>134</a>                    };
+<a href=#135 id=135 data-nosnippet>135</a>                    <span class="kw">let </span>next_bid = (auction.current_bid + step)
+<a href=#136 id=136 data-nosnippet>136</a>                        .min(max_bid)
+<a href=#137 id=137 data-nosnippet>137</a>                        .min(cash.max(<span class="number">0</span>) <span class="kw">as </span>u32);
+<a href=#138 id=138 data-nosnippet>138</a>                    <span class="kw">if </span>next_bid &gt; auction.current_bid {
+<a href=#139 id=139 data-nosnippet>139</a>                        <span class="kw">return </span><span class="prelude-val">Some</span>(MonopolyCommand::AuctionBid(AuctionBidCommand {
+<a href=#140 id=140 data-nosnippet>140</a>                            player: ai,
+<a href=#141 id=141 data-nosnippet>141</a>                            amount: next_bid,
+<a href=#142 id=142 data-nosnippet>142</a>                        }));
+<a href=#143 id=143 data-nosnippet>143</a>                    }
+<a href=#144 id=144 data-nosnippet>144</a>                }
+<a href=#145 id=145 data-nosnippet>145</a>
+<a href=#146 id=146 data-nosnippet>146</a>                <span class="kw">return </span><span class="prelude-val">Some</span>(MonopolyCommand::AuctionBid(AuctionBidCommand {
+<a href=#147 id=147 data-nosnippet>147</a>                    player: ai,
+<a href=#148 id=148 data-nosnippet>148</a>                    amount: <span class="number">0</span>,
+<a href=#149 id=149 data-nosnippet>149</a>                }));
+<a href=#150 id=150 data-nosnippet>150</a>            }
+<a href=#151 id=151 data-nosnippet>151</a>        }
+<a href=#152 id=152 data-nosnippet>152</a>    }
+<a href=#153 id=153 data-nosnippet>153</a>
+<a href=#154 id=154 data-nosnippet>154</a>    <span class="comment">// 2. Decisión de compra pendiente: comprar si cash &gt; price * 2 o si completa un grupo de color
+<a href=#155 id=155 data-nosnippet>155</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pending_res) = state.world().get_resource::&lt;PendingPurchaseResource&gt;() {
+<a href=#156 id=156 data-nosnippet>156</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(decision) = pending_res.pending.get(<span class="kw-2">&amp;</span>ai) {
+<a href=#157 id=157 data-nosnippet>157</a>            <span class="kw">let </span>price = board
+<a href=#158 id=158 data-nosnippet>158</a>                .spaces
+<a href=#159 id=159 data-nosnippet>159</a>                .get(decision.space)
+<a href=#160 id=160 data-nosnippet>160</a>                .and_then(space_market_price)
+<a href=#161 id=161 data-nosnippet>161</a>                .unwrap_or(<span class="number">0</span>);
+<a href=#162 id=162 data-nosnippet>162</a>            <span class="kw">let </span>completes_group = completes_color_group(<span class="kw-2">&amp;</span>board.spaces, players, ai, decision.space);
 <a href=#163 id=163 data-nosnippet>163</a>            <span class="kw">let </span>affordable_double = cash &gt; (price <span class="kw">as </span>i64) * <span class="number">2</span>;
 <a href=#164 id=164 data-nosnippet>164</a>            <span class="kw">let </span>can_afford = cash &gt;= price <span class="kw">as </span>i64;
 <a href=#165 id=165 data-nosnippet>165</a>

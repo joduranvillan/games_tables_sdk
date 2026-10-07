@@ -517,13 +517,16 @@
 <a href=#517 id=517 data-nosnippet>517</a>            .relay_to_peers(<span class="number">1</span>, <span class="string">r#"{"op":"relay","data":"e2e4"}"#</span>)
 <a href=#518 id=518 data-nosnippet>518</a>            .unwrap();
 <a href=#519 id=519 data-nosnippet>519</a>        <span class="kw">for </span>rx_spec <span class="kw">in </span><span class="kw-2">&amp;mut </span>spec_rxs {
-<a href=#520 id=520 data-nosnippet>520</a>            <span class="macro">assert_eq!</span>(rx_spec.try_recv().unwrap(), <span class="string">r#"{"op":"relay","data":"e2e4"}"#</span>);
-<a href=#521 id=521 data-nosnippet>521</a>        }
-<a href=#522 id=522 data-nosnippet>522</a>
-<a href=#523 id=523 data-nosnippet>523</a>        <span class="comment">// Un espectador intenta hacer relay -&gt; recibe SpectatorCannotRelay
-<a href=#524 id=524 data-nosnippet>524</a>        </span><span class="kw">let </span>illegal_msg = <span class="string">r#"{"op":"relay","data":"illegal"}"#</span>;
-<a href=#525 id=525 data-nosnippet>525</a>        <span class="kw">let </span>spec_relay_res = manager.relay_to_peers(<span class="number">1000</span>, illegal_msg);
-<a href=#526 id=526 data-nosnippet>526</a>        <span class="macro">assert_eq!</span>(spec_relay_res, <span class="prelude-val">Err</span>(RoomError::SpectatorCannotRelay));
-<a href=#527 id=527 data-nosnippet>527</a>    }
-<a href=#528 id=528 data-nosnippet>528</a>}
+<a href=#520 id=520 data-nosnippet>520</a>            <span class="macro">assert_eq!</span>(
+<a href=#521 id=521 data-nosnippet>521</a>                rx_spec.try_recv().unwrap(),
+<a href=#522 id=522 data-nosnippet>522</a>                <span class="string">r#"{"op":"relay","data":"e2e4"}"#
+<a href=#523 id=523 data-nosnippet>523</a>            </span>);
+<a href=#524 id=524 data-nosnippet>524</a>        }
+<a href=#525 id=525 data-nosnippet>525</a>
+<a href=#526 id=526 data-nosnippet>526</a>        <span class="comment">// Un espectador intenta hacer relay -&gt; recibe SpectatorCannotRelay
+<a href=#527 id=527 data-nosnippet>527</a>        </span><span class="kw">let </span>illegal_msg = <span class="string">r#"{"op":"relay","data":"illegal"}"#</span>;
+<a href=#528 id=528 data-nosnippet>528</a>        <span class="kw">let </span>spec_relay_res = manager.relay_to_peers(<span class="number">1000</span>, illegal_msg);
+<a href=#529 id=529 data-nosnippet>529</a>        <span class="macro">assert_eq!</span>(spec_relay_res, <span class="prelude-val">Err</span>(RoomError::SpectatorCannotRelay));
+<a href=#530 id=530 data-nosnippet>530</a>    }
+<a href=#531 id=531 data-nosnippet>531</a>}
 </code></pre></div></section></main></body></html>

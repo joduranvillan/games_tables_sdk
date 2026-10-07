@@ -66,62 +66,62 @@
 <a href=#66 id=66 data-nosnippet>66</a><span class="kw">impl </span>FastRng {
 <a href=#67 id=67 data-nosnippet>67</a>    <span class="kw">fn </span>new(seed: u64) -&gt; <span class="self">Self </span>{
 <a href=#68 id=68 data-nosnippet>68</a>        <span class="self">Self </span>{
-<a href=#69 id=69 data-nosnippet>69</a>            state: <span class="kw">if </span>seed == <span class="number">0 </span>{ <span class="number">0x9e37_79b9_7f4a_7c15 </span>} <span class="kw">else </span>{ seed },
-<a href=#70 id=70 data-nosnippet>70</a>        }
-<a href=#71 id=71 data-nosnippet>71</a>    }
-<a href=#72 id=72 data-nosnippet>72</a>
-<a href=#73 id=73 data-nosnippet>73</a>    <span class="kw">fn </span>next_u64(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; u64 {
-<a href=#74 id=74 data-nosnippet>74</a>        <span class="kw">let </span><span class="kw-2">mut </span>x = <span class="self">self</span>.state;
-<a href=#75 id=75 data-nosnippet>75</a>        x ^= x &lt;&lt; <span class="number">13</span>;
-<a href=#76 id=76 data-nosnippet>76</a>        x ^= x &gt;&gt; <span class="number">7</span>;
-<a href=#77 id=77 data-nosnippet>77</a>        x ^= x &lt;&lt; <span class="number">17</span>;
-<a href=#78 id=78 data-nosnippet>78</a>        <span class="self">self</span>.state = x;
-<a href=#79 id=79 data-nosnippet>79</a>        x
-<a href=#80 id=80 data-nosnippet>80</a>    }
-<a href=#81 id=81 data-nosnippet>81</a>
-<a href=#82 id=82 data-nosnippet>82</a>    <span class="kw">fn </span>roll_d6(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; u8 {
-<a href=#83 id=83 data-nosnippet>83</a>        ((<span class="self">self</span>.next_u64() % <span class="number">6</span>) + <span class="number">1</span>) <span class="kw">as </span>u8
+<a href=#69 id=69 data-nosnippet>69</a>            state: <span class="kw">if </span>seed == <span class="number">0 </span>{
+<a href=#70 id=70 data-nosnippet>70</a>                <span class="number">0x9e37_79b9_7f4a_7c15
+<a href=#71 id=71 data-nosnippet>71</a>            </span>} <span class="kw">else </span>{
+<a href=#72 id=72 data-nosnippet>72</a>                seed
+<a href=#73 id=73 data-nosnippet>73</a>            },
+<a href=#74 id=74 data-nosnippet>74</a>        }
+<a href=#75 id=75 data-nosnippet>75</a>    }
+<a href=#76 id=76 data-nosnippet>76</a>
+<a href=#77 id=77 data-nosnippet>77</a>    <span class="kw">fn </span>next_u64(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; u64 {
+<a href=#78 id=78 data-nosnippet>78</a>        <span class="kw">let </span><span class="kw-2">mut </span>x = <span class="self">self</span>.state;
+<a href=#79 id=79 data-nosnippet>79</a>        x ^= x &lt;&lt; <span class="number">13</span>;
+<a href=#80 id=80 data-nosnippet>80</a>        x ^= x &gt;&gt; <span class="number">7</span>;
+<a href=#81 id=81 data-nosnippet>81</a>        x ^= x &lt;&lt; <span class="number">17</span>;
+<a href=#82 id=82 data-nosnippet>82</a>        <span class="self">self</span>.state = x;
+<a href=#83 id=83 data-nosnippet>83</a>        x
 <a href=#84 id=84 data-nosnippet>84</a>    }
-<a href=#85 id=85 data-nosnippet>85</a>}
-<a href=#86 id=86 data-nosnippet>86</a>
-<a href=#87 id=87 data-nosnippet>87</a><span class="doccomment">/// Umbral de superioridad numérica requerido para declarar un ataque según la dificultad.
-<a href=#88 id=88 data-nosnippet>88</a></span><span class="kw">pub fn </span>attack_ratio_threshold(difficulty: AiDifficulty) -&gt; f64 {
-<a href=#89 id=89 data-nosnippet>89</a>    <span class="kw">match </span>difficulty {
-<a href=#90 id=90 data-nosnippet>90</a>        AiDifficulty::Easy =&gt; <span class="number">2.0</span>,
-<a href=#91 id=91 data-nosnippet>91</a>        AiDifficulty::Medium | AiDifficulty::Hard =&gt; <span class="number">1.5</span>,
-<a href=#92 id=92 data-nosnippet>92</a>        AiDifficulty::Expert =&gt; <span class="number">1.2</span>,
-<a href=#93 id=93 data-nosnippet>93</a>    }
-<a href=#94 id=94 data-nosnippet>94</a>}
-<a href=#95 id=95 data-nosnippet>95</a>
-<a href=#96 id=96 data-nosnippet>96</a><span class="doccomment">/// Devuelve todos los territorios adyacentes a `territory`.
-<a href=#97 id=97 data-nosnippet>97</a></span><span class="kw">pub fn </span>adjacent_territories(territory: TerritoryId) -&gt; Vec&lt;TerritoryId&gt; {
-<a href=#98 id=98 data-nosnippet>98</a>    (<span class="number">0</span>..<span class="number">30u8</span>)
-<a href=#99 id=99 data-nosnippet>99</a>        .map(TerritoryId)
-<a href=#100 id=100 data-nosnippet>100</a>        .filter(|<span class="kw-2">&amp;</span>other| are_adjacent(territory, other))
-<a href=#101 id=101 data-nosnippet>101</a>        .collect()
-<a href=#102 id=102 data-nosnippet>102</a>}
-<a href=#103 id=103 data-nosnippet>103</a>
-<a href=#104 id=104 data-nosnippet>104</a><span class="doccomment">/// Suma total de ejércitos enemigos en territorios adyacentes a `territory`.
-<a href=#105 id=105 data-nosnippet>105</a></span><span class="kw">pub fn </span>enemy_neighbor_armies(
-<a href=#106 id=106 data-nosnippet>106</a>    map: <span class="kw-2">&amp;</span>TerritoryStateResource,
-<a href=#107 id=107 data-nosnippet>107</a>    player: PlayerId,
-<a href=#108 id=108 data-nosnippet>108</a>    territory: TerritoryId,
-<a href=#109 id=109 data-nosnippet>109</a>) -&gt; u32 {
-<a href=#110 id=110 data-nosnippet>110</a>    adjacent_territories(territory)
-<a href=#111 id=111 data-nosnippet>111</a>        .into_iter()
-<a href=#112 id=112 data-nosnippet>112</a>        .filter(|adj| map.owners.get(adj).copied() != <span class="prelude-val">Some</span>(player))
-<a href=#113 id=113 data-nosnippet>113</a>        .map(|adj| map.armies.get(<span class="kw-2">&amp;</span>adj).copied().unwrap_or(<span class="number">0</span>))
-<a href=#114 id=114 data-nosnippet>114</a>        .sum()
-<a href=#115 id=115 data-nosnippet>115</a>}
-<a href=#116 id=116 data-nosnippet>116</a>
-<a href=#117 id=117 data-nosnippet>117</a><span class="doccomment">/// Ratio `ejércitos_propios / ejércitos_vecinos_enemigos`.
-<a href=#118 id=118 data-nosnippet>118</a>/// Cuanto menor es este valor, más amenazado está el territorio.
-<a href=#119 id=119 data-nosnippet>119</a>/// Si no tiene vecinos enemigos (territorio interior), devuelve `f64::INFINITY`.
-<a href=#120 id=120 data-nosnippet>120</a></span><span class="kw">pub fn </span>threat_ratio(
-<a href=#121 id=121 data-nosnippet>121</a>    map: <span class="kw-2">&amp;</span>TerritoryStateResource,
-<a href=#122 id=122 data-nosnippet>122</a>    player: PlayerId,
-<a href=#123 id=123 data-nosnippet>123</a>    territory: TerritoryId,
-<a href=#124 id=124 data-nosnippet>124</a>) -&gt; f64 {
+<a href=#85 id=85 data-nosnippet>85</a>
+<a href=#86 id=86 data-nosnippet>86</a>    <span class="kw">fn </span>roll_d6(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; u8 {
+<a href=#87 id=87 data-nosnippet>87</a>        ((<span class="self">self</span>.next_u64() % <span class="number">6</span>) + <span class="number">1</span>) <span class="kw">as </span>u8
+<a href=#88 id=88 data-nosnippet>88</a>    }
+<a href=#89 id=89 data-nosnippet>89</a>}
+<a href=#90 id=90 data-nosnippet>90</a>
+<a href=#91 id=91 data-nosnippet>91</a><span class="doccomment">/// Umbral de superioridad numérica requerido para declarar un ataque según la dificultad.
+<a href=#92 id=92 data-nosnippet>92</a></span><span class="kw">pub fn </span>attack_ratio_threshold(difficulty: AiDifficulty) -&gt; f64 {
+<a href=#93 id=93 data-nosnippet>93</a>    <span class="kw">match </span>difficulty {
+<a href=#94 id=94 data-nosnippet>94</a>        AiDifficulty::Easy =&gt; <span class="number">2.0</span>,
+<a href=#95 id=95 data-nosnippet>95</a>        AiDifficulty::Medium | AiDifficulty::Hard =&gt; <span class="number">1.5</span>,
+<a href=#96 id=96 data-nosnippet>96</a>        AiDifficulty::Expert =&gt; <span class="number">1.2</span>,
+<a href=#97 id=97 data-nosnippet>97</a>    }
+<a href=#98 id=98 data-nosnippet>98</a>}
+<a href=#99 id=99 data-nosnippet>99</a>
+<a href=#100 id=100 data-nosnippet>100</a><span class="doccomment">/// Devuelve todos los territorios adyacentes a `territory`.
+<a href=#101 id=101 data-nosnippet>101</a></span><span class="kw">pub fn </span>adjacent_territories(territory: TerritoryId) -&gt; Vec&lt;TerritoryId&gt; {
+<a href=#102 id=102 data-nosnippet>102</a>    (<span class="number">0</span>..<span class="number">30u8</span>)
+<a href=#103 id=103 data-nosnippet>103</a>        .map(TerritoryId)
+<a href=#104 id=104 data-nosnippet>104</a>        .filter(|<span class="kw-2">&amp;</span>other| are_adjacent(territory, other))
+<a href=#105 id=105 data-nosnippet>105</a>        .collect()
+<a href=#106 id=106 data-nosnippet>106</a>}
+<a href=#107 id=107 data-nosnippet>107</a>
+<a href=#108 id=108 data-nosnippet>108</a><span class="doccomment">/// Suma total de ejércitos enemigos en territorios adyacentes a `territory`.
+<a href=#109 id=109 data-nosnippet>109</a></span><span class="kw">pub fn </span>enemy_neighbor_armies(
+<a href=#110 id=110 data-nosnippet>110</a>    map: <span class="kw-2">&amp;</span>TerritoryStateResource,
+<a href=#111 id=111 data-nosnippet>111</a>    player: PlayerId,
+<a href=#112 id=112 data-nosnippet>112</a>    territory: TerritoryId,
+<a href=#113 id=113 data-nosnippet>113</a>) -&gt; u32 {
+<a href=#114 id=114 data-nosnippet>114</a>    adjacent_territories(territory)
+<a href=#115 id=115 data-nosnippet>115</a>        .into_iter()
+<a href=#116 id=116 data-nosnippet>116</a>        .filter(|adj| map.owners.get(adj).copied() != <span class="prelude-val">Some</span>(player))
+<a href=#117 id=117 data-nosnippet>117</a>        .map(|adj| map.armies.get(<span class="kw-2">&amp;</span>adj).copied().unwrap_or(<span class="number">0</span>))
+<a href=#118 id=118 data-nosnippet>118</a>        .sum()
+<a href=#119 id=119 data-nosnippet>119</a>}
+<a href=#120 id=120 data-nosnippet>120</a>
+<a href=#121 id=121 data-nosnippet>121</a><span class="doccomment">/// Ratio `ejércitos_propios / ejércitos_vecinos_enemigos`.
+<a href=#122 id=122 data-nosnippet>122</a>/// Cuanto menor es este valor, más amenazado está el territorio.
+<a href=#123 id=123 data-nosnippet>123</a>/// Si no tiene vecinos enemigos (territorio interior), devuelve `f64::INFINITY`.
+<a href=#124 id=124 data-nosnippet>124</a></span><span class="kw">pub fn </span>threat_ratio(map: <span class="kw-2">&amp;</span>TerritoryStateResource, player: PlayerId, territory: TerritoryId) -&gt; f64 {
 <a href=#125 id=125 data-nosnippet>125</a>    <span class="kw">let </span>enemy_armies = enemy_neighbor_armies(map, player, territory);
 <a href=#126 id=126 data-nosnippet>126</a>    <span class="kw">if </span>enemy_armies == <span class="number">0 </span>{
 <a href=#127 id=127 data-nosnippet>127</a>        <span class="kw">return </span>f64::INFINITY;
@@ -241,444 +241,446 @@
 <a href=#241 id=241 data-nosnippet>241</a>            <span class="kw">let </span>remaining_ratio = (a <span class="kw">as </span>f64) / (att_armies.max(<span class="number">1</span>) <span class="kw">as </span>f64);
 <a href=#242 id=242 data-nosnippet>242</a>            total_score += <span class="number">1.0 </span>+ remaining_ratio;
 <a href=#243 id=243 data-nosnippet>243</a>        } <span class="kw">else </span>{
-<a href=#244 id=244 data-nosnippet>244</a>            <span class="kw">let </span>damage_ratio =
-<a href=#245 id=245 data-nosnippet>245</a>                ((def_armies.saturating_sub(d)) <span class="kw">as </span>f64) / (def_armies.max(<span class="number">1</span>) <span class="kw">as </span>f64);
-<a href=#246 id=246 data-nosnippet>246</a>            total_score += damage_ratio * <span class="number">0.25</span>;
-<a href=#247 id=247 data-nosnippet>247</a>        }
-<a href=#248 id=248 data-nosnippet>248</a>    }
-<a href=#249 id=249 data-nosnippet>249</a>
-<a href=#250 id=250 data-nosnippet>250</a>    total_score / (sims <span class="kw">as </span>f64)
-<a href=#251 id=251 data-nosnippet>251</a>}
-<a href=#252 id=252 data-nosnippet>252</a>
-<a href=#253 id=253 data-nosnippet>253</a><span class="doccomment">/// Busca un trío válido de tarjetas para canjear si el jugador tiene al menos 3 tarjetas.
-<a href=#254 id=254 data-nosnippet>254</a></span><span class="kw">fn </span>find_valid_card_exchange(state: <span class="kw-2">&amp;</span>CrisisState, ai: PlayerId) -&gt; <span class="prelude-ty">Option</span>&lt;[usize; <span class="number">3</span>]&gt; {
-<a href=#255 id=255 data-nosnippet>255</a>    <span class="kw">let </span>cards_res = state.world().get_resource::&lt;PlayerCardsResource&gt;()<span class="question-mark">?</span>;
-<a href=#256 id=256 data-nosnippet>256</a>    <span class="kw">let </span>hand = cards_res.cards.get(<span class="kw-2">&amp;</span>ai)<span class="question-mark">?</span>;
-<a href=#257 id=257 data-nosnippet>257</a>    <span class="kw">if </span>hand.len() &lt; <span class="number">3 </span>{
-<a href=#258 id=258 data-nosnippet>258</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
-<a href=#259 id=259 data-nosnippet>259</a>    }
-<a href=#260 id=260 data-nosnippet>260</a>
-<a href=#261 id=261 data-nosnippet>261</a>    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..hand.len() {
-<a href=#262 id=262 data-nosnippet>262</a>        <span class="kw">for </span>j <span class="kw">in </span>(i + <span class="number">1</span>)..hand.len() {
-<a href=#263 id=263 data-nosnippet>263</a>            <span class="kw">for </span>k <span class="kw">in </span>(j + <span class="number">1</span>)..hand.len() {
-<a href=#264 id=264 data-nosnippet>264</a>                <span class="kw">let </span>types = [hand[i].card_type, hand[j].card_type, hand[k].card_type];
-<a href=#265 id=265 data-nosnippet>265</a>                <span class="kw">if </span>is_valid_card_set(types) {
-<a href=#266 id=266 data-nosnippet>266</a>                    <span class="kw">return </span><span class="prelude-val">Some</span>([i, j, k]);
-<a href=#267 id=267 data-nosnippet>267</a>                }
-<a href=#268 id=268 data-nosnippet>268</a>            }
-<a href=#269 id=269 data-nosnippet>269</a>        }
-<a href=#270 id=270 data-nosnippet>270</a>    }
-<a href=#271 id=271 data-nosnippet>271</a>    <span class="prelude-val">None
-<a href=#272 id=272 data-nosnippet>272</a></span>}
-<a href=#273 id=273 data-nosnippet>273</a>
-<a href=#274 id=274 data-nosnippet>274</a><span class="doccomment">/// Selecciona la mejor jugada para `ai` en Crisis/TEG según la fase actual y `difficulty`.
-<a href=#275 id=275 data-nosnippet>275</a></span><span class="kw">pub fn </span>best_move(
-<a href=#276 id=276 data-nosnippet>276</a>    state: <span class="kw-2">&amp;</span>CrisisState,
-<a href=#277 id=277 data-nosnippet>277</a>    ai: PlayerId,
-<a href=#278 id=278 data-nosnippet>278</a>    difficulty: AiDifficulty,
-<a href=#279 id=279 data-nosnippet>279</a>) -&gt; <span class="prelude-ty">Option</span>&lt;CrisisCommand&gt; {
-<a href=#280 id=280 data-nosnippet>280</a>    <span class="kw">let </span>map = state.world().get_resource::&lt;TerritoryStateResource&gt;()<span class="question-mark">?</span>;
-<a href=#281 id=281 data-nosnippet>281</a>    <span class="kw">let </span>turn_state = state.world().get_resource::&lt;TurnStateResource&gt;()<span class="question-mark">?</span>;
-<a href=#282 id=282 data-nosnippet>282</a>
-<a href=#283 id=283 data-nosnippet>283</a>    <span class="kw">let </span><span class="kw-2">mut </span>owned_territories: Vec&lt;TerritoryId&gt; = map
-<a href=#284 id=284 data-nosnippet>284</a>        .owners
-<a href=#285 id=285 data-nosnippet>285</a>        .iter()
-<a href=#286 id=286 data-nosnippet>286</a>        .filter_map(|(<span class="kw-2">&amp;</span>t_id, <span class="kw-2">&amp;</span>owner)| <span class="kw">if </span>owner == ai { <span class="prelude-val">Some</span>(t_id) } <span class="kw">else </span>{ <span class="prelude-val">None </span>})
-<a href=#287 id=287 data-nosnippet>287</a>        .collect();
-<a href=#288 id=288 data-nosnippet>288</a>    owned_territories.sort_by_key(|t| t.<span class="number">0</span>);
-<a href=#289 id=289 data-nosnippet>289</a>
-<a href=#290 id=290 data-nosnippet>290</a>    <span class="kw">if </span>owned_territories.is_empty() {
-<a href=#291 id=291 data-nosnippet>291</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
-<a href=#292 id=292 data-nosnippet>292</a>    }
-<a href=#293 id=293 data-nosnippet>293</a>
-<a href=#294 id=294 data-nosnippet>294</a>    <span class="kw">match </span>turn_state.phase {
-<a href=#295 id=295 data-nosnippet>295</a>        TurnPhase::PlaceArmies { armies_remaining } =&gt; {
-<a href=#296 id=296 data-nosnippet>296</a>            <span class="comment">// Si tiene 5 o más tarjetas, las reglas obligan a canjear antes de colocar
-<a href=#297 id=297 data-nosnippet>297</a>            </span><span class="kw">let </span>card_count = state
-<a href=#298 id=298 data-nosnippet>298</a>                .world()
-<a href=#299 id=299 data-nosnippet>299</a>                .get_resource::&lt;PlayerCardsResource&gt;()
-<a href=#300 id=300 data-nosnippet>300</a>                .and_then(|c| c.cards.get(<span class="kw-2">&amp;</span>ai))
-<a href=#301 id=301 data-nosnippet>301</a>                .map(|v| v.len())
-<a href=#302 id=302 data-nosnippet>302</a>                .unwrap_or(<span class="number">0</span>);
-<a href=#303 id=303 data-nosnippet>303</a>            <span class="kw">if </span>card_count &gt;= <span class="number">5 </span>{
-<a href=#304 id=304 data-nosnippet>304</a>                <span class="kw">if let </span><span class="prelude-val">Some</span>(indices) = find_valid_card_exchange(state, ai) {
-<a href=#305 id=305 data-nosnippet>305</a>                    <span class="kw">return </span><span class="prelude-val">Some</span>(CrisisCommand::ExchangeCards(ExchangeCardsCommand {
-<a href=#306 id=306 data-nosnippet>306</a>                        player: ai,
-<a href=#307 id=307 data-nosnippet>307</a>                        card_indices: indices,
-<a href=#308 id=308 data-nosnippet>308</a>                    }));
-<a href=#309 id=309 data-nosnippet>309</a>                }
-<a href=#310 id=310 data-nosnippet>310</a>            }
-<a href=#311 id=311 data-nosnippet>311</a>
-<a href=#312 id=312 data-nosnippet>312</a>            <span class="kw">if </span>armies_remaining == <span class="number">0 </span>{
-<a href=#313 id=313 data-nosnippet>313</a>                <span class="kw">return </span><span class="prelude-val">Some</span>(CrisisCommand::EndPhase(EndPhaseCommand { player: ai }));
-<a href=#314 id=314 data-nosnippet>314</a>            }
-<a href=#315 id=315 data-nosnippet>315</a>
-<a href=#316 id=316 data-nosnippet>316</a>            <span class="comment">// Seleccionar el territorio propio más amenazado (menor ratio propios / vecinos enemigos)
-<a href=#317 id=317 data-nosnippet>317</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>best_territory = owned_territories[<span class="number">0</span>];
-<a href=#318 id=318 data-nosnippet>318</a>            <span class="kw">let </span><span class="kw-2">mut </span>lowest_ratio = f64::INFINITY;
-<a href=#319 id=319 data-nosnippet>319</a>            <span class="kw">let </span><span class="kw-2">mut </span>best_obj_bonus = <span class="bool-val">false</span>;
-<a href=#320 id=320 data-nosnippet>320</a>
-<a href=#321 id=321 data-nosnippet>321</a>            <span class="kw">for </span><span class="kw-2">&amp;</span>t_id <span class="kw">in </span><span class="kw-2">&amp;</span>owned_territories {
-<a href=#322 id=322 data-nosnippet>322</a>                <span class="kw">let </span>ratio = threat_ratio(map, ai, t_id);
-<a href=#323 id=323 data-nosnippet>323</a>                <span class="kw">let </span>touches_obj = difficulty == AiDifficulty::Expert
-<a href=#324 id=324 data-nosnippet>324</a>                    &amp;&amp; adjacent_territories(t_id).into_iter().any(|adj| {
-<a href=#325 id=325 data-nosnippet>325</a>                        map.owners.get(<span class="kw-2">&amp;</span>adj).copied() != <span class="prelude-val">Some</span>(ai)
-<a href=#326 id=326 data-nosnippet>326</a>                            &amp;&amp; advances_secret_objective(state, map, ai, adj)
-<a href=#327 id=327 data-nosnippet>327</a>                    });
-<a href=#328 id=328 data-nosnippet>328</a>
-<a href=#329 id=329 data-nosnippet>329</a>                <span class="kw">let </span>is_better = <span class="kw">if </span>(ratio - lowest_ratio).abs() &lt; <span class="number">1e-9 </span>{
-<a href=#330 id=330 data-nosnippet>330</a>                    touches_obj &amp;&amp; !best_obj_bonus
-<a href=#331 id=331 data-nosnippet>331</a>                } <span class="kw">else </span>{
-<a href=#332 id=332 data-nosnippet>332</a>                    ratio &lt; lowest_ratio
-<a href=#333 id=333 data-nosnippet>333</a>                };
-<a href=#334 id=334 data-nosnippet>334</a>
-<a href=#335 id=335 data-nosnippet>335</a>                <span class="kw">if </span>is_better {
-<a href=#336 id=336 data-nosnippet>336</a>                    lowest_ratio = ratio;
-<a href=#337 id=337 data-nosnippet>337</a>                    best_territory = t_id;
-<a href=#338 id=338 data-nosnippet>338</a>                    best_obj_bonus = touches_obj;
-<a href=#339 id=339 data-nosnippet>339</a>                }
-<a href=#340 id=340 data-nosnippet>340</a>            }
-<a href=#341 id=341 data-nosnippet>341</a>
-<a href=#342 id=342 data-nosnippet>342</a>            <span class="prelude-val">Some</span>(CrisisCommand::PlaceArmies(PlaceArmiesCommand {
-<a href=#343 id=343 data-nosnippet>343</a>                player: ai,
-<a href=#344 id=344 data-nosnippet>344</a>                territory: best_territory,
-<a href=#345 id=345 data-nosnippet>345</a>                count: armies_remaining,
-<a href=#346 id=346 data-nosnippet>346</a>            }))
-<a href=#347 id=347 data-nosnippet>347</a>        }
-<a href=#348 id=348 data-nosnippet>348</a>
-<a href=#349 id=349 data-nosnippet>349</a>        TurnPhase::Attack =&gt; {
-<a href=#350 id=350 data-nosnippet>350</a>            <span class="comment">// Si ya hay un ataque declarado pendiente de lanzar dados, resolverlo
-<a href=#351 id=351 data-nosnippet>351</a>            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pending_res) = state.world().get_resource::&lt;PendingAttackResource&gt;() {
-<a href=#352 id=352 data-nosnippet>352</a>                <span class="kw">if let </span><span class="prelude-val">Some</span>(pending) = <span class="kw-2">&amp;</span>pending_res.attack {
-<a href=#353 id=353 data-nosnippet>353</a>                    <span class="kw">if </span>pending.attacker == ai {
-<a href=#354 id=354 data-nosnippet>354</a>                        <span class="kw">return </span><span class="prelude-val">Some</span>(CrisisCommand::RollAttack(RollAttackCommand { player: ai }));
-<a href=#355 id=355 data-nosnippet>355</a>                    }
-<a href=#356 id=356 data-nosnippet>356</a>                }
-<a href=#357 id=357 data-nosnippet>357</a>            }
-<a href=#358 id=358 data-nosnippet>358</a>
-<a href=#359 id=359 data-nosnippet>359</a>            <span class="kw">let </span>threshold = attack_ratio_threshold(difficulty);
-<a href=#360 id=360 data-nosnippet>360</a>            <span class="kw">let </span>rollouts = difficulty.rollouts().max(<span class="number">1</span>);
-<a href=#361 id=361 data-nosnippet>361</a>
-<a href=#362 id=362 data-nosnippet>362</a>            <span class="kw">let </span><span class="kw-2">mut </span>best_attack: <span class="prelude-ty">Option</span>&lt;(TerritoryId, TerritoryId, u8)&gt; = <span class="prelude-val">None</span>;
-<a href=#363 id=363 data-nosnippet>363</a>            <span class="kw">let </span><span class="kw-2">mut </span>best_priority_obj = <span class="bool-val">false</span>;
-<a href=#364 id=364 data-nosnippet>364</a>            <span class="kw">let </span><span class="kw-2">mut </span>best_score = f64::NEG_INFINITY;
-<a href=#365 id=365 data-nosnippet>365</a>
-<a href=#366 id=366 data-nosnippet>366</a>            <span class="kw">for </span><span class="kw-2">&amp;</span>from <span class="kw">in </span><span class="kw-2">&amp;</span>owned_territories {
-<a href=#367 id=367 data-nosnippet>367</a>                <span class="kw">let </span>att_armies = map.armies.get(<span class="kw-2">&amp;</span>from).copied().unwrap_or(<span class="number">0</span>);
-<a href=#368 id=368 data-nosnippet>368</a>                <span class="kw">if </span>att_armies &lt;= <span class="number">1 </span>{
-<a href=#369 id=369 data-nosnippet>369</a>                    <span class="kw">continue</span>;
-<a href=#370 id=370 data-nosnippet>370</a>                }
-<a href=#371 id=371 data-nosnippet>371</a>
-<a href=#372 id=372 data-nosnippet>372</a>                <span class="kw">for </span>to <span class="kw">in </span>adjacent_territories(from) {
-<a href=#373 id=373 data-nosnippet>373</a>                    <span class="kw">if </span>map.owners.get(<span class="kw-2">&amp;</span>to).copied() == <span class="prelude-val">Some</span>(ai) {
-<a href=#374 id=374 data-nosnippet>374</a>                        <span class="kw">continue</span>;
-<a href=#375 id=375 data-nosnippet>375</a>                    }
-<a href=#376 id=376 data-nosnippet>376</a>                    <span class="kw">let </span>def_armies = map.armies.get(<span class="kw-2">&amp;</span>to).copied().unwrap_or(<span class="number">0</span>);
-<a href=#377 id=377 data-nosnippet>377</a>
-<a href=#378 id=378 data-nosnippet>378</a>                    <span class="comment">// Condición de ataque según dificultad: atacantes &gt; defensores * threshold
-<a href=#379 id=379 data-nosnippet>379</a>                    </span><span class="kw">if </span>(att_armies <span class="kw">as </span>f64) &lt;= (def_armies <span class="kw">as </span>f64) * threshold {
-<a href=#380 id=380 data-nosnippet>380</a>                        <span class="kw">continue</span>;
-<a href=#381 id=381 data-nosnippet>381</a>                    }
-<a href=#382 id=382 data-nosnippet>382</a>
-<a href=#383 id=383 data-nosnippet>383</a>                    <span class="kw">let </span>is_obj_target = difficulty == AiDifficulty::Expert
-<a href=#384 id=384 data-nosnippet>384</a>                        &amp;&amp; advances_secret_objective(state, map, ai, to);
-<a href=#385 id=385 data-nosnippet>385</a>
-<a href=#386 id=386 data-nosnippet>386</a>                    <span class="kw">let </span>seed = state.id.<span class="number">0
-<a href=#387 id=387 data-nosnippet>387</a>                        </span>^ ((from.<span class="number">0 </span><span class="kw">as </span>u64) &lt;&lt; <span class="number">8</span>)
-<a href=#388 id=388 data-nosnippet>388</a>                        ^ ((to.<span class="number">0 </span><span class="kw">as </span>u64) &lt;&lt; <span class="number">16</span>)
-<a href=#389 id=389 data-nosnippet>389</a>                        ^ ((att_armies <span class="kw">as </span>u64) &lt;&lt; <span class="number">24</span>);
-<a href=#390 id=390 data-nosnippet>390</a>                    <span class="kw">let </span>mcts_score = mcts_evaluate_attack(att_armies, def_armies, rollouts, seed);
-<a href=#391 id=391 data-nosnippet>391</a>                    <span class="kw">let </span>ratio_score = (att_armies <span class="kw">as </span>f64) / (def_armies.max(<span class="number">1</span>) <span class="kw">as </span>f64);
-<a href=#392 id=392 data-nosnippet>392</a>                    <span class="kw">let </span>combined_score = mcts_score * <span class="number">10.0 </span>+ ratio_score;
-<a href=#393 id=393 data-nosnippet>393</a>
-<a href=#394 id=394 data-nosnippet>394</a>                    <span class="kw">let </span>should_pick = <span class="kw">match </span>(is_obj_target, best_priority_obj) {
-<a href=#395 id=395 data-nosnippet>395</a>                        (<span class="bool-val">true</span>, <span class="bool-val">false</span>) =&gt; <span class="bool-val">true</span>,
-<a href=#396 id=396 data-nosnippet>396</a>                        (<span class="bool-val">false</span>, <span class="bool-val">true</span>) =&gt; <span class="bool-val">false</span>,
-<a href=#397 id=397 data-nosnippet>397</a>                        <span class="kw">_ </span>=&gt; combined_score &gt; best_score,
-<a href=#398 id=398 data-nosnippet>398</a>                    };
-<a href=#399 id=399 data-nosnippet>399</a>
-<a href=#400 id=400 data-nosnippet>400</a>                    <span class="kw">if </span>should_pick {
-<a href=#401 id=401 data-nosnippet>401</a>                        best_priority_obj = is_obj_target;
-<a href=#402 id=402 data-nosnippet>402</a>                        best_score = combined_score;
-<a href=#403 id=403 data-nosnippet>403</a>                        <span class="kw">let </span>dice = std::cmp::min(<span class="number">3</span>, att_armies - <span class="number">1</span>) <span class="kw">as </span>u8;
-<a href=#404 id=404 data-nosnippet>404</a>                        best_attack = <span class="prelude-val">Some</span>((from, to, dice));
-<a href=#405 id=405 data-nosnippet>405</a>                    }
-<a href=#406 id=406 data-nosnippet>406</a>                }
-<a href=#407 id=407 data-nosnippet>407</a>            }
-<a href=#408 id=408 data-nosnippet>408</a>
-<a href=#409 id=409 data-nosnippet>409</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>((from, to, dice)) = best_attack {
-<a href=#410 id=410 data-nosnippet>410</a>                <span class="prelude-val">Some</span>(CrisisCommand::DeclareAttack(DeclareAttackCommand {
-<a href=#411 id=411 data-nosnippet>411</a>                    player: ai,
-<a href=#412 id=412 data-nosnippet>412</a>                    from,
-<a href=#413 id=413 data-nosnippet>413</a>                    to,
-<a href=#414 id=414 data-nosnippet>414</a>                    dice,
-<a href=#415 id=415 data-nosnippet>415</a>                }))
-<a href=#416 id=416 data-nosnippet>416</a>            } <span class="kw">else </span>{
-<a href=#417 id=417 data-nosnippet>417</a>                <span class="prelude-val">Some</span>(CrisisCommand::EndPhase(EndPhaseCommand { player: ai }))
-<a href=#418 id=418 data-nosnippet>418</a>            }
-<a href=#419 id=419 data-nosnippet>419</a>        }
-<a href=#420 id=420 data-nosnippet>420</a>
-<a href=#421 id=421 data-nosnippet>421</a>        TurnPhase::Fortify =&gt; {
-<a href=#422 id=422 data-nosnippet>422</a>            <span class="kw">if </span>turn_state.fortified {
-<a href=#423 id=423 data-nosnippet>423</a>                <span class="kw">return </span><span class="prelude-val">Some</span>(CrisisCommand::EndPhase(EndPhaseCommand { player: ai }));
-<a href=#424 id=424 data-nosnippet>424</a>            }
-<a href=#425 id=425 data-nosnippet>425</a>
-<a href=#426 id=426 data-nosnippet>426</a>            <span class="comment">// Encontrar el territorio fronterizo más débil (menor threat_ratio con enemigos adyacentes)
-<a href=#427 id=427 data-nosnippet>427</a>            </span><span class="kw">let </span>border_territories: Vec&lt;(TerritoryId, f64)&gt; = owned_territories
-<a href=#428 id=428 data-nosnippet>428</a>                .iter()
-<a href=#429 id=429 data-nosnippet>429</a>                .copied()
-<a href=#430 id=430 data-nosnippet>430</a>                .filter_map(|t_id| {
-<a href=#431 id=431 data-nosnippet>431</a>                    <span class="kw">let </span>ratio = threat_ratio(map, ai, t_id);
-<a href=#432 id=432 data-nosnippet>432</a>                    <span class="kw">if </span>ratio.is_finite() {
-<a href=#433 id=433 data-nosnippet>433</a>                        <span class="prelude-val">Some</span>((t_id, ratio))
-<a href=#434 id=434 data-nosnippet>434</a>                    } <span class="kw">else </span>{
-<a href=#435 id=435 data-nosnippet>435</a>                        <span class="prelude-val">None
-<a href=#436 id=436 data-nosnippet>436</a>                    </span>}
-<a href=#437 id=437 data-nosnippet>437</a>                })
-<a href=#438 id=438 data-nosnippet>438</a>                .collect();
-<a href=#439 id=439 data-nosnippet>439</a>
-<a href=#440 id=440 data-nosnippet>440</a>            <span class="kw">if </span>border_territories.is_empty() {
-<a href=#441 id=441 data-nosnippet>441</a>                <span class="kw">return </span><span class="prelude-val">Some</span>(CrisisCommand::EndPhase(EndPhaseCommand { player: ai }));
-<a href=#442 id=442 data-nosnippet>442</a>            }
-<a href=#443 id=443 data-nosnippet>443</a>
-<a href=#444 id=444 data-nosnippet>444</a>            <span class="comment">// Ordenar territorios fronterizos del más débil al más fuerte
-<a href=#445 id=445 data-nosnippet>445</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>sorted_borders = border_territories;
-<a href=#446 id=446 data-nosnippet>446</a>            sorted_borders.sort_by(|(ta, ra), (tb, rb)| {
-<a href=#447 id=447 data-nosnippet>447</a>                ra.partial_cmp(rb)
-<a href=#448 id=448 data-nosnippet>448</a>                    .unwrap_or(std::cmp::Ordering::Equal)
-<a href=#449 id=449 data-nosnippet>449</a>                    .then_with(|| ta.<span class="number">0</span>.cmp(<span class="kw-2">&amp;</span>tb.<span class="number">0</span>))
-<a href=#450 id=450 data-nosnippet>450</a>            });
-<a href=#451 id=451 data-nosnippet>451</a>
-<a href=#452 id=452 data-nosnippet>452</a>            <span class="comment">// Buscar ejércitos excedentes para mover al territorio fronterizo más débil conectado
-<a href=#453 id=453 data-nosnippet>453</a>            </span><span class="kw">for </span><span class="kw-2">&amp;</span>(weakest_border, weakest_ratio) <span class="kw">in </span><span class="kw-2">&amp;</span>sorted_borders {
-<a href=#454 id=454 data-nosnippet>454</a>                <span class="comment">// Preferir primero territorios interiores con &gt; 1 ejército, luego territorios con mayor ratio
-<a href=#455 id=455 data-nosnippet>455</a>                </span><span class="kw">let </span><span class="kw-2">mut </span>best_donor: <span class="prelude-ty">Option</span>&lt;(TerritoryId, u32, f64)&gt; = <span class="prelude-val">None</span>;
-<a href=#456 id=456 data-nosnippet>456</a>
-<a href=#457 id=457 data-nosnippet>457</a>                <span class="kw">for </span><span class="kw-2">&amp;</span>donor <span class="kw">in </span><span class="kw-2">&amp;</span>owned_territories {
-<a href=#458 id=458 data-nosnippet>458</a>                    <span class="kw">if </span>donor == weakest_border {
-<a href=#459 id=459 data-nosnippet>459</a>                        <span class="kw">continue</span>;
-<a href=#460 id=460 data-nosnippet>460</a>                    }
-<a href=#461 id=461 data-nosnippet>461</a>                    <span class="kw">let </span>donor_armies = map.armies.get(<span class="kw-2">&amp;</span>donor).copied().unwrap_or(<span class="number">0</span>);
-<a href=#462 id=462 data-nosnippet>462</a>                    <span class="kw">if </span>donor_armies &lt;= <span class="number">1 </span>{
-<a href=#463 id=463 data-nosnippet>463</a>                        <span class="kw">continue</span>;
-<a href=#464 id=464 data-nosnippet>464</a>                    }
-<a href=#465 id=465 data-nosnippet>465</a>                    <span class="kw">if </span>!are_connected_by_owner(donor, weakest_border, ai, map) {
-<a href=#466 id=466 data-nosnippet>466</a>                        <span class="kw">continue</span>;
-<a href=#467 id=467 data-nosnippet>467</a>                    }
-<a href=#468 id=468 data-nosnippet>468</a>
-<a href=#469 id=469 data-nosnippet>469</a>                    <span class="kw">let </span>donor_ratio = threat_ratio(map, ai, donor);
-<a href=#470 id=470 data-nosnippet>470</a>                    <span class="kw">let </span>surplus = <span class="kw">if </span>!donor_ratio.is_finite() {
-<a href=#471 id=471 data-nosnippet>471</a>                        <span class="comment">// Territorio interior: todos los ejércitos salvo 1 son excedentes
-<a href=#472 id=472 data-nosnippet>472</a>                        </span>donor_armies - <span class="number">1
-<a href=#473 id=473 data-nosnippet>473</a>                    </span>} <span class="kw">else if </span>donor_ratio &gt; weakest_ratio * <span class="number">2.0 </span>&amp;&amp; donor_armies &gt;= <span class="number">3 </span>{
-<a href=#474 id=474 data-nosnippet>474</a>                        (donor_armies - <span class="number">1</span>) / <span class="number">2
-<a href=#475 id=475 data-nosnippet>475</a>                    </span>} <span class="kw">else </span>{
-<a href=#476 id=476 data-nosnippet>476</a>                        <span class="number">0
-<a href=#477 id=477 data-nosnippet>477</a>                    </span>};
-<a href=#478 id=478 data-nosnippet>478</a>
-<a href=#479 id=479 data-nosnippet>479</a>                    <span class="kw">if </span>surplus &gt; <span class="number">0 </span>{
-<a href=#480 id=480 data-nosnippet>480</a>                        <span class="kw">let </span>is_better_donor = <span class="kw">match </span>best_donor {
-<a href=#481 id=481 data-nosnippet>481</a>                            <span class="prelude-val">None </span>=&gt; <span class="bool-val">true</span>,
-<a href=#482 id=482 data-nosnippet>482</a>                            <span class="prelude-val">Some</span>((<span class="kw">_</span>, best_surplus, best_d_ratio)) =&gt; {
-<a href=#483 id=483 data-nosnippet>483</a>                                <span class="kw">if </span>donor_ratio.is_infinite() &amp;&amp; !best_d_ratio.is_infinite() {
-<a href=#484 id=484 data-nosnippet>484</a>                                    <span class="bool-val">true
-<a href=#485 id=485 data-nosnippet>485</a>                                </span>} <span class="kw">else if </span>!donor_ratio.is_infinite() &amp;&amp; best_d_ratio.is_infinite() {
-<a href=#486 id=486 data-nosnippet>486</a>                                    <span class="bool-val">false
-<a href=#487 id=487 data-nosnippet>487</a>                                </span>} <span class="kw">else </span>{
-<a href=#488 id=488 data-nosnippet>488</a>                                    surplus &gt; best_surplus
-<a href=#489 id=489 data-nosnippet>489</a>                                }
-<a href=#490 id=490 data-nosnippet>490</a>                            }
-<a href=#491 id=491 data-nosnippet>491</a>                        };
-<a href=#492 id=492 data-nosnippet>492</a>                        <span class="kw">if </span>is_better_donor {
-<a href=#493 id=493 data-nosnippet>493</a>                            best_donor = <span class="prelude-val">Some</span>((donor, surplus, donor_ratio));
-<a href=#494 id=494 data-nosnippet>494</a>                        }
-<a href=#495 id=495 data-nosnippet>495</a>                    }
-<a href=#496 id=496 data-nosnippet>496</a>                }
-<a href=#497 id=497 data-nosnippet>497</a>
-<a href=#498 id=498 data-nosnippet>498</a>                <span class="kw">if let </span><span class="prelude-val">Some</span>((from, armies, <span class="kw">_</span>)) = best_donor {
-<a href=#499 id=499 data-nosnippet>499</a>                    <span class="kw">return </span><span class="prelude-val">Some</span>(CrisisCommand::Fortify(FortifyCommand {
-<a href=#500 id=500 data-nosnippet>500</a>                        player: ai,
-<a href=#501 id=501 data-nosnippet>501</a>                        from,
-<a href=#502 id=502 data-nosnippet>502</a>                        to: weakest_border,
-<a href=#503 id=503 data-nosnippet>503</a>                        armies,
-<a href=#504 id=504 data-nosnippet>504</a>                    }));
-<a href=#505 id=505 data-nosnippet>505</a>                }
-<a href=#506 id=506 data-nosnippet>506</a>            }
-<a href=#507 id=507 data-nosnippet>507</a>
-<a href=#508 id=508 data-nosnippet>508</a>            <span class="prelude-val">Some</span>(CrisisCommand::EndPhase(EndPhaseCommand { player: ai }))
-<a href=#509 id=509 data-nosnippet>509</a>        }
-<a href=#510 id=510 data-nosnippet>510</a>
-<a href=#511 id=511 data-nosnippet>511</a>        TurnPhase::EndTurn =&gt; <span class="prelude-val">Some</span>(CrisisCommand::EndPhase(EndPhaseCommand { player: ai })),
-<a href=#512 id=512 data-nosnippet>512</a>    }
-<a href=#513 id=513 data-nosnippet>513</a>}
-<a href=#514 id=514 data-nosnippet>514</a>
-<a href=#515 id=515 data-nosnippet>515</a><span class="attr">#[cfg(test)]
-<a href=#516 id=516 data-nosnippet>516</a></span><span class="kw">mod </span>tests {
-<a href=#517 id=517 data-nosnippet>517</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#518 id=518 data-nosnippet>518</a>    <span class="kw">use </span><span class="kw">crate</span>::new_crisis_session;
-<a href=#519 id=519 data-nosnippet>519</a>
-<a href=#520 id=520 data-nosnippet>520</a>    <span class="kw">const </span>P1: PlayerId = PlayerId(<span class="number">1</span>);
-<a href=#521 id=521 data-nosnippet>521</a>    <span class="kw">const </span>P2: PlayerId = PlayerId(<span class="number">2</span>);
-<a href=#522 id=522 data-nosnippet>522</a>
-<a href=#523 id=523 data-nosnippet>523</a>    <span class="attr">#[test]
-<a href=#524 id=524 data-nosnippet>524</a>    </span><span class="kw">fn </span>crisis_ai_reinforces_threatened_territory() {
-<a href=#525 id=525 data-nosnippet>525</a>        <span class="kw">let </span><span class="kw-2">mut </span>session = new_crisis_session(SessionId(<span class="number">1</span>), <span class="number">42</span>, <span class="kw-2">&amp;</span>[P1, P2]).unwrap();
-<a href=#526 id=526 data-nosnippet>526</a>
-<a href=#527 id=527 data-nosnippet>527</a>        {
-<a href=#528 id=528 data-nosnippet>528</a>            <span class="kw">let </span><span class="kw-2">mut </span>map = session.world_mut().resource_mut::&lt;TerritoryStateResource&gt;();
-<a href=#529 id=529 data-nosnippet>529</a>            <span class="comment">// Asignar todos los territorios inicialmente a P1 con 5 ejércitos
-<a href=#530 id=530 data-nosnippet>530</a>            </span><span class="kw">for </span>id <span class="kw">in </span><span class="number">0</span>..<span class="number">30u8 </span>{
-<a href=#531 id=531 data-nosnippet>531</a>                map.set_owner_and_armies(TerritoryId(id), P1, <span class="number">5</span>);
-<a href=#532 id=532 data-nosnippet>532</a>            }
-<a href=#533 id=533 data-nosnippet>533</a>            <span class="comment">// Territorio 0 (Argentina) tiene 4 ejércitos propios y solo 2 enemigos vecinos en Chile (2) -&gt; ratio = 4/2 = 2.0
-<a href=#534 id=534 data-nosnippet>534</a>            </span>map.set_owner_and_armies(TerritoryId(<span class="number">0</span>), P1, <span class="number">4</span>);
-<a href=#535 id=535 data-nosnippet>535</a>            map.set_owner_and_armies(TerritoryId(<span class="number">2</span>), P2, <span class="number">2</span>);
-<a href=#536 id=536 data-nosnippet>536</a>
-<a href=#537 id=537 data-nosnippet>537</a>            <span class="comment">// Territorio 10 (España) tiene 2 ejércitos propios y 10 enemigos vecinos en Sahara (14) -&gt; ratio = 2/10 = 0.2
-<a href=#538 id=538 data-nosnippet>538</a>            </span>map.set_owner_and_armies(TerritoryId(<span class="number">10</span>), P1, <span class="number">2</span>);
-<a href=#539 id=539 data-nosnippet>539</a>            map.set_owner_and_armies(TerritoryId(<span class="number">14</span>), P2, <span class="number">10</span>);
-<a href=#540 id=540 data-nosnippet>540</a>
-<a href=#541 id=541 data-nosnippet>541</a>            <span class="kw">let </span><span class="kw-2">mut </span>turn_state = session.world_mut().resource_mut::&lt;TurnStateResource&gt;();
-<a href=#542 id=542 data-nosnippet>542</a>            turn_state.phase = TurnPhase::PlaceArmies {
-<a href=#543 id=543 data-nosnippet>543</a>                armies_remaining: <span class="number">5</span>,
-<a href=#544 id=544 data-nosnippet>544</a>            };
-<a href=#545 id=545 data-nosnippet>545</a>        }
-<a href=#546 id=546 data-nosnippet>546</a>
-<a href=#547 id=547 data-nosnippet>547</a>        <span class="kw">let </span>cmd = best_move(<span class="kw-2">&amp;</span>session, P1, AiDifficulty::Hard).unwrap();
-<a href=#548 id=548 data-nosnippet>548</a>
-<a href=#549 id=549 data-nosnippet>549</a>        <span class="kw">match </span>cmd {
-<a href=#550 id=550 data-nosnippet>550</a>            CrisisCommand::PlaceArmies(place) =&gt; {
-<a href=#551 id=551 data-nosnippet>551</a>                <span class="macro">assert_eq!</span>(place.player, P1);
-<a href=#552 id=552 data-nosnippet>552</a>                <span class="macro">assert_eq!</span>(
-<a href=#553 id=553 data-nosnippet>553</a>                    place.territory,
-<a href=#554 id=554 data-nosnippet>554</a>                    TerritoryId(<span class="number">10</span>),
-<a href=#555 id=555 data-nosnippet>555</a>                    <span class="string">"Debe reforzar el territorio más amenazado (España, ratio 0.2)"
-<a href=#556 id=556 data-nosnippet>556</a>                </span>);
-<a href=#557 id=557 data-nosnippet>557</a>                <span class="macro">assert_eq!</span>(place.count, <span class="number">5</span>);
-<a href=#558 id=558 data-nosnippet>558</a>            }
-<a href=#559 id=559 data-nosnippet>559</a>            other =&gt; <span class="macro">panic!</span>(<span class="string">"Se esperaba PlaceArmies, se obtuvo {:?}"</span>, other),
-<a href=#560 id=560 data-nosnippet>560</a>        }
-<a href=#561 id=561 data-nosnippet>561</a>    }
-<a href=#562 id=562 data-nosnippet>562</a>
-<a href=#563 id=563 data-nosnippet>563</a>    <span class="attr">#[test]
-<a href=#564 id=564 data-nosnippet>564</a>    </span><span class="kw">fn </span>crisis_ai_attacks_when_superior() {
-<a href=#565 id=565 data-nosnippet>565</a>        <span class="kw">let </span><span class="kw-2">mut </span>session = new_crisis_session(SessionId(<span class="number">2</span>), <span class="number">99</span>, <span class="kw-2">&amp;</span>[P1, P2]).unwrap();
-<a href=#566 id=566 data-nosnippet>566</a>
-<a href=#567 id=567 data-nosnippet>567</a>        {
-<a href=#568 id=568 data-nosnippet>568</a>            <span class="kw">let </span><span class="kw-2">mut </span>map = session.world_mut().resource_mut::&lt;TerritoryStateResource&gt;();
-<a href=#569 id=569 data-nosnippet>569</a>            <span class="kw">for </span>id <span class="kw">in </span><span class="number">0</span>..<span class="number">30u8 </span>{
-<a href=#570 id=570 data-nosnippet>570</a>                map.set_owner_and_armies(TerritoryId(id), P1, <span class="number">1</span>);
-<a href=#571 id=571 data-nosnippet>571</a>            }
-<a href=#572 id=572 data-nosnippet>572</a>            <span class="comment">// Argentina (0) de P1 con 6 ejércitos frente a Brasil (1) de P2 con 2 ejércitos (6 &gt; 2 * 1.5 = 3.0)
-<a href=#573 id=573 data-nosnippet>573</a>            </span>map.set_owner_and_armies(TerritoryId(<span class="number">0</span>), P1, <span class="number">6</span>);
-<a href=#574 id=574 data-nosnippet>574</a>            map.set_owner_and_armies(TerritoryId(<span class="number">1</span>), P2, <span class="number">2</span>);
-<a href=#575 id=575 data-nosnippet>575</a>
-<a href=#576 id=576 data-nosnippet>576</a>            <span class="kw">let </span><span class="kw-2">mut </span>turn_state = session.world_mut().resource_mut::&lt;TurnStateResource&gt;();
-<a href=#577 id=577 data-nosnippet>577</a>            turn_state.phase = TurnPhase::Attack;
-<a href=#578 id=578 data-nosnippet>578</a>        }
-<a href=#579 id=579 data-nosnippet>579</a>
-<a href=#580 id=580 data-nosnippet>580</a>        <span class="kw">let </span>cmd = best_move(<span class="kw-2">&amp;</span>session, P1, AiDifficulty::Medium).unwrap();
-<a href=#581 id=581 data-nosnippet>581</a>
-<a href=#582 id=582 data-nosnippet>582</a>        <span class="macro">assert_eq!</span>(
-<a href=#583 id=583 data-nosnippet>583</a>            cmd,
-<a href=#584 id=584 data-nosnippet>584</a>            CrisisCommand::DeclareAttack(DeclareAttackCommand {
-<a href=#585 id=585 data-nosnippet>585</a>                player: P1,
-<a href=#586 id=586 data-nosnippet>586</a>                from: TerritoryId(<span class="number">0</span>),
-<a href=#587 id=587 data-nosnippet>587</a>                to: TerritoryId(<span class="number">1</span>),
-<a href=#588 id=588 data-nosnippet>588</a>                dice: <span class="number">3</span>,
-<a href=#589 id=589 data-nosnippet>589</a>            })
-<a href=#590 id=590 data-nosnippet>590</a>        );
-<a href=#591 id=591 data-nosnippet>591</a>
-<a href=#592 id=592 data-nosnippet>592</a>        <span class="comment">// Si P1 solo tiene 3 ejércitos contra 2 (ratio 1.5, no &gt; 1.5), en Medium pasa de fase,
-<a href=#593 id=593 data-nosnippet>593</a>        // pero en Expert (umbral 1.2: 3 &gt; 2.4) sí ataca.
-<a href=#594 id=594 data-nosnippet>594</a>        </span>{
-<a href=#595 id=595 data-nosnippet>595</a>            <span class="kw">let </span><span class="kw-2">mut </span>map = session.world_mut().resource_mut::&lt;TerritoryStateResource&gt;();
-<a href=#596 id=596 data-nosnippet>596</a>            map.set_owner_and_armies(TerritoryId(<span class="number">0</span>), P1, <span class="number">3</span>);
-<a href=#597 id=597 data-nosnippet>597</a>            map.set_owner_and_armies(TerritoryId(<span class="number">1</span>), P2, <span class="number">2</span>);
-<a href=#598 id=598 data-nosnippet>598</a>        }
-<a href=#599 id=599 data-nosnippet>599</a>
-<a href=#600 id=600 data-nosnippet>600</a>        <span class="kw">let </span>cmd_medium = best_move(<span class="kw-2">&amp;</span>session, P1, AiDifficulty::Medium).unwrap();
-<a href=#601 id=601 data-nosnippet>601</a>        <span class="macro">assert_eq!</span>(
-<a href=#602 id=602 data-nosnippet>602</a>            cmd_medium,
-<a href=#603 id=603 data-nosnippet>603</a>            CrisisCommand::EndPhase(EndPhaseCommand { player: P1 })
-<a href=#604 id=604 data-nosnippet>604</a>        );
-<a href=#605 id=605 data-nosnippet>605</a>
-<a href=#606 id=606 data-nosnippet>606</a>        <span class="kw">let </span>cmd_expert = best_move(<span class="kw-2">&amp;</span>session, P1, AiDifficulty::Expert).unwrap();
-<a href=#607 id=607 data-nosnippet>607</a>        <span class="macro">assert_eq!</span>(
-<a href=#608 id=608 data-nosnippet>608</a>            cmd_expert,
-<a href=#609 id=609 data-nosnippet>609</a>            CrisisCommand::DeclareAttack(DeclareAttackCommand {
-<a href=#610 id=610 data-nosnippet>610</a>                player: P1,
-<a href=#611 id=611 data-nosnippet>611</a>                from: TerritoryId(<span class="number">0</span>),
-<a href=#612 id=612 data-nosnippet>612</a>                to: TerritoryId(<span class="number">1</span>),
-<a href=#613 id=613 data-nosnippet>613</a>                dice: <span class="number">2</span>,
-<a href=#614 id=614 data-nosnippet>614</a>            })
-<a href=#615 id=615 data-nosnippet>615</a>        );
-<a href=#616 id=616 data-nosnippet>616</a>    }
-<a href=#617 id=617 data-nosnippet>617</a>
-<a href=#618 id=618 data-nosnippet>618</a>    <span class="attr">#[test]
-<a href=#619 id=619 data-nosnippet>619</a>    </span><span class="kw">fn </span>crisis_ai_expert_prioritizes_secret_objective_and_fortifies() {
-<a href=#620 id=620 data-nosnippet>620</a>        <span class="kw">let </span><span class="kw-2">mut </span>session = new_crisis_session(SessionId(<span class="number">3</span>), <span class="number">77</span>, <span class="kw-2">&amp;</span>[P1, P2]).unwrap();
-<a href=#621 id=621 data-nosnippet>621</a>
-<a href=#622 id=622 data-nosnippet>622</a>        {
-<a href=#623 id=623 data-nosnippet>623</a>            <span class="kw">let </span><span class="kw-2">mut </span>map = session.world_mut().resource_mut::&lt;TerritoryStateResource&gt;();
-<a href=#624 id=624 data-nosnippet>624</a>            <span class="kw">for </span>id <span class="kw">in </span><span class="number">0</span>..<span class="number">30u8 </span>{
-<a href=#625 id=625 data-nosnippet>625</a>                map.set_owner_and_armies(TerritoryId(id), P1, <span class="number">1</span>);
-<a href=#626 id=626 data-nosnippet>626</a>            }
-<a href=#627 id=627 data-nosnippet>627</a>            <span class="comment">// P1 puede atacar desde Colombia (3, con 6 ejércitos) hacia Perú (4, América del Sur, 2 ejércitos)
-<a href=#628 id=628 data-nosnippet>628</a>            // o hacia México (5, América del Norte, 2 ejércitos).
-<a href=#629 id=629 data-nosnippet>629</a>            </span>map.set_owner_and_armies(TerritoryId(<span class="number">3</span>), P1, <span class="number">6</span>);
-<a href=#630 id=630 data-nosnippet>630</a>            map.set_owner_and_armies(TerritoryId(<span class="number">4</span>), P2, <span class="number">2</span>);
-<a href=#631 id=631 data-nosnippet>631</a>            map.set_owner_and_armies(TerritoryId(<span class="number">5</span>), P2, <span class="number">2</span>);
-<a href=#632 id=632 data-nosnippet>632</a>
-<a href=#633 id=633 data-nosnippet>633</a>            <span class="comment">// Objetivo secreto de P1: Conquistar América del Norte (ContinentId(1), que incluye México = 5)
-<a href=#634 id=634 data-nosnippet>634</a>            </span>session
-<a href=#635 id=635 data-nosnippet>635</a>                .world_mut()
-<a href=#636 id=636 data-nosnippet>636</a>                .resource_mut::&lt;PlayerObjectivesResource&gt;()
-<a href=#637 id=637 data-nosnippet>637</a>                .objectives
-<a href=#638 id=638 data-nosnippet>638</a>                .insert(
-<a href=#639 id=639 data-nosnippet>639</a>                    P1,
-<a href=#640 id=640 data-nosnippet>640</a>                    ObjectiveCard::ConquerContinent(<span class="kw">crate</span>::board::CONTINENT_NORTH_AMERICA),
-<a href=#641 id=641 data-nosnippet>641</a>                );
-<a href=#642 id=642 data-nosnippet>642</a>
-<a href=#643 id=643 data-nosnippet>643</a>            session.world_mut().resource_mut::&lt;TurnStateResource&gt;().phase = TurnPhase::Attack;
-<a href=#644 id=644 data-nosnippet>644</a>        }
-<a href=#645 id=645 data-nosnippet>645</a>
-<a href=#646 id=646 data-nosnippet>646</a>        <span class="kw">let </span>attack_cmd = best_move(<span class="kw-2">&amp;</span>session, P1, AiDifficulty::Expert).unwrap();
-<a href=#647 id=647 data-nosnippet>647</a>        <span class="macro">assert_eq!</span>(
-<a href=#648 id=648 data-nosnippet>648</a>            attack_cmd,
-<a href=#649 id=649 data-nosnippet>649</a>            CrisisCommand::DeclareAttack(DeclareAttackCommand {
-<a href=#650 id=650 data-nosnippet>650</a>                player: P1,
-<a href=#651 id=651 data-nosnippet>651</a>                from: TerritoryId(<span class="number">3</span>),
-<a href=#652 id=652 data-nosnippet>652</a>                to: TerritoryId(<span class="number">5</span>),
-<a href=#653 id=653 data-nosnippet>653</a>                dice: <span class="number">3</span>,
-<a href=#654 id=654 data-nosnippet>654</a>            })
-<a href=#655 id=655 data-nosnippet>655</a>        );
-<a href=#656 id=656 data-nosnippet>656</a>
-<a href=#657 id=657 data-nosnippet>657</a>        <span class="comment">// Probar fortificación: Argentina (0) es interior con 5 ejércitos, conectada a Colombia (3, fronteriza con México 5 enemigo)
-<a href=#658 id=658 data-nosnippet>658</a>        </span>{
-<a href=#659 id=659 data-nosnippet>659</a>            <span class="kw">let </span><span class="kw-2">mut </span>map = session.world_mut().resource_mut::&lt;TerritoryStateResource&gt;();
-<a href=#660 id=660 data-nosnippet>660</a>            <span class="kw">for </span>id <span class="kw">in </span><span class="number">0</span>..<span class="number">30u8 </span>{
-<a href=#661 id=661 data-nosnippet>661</a>                map.set_owner_and_armies(TerritoryId(id), P1, <span class="number">1</span>);
-<a href=#662 id=662 data-nosnippet>662</a>            }
-<a href=#663 id=663 data-nosnippet>663</a>            map.set_owner_and_armies(TerritoryId(<span class="number">0</span>), P1, <span class="number">5</span>); <span class="comment">// Interior (vecinos 1, 2, 4 son de P1)
-<a href=#664 id=664 data-nosnippet>664</a>            </span>map.set_owner_and_armies(TerritoryId(<span class="number">3</span>), P1, <span class="number">2</span>); <span class="comment">// Frontera con México (5, de P2)
-<a href=#665 id=665 data-nosnippet>665</a>            </span>map.set_owner_and_armies(TerritoryId(<span class="number">5</span>), P2, <span class="number">6</span>);
-<a href=#666 id=666 data-nosnippet>666</a>
-<a href=#667 id=667 data-nosnippet>667</a>            <span class="kw">let </span><span class="kw-2">mut </span>turn_state = session.world_mut().resource_mut::&lt;TurnStateResource&gt;();
-<a href=#668 id=668 data-nosnippet>668</a>            turn_state.phase = TurnPhase::Fortify;
-<a href=#669 id=669 data-nosnippet>669</a>            turn_state.fortified = <span class="bool-val">false</span>;
-<a href=#670 id=670 data-nosnippet>670</a>        }
-<a href=#671 id=671 data-nosnippet>671</a>
-<a href=#672 id=672 data-nosnippet>672</a>        <span class="kw">let </span>fortify_cmd = best_move(<span class="kw-2">&amp;</span>session, P1, AiDifficulty::Hard).unwrap();
-<a href=#673 id=673 data-nosnippet>673</a>        <span class="macro">assert_eq!</span>(
-<a href=#674 id=674 data-nosnippet>674</a>            fortify_cmd,
-<a href=#675 id=675 data-nosnippet>675</a>            CrisisCommand::Fortify(FortifyCommand {
-<a href=#676 id=676 data-nosnippet>676</a>                player: P1,
-<a href=#677 id=677 data-nosnippet>677</a>                from: TerritoryId(<span class="number">0</span>),
-<a href=#678 id=678 data-nosnippet>678</a>                to: TerritoryId(<span class="number">3</span>),
-<a href=#679 id=679 data-nosnippet>679</a>                armies: <span class="number">4</span>,
-<a href=#680 id=680 data-nosnippet>680</a>            })
-<a href=#681 id=681 data-nosnippet>681</a>        );
-<a href=#682 id=682 data-nosnippet>682</a>    }
-<a href=#683 id=683 data-nosnippet>683</a>}
+<a href=#244 id=244 data-nosnippet>244</a>            <span class="kw">let </span>damage_ratio = ((def_armies.saturating_sub(d)) <span class="kw">as </span>f64) / (def_armies.max(<span class="number">1</span>) <span class="kw">as </span>f64);
+<a href=#245 id=245 data-nosnippet>245</a>            total_score += damage_ratio * <span class="number">0.25</span>;
+<a href=#246 id=246 data-nosnippet>246</a>        }
+<a href=#247 id=247 data-nosnippet>247</a>    }
+<a href=#248 id=248 data-nosnippet>248</a>
+<a href=#249 id=249 data-nosnippet>249</a>    total_score / (sims <span class="kw">as </span>f64)
+<a href=#250 id=250 data-nosnippet>250</a>}
+<a href=#251 id=251 data-nosnippet>251</a>
+<a href=#252 id=252 data-nosnippet>252</a><span class="doccomment">/// Busca un trío válido de tarjetas para canjear si el jugador tiene al menos 3 tarjetas.
+<a href=#253 id=253 data-nosnippet>253</a></span><span class="kw">fn </span>find_valid_card_exchange(state: <span class="kw-2">&amp;</span>CrisisState, ai: PlayerId) -&gt; <span class="prelude-ty">Option</span>&lt;[usize; <span class="number">3</span>]&gt; {
+<a href=#254 id=254 data-nosnippet>254</a>    <span class="kw">let </span>cards_res = state.world().get_resource::&lt;PlayerCardsResource&gt;()<span class="question-mark">?</span>;
+<a href=#255 id=255 data-nosnippet>255</a>    <span class="kw">let </span>hand = cards_res.cards.get(<span class="kw-2">&amp;</span>ai)<span class="question-mark">?</span>;
+<a href=#256 id=256 data-nosnippet>256</a>    <span class="kw">if </span>hand.len() &lt; <span class="number">3 </span>{
+<a href=#257 id=257 data-nosnippet>257</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#258 id=258 data-nosnippet>258</a>    }
+<a href=#259 id=259 data-nosnippet>259</a>
+<a href=#260 id=260 data-nosnippet>260</a>    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..hand.len() {
+<a href=#261 id=261 data-nosnippet>261</a>        <span class="kw">for </span>j <span class="kw">in </span>(i + <span class="number">1</span>)..hand.len() {
+<a href=#262 id=262 data-nosnippet>262</a>            <span class="kw">for </span>k <span class="kw">in </span>(j + <span class="number">1</span>)..hand.len() {
+<a href=#263 id=263 data-nosnippet>263</a>                <span class="kw">let </span>types = [hand[i].card_type, hand[j].card_type, hand[k].card_type];
+<a href=#264 id=264 data-nosnippet>264</a>                <span class="kw">if </span>is_valid_card_set(types) {
+<a href=#265 id=265 data-nosnippet>265</a>                    <span class="kw">return </span><span class="prelude-val">Some</span>([i, j, k]);
+<a href=#266 id=266 data-nosnippet>266</a>                }
+<a href=#267 id=267 data-nosnippet>267</a>            }
+<a href=#268 id=268 data-nosnippet>268</a>        }
+<a href=#269 id=269 data-nosnippet>269</a>    }
+<a href=#270 id=270 data-nosnippet>270</a>    <span class="prelude-val">None
+<a href=#271 id=271 data-nosnippet>271</a></span>}
+<a href=#272 id=272 data-nosnippet>272</a>
+<a href=#273 id=273 data-nosnippet>273</a><span class="doccomment">/// Selecciona la mejor jugada para `ai` en Crisis/TEG según la fase actual y `difficulty`.
+<a href=#274 id=274 data-nosnippet>274</a></span><span class="kw">pub fn </span>best_move(
+<a href=#275 id=275 data-nosnippet>275</a>    state: <span class="kw-2">&amp;</span>CrisisState,
+<a href=#276 id=276 data-nosnippet>276</a>    ai: PlayerId,
+<a href=#277 id=277 data-nosnippet>277</a>    difficulty: AiDifficulty,
+<a href=#278 id=278 data-nosnippet>278</a>) -&gt; <span class="prelude-ty">Option</span>&lt;CrisisCommand&gt; {
+<a href=#279 id=279 data-nosnippet>279</a>    <span class="kw">let </span>map = state.world().get_resource::&lt;TerritoryStateResource&gt;()<span class="question-mark">?</span>;
+<a href=#280 id=280 data-nosnippet>280</a>    <span class="kw">let </span>turn_state = state.world().get_resource::&lt;TurnStateResource&gt;()<span class="question-mark">?</span>;
+<a href=#281 id=281 data-nosnippet>281</a>
+<a href=#282 id=282 data-nosnippet>282</a>    <span class="kw">let </span><span class="kw-2">mut </span>owned_territories: Vec&lt;TerritoryId&gt; = map
+<a href=#283 id=283 data-nosnippet>283</a>        .owners
+<a href=#284 id=284 data-nosnippet>284</a>        .iter()
+<a href=#285 id=285 data-nosnippet>285</a>        .filter_map(|(<span class="kw-2">&amp;</span>t_id, <span class="kw-2">&amp;</span>owner)| <span class="kw">if </span>owner == ai { <span class="prelude-val">Some</span>(t_id) } <span class="kw">else </span>{ <span class="prelude-val">None </span>})
+<a href=#286 id=286 data-nosnippet>286</a>        .collect();
+<a href=#287 id=287 data-nosnippet>287</a>    owned_territories.sort_by_key(|t| t.<span class="number">0</span>);
+<a href=#288 id=288 data-nosnippet>288</a>
+<a href=#289 id=289 data-nosnippet>289</a>    <span class="kw">if </span>owned_territories.is_empty() {
+<a href=#290 id=290 data-nosnippet>290</a>        <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#291 id=291 data-nosnippet>291</a>    }
+<a href=#292 id=292 data-nosnippet>292</a>
+<a href=#293 id=293 data-nosnippet>293</a>    <span class="kw">match </span>turn_state.phase {
+<a href=#294 id=294 data-nosnippet>294</a>        TurnPhase::PlaceArmies { armies_remaining } =&gt; {
+<a href=#295 id=295 data-nosnippet>295</a>            <span class="comment">// Si tiene 5 o más tarjetas, las reglas obligan a canjear antes de colocar
+<a href=#296 id=296 data-nosnippet>296</a>            </span><span class="kw">let </span>card_count = state
+<a href=#297 id=297 data-nosnippet>297</a>                .world()
+<a href=#298 id=298 data-nosnippet>298</a>                .get_resource::&lt;PlayerCardsResource&gt;()
+<a href=#299 id=299 data-nosnippet>299</a>                .and_then(|c| c.cards.get(<span class="kw-2">&amp;</span>ai))
+<a href=#300 id=300 data-nosnippet>300</a>                .map(|v| v.len())
+<a href=#301 id=301 data-nosnippet>301</a>                .unwrap_or(<span class="number">0</span>);
+<a href=#302 id=302 data-nosnippet>302</a>            <span class="kw">if </span>card_count &gt;= <span class="number">5 </span>{
+<a href=#303 id=303 data-nosnippet>303</a>                <span class="kw">if let </span><span class="prelude-val">Some</span>(indices) = find_valid_card_exchange(state, ai) {
+<a href=#304 id=304 data-nosnippet>304</a>                    <span class="kw">return </span><span class="prelude-val">Some</span>(CrisisCommand::ExchangeCards(ExchangeCardsCommand {
+<a href=#305 id=305 data-nosnippet>305</a>                        player: ai,
+<a href=#306 id=306 data-nosnippet>306</a>                        card_indices: indices,
+<a href=#307 id=307 data-nosnippet>307</a>                    }));
+<a href=#308 id=308 data-nosnippet>308</a>                }
+<a href=#309 id=309 data-nosnippet>309</a>            }
+<a href=#310 id=310 data-nosnippet>310</a>
+<a href=#311 id=311 data-nosnippet>311</a>            <span class="kw">if </span>armies_remaining == <span class="number">0 </span>{
+<a href=#312 id=312 data-nosnippet>312</a>                <span class="kw">return </span><span class="prelude-val">Some</span>(CrisisCommand::EndPhase(EndPhaseCommand { player: ai }));
+<a href=#313 id=313 data-nosnippet>313</a>            }
+<a href=#314 id=314 data-nosnippet>314</a>
+<a href=#315 id=315 data-nosnippet>315</a>            <span class="comment">// Seleccionar el territorio propio más amenazado (menor ratio propios / vecinos enemigos)
+<a href=#316 id=316 data-nosnippet>316</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>best_territory = owned_territories[<span class="number">0</span>];
+<a href=#317 id=317 data-nosnippet>317</a>            <span class="kw">let </span><span class="kw-2">mut </span>lowest_ratio = f64::INFINITY;
+<a href=#318 id=318 data-nosnippet>318</a>            <span class="kw">let </span><span class="kw-2">mut </span>best_obj_bonus = <span class="bool-val">false</span>;
+<a href=#319 id=319 data-nosnippet>319</a>
+<a href=#320 id=320 data-nosnippet>320</a>            <span class="kw">for </span><span class="kw-2">&amp;</span>t_id <span class="kw">in </span><span class="kw-2">&amp;</span>owned_territories {
+<a href=#321 id=321 data-nosnippet>321</a>                <span class="kw">let </span>ratio = threat_ratio(map, ai, t_id);
+<a href=#322 id=322 data-nosnippet>322</a>                <span class="kw">let </span>touches_obj = difficulty == AiDifficulty::Expert
+<a href=#323 id=323 data-nosnippet>323</a>                    &amp;&amp; adjacent_territories(t_id).into_iter().any(|adj| {
+<a href=#324 id=324 data-nosnippet>324</a>                        map.owners.get(<span class="kw-2">&amp;</span>adj).copied() != <span class="prelude-val">Some</span>(ai)
+<a href=#325 id=325 data-nosnippet>325</a>                            &amp;&amp; advances_secret_objective(state, map, ai, adj)
+<a href=#326 id=326 data-nosnippet>326</a>                    });
+<a href=#327 id=327 data-nosnippet>327</a>
+<a href=#328 id=328 data-nosnippet>328</a>                <span class="kw">let </span>is_better = <span class="kw">if </span>(ratio - lowest_ratio).abs() &lt; <span class="number">1e-9 </span>{
+<a href=#329 id=329 data-nosnippet>329</a>                    touches_obj &amp;&amp; !best_obj_bonus
+<a href=#330 id=330 data-nosnippet>330</a>                } <span class="kw">else </span>{
+<a href=#331 id=331 data-nosnippet>331</a>                    ratio &lt; lowest_ratio
+<a href=#332 id=332 data-nosnippet>332</a>                };
+<a href=#333 id=333 data-nosnippet>333</a>
+<a href=#334 id=334 data-nosnippet>334</a>                <span class="kw">if </span>is_better {
+<a href=#335 id=335 data-nosnippet>335</a>                    lowest_ratio = ratio;
+<a href=#336 id=336 data-nosnippet>336</a>                    best_territory = t_id;
+<a href=#337 id=337 data-nosnippet>337</a>                    best_obj_bonus = touches_obj;
+<a href=#338 id=338 data-nosnippet>338</a>                }
+<a href=#339 id=339 data-nosnippet>339</a>            }
+<a href=#340 id=340 data-nosnippet>340</a>
+<a href=#341 id=341 data-nosnippet>341</a>            <span class="prelude-val">Some</span>(CrisisCommand::PlaceArmies(PlaceArmiesCommand {
+<a href=#342 id=342 data-nosnippet>342</a>                player: ai,
+<a href=#343 id=343 data-nosnippet>343</a>                territory: best_territory,
+<a href=#344 id=344 data-nosnippet>344</a>                count: armies_remaining,
+<a href=#345 id=345 data-nosnippet>345</a>            }))
+<a href=#346 id=346 data-nosnippet>346</a>        }
+<a href=#347 id=347 data-nosnippet>347</a>
+<a href=#348 id=348 data-nosnippet>348</a>        TurnPhase::Attack =&gt; {
+<a href=#349 id=349 data-nosnippet>349</a>            <span class="comment">// Si ya hay un ataque declarado pendiente de lanzar dados, resolverlo
+<a href=#350 id=350 data-nosnippet>350</a>            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pending_res) = state.world().get_resource::&lt;PendingAttackResource&gt;() {
+<a href=#351 id=351 data-nosnippet>351</a>                <span class="kw">if let </span><span class="prelude-val">Some</span>(pending) = <span class="kw-2">&amp;</span>pending_res.attack {
+<a href=#352 id=352 data-nosnippet>352</a>                    <span class="kw">if </span>pending.attacker == ai {
+<a href=#353 id=353 data-nosnippet>353</a>                        <span class="kw">return </span><span class="prelude-val">Some</span>(CrisisCommand::RollAttack(RollAttackCommand { player: ai }));
+<a href=#354 id=354 data-nosnippet>354</a>                    }
+<a href=#355 id=355 data-nosnippet>355</a>                }
+<a href=#356 id=356 data-nosnippet>356</a>            }
+<a href=#357 id=357 data-nosnippet>357</a>
+<a href=#358 id=358 data-nosnippet>358</a>            <span class="kw">let </span>threshold = attack_ratio_threshold(difficulty);
+<a href=#359 id=359 data-nosnippet>359</a>            <span class="kw">let </span>rollouts = difficulty.rollouts().max(<span class="number">1</span>);
+<a href=#360 id=360 data-nosnippet>360</a>
+<a href=#361 id=361 data-nosnippet>361</a>            <span class="kw">let </span><span class="kw-2">mut </span>best_attack: <span class="prelude-ty">Option</span>&lt;(TerritoryId, TerritoryId, u8)&gt; = <span class="prelude-val">None</span>;
+<a href=#362 id=362 data-nosnippet>362</a>            <span class="kw">let </span><span class="kw-2">mut </span>best_priority_obj = <span class="bool-val">false</span>;
+<a href=#363 id=363 data-nosnippet>363</a>            <span class="kw">let </span><span class="kw-2">mut </span>best_score = f64::NEG_INFINITY;
+<a href=#364 id=364 data-nosnippet>364</a>
+<a href=#365 id=365 data-nosnippet>365</a>            <span class="kw">for </span><span class="kw-2">&amp;</span>from <span class="kw">in </span><span class="kw-2">&amp;</span>owned_territories {
+<a href=#366 id=366 data-nosnippet>366</a>                <span class="kw">let </span>att_armies = map.armies.get(<span class="kw-2">&amp;</span>from).copied().unwrap_or(<span class="number">0</span>);
+<a href=#367 id=367 data-nosnippet>367</a>                <span class="kw">if </span>att_armies &lt;= <span class="number">1 </span>{
+<a href=#368 id=368 data-nosnippet>368</a>                    <span class="kw">continue</span>;
+<a href=#369 id=369 data-nosnippet>369</a>                }
+<a href=#370 id=370 data-nosnippet>370</a>
+<a href=#371 id=371 data-nosnippet>371</a>                <span class="kw">for </span>to <span class="kw">in </span>adjacent_territories(from) {
+<a href=#372 id=372 data-nosnippet>372</a>                    <span class="kw">if </span>map.owners.get(<span class="kw-2">&amp;</span>to).copied() == <span class="prelude-val">Some</span>(ai) {
+<a href=#373 id=373 data-nosnippet>373</a>                        <span class="kw">continue</span>;
+<a href=#374 id=374 data-nosnippet>374</a>                    }
+<a href=#375 id=375 data-nosnippet>375</a>                    <span class="kw">let </span>def_armies = map.armies.get(<span class="kw-2">&amp;</span>to).copied().unwrap_or(<span class="number">0</span>);
+<a href=#376 id=376 data-nosnippet>376</a>
+<a href=#377 id=377 data-nosnippet>377</a>                    <span class="comment">// Condición de ataque según dificultad: atacantes &gt; defensores * threshold
+<a href=#378 id=378 data-nosnippet>378</a>                    </span><span class="kw">if </span>(att_armies <span class="kw">as </span>f64) &lt;= (def_armies <span class="kw">as </span>f64) * threshold {
+<a href=#379 id=379 data-nosnippet>379</a>                        <span class="kw">continue</span>;
+<a href=#380 id=380 data-nosnippet>380</a>                    }
+<a href=#381 id=381 data-nosnippet>381</a>
+<a href=#382 id=382 data-nosnippet>382</a>                    <span class="kw">let </span>is_obj_target = difficulty == AiDifficulty::Expert
+<a href=#383 id=383 data-nosnippet>383</a>                        &amp;&amp; advances_secret_objective(state, map, ai, to);
+<a href=#384 id=384 data-nosnippet>384</a>
+<a href=#385 id=385 data-nosnippet>385</a>                    <span class="kw">let </span>seed = state.id.<span class="number">0
+<a href=#386 id=386 data-nosnippet>386</a>                        </span>^ ((from.<span class="number">0 </span><span class="kw">as </span>u64) &lt;&lt; <span class="number">8</span>)
+<a href=#387 id=387 data-nosnippet>387</a>                        ^ ((to.<span class="number">0 </span><span class="kw">as </span>u64) &lt;&lt; <span class="number">16</span>)
+<a href=#388 id=388 data-nosnippet>388</a>                        ^ ((att_armies <span class="kw">as </span>u64) &lt;&lt; <span class="number">24</span>);
+<a href=#389 id=389 data-nosnippet>389</a>                    <span class="kw">let </span>mcts_score = mcts_evaluate_attack(att_armies, def_armies, rollouts, seed);
+<a href=#390 id=390 data-nosnippet>390</a>                    <span class="kw">let </span>ratio_score = (att_armies <span class="kw">as </span>f64) / (def_armies.max(<span class="number">1</span>) <span class="kw">as </span>f64);
+<a href=#391 id=391 data-nosnippet>391</a>                    <span class="kw">let </span>combined_score = mcts_score * <span class="number">10.0 </span>+ ratio_score;
+<a href=#392 id=392 data-nosnippet>392</a>
+<a href=#393 id=393 data-nosnippet>393</a>                    <span class="kw">let </span>should_pick = <span class="kw">match </span>(is_obj_target, best_priority_obj) {
+<a href=#394 id=394 data-nosnippet>394</a>                        (<span class="bool-val">true</span>, <span class="bool-val">false</span>) =&gt; <span class="bool-val">true</span>,
+<a href=#395 id=395 data-nosnippet>395</a>                        (<span class="bool-val">false</span>, <span class="bool-val">true</span>) =&gt; <span class="bool-val">false</span>,
+<a href=#396 id=396 data-nosnippet>396</a>                        <span class="kw">_ </span>=&gt; combined_score &gt; best_score,
+<a href=#397 id=397 data-nosnippet>397</a>                    };
+<a href=#398 id=398 data-nosnippet>398</a>
+<a href=#399 id=399 data-nosnippet>399</a>                    <span class="kw">if </span>should_pick {
+<a href=#400 id=400 data-nosnippet>400</a>                        best_priority_obj = is_obj_target;
+<a href=#401 id=401 data-nosnippet>401</a>                        best_score = combined_score;
+<a href=#402 id=402 data-nosnippet>402</a>                        <span class="kw">let </span>dice = std::cmp::min(<span class="number">3</span>, att_armies - <span class="number">1</span>) <span class="kw">as </span>u8;
+<a href=#403 id=403 data-nosnippet>403</a>                        best_attack = <span class="prelude-val">Some</span>((from, to, dice));
+<a href=#404 id=404 data-nosnippet>404</a>                    }
+<a href=#405 id=405 data-nosnippet>405</a>                }
+<a href=#406 id=406 data-nosnippet>406</a>            }
+<a href=#407 id=407 data-nosnippet>407</a>
+<a href=#408 id=408 data-nosnippet>408</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>((from, to, dice)) = best_attack {
+<a href=#409 id=409 data-nosnippet>409</a>                <span class="prelude-val">Some</span>(CrisisCommand::DeclareAttack(DeclareAttackCommand {
+<a href=#410 id=410 data-nosnippet>410</a>                    player: ai,
+<a href=#411 id=411 data-nosnippet>411</a>                    from,
+<a href=#412 id=412 data-nosnippet>412</a>                    to,
+<a href=#413 id=413 data-nosnippet>413</a>                    dice,
+<a href=#414 id=414 data-nosnippet>414</a>                }))
+<a href=#415 id=415 data-nosnippet>415</a>            } <span class="kw">else </span>{
+<a href=#416 id=416 data-nosnippet>416</a>                <span class="prelude-val">Some</span>(CrisisCommand::EndPhase(EndPhaseCommand { player: ai }))
+<a href=#417 id=417 data-nosnippet>417</a>            }
+<a href=#418 id=418 data-nosnippet>418</a>        }
+<a href=#419 id=419 data-nosnippet>419</a>
+<a href=#420 id=420 data-nosnippet>420</a>        TurnPhase::Fortify =&gt; {
+<a href=#421 id=421 data-nosnippet>421</a>            <span class="kw">if </span>turn_state.fortified {
+<a href=#422 id=422 data-nosnippet>422</a>                <span class="kw">return </span><span class="prelude-val">Some</span>(CrisisCommand::EndPhase(EndPhaseCommand { player: ai }));
+<a href=#423 id=423 data-nosnippet>423</a>            }
+<a href=#424 id=424 data-nosnippet>424</a>
+<a href=#425 id=425 data-nosnippet>425</a>            <span class="comment">// Encontrar el territorio fronterizo más débil (menor threat_ratio con enemigos adyacentes)
+<a href=#426 id=426 data-nosnippet>426</a>            </span><span class="kw">let </span>border_territories: Vec&lt;(TerritoryId, f64)&gt; = owned_territories
+<a href=#427 id=427 data-nosnippet>427</a>                .iter()
+<a href=#428 id=428 data-nosnippet>428</a>                .copied()
+<a href=#429 id=429 data-nosnippet>429</a>                .filter_map(|t_id| {
+<a href=#430 id=430 data-nosnippet>430</a>                    <span class="kw">let </span>ratio = threat_ratio(map, ai, t_id);
+<a href=#431 id=431 data-nosnippet>431</a>                    <span class="kw">if </span>ratio.is_finite() {
+<a href=#432 id=432 data-nosnippet>432</a>                        <span class="prelude-val">Some</span>((t_id, ratio))
+<a href=#433 id=433 data-nosnippet>433</a>                    } <span class="kw">else </span>{
+<a href=#434 id=434 data-nosnippet>434</a>                        <span class="prelude-val">None
+<a href=#435 id=435 data-nosnippet>435</a>                    </span>}
+<a href=#436 id=436 data-nosnippet>436</a>                })
+<a href=#437 id=437 data-nosnippet>437</a>                .collect();
+<a href=#438 id=438 data-nosnippet>438</a>
+<a href=#439 id=439 data-nosnippet>439</a>            <span class="kw">if </span>border_territories.is_empty() {
+<a href=#440 id=440 data-nosnippet>440</a>                <span class="kw">return </span><span class="prelude-val">Some</span>(CrisisCommand::EndPhase(EndPhaseCommand { player: ai }));
+<a href=#441 id=441 data-nosnippet>441</a>            }
+<a href=#442 id=442 data-nosnippet>442</a>
+<a href=#443 id=443 data-nosnippet>443</a>            <span class="comment">// Ordenar territorios fronterizos del más débil al más fuerte
+<a href=#444 id=444 data-nosnippet>444</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>sorted_borders = border_territories;
+<a href=#445 id=445 data-nosnippet>445</a>            sorted_borders.sort_by(|(ta, ra), (tb, rb)| {
+<a href=#446 id=446 data-nosnippet>446</a>                ra.partial_cmp(rb)
+<a href=#447 id=447 data-nosnippet>447</a>                    .unwrap_or(std::cmp::Ordering::Equal)
+<a href=#448 id=448 data-nosnippet>448</a>                    .then_with(|| ta.<span class="number">0</span>.cmp(<span class="kw-2">&amp;</span>tb.<span class="number">0</span>))
+<a href=#449 id=449 data-nosnippet>449</a>            });
+<a href=#450 id=450 data-nosnippet>450</a>
+<a href=#451 id=451 data-nosnippet>451</a>            <span class="comment">// Buscar ejércitos excedentes para mover al territorio fronterizo más débil conectado
+<a href=#452 id=452 data-nosnippet>452</a>            </span><span class="kw">for </span><span class="kw-2">&amp;</span>(weakest_border, weakest_ratio) <span class="kw">in </span><span class="kw-2">&amp;</span>sorted_borders {
+<a href=#453 id=453 data-nosnippet>453</a>                <span class="comment">// Preferir primero territorios interiores con &gt; 1 ejército, luego territorios con mayor ratio
+<a href=#454 id=454 data-nosnippet>454</a>                </span><span class="kw">let </span><span class="kw-2">mut </span>best_donor: <span class="prelude-ty">Option</span>&lt;(TerritoryId, u32, f64)&gt; = <span class="prelude-val">None</span>;
+<a href=#455 id=455 data-nosnippet>455</a>
+<a href=#456 id=456 data-nosnippet>456</a>                <span class="kw">for </span><span class="kw-2">&amp;</span>donor <span class="kw">in </span><span class="kw-2">&amp;</span>owned_territories {
+<a href=#457 id=457 data-nosnippet>457</a>                    <span class="kw">if </span>donor == weakest_border {
+<a href=#458 id=458 data-nosnippet>458</a>                        <span class="kw">continue</span>;
+<a href=#459 id=459 data-nosnippet>459</a>                    }
+<a href=#460 id=460 data-nosnippet>460</a>                    <span class="kw">let </span>donor_armies = map.armies.get(<span class="kw-2">&amp;</span>donor).copied().unwrap_or(<span class="number">0</span>);
+<a href=#461 id=461 data-nosnippet>461</a>                    <span class="kw">if </span>donor_armies &lt;= <span class="number">1 </span>{
+<a href=#462 id=462 data-nosnippet>462</a>                        <span class="kw">continue</span>;
+<a href=#463 id=463 data-nosnippet>463</a>                    }
+<a href=#464 id=464 data-nosnippet>464</a>                    <span class="kw">if </span>!are_connected_by_owner(donor, weakest_border, ai, map) {
+<a href=#465 id=465 data-nosnippet>465</a>                        <span class="kw">continue</span>;
+<a href=#466 id=466 data-nosnippet>466</a>                    }
+<a href=#467 id=467 data-nosnippet>467</a>
+<a href=#468 id=468 data-nosnippet>468</a>                    <span class="kw">let </span>donor_ratio = threat_ratio(map, ai, donor);
+<a href=#469 id=469 data-nosnippet>469</a>                    <span class="kw">let </span>surplus = <span class="kw">if </span>!donor_ratio.is_finite() {
+<a href=#470 id=470 data-nosnippet>470</a>                        <span class="comment">// Territorio interior: todos los ejércitos salvo 1 son excedentes
+<a href=#471 id=471 data-nosnippet>471</a>                        </span>donor_armies - <span class="number">1
+<a href=#472 id=472 data-nosnippet>472</a>                    </span>} <span class="kw">else if </span>donor_ratio &gt; weakest_ratio * <span class="number">2.0 </span>&amp;&amp; donor_armies &gt;= <span class="number">3 </span>{
+<a href=#473 id=473 data-nosnippet>473</a>                        (donor_armies - <span class="number">1</span>) / <span class="number">2
+<a href=#474 id=474 data-nosnippet>474</a>                    </span>} <span class="kw">else </span>{
+<a href=#475 id=475 data-nosnippet>475</a>                        <span class="number">0
+<a href=#476 id=476 data-nosnippet>476</a>                    </span>};
+<a href=#477 id=477 data-nosnippet>477</a>
+<a href=#478 id=478 data-nosnippet>478</a>                    <span class="kw">if </span>surplus &gt; <span class="number">0 </span>{
+<a href=#479 id=479 data-nosnippet>479</a>                        <span class="kw">let </span>is_better_donor = <span class="kw">match </span>best_donor {
+<a href=#480 id=480 data-nosnippet>480</a>                            <span class="prelude-val">None </span>=&gt; <span class="bool-val">true</span>,
+<a href=#481 id=481 data-nosnippet>481</a>                            <span class="prelude-val">Some</span>((<span class="kw">_</span>, best_surplus, best_d_ratio)) =&gt; {
+<a href=#482 id=482 data-nosnippet>482</a>                                <span class="kw">if </span>donor_ratio.is_infinite() &amp;&amp; !best_d_ratio.is_infinite() {
+<a href=#483 id=483 data-nosnippet>483</a>                                    <span class="bool-val">true
+<a href=#484 id=484 data-nosnippet>484</a>                                </span>} <span class="kw">else if </span>!donor_ratio.is_infinite() &amp;&amp; best_d_ratio.is_infinite() {
+<a href=#485 id=485 data-nosnippet>485</a>                                    <span class="bool-val">false
+<a href=#486 id=486 data-nosnippet>486</a>                                </span>} <span class="kw">else </span>{
+<a href=#487 id=487 data-nosnippet>487</a>                                    surplus &gt; best_surplus
+<a href=#488 id=488 data-nosnippet>488</a>                                }
+<a href=#489 id=489 data-nosnippet>489</a>                            }
+<a href=#490 id=490 data-nosnippet>490</a>                        };
+<a href=#491 id=491 data-nosnippet>491</a>                        <span class="kw">if </span>is_better_donor {
+<a href=#492 id=492 data-nosnippet>492</a>                            best_donor = <span class="prelude-val">Some</span>((donor, surplus, donor_ratio));
+<a href=#493 id=493 data-nosnippet>493</a>                        }
+<a href=#494 id=494 data-nosnippet>494</a>                    }
+<a href=#495 id=495 data-nosnippet>495</a>                }
+<a href=#496 id=496 data-nosnippet>496</a>
+<a href=#497 id=497 data-nosnippet>497</a>                <span class="kw">if let </span><span class="prelude-val">Some</span>((from, armies, <span class="kw">_</span>)) = best_donor {
+<a href=#498 id=498 data-nosnippet>498</a>                    <span class="kw">return </span><span class="prelude-val">Some</span>(CrisisCommand::Fortify(FortifyCommand {
+<a href=#499 id=499 data-nosnippet>499</a>                        player: ai,
+<a href=#500 id=500 data-nosnippet>500</a>                        from,
+<a href=#501 id=501 data-nosnippet>501</a>                        to: weakest_border,
+<a href=#502 id=502 data-nosnippet>502</a>                        armies,
+<a href=#503 id=503 data-nosnippet>503</a>                    }));
+<a href=#504 id=504 data-nosnippet>504</a>                }
+<a href=#505 id=505 data-nosnippet>505</a>            }
+<a href=#506 id=506 data-nosnippet>506</a>
+<a href=#507 id=507 data-nosnippet>507</a>            <span class="prelude-val">Some</span>(CrisisCommand::EndPhase(EndPhaseCommand { player: ai }))
+<a href=#508 id=508 data-nosnippet>508</a>        }
+<a href=#509 id=509 data-nosnippet>509</a>
+<a href=#510 id=510 data-nosnippet>510</a>        TurnPhase::EndTurn =&gt; <span class="prelude-val">Some</span>(CrisisCommand::EndPhase(EndPhaseCommand { player: ai })),
+<a href=#511 id=511 data-nosnippet>511</a>    }
+<a href=#512 id=512 data-nosnippet>512</a>}
+<a href=#513 id=513 data-nosnippet>513</a>
+<a href=#514 id=514 data-nosnippet>514</a><span class="attr">#[cfg(test)]
+<a href=#515 id=515 data-nosnippet>515</a></span><span class="kw">mod </span>tests {
+<a href=#516 id=516 data-nosnippet>516</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#517 id=517 data-nosnippet>517</a>    <span class="kw">use </span><span class="kw">crate</span>::new_crisis_session;
+<a href=#518 id=518 data-nosnippet>518</a>
+<a href=#519 id=519 data-nosnippet>519</a>    <span class="kw">const </span>P1: PlayerId = PlayerId(<span class="number">1</span>);
+<a href=#520 id=520 data-nosnippet>520</a>    <span class="kw">const </span>P2: PlayerId = PlayerId(<span class="number">2</span>);
+<a href=#521 id=521 data-nosnippet>521</a>
+<a href=#522 id=522 data-nosnippet>522</a>    <span class="attr">#[test]
+<a href=#523 id=523 data-nosnippet>523</a>    </span><span class="kw">fn </span>crisis_ai_reinforces_threatened_territory() {
+<a href=#524 id=524 data-nosnippet>524</a>        <span class="kw">let </span><span class="kw-2">mut </span>session = new_crisis_session(SessionId(<span class="number">1</span>), <span class="number">42</span>, <span class="kw-2">&amp;</span>[P1, P2]).unwrap();
+<a href=#525 id=525 data-nosnippet>525</a>
+<a href=#526 id=526 data-nosnippet>526</a>        {
+<a href=#527 id=527 data-nosnippet>527</a>            <span class="kw">let </span><span class="kw-2">mut </span>map = session.world_mut().resource_mut::&lt;TerritoryStateResource&gt;();
+<a href=#528 id=528 data-nosnippet>528</a>            <span class="comment">// Asignar todos los territorios inicialmente a P1 con 5 ejércitos
+<a href=#529 id=529 data-nosnippet>529</a>            </span><span class="kw">for </span>id <span class="kw">in </span><span class="number">0</span>..<span class="number">30u8 </span>{
+<a href=#530 id=530 data-nosnippet>530</a>                map.set_owner_and_armies(TerritoryId(id), P1, <span class="number">5</span>);
+<a href=#531 id=531 data-nosnippet>531</a>            }
+<a href=#532 id=532 data-nosnippet>532</a>            <span class="comment">// Territorio 0 (Argentina) tiene 4 ejércitos propios y solo 2 enemigos vecinos en Chile (2) -&gt; ratio = 4/2 = 2.0
+<a href=#533 id=533 data-nosnippet>533</a>            </span>map.set_owner_and_armies(TerritoryId(<span class="number">0</span>), P1, <span class="number">4</span>);
+<a href=#534 id=534 data-nosnippet>534</a>            map.set_owner_and_armies(TerritoryId(<span class="number">2</span>), P2, <span class="number">2</span>);
+<a href=#535 id=535 data-nosnippet>535</a>
+<a href=#536 id=536 data-nosnippet>536</a>            <span class="comment">// Territorio 10 (España) tiene 2 ejércitos propios y 10 enemigos vecinos en Sahara (14) -&gt; ratio = 2/10 = 0.2
+<a href=#537 id=537 data-nosnippet>537</a>            </span>map.set_owner_and_armies(TerritoryId(<span class="number">10</span>), P1, <span class="number">2</span>);
+<a href=#538 id=538 data-nosnippet>538</a>            map.set_owner_and_armies(TerritoryId(<span class="number">14</span>), P2, <span class="number">10</span>);
+<a href=#539 id=539 data-nosnippet>539</a>
+<a href=#540 id=540 data-nosnippet>540</a>            <span class="kw">let </span><span class="kw-2">mut </span>turn_state = session.world_mut().resource_mut::&lt;TurnStateResource&gt;();
+<a href=#541 id=541 data-nosnippet>541</a>            turn_state.phase = TurnPhase::PlaceArmies {
+<a href=#542 id=542 data-nosnippet>542</a>                armies_remaining: <span class="number">5</span>,
+<a href=#543 id=543 data-nosnippet>543</a>            };
+<a href=#544 id=544 data-nosnippet>544</a>        }
+<a href=#545 id=545 data-nosnippet>545</a>
+<a href=#546 id=546 data-nosnippet>546</a>        <span class="kw">let </span>cmd = best_move(<span class="kw-2">&amp;</span>session, P1, AiDifficulty::Hard).unwrap();
+<a href=#547 id=547 data-nosnippet>547</a>
+<a href=#548 id=548 data-nosnippet>548</a>        <span class="kw">match </span>cmd {
+<a href=#549 id=549 data-nosnippet>549</a>            CrisisCommand::PlaceArmies(place) =&gt; {
+<a href=#550 id=550 data-nosnippet>550</a>                <span class="macro">assert_eq!</span>(place.player, P1);
+<a href=#551 id=551 data-nosnippet>551</a>                <span class="macro">assert_eq!</span>(
+<a href=#552 id=552 data-nosnippet>552</a>                    place.territory,
+<a href=#553 id=553 data-nosnippet>553</a>                    TerritoryId(<span class="number">10</span>),
+<a href=#554 id=554 data-nosnippet>554</a>                    <span class="string">"Debe reforzar el territorio más amenazado (España, ratio 0.2)"
+<a href=#555 id=555 data-nosnippet>555</a>                </span>);
+<a href=#556 id=556 data-nosnippet>556</a>                <span class="macro">assert_eq!</span>(place.count, <span class="number">5</span>);
+<a href=#557 id=557 data-nosnippet>557</a>            }
+<a href=#558 id=558 data-nosnippet>558</a>            other =&gt; <span class="macro">panic!</span>(<span class="string">"Se esperaba PlaceArmies, se obtuvo {:?}"</span>, other),
+<a href=#559 id=559 data-nosnippet>559</a>        }
+<a href=#560 id=560 data-nosnippet>560</a>    }
+<a href=#561 id=561 data-nosnippet>561</a>
+<a href=#562 id=562 data-nosnippet>562</a>    <span class="attr">#[test]
+<a href=#563 id=563 data-nosnippet>563</a>    </span><span class="kw">fn </span>crisis_ai_attacks_when_superior() {
+<a href=#564 id=564 data-nosnippet>564</a>        <span class="kw">let </span><span class="kw-2">mut </span>session = new_crisis_session(SessionId(<span class="number">2</span>), <span class="number">99</span>, <span class="kw-2">&amp;</span>[P1, P2]).unwrap();
+<a href=#565 id=565 data-nosnippet>565</a>
+<a href=#566 id=566 data-nosnippet>566</a>        {
+<a href=#567 id=567 data-nosnippet>567</a>            <span class="kw">let </span><span class="kw-2">mut </span>map = session.world_mut().resource_mut::&lt;TerritoryStateResource&gt;();
+<a href=#568 id=568 data-nosnippet>568</a>            <span class="kw">for </span>id <span class="kw">in </span><span class="number">0</span>..<span class="number">30u8 </span>{
+<a href=#569 id=569 data-nosnippet>569</a>                map.set_owner_and_armies(TerritoryId(id), P1, <span class="number">1</span>);
+<a href=#570 id=570 data-nosnippet>570</a>            }
+<a href=#571 id=571 data-nosnippet>571</a>            <span class="comment">// Argentina (0) de P1 con 6 ejércitos frente a Brasil (1) de P2 con 2 ejércitos (6 &gt; 2 * 1.5 = 3.0)
+<a href=#572 id=572 data-nosnippet>572</a>            </span>map.set_owner_and_armies(TerritoryId(<span class="number">0</span>), P1, <span class="number">6</span>);
+<a href=#573 id=573 data-nosnippet>573</a>            map.set_owner_and_armies(TerritoryId(<span class="number">1</span>), P2, <span class="number">2</span>);
+<a href=#574 id=574 data-nosnippet>574</a>
+<a href=#575 id=575 data-nosnippet>575</a>            <span class="kw">let </span><span class="kw-2">mut </span>turn_state = session.world_mut().resource_mut::&lt;TurnStateResource&gt;();
+<a href=#576 id=576 data-nosnippet>576</a>            turn_state.phase = TurnPhase::Attack;
+<a href=#577 id=577 data-nosnippet>577</a>        }
+<a href=#578 id=578 data-nosnippet>578</a>
+<a href=#579 id=579 data-nosnippet>579</a>        <span class="kw">let </span>cmd = best_move(<span class="kw-2">&amp;</span>session, P1, AiDifficulty::Medium).unwrap();
+<a href=#580 id=580 data-nosnippet>580</a>
+<a href=#581 id=581 data-nosnippet>581</a>        <span class="macro">assert_eq!</span>(
+<a href=#582 id=582 data-nosnippet>582</a>            cmd,
+<a href=#583 id=583 data-nosnippet>583</a>            CrisisCommand::DeclareAttack(DeclareAttackCommand {
+<a href=#584 id=584 data-nosnippet>584</a>                player: P1,
+<a href=#585 id=585 data-nosnippet>585</a>                from: TerritoryId(<span class="number">0</span>),
+<a href=#586 id=586 data-nosnippet>586</a>                to: TerritoryId(<span class="number">1</span>),
+<a href=#587 id=587 data-nosnippet>587</a>                dice: <span class="number">3</span>,
+<a href=#588 id=588 data-nosnippet>588</a>            })
+<a href=#589 id=589 data-nosnippet>589</a>        );
+<a href=#590 id=590 data-nosnippet>590</a>
+<a href=#591 id=591 data-nosnippet>591</a>        <span class="comment">// Si P1 solo tiene 3 ejércitos contra 2 (ratio 1.5, no &gt; 1.5), en Medium pasa de fase,
+<a href=#592 id=592 data-nosnippet>592</a>        // pero en Expert (umbral 1.2: 3 &gt; 2.4) sí ataca.
+<a href=#593 id=593 data-nosnippet>593</a>        </span>{
+<a href=#594 id=594 data-nosnippet>594</a>            <span class="kw">let </span><span class="kw-2">mut </span>map = session.world_mut().resource_mut::&lt;TerritoryStateResource&gt;();
+<a href=#595 id=595 data-nosnippet>595</a>            map.set_owner_and_armies(TerritoryId(<span class="number">0</span>), P1, <span class="number">3</span>);
+<a href=#596 id=596 data-nosnippet>596</a>            map.set_owner_and_armies(TerritoryId(<span class="number">1</span>), P2, <span class="number">2</span>);
+<a href=#597 id=597 data-nosnippet>597</a>        }
+<a href=#598 id=598 data-nosnippet>598</a>
+<a href=#599 id=599 data-nosnippet>599</a>        <span class="kw">let </span>cmd_medium = best_move(<span class="kw-2">&amp;</span>session, P1, AiDifficulty::Medium).unwrap();
+<a href=#600 id=600 data-nosnippet>600</a>        <span class="macro">assert_eq!</span>(
+<a href=#601 id=601 data-nosnippet>601</a>            cmd_medium,
+<a href=#602 id=602 data-nosnippet>602</a>            CrisisCommand::EndPhase(EndPhaseCommand { player: P1 })
+<a href=#603 id=603 data-nosnippet>603</a>        );
+<a href=#604 id=604 data-nosnippet>604</a>
+<a href=#605 id=605 data-nosnippet>605</a>        <span class="kw">let </span>cmd_expert = best_move(<span class="kw-2">&amp;</span>session, P1, AiDifficulty::Expert).unwrap();
+<a href=#606 id=606 data-nosnippet>606</a>        <span class="macro">assert_eq!</span>(
+<a href=#607 id=607 data-nosnippet>607</a>            cmd_expert,
+<a href=#608 id=608 data-nosnippet>608</a>            CrisisCommand::DeclareAttack(DeclareAttackCommand {
+<a href=#609 id=609 data-nosnippet>609</a>                player: P1,
+<a href=#610 id=610 data-nosnippet>610</a>                from: TerritoryId(<span class="number">0</span>),
+<a href=#611 id=611 data-nosnippet>611</a>                to: TerritoryId(<span class="number">1</span>),
+<a href=#612 id=612 data-nosnippet>612</a>                dice: <span class="number">2</span>,
+<a href=#613 id=613 data-nosnippet>613</a>            })
+<a href=#614 id=614 data-nosnippet>614</a>        );
+<a href=#615 id=615 data-nosnippet>615</a>    }
+<a href=#616 id=616 data-nosnippet>616</a>
+<a href=#617 id=617 data-nosnippet>617</a>    <span class="attr">#[test]
+<a href=#618 id=618 data-nosnippet>618</a>    </span><span class="kw">fn </span>crisis_ai_expert_prioritizes_secret_objective_and_fortifies() {
+<a href=#619 id=619 data-nosnippet>619</a>        <span class="kw">let </span><span class="kw-2">mut </span>session = new_crisis_session(SessionId(<span class="number">3</span>), <span class="number">77</span>, <span class="kw-2">&amp;</span>[P1, P2]).unwrap();
+<a href=#620 id=620 data-nosnippet>620</a>
+<a href=#621 id=621 data-nosnippet>621</a>        {
+<a href=#622 id=622 data-nosnippet>622</a>            <span class="kw">let </span><span class="kw-2">mut </span>map = session.world_mut().resource_mut::&lt;TerritoryStateResource&gt;();
+<a href=#623 id=623 data-nosnippet>623</a>            <span class="kw">for </span>id <span class="kw">in </span><span class="number">0</span>..<span class="number">30u8 </span>{
+<a href=#624 id=624 data-nosnippet>624</a>                map.set_owner_and_armies(TerritoryId(id), P1, <span class="number">1</span>);
+<a href=#625 id=625 data-nosnippet>625</a>            }
+<a href=#626 id=626 data-nosnippet>626</a>            <span class="comment">// P1 puede atacar desde Colombia (3, con 6 ejércitos) hacia Perú (4, América del Sur, 2 ejércitos)
+<a href=#627 id=627 data-nosnippet>627</a>            // o hacia México (5, América del Norte, 2 ejércitos).
+<a href=#628 id=628 data-nosnippet>628</a>            </span>map.set_owner_and_armies(TerritoryId(<span class="number">3</span>), P1, <span class="number">6</span>);
+<a href=#629 id=629 data-nosnippet>629</a>            map.set_owner_and_armies(TerritoryId(<span class="number">4</span>), P2, <span class="number">2</span>);
+<a href=#630 id=630 data-nosnippet>630</a>            map.set_owner_and_armies(TerritoryId(<span class="number">5</span>), P2, <span class="number">2</span>);
+<a href=#631 id=631 data-nosnippet>631</a>
+<a href=#632 id=632 data-nosnippet>632</a>            <span class="comment">// Objetivo secreto de P1: Conquistar América del Norte (ContinentId(1), que incluye México = 5)
+<a href=#633 id=633 data-nosnippet>633</a>            </span>session
+<a href=#634 id=634 data-nosnippet>634</a>                .world_mut()
+<a href=#635 id=635 data-nosnippet>635</a>                .resource_mut::&lt;PlayerObjectivesResource&gt;()
+<a href=#636 id=636 data-nosnippet>636</a>                .objectives
+<a href=#637 id=637 data-nosnippet>637</a>                .insert(
+<a href=#638 id=638 data-nosnippet>638</a>                    P1,
+<a href=#639 id=639 data-nosnippet>639</a>                    ObjectiveCard::ConquerContinent(<span class="kw">crate</span>::board::CONTINENT_NORTH_AMERICA),
+<a href=#640 id=640 data-nosnippet>640</a>                );
+<a href=#641 id=641 data-nosnippet>641</a>
+<a href=#642 id=642 data-nosnippet>642</a>            session
+<a href=#643 id=643 data-nosnippet>643</a>                .world_mut()
+<a href=#644 id=644 data-nosnippet>644</a>                .resource_mut::&lt;TurnStateResource&gt;()
+<a href=#645 id=645 data-nosnippet>645</a>                .phase = TurnPhase::Attack;
+<a href=#646 id=646 data-nosnippet>646</a>        }
+<a href=#647 id=647 data-nosnippet>647</a>
+<a href=#648 id=648 data-nosnippet>648</a>        <span class="kw">let </span>attack_cmd = best_move(<span class="kw-2">&amp;</span>session, P1, AiDifficulty::Expert).unwrap();
+<a href=#649 id=649 data-nosnippet>649</a>        <span class="macro">assert_eq!</span>(
+<a href=#650 id=650 data-nosnippet>650</a>            attack_cmd,
+<a href=#651 id=651 data-nosnippet>651</a>            CrisisCommand::DeclareAttack(DeclareAttackCommand {
+<a href=#652 id=652 data-nosnippet>652</a>                player: P1,
+<a href=#653 id=653 data-nosnippet>653</a>                from: TerritoryId(<span class="number">3</span>),
+<a href=#654 id=654 data-nosnippet>654</a>                to: TerritoryId(<span class="number">5</span>),
+<a href=#655 id=655 data-nosnippet>655</a>                dice: <span class="number">3</span>,
+<a href=#656 id=656 data-nosnippet>656</a>            })
+<a href=#657 id=657 data-nosnippet>657</a>        );
+<a href=#658 id=658 data-nosnippet>658</a>
+<a href=#659 id=659 data-nosnippet>659</a>        <span class="comment">// Probar fortificación: Argentina (0) es interior con 5 ejércitos, conectada a Colombia (3, fronteriza con México 5 enemigo)
+<a href=#660 id=660 data-nosnippet>660</a>        </span>{
+<a href=#661 id=661 data-nosnippet>661</a>            <span class="kw">let </span><span class="kw-2">mut </span>map = session.world_mut().resource_mut::&lt;TerritoryStateResource&gt;();
+<a href=#662 id=662 data-nosnippet>662</a>            <span class="kw">for </span>id <span class="kw">in </span><span class="number">0</span>..<span class="number">30u8 </span>{
+<a href=#663 id=663 data-nosnippet>663</a>                map.set_owner_and_armies(TerritoryId(id), P1, <span class="number">1</span>);
+<a href=#664 id=664 data-nosnippet>664</a>            }
+<a href=#665 id=665 data-nosnippet>665</a>            map.set_owner_and_armies(TerritoryId(<span class="number">0</span>), P1, <span class="number">5</span>); <span class="comment">// Interior (vecinos 1, 2, 4 son de P1)
+<a href=#666 id=666 data-nosnippet>666</a>            </span>map.set_owner_and_armies(TerritoryId(<span class="number">3</span>), P1, <span class="number">2</span>); <span class="comment">// Frontera con México (5, de P2)
+<a href=#667 id=667 data-nosnippet>667</a>            </span>map.set_owner_and_armies(TerritoryId(<span class="number">5</span>), P2, <span class="number">6</span>);
+<a href=#668 id=668 data-nosnippet>668</a>
+<a href=#669 id=669 data-nosnippet>669</a>            <span class="kw">let </span><span class="kw-2">mut </span>turn_state = session.world_mut().resource_mut::&lt;TurnStateResource&gt;();
+<a href=#670 id=670 data-nosnippet>670</a>            turn_state.phase = TurnPhase::Fortify;
+<a href=#671 id=671 data-nosnippet>671</a>            turn_state.fortified = <span class="bool-val">false</span>;
+<a href=#672 id=672 data-nosnippet>672</a>        }
+<a href=#673 id=673 data-nosnippet>673</a>
+<a href=#674 id=674 data-nosnippet>674</a>        <span class="kw">let </span>fortify_cmd = best_move(<span class="kw-2">&amp;</span>session, P1, AiDifficulty::Hard).unwrap();
+<a href=#675 id=675 data-nosnippet>675</a>        <span class="macro">assert_eq!</span>(
+<a href=#676 id=676 data-nosnippet>676</a>            fortify_cmd,
+<a href=#677 id=677 data-nosnippet>677</a>            CrisisCommand::Fortify(FortifyCommand {
+<a href=#678 id=678 data-nosnippet>678</a>                player: P1,
+<a href=#679 id=679 data-nosnippet>679</a>                from: TerritoryId(<span class="number">0</span>),
+<a href=#680 id=680 data-nosnippet>680</a>                to: TerritoryId(<span class="number">3</span>),
+<a href=#681 id=681 data-nosnippet>681</a>                armies: <span class="number">4</span>,
+<a href=#682 id=682 data-nosnippet>682</a>            })
+<a href=#683 id=683 data-nosnippet>683</a>        );
+<a href=#684 id=684 data-nosnippet>684</a>    }
+<a href=#685 id=685 data-nosnippet>685</a>}
 </code></pre></div></section></main></body></html>
