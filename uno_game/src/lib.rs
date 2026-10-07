@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod events;
@@ -5,6 +6,7 @@ pub mod rules;
 
 use open_table_engine::prelude::*;
 
+pub use ai::{best_move, most_frequent_color, UnoCommand, UnoStateAccess};
 pub use board::{Card, CardColor, CardValue, UnoState};
 pub use commands::{DrawCardCommand, InterceptCommand, PlayCardCommand};
 pub use events::{

@@ -2,6 +2,7 @@
 //! Maneja información oculta (ubicación de barcos), fase de colocación
 //! de flotas y disparos por turnos.
 
+pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod events;
@@ -9,6 +10,10 @@ pub mod fleet;
 pub mod position;
 pub mod rules;
 
+pub use ai::{
+    best_move, compute_probability_density_map, default_ai_fleet, default_ai_place_fleet_command,
+    BattleshipCommand, BattleshipState,
+};
 pub use board::BOARD_SIZE;
 pub use commands::{FireShotCommand, PlaceFleetCommand, RematchCommand};
 pub use events::{FleetPlacedEvent, GameOverEvent, ShotResult, ShotResultEvent, SunkenShipEvent};

@@ -10,10 +10,18 @@ keywords = ["networking", "websocket", "relay", "board-games", "opentable"]
 categories = ["network-programming", "game-engines"]
 
 [dependencies]
-# Servicio ELO persistente (./data/ratings.db) y API HTTP en puerto 8081 (compatible con esquema rusqlite / axum)
+# Servicio ELO persistente (./data/ratings.db), API HTTP (8081), TLS/WSS (rustls = "0.23", tokio-rustls = "0.26"),
+# JWT HS256 (jsonwebtoken = "9"), Rate Limiting GCRA (governor = "0.6"), Anti-Cheat (chess_game, checkers_game)
+# y Métricas Prometheus (metrics = "0.23", metrics-exporter-prometheus = "0.15")
+open_table_core = { version = "1.0.0", path = "../open_table_core" }
+open_table_engine = { version = "1.0.0", path = "../open_table_engine" }
+chess_game = { path = "../chess_game" }
+checkers_game = { path = "../checkers_game" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 getrandom = "0.4"
 tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = "0.30"
 futures-util = "0.3"
+hmac = "0.13.0"
+sha2 = "0.11.0"

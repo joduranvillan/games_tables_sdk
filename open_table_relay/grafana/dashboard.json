@@ -1,0 +1,88 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active Connections & Active Rooms",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "relay_connections_active",
+          "legendFormat": "Active WebSocket Connections",
+          "refId": "A"
+        },
+        {
+          "expr": "relay_rooms_active",
+          "legendFormat": "Active Rooms",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Messages per Minute",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(relay_messages_total[1m])) * 60",
+          "legendFormat": "Messages / min",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Top 5 Games by Activity",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "topk(5, sum by (game_id) (rate(relay_messages_total[5m])))",
+          "legendFormat": "{{game_id}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "ELO Updates, Rate Limit Drops & IP Bans",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "relay_elo_updates_total",
+          "legendFormat": "ELO Updates",
+          "refId": "A"
+        },
+        {
+          "expr": "rate_limit_drops_total",
+          "legendFormat": "Rate Limit Drops",
+          "refId": "B"
+        },
+        {
+          "expr": "ip_bans_total",
+          "legendFormat": "IP Bans",
+          "refId": "C"
+        }
+      ]
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "tags": ["opentable", "relay", "prometheus"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "utc",
+  "title": "OpenTable Relay — Operational Telemetry",
+  "uid": "opentable-relay-ops",
+  "version": 1
+}

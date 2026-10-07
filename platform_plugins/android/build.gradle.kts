@@ -9,6 +9,8 @@ android {
 
     defaultConfig {
         minSdk = 21
+        @Suppress("DEPRECATION")
+        targetSdk = 34
     }
 
     compileOptions {
@@ -18,6 +20,19 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+}
+
+tasks.whenTaskAdded {
+    if (name == "assembleRelease") {
+        doLast {
+            val aarDir = layout.buildDirectory.dir("outputs/aar").get().asFile
+            val srcAar = aarDir.resolve("${project.name}-release.aar")
+            val destAar = aarDir.resolve("OpenTableNearby-release.aar")
+            if (srcAar.exists() && srcAar != destAar) {
+                srcAar.copyTo(destAar, overwrite = true)
+            }
+        }
     }
 }
 

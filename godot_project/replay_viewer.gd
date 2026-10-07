@@ -32,7 +32,12 @@ var btn_next: Button
 var btn_end: Button
 var speed_selector: OptionButton
 var game_type_option: OptionButton
+var btn_import_replay: Button
+var btn_export_replay: Button
 var file_dialog: FileDialog
+var import_otr_dialog: FileDialog
+var export_otr_dialog: FileDialog
+var player_names: Array[String] = ["Jugador 1", "Jugador 2"]
 
 const GAME_SCENES = {
 	"checkers": "res://checkers_board.tscn",
@@ -100,6 +105,16 @@ func _setup_ui() -> void:
 	btn_open.text = "📂 Cargar Archivo .otlog"
 	btn_open.pressed.connect(_on_open_file_pressed)
 
+	btn_import_replay = Button.new()
+	btn_import_replay.name = "BtnImportReplay"
+	btn_import_replay.text = "Importar Replay"
+	btn_import_replay.pressed.connect(_on_import_replay_pressed)
+
+	btn_export_replay = Button.new()
+	btn_export_replay.name = "BtnExportReplay"
+	btn_export_replay.text = "Exportar Replay (.otr)"
+	btn_export_replay.pressed.connect(_on_export_replay_pressed)
+
 	game_type_option = OptionButton.new()
 	for gt in GAME_SCENES.keys():
 		game_type_option.add_item(gt.capitalize(), GAME_SCENES.keys().find(gt))
@@ -111,6 +126,8 @@ func _setup_ui() -> void:
 
 	top_hbox.add_child(title_lbl)
 	top_hbox.add_child(btn_open)
+	top_hbox.add_child(btn_import_replay)
+	top_hbox.add_child(btn_export_replay)
 	top_hbox.add_child(game_type_option)
 	var spacer = Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -246,9 +263,25 @@ func _setup_ui() -> void:
 	file_dialog = FileDialog.new()
 	file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
 	file_dialog.access = FileDialog.ACCESS_FILESYSTEM
-	file_dialog.filters = PackedStringArray(["*.otlog ; Archivos de Replay OpenTable", "* ; Todos los archivos"])
+	file_dialog.filters = PackedStringArray(["*.otr ; OpenTable Replay (*.otr)", "*.otlog ; Archivos de Replay OpenTable", "* ; Todos los archivos"])
 	file_dialog.file_selected.connect(_on_file_selected)
 	add_child(file_dialog)
+
+	import_otr_dialog = FileDialog.new()
+	import_otr_dialog.name = "ImportOtrDialog"
+	import_otr_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	import_otr_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	import_otr_dialog.filters = PackedStringArray(["*.otr ; OpenTable Replay (*.otr)"])
+	import_otr_dialog.file_selected.connect(_on_otr_file_selected)
+	add_child(import_otr_dialog)
+
+	export_otr_dialog = FileDialog.new()
+	export_otr_dialog.name = "ExportOtrDialog"
+	export_otr_dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+	export_otr_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	export_otr_dialog.filters = PackedStringArray(["*.otr ; OpenTable Replay (*.otr)"])
+	export_otr_dialog.file_selected.connect(_on_export_otr_file_selected)
+	add_child(export_otr_dialog)
 
 func load_replay_data(bytes: PackedByteArray, type_str: String) -> void:
 	if step_slider == null:
@@ -438,7 +471,69 @@ func _on_play_timer_timeout() -> void:
 func _on_open_file_pressed() -> void:
 	file_dialog.popup_centered(Vector2i(800, 600))
 
+func _on_import_replay_pressed() -> void:
+	if import_otr_dialog != null:
+		import_otr_dialog.popup_centered(Vector2i(800, 600))
+
+func _on_export_replay_pressed() -> void:
+	if export_otr_dialog != null:
+		export_otr_dialog.popup_centered(Vector2i(800, 600))
+
+func _get_save_manager() -> Node:
+	if has_node("/root/SaveManager"):
+		return get_node("/root/SaveManager")
+	var script_res = load("res://scripts/save_manager.gd")
+	if script_res != null:
+		var inst: Node = script_res.new()
+		inst._ready()
+		return inst
+	return null
+
+func import_otr_replay(path: String) -> bool:
+	var save_mgr := _get_save_manager()
+	if save_mgr == null:
+		return false
+	var ok: bool = bool(save_mgr.call("import_replay_file", path))
+	if ok:
+		var imported_data: Dictionary = save_mgr.get("last_imported_replay")
+		var imported_game_id := str(imported_data.get("game_id", game_type))
+		var imported_names: Array = imported_data.get("player_names", [])
+		player_names.clear()
+		for n in imported_names:
+			player_names.append(str(n))
+		var moves_bytes: PackedByteArray = save_mgr.call("get_last_imported_replay_bytes")
+		load_replay_data(moves_bytes, imported_game_id)
+	if not has_node("/root/SaveManager"):
+		save_mgr.free()
+	return ok
+
+func export_otr_replay(path: String) -> bool:
+	var save_mgr := _get_save_manager()
+	if save_mgr == null:
+		return false
+	var players_meta: Array = []
+	for idx in range(player_names.size()):
+		players_meta.append({"id": idx + 1, "name": player_names[idx], "score": 0})
+	save_mgr.call("set_context", bridge, game_type, current_step, players_meta)
+	var ok: bool = bool(save_mgr.call("export_replay_file", path))
+	if not has_node("/root/SaveManager"):
+		save_mgr.free()
+	return ok
+
+func _on_otr_file_selected(path: String) -> void:
+	if not import_otr_replay(path):
+		_update_status("Error al importar archivo .otr (formato o versión incompatible)")
+
+func _on_export_otr_file_selected(path: String) -> void:
+	if export_otr_replay(path):
+		_update_status("Replay exportado a %s" % path)
+	else:
+		_update_status("Error al exportar archivo .otr")
+
 func _on_file_selected(path: String) -> void:
+	if path.ends_with(".otr"):
+		_on_otr_file_selected(path)
+		return
 	var f = FileAccess.open(path, FileAccess.READ)
 	if f != null:
 		var bytes = f.get_buffer(f.get_length())

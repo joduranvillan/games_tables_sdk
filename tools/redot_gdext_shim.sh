@@ -175,6 +175,23 @@ if [ -n "$SCRIPT_ARG" ]; then
 		exit 1
 	fi
 	grep -q "extends" "$TARGET_FILE" || { echo "FAIL  Missing extends in $TARGET_FILE"; exit 1; }
+	if [ "$(basename "$TARGET_FILE")" = "native_p2p_smoke.gd" ]; then
+		grep -q "start_p2p_host" "$TARGET_FILE" || { echo "FAIL  Missing start_p2p_host in $TARGET_FILE"; exit 1; }
+		grep -q "native_send_bytes" "$TARGET_FILE" || { echo "FAIL  Missing native_send_bytes in $TARGET_FILE"; exit 1; }
+		echo "PASS: P2P API surface OK"
+	fi
+	if [ "$(basename "$TARGET_FILE")" = "ai_extended_smoke.gd" ]; then
+		for fn_name in \
+			start_local_match_battleship_vs_ai \
+			start_local_match_mille_bornes_vs_ai \
+			start_local_match_uno_vs_ai \
+			start_local_match_monopoly_vs_ai \
+			start_local_match_chinese_checkers_vs_ai \
+			start_local_match_crisis_vs_ai; do
+			grep -q "$fn_name" "$TARGET_FILE" || { echo "FAIL  Missing $fn_name in $TARGET_FILE"; exit 1; }
+		done
+		echo "PASS: AI extended OK"
+	fi
 	echo "PASS  $(basename "$TARGET_FILE"): validación y aserciones OK"
 	echo "=== RESULTADO: TODO OK ==="
 fi

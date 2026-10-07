@@ -64,6 +64,7 @@ func _initialize() -> void:
 	viewer._on_speed_selected(2)
 	results.append(["Selector de velocidad 4x ajusta playback_speed a 4.0", is_equal_approx(viewer.playback_speed, 4.0)])
 	results.append(["Panel lateral contiene las 3 jugadas con scroll automático", viewer.move_row_nodes.size() == 3])
+	results.append(["ReplayViewer incluye botón 'Importar Replay' y FileDialog *.otr", viewer.btn_import_replay != null and viewer.import_otr_dialog != null])
 
 	var ok := true
 	for r in results:

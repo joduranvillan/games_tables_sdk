@@ -3,12 +3,14 @@
 //! de velocidad (máximo 50 km), rebarajado de la pila de descarte al vaciarse
 //! el mazo, peligros, remedios y avance hasta la meta.
 
+pub mod ai;
 pub mod card;
 pub mod commands;
 pub mod deck;
 pub mod events;
 pub mod rules;
 
+pub use ai::{best_move, MilleBornesCommand, MilleBornesState};
 pub use card::{Card, Hazard, Safety};
 pub use commands::{
     CoupFourreCommand, DiscardCardCommand, DrawCardCommand, PlayCardCommand, PlayDistanceCommand,

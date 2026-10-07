@@ -4,12 +4,14 @@
 //! - 6 casillas de Suerte/Arca Comunitaria (3 cada una)
 //! - Impuesto sobre la Renta (200$), Impuesto de Lujo (100$)
 
+pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod events;
 pub mod resources;
 pub mod rules;
 
+pub use ai::{best_move, completes_color_group, space_market_price, MonopolyCommand, MonopolyState};
 pub use board::{
     board_layout, ChanceCard, CommunityChestCard, Space, SpaceKind, BOARD_SIZE, GO_BONUS,
     GO_TO_JAIL_SPACE, JAIL_SPACE, STARTING_MONEY,

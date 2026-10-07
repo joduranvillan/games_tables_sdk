@@ -131,6 +131,11 @@ jobs:
       - name: Build Android Plugin
         run: cd platform_plugins && gradle :android:assembleRelease --no-daemon
         working-directory: .
+      - name: Upload OpenTableNearby-release.aar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenTableNearby-release.aar
+          path: platform_plugins/android/build/outputs/aar/OpenTableNearby-release.aar
 
   build-ios-plugin:
     name: Build iOS Swift Plugin (macOS)
@@ -181,4 +186,20 @@ jobs:
             platform_plugins/ios/OpenTableMultipeerPlugin.swift \
             -o build-ios-simulator.o
 
-          echo "iOS Swift plugin compiled successfully for both Device and Simulator!"
+          mkdir -p build/ios-device build/ios-sim
+          libtool -static -o build/ios-device/libOpenTableMultipeer.a build-ios-device.o
+          libtool -static -o build/ios-sim/libOpenTableMultipeer.a build-ios-simulator.o
+
+          rm -rf OpenTableMultipeer.xcframework
+          xcodebuild -create-xcframework \
+            -library build/ios-device/libOpenTableMultipeer.a \
+            -library build/ios-sim/libOpenTableMultipeer.a \
+            -output OpenTableMultipeer.xcframework
+
+          echo "iOS Swift plugin compiled and packaged into OpenTableMultipeer.xcframework!"
+
+      - name: Upload OpenTableMultipeer.xcframework artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenTableMultipeer.xcframework
+          path: OpenTableMultipeer.xcframework

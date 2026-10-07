@@ -1,5 +1,6 @@
 #![deny(unused_imports)]
 
+pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod events;
@@ -7,6 +8,10 @@ pub mod i18n;
 pub mod resources;
 pub mod rules;
 
+pub use ai::{
+    adjacent_territories, advances_secret_objective, attack_ratio_threshold, best_move,
+    enemy_neighbor_armies, threat_ratio, CrisisCommand, CrisisState,
+};
 pub use i18n::territory_name;
 
 pub use board::{

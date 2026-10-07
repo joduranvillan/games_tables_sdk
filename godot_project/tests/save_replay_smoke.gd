@@ -113,7 +113,40 @@ func _initialize() -> void:
 	])
 	viewer.free()
 
-	# 7. Limpiar archivo de prueba
+	# 7. Exportar e importar Replay (.otr comprimido con gzip, version "1")
+	save_mgr.set_context(restored_bridge, "checkers", 3, players_meta)
+	var otr_path := "user://saves/test_share.otr"
+	var exported_otr: bool = save_mgr.export_replay_file(otr_path)
+	results.append([
+		"export_replay_file guarda archivo .otr comprimido con gzip en disco",
+		exported_otr and FileAccess.file_exists(otr_path)
+	])
+
+	var imported_otr: bool = save_mgr.import_replay_file(otr_path)
+	var otr_meta: Dictionary = save_mgr.last_imported_replay
+	results.append([
+		"import_replay_file descomprime y valida version=='1', game_id=='checkers' y moves",
+		imported_otr
+		and str(otr_meta.get("version", "")) == "1"
+		and str(otr_meta.get("game_id", "")) == "checkers"
+		and (otr_meta.get("player_names", []) as Array).size() == 2
+		and (otr_meta.get("moves", []) as Array).size() == 3
+	])
+
+	var otr_viewer = ReplayViewer.new()
+	root.add_child(otr_viewer)
+	var viewer_imported: bool = otr_viewer.import_otr_replay(otr_path)
+	results.append([
+		"ReplayViewer importa .otr y muestra botón 'Importar Replay' con filtro *.otr",
+		viewer_imported
+		and otr_viewer.total_steps == 3
+		and otr_viewer.btn_import_replay != null
+		and otr_viewer.import_otr_dialog != null
+	])
+	otr_viewer.free()
+	DirAccess.remove_absolute(otr_path)
+
+	# 8. Limpiar archivo de prueba
 	var deleted_ok: bool = save_mgr.delete_save(save_id)
 	results.append([
 		"delete_save elimina la partida guardada de disco",

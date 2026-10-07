@@ -11,7 +11,12 @@ use godot::classes::{INode, Node};
 use godot::prelude::*;
 
 pub use godot;
+pub mod native_link;
 pub mod steam_bridge;
+
+pub use native_link::{
+    GodotMultipeerLink, GodotNearbyLink, GodotRawByteLink, NativeBridgeTransport, SharedLinkQueue,
+};
 
 use backgammon_game::new_backgammon_session;
 use battleship_game::{new_battleship_session, ShotResult, ShotResultEvent};
@@ -57,89 +62,6 @@ struct OpenTableExtension;
 #[gdextension]
 unsafe impl ExtensionLibrary for OpenTableExtension {}
 
-#[derive(Clone, Default)]
-pub struct SharedLinkQueue {
-    pub incoming: Vec<(String, Vec<u8>)>,
-    pub events: Vec<RawLinkEvent>,
-    pub outgoing_sends: Vec<(String, Vec<u8>)>,
-    pub outgoing_broadcasts: Vec<Vec<u8>>,
-}
-
-/// Enlace de transporte nativo para Android (Nearby Connections).
-pub struct GodotNearbyLink {
-    pub queue: Arc<Mutex<SharedLinkQueue>>,
-}
-
-impl GodotNearbyLink {
-    pub fn new(queue: Arc<Mutex<SharedLinkQueue>>) -> Self {
-        Self { queue }
-    }
-}
-
-impl RawByteLink for GodotNearbyLink {
-    fn send_raw(&mut self, peer_tag: &str, bytes: &[u8]) -> EngineResult<()> {
-        let mut q = self.queue.lock().unwrap();
-        q.outgoing_sends
-            .push((peer_tag.to_string(), bytes.to_vec()));
-        Ok(())
-    }
-
-    fn broadcast_raw(&mut self, bytes: &[u8]) -> EngineResult<()> {
-        let mut q = self.queue.lock().unwrap();
-        q.outgoing_broadcasts.push(bytes.to_vec());
-        Ok(())
-    }
-
-    fn poll_raw_received(&mut self) -> Vec<(String, Vec<u8>)> {
-        let mut q = self.queue.lock().unwrap();
-        std::mem::take(&mut q.incoming)
-    }
-
-    fn poll_link_events(&mut self) -> Vec<RawLinkEvent> {
-        let mut q = self.queue.lock().unwrap();
-        std::mem::take(&mut q.events)
-    }
-}
-
-/// Enlace de transporte nativo para iOS (MultipeerConnectivity / OpenTableMultipeer).
-///
-/// Implementa `RawByteLink` para interactuar de forma transparente con el singleton
-/// de Swift `OpenTableMultipeer` de iOS a través de la cola compartida `SharedLinkQueue`.
-pub struct GodotMultipeerLink {
-    pub queue: Arc<Mutex<SharedLinkQueue>>,
-}
-
-impl GodotMultipeerLink {
-    pub fn new(queue: Arc<Mutex<SharedLinkQueue>>) -> Self {
-        Self { queue }
-    }
-}
-
-impl RawByteLink for GodotMultipeerLink {
-    fn send_raw(&mut self, peer_tag: &str, bytes: &[u8]) -> EngineResult<()> {
-        let mut q = self.queue.lock().unwrap();
-        q.outgoing_sends
-            .push((peer_tag.to_string(), bytes.to_vec()));
-        Ok(())
-    }
-
-    fn broadcast_raw(&mut self, bytes: &[u8]) -> EngineResult<()> {
-        let mut q = self.queue.lock().unwrap();
-        q.outgoing_broadcasts.push(bytes.to_vec());
-        Ok(())
-    }
-
-    fn poll_raw_received(&mut self) -> Vec<(String, Vec<u8>)> {
-        let mut q = self.queue.lock().unwrap();
-        std::mem::take(&mut q.incoming)
-    }
-
-    fn poll_link_events(&mut self) -> Vec<RawLinkEvent> {
-        let mut q = self.queue.lock().unwrap();
-        std::mem::take(&mut q.events)
-    }
-}
-
 #[derive(Clone)]
 struct TournamentMatch {
     player1: PlayerId,
@@ -167,11 +89,11 @@ enum BridgeMode {
     },
     NativeHost {
         session: Session,
-        transport: NativeHostTransport<GodotNearbyLink>,
+        transport: NativeHostTransport<GodotRawByteLink>,
         queue: Arc<Mutex<SharedLinkQueue>>,
     },
     NativeClient {
-        transport: NativeClientTransport<GodotNearbyLink>,
+        transport: NativeClientTransport<GodotRawByteLink>,
         player_id: PlayerId,
         queue: Arc<Mutex<SharedLinkQueue>>,
         handshake_complete: bool,
@@ -480,6 +402,12 @@ impl OpenTableBridge {
     fn disconnected();
 
     #[signal]
+    fn native_send_bytes(bytes: PackedByteArray);
+
+    #[signal]
+    fn native_bytes_received(bytes: PackedByteArray);
+
+    #[signal]
     fn native_send_requested(peer_tag: GString, bytes: PackedByteArray);
 
     #[signal]
@@ -773,6 +701,38 @@ impl OpenTableBridge {
         };
     }
 
+    #[func]
+    fn start_local_match_uno_vs_ai(&mut self, human: i64, ai: i64, difficulty: i64) -> bool {
+        if human == ai || human <= 0 || ai <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "uno".to_string();
+        self.ai_difficulty = AiDifficulty::from_i64(difficulty);
+        let p_human = PlayerId(human as u32);
+        let p_ai = PlayerId(ai as u32);
+
+        let (p1, p2) = if human < ai {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let session = new_uno_session(SessionId(1), 1, vec![p1, p2]);
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
+    }
+
     fn parse_player_ids(players: &Variant) -> Vec<PlayerId> {
         if let Ok(arr) = players.try_to::<Array<i64>>() {
             arr.iter_shared().map(|p| PlayerId(p as u32)).collect()
@@ -803,6 +763,41 @@ impl OpenTableBridge {
             session,
             ai_player: None,
         };
+        true
+    }
+
+    #[func]
+    fn start_local_match_crisis_vs_ai(&mut self, human: i64, ai: i64, difficulty: i64) -> bool {
+        if human == ai || human <= 0 || ai <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "crisis".to_string();
+        self.ai_difficulty = AiDifficulty::from_i64(difficulty);
+        let p_human = PlayerId(human as u32);
+        let p_ai = PlayerId(ai as u32);
+
+        let (p1, p2) = if human < ai {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let session = match new_crisis_session(SessionId(1), 1, &[p1, p2]) {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
         true
     }
 
@@ -886,6 +881,43 @@ impl OpenTableBridge {
     }
 
     #[func]
+    fn start_local_match_chinese_checkers_vs_ai(
+        &mut self,
+        human: i64,
+        ai: i64,
+        difficulty: i64,
+    ) -> bool {
+        if human == ai || human <= 0 || ai <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "chinese_checkers".to_string();
+        self.ai_difficulty = AiDifficulty::from_i64(difficulty);
+        let p_human = PlayerId(human as u32);
+        let p_ai = PlayerId(ai as u32);
+
+        let (p1, p2) = if human < ai {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let session = new_chinese_checkers_session(SessionId(1), 1, vec![p1, p2]);
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
+    }
+
+    #[func]
     fn start_local_match_mille_bornes(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "mille_bornes".to_string();
         let session =
@@ -894,6 +926,43 @@ impl OpenTableBridge {
             session,
             ai_player: None,
         };
+    }
+
+    #[func]
+    fn start_local_match_mille_bornes_vs_ai(
+        &mut self,
+        human: i64,
+        ai: i64,
+        difficulty: i64,
+    ) -> bool {
+        if human == ai || human <= 0 || ai <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "mille_bornes".to_string();
+        self.ai_difficulty = AiDifficulty::from_i64(difficulty);
+        let p_human = PlayerId(human as u32);
+        let p_ai = PlayerId(ai as u32);
+
+        let (p1, p2) = if human < ai {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let session = new_mille_bornes_session(SessionId(1), 1, p1, p2);
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
     }
 
     #[func]
@@ -950,6 +1019,38 @@ impl OpenTableBridge {
     }
 
     #[func]
+    fn start_local_match_monopoly_vs_ai(&mut self, human: i64, ai: i64, difficulty: i64) -> bool {
+        if human == ai || human <= 0 || ai <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "monopoly".to_string();
+        self.ai_difficulty = AiDifficulty::from_i64(difficulty);
+        let p_human = PlayerId(human as u32);
+        let p_ai = PlayerId(ai as u32);
+
+        let (p1, p2) = if human < ai {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let session = new_monopoly_session(SessionId(1), 1, p1, p2);
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
+    }
+
+    #[func]
     fn start_local_match_ludo(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "ludo".to_string();
         let session = new_ludo_session(
@@ -1003,6 +1104,42 @@ impl OpenTableBridge {
             session,
             ai_player: None,
         };
+    }
+
+    #[func]
+    fn start_local_match_battleship_vs_ai(&mut self, human: i64, ai: i64, difficulty: i64) -> bool {
+        if human == ai || human <= 0 || ai <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "battleship".to_string();
+        self.ai_difficulty = AiDifficulty::from_i64(difficulty);
+        let p_human = PlayerId(human as u32);
+        let p_ai = PlayerId(ai as u32);
+
+        let (p1, p2) = if human < ai {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let mut session = new_battleship_session(SessionId(1), 1, p1, p2);
+        let _ = session.process_command(
+            p_ai,
+            Box::new(battleship_game::default_ai_place_fleet_command(p_ai)),
+        );
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
     }
 
     #[func]
@@ -1595,8 +1732,120 @@ impl OpenTableBridge {
     // ------------------------------------------------------------------
     // NATIVE BRIDGE (Android Nearby Connections / iOS Multipeer)
     // ------------------------------------------------------------------
+    fn ensure_native_signal_connections(&mut self) {
+        let callable = self.base().callable("on_native_bytes_received");
+        if !self.base().is_connected("native_bytes_received", &callable) {
+            self.base_mut().connect("native_bytes_received", &callable);
+        }
+    }
+
+    #[func]
+    fn start_p2p_host(&mut self, game_id: GString) -> bool {
+        let plugin_available = GodotRawByteLink::check_native_plugin_available();
+        self.ensure_native_signal_connections();
+
+        let gid = game_id.to_string();
+        let effective_game_id = if gid.trim().is_empty() {
+            "checkers".to_string()
+        } else {
+            gid.trim().to_lowercase()
+        };
+        self.current_game_type = effective_game_id.clone();
+
+        let session = create_initial_session(&effective_game_id)
+            .unwrap_or_else(|| new_checkers_session(SessionId(1), 1, PlayerId(1), PlayerId(2)));
+        let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
+        let link = GodotRawByteLink::new(queue.clone());
+        let p2p_transport: NativeBridgeTransport<GodotRawByteLink> =
+            NativeBridgeTransport::new_host(link);
+        if let Some(transport) = p2p_transport.into_host() {
+            self.mode = BridgeMode::NativeHost {
+                session,
+                transport,
+                queue,
+            };
+        }
+        self.flush_native_outgoing();
+        godot_print!("✅ P2P Host iniciado para juego '{}'", effective_game_id);
+        plugin_available
+    }
+
+    #[func]
+    fn start_p2p_client(&mut self, game_id: GString) -> bool {
+        let plugin_available = GodotRawByteLink::check_native_plugin_available();
+        self.ensure_native_signal_connections();
+
+        let gid = game_id.to_string();
+        let effective_game_id = if gid.trim().is_empty() {
+            "checkers".to_string()
+        } else {
+            gid.trim().to_lowercase()
+        };
+        self.current_game_type = effective_game_id.clone();
+
+        let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
+        let link = GodotRawByteLink::new(queue.clone());
+        match NativeBridgeTransport::<GodotRawByteLink>::new_client(link, "P2PClient") {
+            Ok(p2p_transport) => {
+                if let Some(transport) = p2p_transport.into_client() {
+                    self.mode = BridgeMode::NativeClient {
+                        transport,
+                        player_id: PlayerId(0),
+                        queue,
+                        handshake_complete: false,
+                    };
+                }
+                self.flush_native_outgoing();
+                godot_print!("✅ P2P Client iniciado para juego '{}'", effective_game_id);
+                plugin_available
+            }
+            Err(e) => {
+                godot_warn!("No se pudo inicializar P2P Client: {}", e);
+                false
+            }
+        }
+    }
+
+    #[func]
+    fn on_native_bytes_received(&mut self, bytes: PackedByteArray) {
+        self.feed_native_data_received(GString::from("p2p_peer"), bytes);
+    }
+
+    #[func]
+    fn send_native_bytes(&mut self, bytes: PackedByteArray) {
+        let raw = bytes.to_vec();
+        if let BridgeMode::NativeHost { queue, .. }
+        | BridgeMode::NativeClient { queue, .. }
+        | BridgeMode::MultipeerHost { queue, .. }
+        | BridgeMode::MultipeerClient { queue, .. } = &self.mode
+        {
+            let mut link = GodotRawByteLink::new(queue.clone());
+            let _ = link.send(&raw);
+        }
+        self.flush_native_outgoing();
+    }
+
+    #[func]
+    fn receive_native_bytes(&mut self) -> PackedByteArray {
+        let mut out = PackedByteArray::new();
+        if let BridgeMode::NativeHost { queue, .. }
+        | BridgeMode::NativeClient { queue, .. }
+        | BridgeMode::MultipeerHost { queue, .. }
+        | BridgeMode::MultipeerClient { queue, .. } = &self.mode
+        {
+            let mut link = GodotRawByteLink::new(queue.clone());
+            for chunk in link.receive() {
+                for b in chunk {
+                    out.push(b);
+                }
+            }
+        }
+        out
+    }
+
     #[func]
     fn start_native_hosting(&mut self, player_top_id: i64, player_bottom_id: i64) {
+        self.ensure_native_signal_connections();
         let session = new_checkers_session(
             SessionId(1),
             1,
@@ -1604,9 +1853,7 @@ impl OpenTableBridge {
             PlayerId(player_bottom_id as u32),
         );
         let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
-        let link = GodotNearbyLink {
-            queue: queue.clone(),
-        };
+        let link = GodotRawByteLink::new(queue.clone());
         let transport = NativeHostTransport::new(link);
         self.mode = BridgeMode::NativeHost {
             session,
@@ -1618,10 +1865,9 @@ impl OpenTableBridge {
 
     #[func]
     fn start_native_client(&mut self, player_name: GString) {
+        self.ensure_native_signal_connections();
         let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
-        let link = GodotNearbyLink {
-            queue: queue.clone(),
-        };
+        let link = GodotRawByteLink::new(queue.clone());
         let transport = NativeClientTransport::begin_join(link, &player_name.to_string())
             .expect("no pude iniciar handshake nativo");
         self.mode = BridgeMode::NativeClient {
@@ -1635,10 +1881,9 @@ impl OpenTableBridge {
 
     #[func]
     fn reconnect_native(&mut self, player_id: i64, token: GString) {
+        self.ensure_native_signal_connections();
         let queue = Arc::new(Mutex::new(SharedLinkQueue::default()));
-        let link = GodotNearbyLink {
-            queue: queue.clone(),
-        };
+        let link = GodotRawByteLink::new(queue.clone());
         let pid = PlayerId(player_id as u32);
         let transport = NativeClientTransport::begin_reconnect(link, pid, token.to_string())
             .expect("no pude iniciar reconexión nativa");
@@ -3141,7 +3386,7 @@ impl OpenTableBridge {
     }
 
     fn flush_native_outgoing(&mut self) {
-        let (sends, broadcasts) = match &self.mode {
+        let (sends, broadcasts, raw_bytes) = match &self.mode {
             BridgeMode::NativeHost { queue, .. }
             | BridgeMode::NativeClient { queue, .. }
             | BridgeMode::MultipeerHost { queue, .. }
@@ -3149,10 +3394,20 @@ impl OpenTableBridge {
                 let mut q = queue.lock().unwrap();
                 let sends = std::mem::take(&mut q.outgoing_sends);
                 let broadcasts = std::mem::take(&mut q.outgoing_broadcasts);
-                (sends, broadcasts)
+                let raw_bytes = std::mem::take(&mut q.outgoing_raw_bytes);
+                (sends, broadcasts, raw_bytes)
             }
             _ => return,
         };
+
+        for bytes in raw_bytes {
+            let mut packed = PackedByteArray::new();
+            for b in bytes {
+                packed.push(b);
+            }
+            self.base_mut()
+                .emit_signal("native_send_bytes", &[Variant::from(packed)]);
+        }
 
         for (peer_tag, bytes) in sends {
             let mut packed = PackedByteArray::new();
@@ -3161,8 +3416,10 @@ impl OpenTableBridge {
             }
             self.base_mut().emit_signal(
                 "native_send_requested",
-                &[Variant::from(peer_tag), Variant::from(packed)],
+                &[Variant::from(peer_tag), Variant::from(packed.clone())],
             );
+            self.base_mut()
+                .emit_signal("native_send_bytes", &[Variant::from(packed)]);
         }
 
         for bytes in broadcasts {
@@ -3170,8 +3427,12 @@ impl OpenTableBridge {
             for b in bytes {
                 packed.push(b);
             }
+            self.base_mut().emit_signal(
+                "native_broadcast_requested",
+                &[Variant::from(packed.clone())],
+            );
             self.base_mut()
-                .emit_signal("native_broadcast_requested", &[Variant::from(packed)]);
+                .emit_signal("native_send_bytes", &[Variant::from(packed)]);
         }
     }
 
@@ -3429,8 +3690,13 @@ impl OpenTableBridge {
 
     fn process_ai_turn_if_needed(&mut self) {
         let mut steps = 0;
+        let max_steps = if self.current_game_type == "crisis" {
+            16
+        } else {
+            2
+        };
         loop {
-            if steps >= 2 {
+            if steps >= max_steps {
                 break;
             }
             let (acting_p, cmd_opt): (PlayerId, Option<Box<dyn Command>>) = match &self.mode {
@@ -3444,7 +3710,13 @@ impl OpenTableBridge {
                         || self.current_game_type == "shogi"
                         || self.current_game_type == "xiangqi"
                         || self.current_game_type == "go"
+                        || self.current_game_type == "monopoly"
                     {
+                        let acting = if self.current_game_type == "monopoly" {
+                            *ai_p
+                        } else {
+                            curr_p
+                        };
                         let cmd: Option<Box<dyn Command>> = match self.current_game_type.as_str() {
                             "chess" if is_ai_turn => {
                                 chess_game::ai::best_move(session, *ai_p, self.ai_difficulty)
@@ -3493,13 +3765,71 @@ impl OpenTableBridge {
                                         .map(|c| Box::new(c) as Box<dyn Command>)
                                 }
                             }
+                            "battleship" if is_ai_turn => {
+                                let ai_has_fleet = session
+                                    .world()
+                                    .get_resource::<battleship_game::FleetResource>()
+                                    .map(|f| f.has_placed_fleet(*ai_p))
+                                    .unwrap_or(false);
+                                if !ai_has_fleet {
+                                    Some(Box::new(
+                                        battleship_game::default_ai_place_fleet_command(*ai_p),
+                                    ) as Box<dyn Command>)
+                                } else {
+                                    let both_placed = session
+                                        .world()
+                                        .get_resource::<battleship_game::FleetResource>()
+                                        .map(|f| f.ships.len() >= 2)
+                                        .unwrap_or(false);
+                                    if both_placed {
+                                        battleship_game::ai::best_move(
+                                            session,
+                                            *ai_p,
+                                            self.ai_difficulty,
+                                        )
+                                        .map(|c| Box::new(c) as Box<dyn Command>)
+                                    } else {
+                                        None
+                                    }
+                                }
+                            }
+                            "mille_bornes" | "mille-bornes" | "millebornes" if is_ai_turn => {
+                                mille_bornes_game::ai::best_move(
+                                    session,
+                                    *ai_p,
+                                    self.ai_difficulty,
+                                )
+                                .map(|c| c.into_command())
+                            }
+                            "uno" if is_ai_turn => {
+                                uno_game::ai::best_move(session, *ai_p, self.ai_difficulty)
+                                    .map(|c| c.into_command())
+                            }
+                            "monopoly" => {
+                                monopoly_game::ai::best_move(session, *ai_p, self.ai_difficulty)
+                                    .map(|c| c.into_command())
+                            }
+                            "chinese_checkers" | "chinese-checkers" | "chinesecheckers"
+                                if is_ai_turn =>
+                            {
+                                chinese_checkers_game::ai::best_move(
+                                    session,
+                                    *ai_p,
+                                    self.ai_difficulty,
+                                )
+                                .map(|c| Box::new(c) as Box<dyn Command>)
+                            }
+                            "crisis" | "teg" if is_ai_turn => {
+                                crisis_game::ai::best_move(session, *ai_p, self.ai_difficulty)
+                                    .map(|c| c.into_command())
+                            }
                             _ if is_ai_turn => {
                                 checkers_game::ai::best_move(session, *ai_p, self.ai_difficulty)
                                     .map(|c| Box::new(c) as Box<dyn Command>)
                             }
                             _ => None,
                         };
-                        (curr_p, cmd)
+                        (acting, cmd)
                     } else {
                         break;
                     }
@@ -3514,5 +3844,51 @@ impl OpenTableBridge {
                 break;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extended_ai_engines_produce_valid_commands_in_easy_mode() {
+        let p1 = PlayerId(1);
+        let p2 = PlayerId(2);
+        let easy = AiDifficulty::Easy;
+
+        // 1. Battleship
+        let mut bs = new_battleship_session(SessionId(1), 1, p1, p2);
+        bs.process_command(
+            p1,
+            Box::new(battleship_game::default_ai_place_fleet_command(p1)),
+        )
+        .unwrap();
+        bs.process_command(
+            p2,
+            Box::new(battleship_game::default_ai_place_fleet_command(p2)),
+        )
+        .unwrap();
+        assert!(battleship_game::ai::best_move(&bs, p1, easy).is_some());
+
+        // 2. Mille Bornes
+        let mb = new_mille_bornes_session(SessionId(2), 1, p1, p2);
+        assert!(mille_bornes_game::ai::best_move(&mb, p1, easy).is_some());
+
+        // 3. UNO
+        let uno = new_uno_session(SessionId(3), 1, vec![p1, p2]);
+        assert!(uno_game::ai::best_move(&uno, p1, easy).is_some());
+
+        // 4. Monopoly
+        let mono = new_monopoly_session(SessionId(4), 1, p1, p2);
+        assert!(monopoly_game::ai::best_move(&mono, p1, easy).is_some());
+
+        // 5. Chinese Checkers
+        let cc = new_chinese_checkers_session(SessionId(5), 1, vec![p1, p2]);
+        assert!(chinese_checkers_game::ai::best_move(&cc, p1, easy).is_some());
+
+        // 6. Crisis / TEG
+        let crisis = new_crisis_session(SessionId(6), 1, &[p1, p2]).unwrap();
+        assert!(crisis_game::ai::best_move(&crisis, p1, easy).is_some());
     }
 }

@@ -1,9 +1,14 @@
+pub mod ai;
 pub mod board;
 pub mod commands;
 pub mod events;
 pub mod position;
 pub mod rules;
 
+pub use ai::{
+    best_move, generate_legal_moves, hex_distance, total_distance_to_goal, ChineseCheckersCommand,
+    ChineseCheckersState,
+};
 pub use board::BoardResource;
 pub use commands::MovePegCommand;
 pub use events::{GameOverEvent, PegMovedEvent};

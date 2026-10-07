@@ -11,30 +11,62 @@
 //! - `GET /rankings/:game_id` -> JSON con top-50 jugadores por ELO
 //! - `GET /player/:player_id` -> JSON con todos los ratings del jugador por juego
 
+pub mod anticheat;
 pub mod api;
+pub mod auth;
 pub mod elo;
+pub mod metrics;
+pub mod rate_limit;
 pub mod room;
+pub mod tls;
 pub mod tournament;
 
 use api::run_http_api_server;
+use auth::{AuthConfig, AUTH_HANDSHAKE_TIMEOUT_SECS};
 use elo::EloStore;
 use futures_util::{SinkExt, StreamExt};
+use metrics::global_metrics;
+use rate_limit::{RateLimitDecision, RelayRateLimiter};
 use room::{ClientSender, ConnectionId, RoomError, RoomManager};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
+use tls::TlsConfig;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex};
 use tokio_tungstenite::tungstenite::Message;
 use tournament::{Tournament, TournamentManager};
 
+/// Estado compartido entre todas las conexiones WebSocket del Relay.
+#[derive(Clone)]
+pub struct RelaySharedState {
+    /// Gestor de salas activas.
+    pub manager: Arc<Mutex<RoomManager>>,
+    /// Almacén persistente de ELO.
+    pub elo_store: Arc<Mutex<EloStore>>,
+    /// Gestor de torneos.
+    pub tournaments: Arc<Mutex<TournamentManager>>,
+    /// Limitador de velocidad por IP y por sala.
+    pub rate_limiter: Arc<Mutex<RelayRateLimiter>>,
+    /// Configuración de autenticación JWT.
+    pub auth_config: AuthConfig,
+    /// Configuración TLS opcional cargada desde entorno.
+    pub tls_config: Option<TlsConfig>,
+}
+
 /// Solicitud entrante enviada por un cliente WebSocket al servidor Relay.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum RelayRequest {
+    /// Autentica la conexión mediante un token JWT (`HS256`).
+    Auth {
+        /// Token JWT firmado con `JWT_SECRET`.
+        token: String,
+    },
     /// Crea una nueva sala y registra al cliente como anfitrión (`player_id = 1`).
     Create {
         /// Identificador opcional del juego.
@@ -46,6 +78,11 @@ pub enum RelayRequest {
     },
     /// Une al cliente a una sala existente mediante su código.
     Join {
+        /// Código de la sala.
+        room_code: String,
+    },
+    /// Une al cliente como espectador de solo lectura a una sala existente.
+    JoinSpectator {
         /// Código de la sala.
         room_code: String,
     },
@@ -103,6 +140,26 @@ fn default_true() -> bool {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum RelayResponse {
+    /// Confirmación de autenticación JWT exitosa.
+    AuthOk {
+        /// Identificador canónico (`sub`) extraído del JWT.
+        player_id: String,
+    },
+    /// Error de autenticación JWT (`expired`, `invalid_signature`, `malformed_token`).
+    AuthError {
+        /// Motivo del rechazo.
+        reason: String,
+    },
+    /// Notificación de límite de velocidad superado.
+    RateLimited {
+        /// Tiempo recomendado antes de reintentar en milisegundos (`1000`).
+        retry_after_ms: u64,
+    },
+    /// Notificación de movimiento rechazado por el validador Anti-Cheat.
+    MoveRejected {
+        /// Motivo del rechazo (`"illegal_move"`).
+        reason: String,
+    },
     /// Confirmación de creación de sala.
     Created {
         /// Código asignado a la sala.
@@ -112,6 +169,11 @@ pub enum RelayResponse {
     Joined {
         /// Identificador de jugador asignado dentro de la sala (2..N).
         player_id: u32,
+    },
+    /// Confirmación de unión exitosa como espectador a una sala.
+    Spectating {
+        /// Cantidad de jugadores activos en la sala.
+        player_count: usize,
     },
     /// Notificación a los miembros existentes cuando un nuevo jugador entra a la sala.
     PeerJoined {
@@ -165,9 +227,29 @@ pub enum RelayResponse {
     Pong,
     /// Error de protocolo o de estado de sala.
     Error {
+        /// Código estructurado del motivo del error (`"spectator_cannot_relay"`, `"spectator_limit"`, etc.).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
         /// Descripción legible del error.
-        message: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        message: Option<String>,
     },
+}
+
+impl RelayResponse {
+    pub fn error_reason(reason: impl Into<String>) -> Self {
+        Self::Error {
+            reason: Some(reason.into()),
+            message: None,
+        }
+    }
+
+    pub fn error_message(message: impl Into<String>) -> Self {
+        Self::Error {
+            reason: None,
+            message: Some(message.into()),
+        }
+    }
 }
 
 /// Inicia el servidor Relay sobre un `TcpListener` ya enlazado usando la base de datos por defecto.
@@ -183,41 +265,58 @@ pub async fn run_relay_server_with_store(
     listener: TcpListener,
     elo_store: Arc<Mutex<EloStore>>,
 ) -> std::io::Result<()> {
-    let manager = Arc::new(Mutex::new(RoomManager::new()));
-    let tournaments = Arc::new(Mutex::new(TournamentManager::new()));
+    let tls_config = TlsConfig::from_env()?;
+    let auth_config = AuthConfig::from_env();
+    run_relay_server_with_config(listener, elo_store, auth_config, tls_config).await
+}
+
+/// Inicia el servidor Relay con configuración explícita de `AuthConfig` y `TlsConfig`.
+pub async fn run_relay_server_with_config(
+    listener: TcpListener,
+    elo_store: Arc<Mutex<EloStore>>,
+    auth_config: AuthConfig,
+    tls_config: Option<TlsConfig>,
+) -> std::io::Result<()> {
+    let state = RelaySharedState {
+        manager: Arc::new(Mutex::new(RoomManager::new())),
+        elo_store,
+        tournaments: Arc::new(Mutex::new(TournamentManager::new())),
+        rate_limiter: Arc::new(Mutex::new(RelayRateLimiter::new())),
+        auth_config,
+        tls_config,
+    };
     let next_conn_id = Arc::new(AtomicU64::new(1));
 
     loop {
-        let (stream, _peer_addr) = listener.accept().await?;
+        let (stream, peer_addr) = listener.accept().await?;
         let conn_id = next_conn_id.fetch_add(1, Ordering::Relaxed);
-        let manager_clone = Arc::clone(&manager);
-        let store_clone = Arc::clone(&elo_store);
-        let tournaments_clone = Arc::clone(&tournaments);
+        let state_clone = state.clone();
 
         tokio::spawn(async move {
-            handle_connection(
-                stream,
-                conn_id,
-                manager_clone,
-                store_clone,
-                tournaments_clone,
-            )
-            .await;
+            handle_connection(stream, peer_addr.ip(), conn_id, state_clone).await;
         });
     }
 }
 
 async fn handle_connection(
     stream: TcpStream,
+    peer_ip: IpAddr,
     conn_id: ConnectionId,
-    manager: Arc<Mutex<RoomManager>>,
-    elo_store: Arc<Mutex<EloStore>>,
-    tournaments: Arc<Mutex<TournamentManager>>,
+    state: RelaySharedState,
 ) {
+    {
+        let mut limiter = state.rate_limiter.lock().await;
+        if limiter.is_ip_banned(peer_ip) {
+            return;
+        }
+    }
+
     let ws_stream = match tokio_tungstenite::accept_async(stream).await {
         Ok(ws) => ws,
         Err(_) => return,
     };
+
+    global_metrics().inc_connections_active();
 
     let (mut ws_sink, mut ws_source) = ws_stream.split();
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
@@ -230,10 +329,89 @@ async fn handle_connection(
         }
     });
 
+    let mut canonical_player_id: Option<String> = None;
+
+    if state.auth_config.is_enabled() {
+        let first_frame = tokio::time::timeout(
+            Duration::from_secs(AUTH_HANDSHAKE_TIMEOUT_SECS),
+            ws_source.next(),
+        )
+        .await;
+
+        let Some(Some(Ok(Message::Text(first_text)))) = first_frame.ok() else {
+            send_response(
+                &tx,
+                &RelayResponse::AuthError {
+                    reason: "auth_timeout".to_string(),
+                },
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            writer_task.abort();
+            return;
+        };
+
+        let Ok(RelayRequest::Auth { token }) = serde_json::from_str::<RelayRequest>(&first_text)
+        else {
+            send_response(
+                &tx,
+                &RelayResponse::AuthError {
+                    reason: "auth_required".to_string(),
+                },
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            writer_task.abort();
+            return;
+        };
+
+        match state.auth_config.verify_token(&token) {
+            Ok(claims) => {
+                canonical_player_id = Some(claims.sub.clone());
+                send_response(
+                    &tx,
+                    &RelayResponse::AuthOk {
+                        player_id: claims.sub,
+                    },
+                );
+            }
+            Err(err) => {
+                send_response(
+                    &tx,
+                    &RelayResponse::AuthError {
+                        reason: err.reason().to_string(),
+                    },
+                );
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                writer_task.abort();
+                return;
+            }
+        }
+    }
+
     while let Some(Ok(msg)) = ws_source.next().await {
         match msg {
             Message::Text(text) => {
-                process_text_message(&text, conn_id, &tx, &manager, &elo_store, &tournaments).await;
+                let current_room = {
+                    let mgr = state.manager.lock().await;
+                    mgr.participant_info(conn_id).map(|(code, _)| code)
+                };
+                let decision = {
+                    let mut limiter = state.rate_limiter.lock().await;
+                    limiter.check_message(peer_ip, current_room.as_deref())
+                };
+                if let RateLimitDecision::Limited {
+                    retry_after_ms,
+                    disconnect,
+                } = decision
+                {
+                    send_response(&tx, &RelayResponse::RateLimited { retry_after_ms });
+                    if disconnect {
+                        tokio::time::sleep(Duration::from_millis(20)).await;
+                        break;
+                    }
+                    continue;
+                }
+
+                process_text_message(&text, conn_id, &mut canonical_player_id, &tx, &state).await;
             }
             Message::Ping(payload) => {
                 let _ = tx.send(
@@ -250,20 +428,21 @@ async fn handle_connection(
     }
 
     {
-        let mut mgr = manager.lock().await;
+        let mut mgr = state.manager.lock().await;
         mgr.leave_room(conn_id);
+        global_metrics().set_rooms_active(mgr.active_room_count());
     }
 
+    global_metrics().dec_connections_active();
     writer_task.abort();
 }
 
 async fn process_text_message(
     raw_text: &str,
     conn_id: ConnectionId,
+    canonical_player_id: &mut Option<String>,
     tx: &ClientSender,
-    manager: &Arc<Mutex<RoomManager>>,
-    elo_store: &Arc<Mutex<EloStore>>,
-    tournaments: &Arc<Mutex<TournamentManager>>,
+    state: &RelaySharedState,
 ) {
     let parsed: Result<RelayRequest, _> = serde_json::from_str(raw_text);
     let request = match parsed {
@@ -271,22 +450,41 @@ async fn process_text_message(
         Err(err) => {
             send_response(
                 tx,
-                &RelayResponse::Error {
-                    message: format!("invalid json request: {err}"),
-                },
+                &RelayResponse::error_message(format!("invalid json request: {err}")),
             );
             return;
         }
     };
 
     match request {
+        RelayRequest::Auth { token } => match state.auth_config.verify_token(&token) {
+            Ok(claims) => {
+                *canonical_player_id = Some(claims.sub.clone());
+                send_response(
+                    tx,
+                    &RelayResponse::AuthOk {
+                        player_id: claims.sub,
+                    },
+                );
+            }
+            Err(err) => {
+                send_response(
+                    tx,
+                    &RelayResponse::AuthError {
+                        reason: err.reason().to_string(),
+                    },
+                );
+            }
+        },
         RelayRequest::Create { game_id, is_public } => {
-            let mut mgr = manager.lock().await;
+            global_metrics().inc_messages_total(game_id.as_deref());
+            let mut mgr = state.manager.lock().await;
             let room_code = mgr.create_room(conn_id, tx.clone(), game_id, is_public);
+            global_metrics().set_rooms_active(mgr.active_room_count());
             send_response(tx, &RelayResponse::Created { room_code });
         }
         RelayRequest::Join { room_code } => {
-            let mut mgr = manager.lock().await;
+            let mut mgr = state.manager.lock().await;
             match mgr.join_room(conn_id, tx.clone(), &room_code) {
                 Ok((normalized_code, player_id)) => {
                     send_response(tx, &RelayResponse::Joined { player_id });
@@ -298,46 +496,60 @@ async fn process_text_message(
                     let _ = normalized_code;
                 }
                 Err(RoomError::InvalidRoomCode) => {
-                    send_response(
-                        tx,
-                        &RelayResponse::Error {
-                            message: "invalid room code format".to_string(),
-                        },
-                    );
+                    send_response(tx, &RelayResponse::error_message("invalid room code format"));
                 }
                 Err(RoomError::RoomNotFound) => {
-                    send_response(
-                        tx,
-                        &RelayResponse::Error {
-                            message: "room not found".to_string(),
-                        },
-                    );
+                    send_response(tx, &RelayResponse::error_message("room not found"));
                 }
-                Err(RoomError::NotInRoom) => {
-                    send_response(
-                        tx,
-                        &RelayResponse::Error {
-                            message: "not in room".to_string(),
-                        },
-                    );
+                Err(_) => {
+                    send_response(tx, &RelayResponse::error_message("not in room"));
+                }
+            }
+        }
+        RelayRequest::JoinSpectator { room_code } => {
+            let mut mgr = state.manager.lock().await;
+            match mgr.join_spectator(conn_id, tx.clone(), &room_code) {
+                Ok((_normalized_code, player_count)) => {
+                    send_response(tx, &RelayResponse::Spectating { player_count });
+                }
+                Err(RoomError::SpectatorLimit) => {
+                    send_response(tx, &RelayResponse::error_reason("spectator_limit"));
+                }
+                Err(RoomError::InvalidRoomCode) => {
+                    send_response(tx, &RelayResponse::error_message("invalid room code format"));
+                }
+                Err(RoomError::RoomNotFound) => {
+                    send_response(tx, &RelayResponse::error_message("room not found"));
+                }
+                Err(_) => {
+                    send_response(tx, &RelayResponse::error_message("not in room"));
                 }
             }
         }
         RelayRequest::Relay { data } => {
-            let mgr = manager.lock().await;
+            let mut mgr = state.manager.lock().await;
             let from_player = mgr.participant_info(conn_id).map(|(_, pid)| pid);
             let outbound = RelayResponse::Relay {
-                data,
+                data: data.clone(),
                 from: from_player,
             };
             if let Ok(serialized) = serde_json::to_string(&outbound) {
-                if mgr.relay_to_peers(conn_id, &serialized).is_err() {
-                    send_response(
-                        tx,
-                        &RelayResponse::Error {
-                            message: "client is not in a room".to_string(),
-                        },
-                    );
+                match mgr.validate_and_relay(conn_id, &data, &serialized) {
+                    Ok(_) => {}
+                    Err(RoomError::SpectatorCannotRelay) => {
+                        send_response(tx, &RelayResponse::error_reason("spectator_cannot_relay"));
+                    }
+                    Err(RoomError::IllegalMove) => {
+                        send_response(
+                            tx,
+                            &RelayResponse::MoveRejected {
+                                reason: "illegal_move".to_string(),
+                            },
+                        );
+                    }
+                    Err(_) => {
+                        send_response(tx, &RelayResponse::error_message("client is not in a room"));
+                    }
                 }
             }
         }
@@ -346,9 +558,11 @@ async fn process_text_message(
             loser,
             game_id,
         } => {
-            let mut store = elo_store.lock().await;
+            global_metrics().inc_messages_total(Some(&game_id));
+            let mut store = state.elo_store.lock().await;
             match store.report_result(&winner, &loser, &game_id) {
                 Ok((w_rating, l_rating)) => {
+                    global_metrics().inc_elo_updates_total();
                     send_response(
                         tx,
                         &RelayResponse::ResultReported {
@@ -363,9 +577,9 @@ async fn process_text_message(
                 Err(err) => {
                     send_response(
                         tx,
-                        &RelayResponse::Error {
-                            message: format!("failed to persist ELO result: {err}"),
-                        },
+                        &RelayResponse::error_message(format!(
+                            "failed to persist ELO result: {err}"
+                        )),
                     );
                 }
             }
@@ -374,7 +588,7 @@ async fn process_text_message(
             game_id,
             max_players,
         } => {
-            let mut tm = tournaments.lock().await;
+            let mut tm = state.tournaments.lock().await;
             match tm.create_tournament(game_id, max_players) {
                 Ok(tournament_id) => {
                     send_response(tx, &RelayResponse::TournamentCreated { tournament_id });
@@ -382,9 +596,9 @@ async fn process_text_message(
                 Err(err) => {
                     send_response(
                         tx,
-                        &RelayResponse::Error {
-                            message: format!("invalid tournament configuration: {err:?}"),
-                        },
+                        &RelayResponse::error_message(format!(
+                            "invalid tournament configuration: {err:?}"
+                        )),
                     );
                 }
             }
@@ -393,8 +607,11 @@ async fn process_text_message(
             tournament_id,
             player_id,
         } => {
-            let mut tm = tournaments.lock().await;
-            let pid = player_id.unwrap_or_else(|| format!("player_{conn_id}"));
+            let mut tm = state.tournaments.lock().await;
+            let pid = canonical_player_id
+                .clone()
+                .or(player_id)
+                .unwrap_or_else(|| format!("player_{conn_id}"));
             match tm.join_tournament(&tournament_id, pid) {
                 Ok((tournament, _started)) => {
                     send_response(tx, &RelayResponse::TournamentUpdated { tournament });
@@ -402,9 +619,9 @@ async fn process_text_message(
                 Err(err) => {
                     send_response(
                         tx,
-                        &RelayResponse::Error {
-                            message: format!("failed to join tournament: {err:?}"),
-                        },
+                        &RelayResponse::error_message(format!(
+                            "failed to join tournament: {err:?}"
+                        )),
                     );
                 }
             }
@@ -415,7 +632,7 @@ async fn process_text_message(
             match_index,
             winner,
         } => {
-            let mut tm = tournaments.lock().await;
+            let mut tm = state.tournaments.lock().await;
             match tm.report_match(&tournament_id, round, match_index, &winner) {
                 Ok(tournament) => {
                     send_response(tx, &RelayResponse::TournamentUpdated { tournament });
@@ -423,24 +640,19 @@ async fn process_text_message(
                 Err(err) => {
                     send_response(
                         tx,
-                        &RelayResponse::Error {
-                            message: format!("failed to report tournament match: {err:?}"),
-                        },
+                        &RelayResponse::error_message(format!(
+                            "failed to report tournament match: {err:?}"
+                        )),
                     );
                 }
             }
         }
         RelayRequest::Leave => {
-            let mut mgr = manager.lock().await;
+            let mut mgr = state.manager.lock().await;
             if let Some((room_code, _player_id)) = mgr.leave_room(conn_id) {
                 send_response(tx, &RelayResponse::Left { room_code });
             } else {
-                send_response(
-                    tx,
-                    &RelayResponse::Error {
-                        message: "client is not in a room".to_string(),
-                    },
-                );
+                send_response(tx, &RelayResponse::error_message("client is not in a room"));
             }
         }
         RelayRequest::Ping => {
@@ -457,6 +669,7 @@ fn send_response(tx: &ClientSender, response: &RelayResponse) {
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    let _ = IpAddr::V4(Ipv4Addr::LOCALHOST);
     let ws_addr: SocketAddr = std::env::var("OPEN_TABLE_RELAY_ADDR")
         .unwrap_or_else(|_| "0.0.0.0:8080".to_string())
         .parse()
@@ -638,6 +851,246 @@ mod tests {
 
         ws_handle.abort();
         http_handle.abort();
+        let _ = std::fs::remove_file(&db_file);
+    }
+
+    #[tokio::test]
+    async fn test_auth_jwt_expired_and_valid_over_websocket() {
+        let db_file =
+            std::env::temp_dir().join(format!("opentable_ratings_auth_{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&db_file);
+        let elo_store = Arc::new(Mutex::new(EloStore::new(&db_file).unwrap()));
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let secret = "relay_jwt_secret_123";
+        let auth_cfg = AuthConfig::with_secret(secret);
+
+        let handle = tokio::spawn(async move {
+            let _ = run_relay_server_with_config(listener, elo_store, auth_cfg, None).await;
+        });
+
+        let url = format!("ws://{addr}");
+
+        // 1. Token expirado -> {"op": "auth_error", "reason": "expired"}
+        let expired_token = auth::encode_jwt_hs256(
+            &auth::JwtClaims {
+                sub: "alice".to_string(),
+                exp: 100,
+            },
+            secret,
+        );
+        let (mut ws_exp, _) = connect_async(&url).await.unwrap();
+        let auth_msg = serde_json::json!({
+            "op": "auth",
+            "token": expired_token,
+        })
+        .to_string();
+        ws_exp.send(Message::Text(auth_msg.into())).await.unwrap();
+        let exp_resp = ws_exp.next().await.unwrap().unwrap().into_text().unwrap();
+        let exp_val: Value = serde_json::from_str(&exp_resp).unwrap();
+        assert_eq!(exp_val["op"], "auth_error");
+        assert_eq!(exp_val["reason"], "expired");
+
+        // 2. Token válido -> {"op": "auth_ok", "player_id": "alice_canonical"}
+        let valid_token = auth::encode_jwt_hs256(
+            &auth::JwtClaims {
+                sub: "alice_canonical".to_string(),
+                exp: auth::current_unix_timestamp() + 3600,
+            },
+            secret,
+        );
+        let (mut ws_ok, _) = connect_async(&url).await.unwrap();
+        let ok_msg = serde_json::json!({
+            "op": "auth",
+            "token": valid_token,
+        })
+        .to_string();
+        ws_ok.send(Message::Text(ok_msg.into())).await.unwrap();
+        let ok_resp = ws_ok.next().await.unwrap().unwrap().into_text().unwrap();
+        let ok_val: Value = serde_json::from_str(&ok_resp).unwrap();
+        assert_eq!(ok_val["op"], "auth_ok");
+        assert_eq!(ok_val["player_id"], "alice_canonical");
+
+        handle.abort();
+        let _ = std::fs::remove_file(&db_file);
+    }
+
+    #[tokio::test]
+    async fn test_anticheat_websocket_rejects_illegal_chess_move() {
+        let db_file =
+            std::env::temp_dir().join(format!("opentable_ratings_ac_{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&db_file);
+        let elo_store = Arc::new(Mutex::new(EloStore::new(&db_file).unwrap()));
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = tokio::spawn(async move {
+            let _ =
+                run_relay_server_with_config(listener, elo_store, AuthConfig::default(), None)
+                    .await;
+        });
+
+        let url = format!("ws://{addr}");
+        let (mut ws_host, _) = connect_async(&url).await.unwrap();
+
+        ws_host
+            .send(Message::Text(
+                r#"{"op":"create","game_id":"chess"}"#.into(),
+            ))
+            .await
+            .unwrap();
+        let _created = ws_host.next().await.unwrap().unwrap();
+
+        // Enviar movimiento ilegal en Ajedrez (rey e1 -> e5)
+        let illegal_relay = serde_json::json!({
+            "op": "relay",
+            "data": {
+                "player": 1,
+                "from": { "row": 0, "col": 4 },
+                "to": { "row": 4, "col": 4 }
+            }
+        })
+        .to_string();
+        ws_host
+            .send(Message::Text(illegal_relay.into()))
+            .await
+            .unwrap();
+
+        let rej_txt = ws_host.next().await.unwrap().unwrap().into_text().unwrap();
+        let rej_val: Value = serde_json::from_str(&rej_txt).unwrap();
+        assert_eq!(rej_val["op"], "move_rejected");
+        assert_eq!(rej_val["reason"], "illegal_move");
+
+        handle.abort();
+        let _ = std::fs::remove_file(&db_file);
+    }
+
+    #[tokio::test]
+    async fn test_websocket_spectator_flow_and_limits() {
+        let db_file = std::env::temp_dir().join(format!(
+            "opentable_ratings_spec_{}.db",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&db_file);
+        let elo_store = Arc::new(Mutex::new(EloStore::new(&db_file).unwrap()));
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = tokio::spawn(async move {
+            let _ =
+                run_relay_server_with_config(listener, elo_store, AuthConfig::default(), None)
+                    .await;
+        });
+
+        let url = format!("ws://{addr}");
+        let (mut ws_host, _) = connect_async(&url).await.unwrap();
+        let (mut ws_guest, _) = connect_async(&url).await.unwrap();
+
+        // 1. Host crea sala y Guest se une (player_count = 2)
+        ws_host
+            .send(Message::Text(r#"{"op":"create"}"#.into()))
+            .await
+            .unwrap();
+        let created_msg = ws_host.next().await.unwrap().unwrap().into_text().unwrap();
+        let created_val: Value = serde_json::from_str(&created_msg).unwrap();
+        let room_code = created_val["room_code"].as_str().unwrap().to_string();
+
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({ "op": "join", "room_code": room_code })
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_guest.next().await.unwrap().unwrap();
+        let _ = ws_host.next().await.unwrap().unwrap(); // peer_joined
+
+        // 2. Conectar 10 espectadores con {"op": "join_spectator", "room_code": ...}
+        let mut spectators = Vec::new();
+        for _ in 0..room::MAX_SPECTATORS_PER_ROOM {
+            let (mut ws_spec, _) = connect_async(&url).await.unwrap();
+            ws_spec
+                .send(Message::Text(
+                    serde_json::json!({
+                        "op": "join_spectator",
+                        "room_code": room_code,
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .await
+                .unwrap();
+
+            let spec_resp = ws_spec.next().await.unwrap().unwrap().into_text().unwrap();
+            let spec_val: Value = serde_json::from_str(&spec_resp).unwrap();
+            assert_eq!(spec_val["op"], "spectating");
+            assert_eq!(spec_val["player_count"], 2);
+            spectators.push(ws_spec);
+        }
+
+        // 3. El 11.º espectador supera el límite -> {"op": "error", "reason": "spectator_limit"}
+        let (mut ws_spec_11, _) = connect_async(&url).await.unwrap();
+        ws_spec_11
+            .send(Message::Text(
+                serde_json::json!({
+                    "op": "join_spectator",
+                    "room_code": room_code,
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+        let limit_resp = ws_spec_11
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .into_text()
+            .unwrap();
+        let limit_val: Value = serde_json::from_str(&limit_resp).unwrap();
+        assert_eq!(limit_val["op"], "error");
+        assert_eq!(limit_val["reason"], "spectator_limit");
+
+        // 4. Host envía {"op": "relay", "data": "move_1"} -> espectadores reciben el evento en tiempo real
+        ws_host
+            .send(Message::Text(r#"{"op":"relay","data":"move_1"}"#.into()))
+            .await
+            .unwrap();
+        let sp_relayed = spectators[0]
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .into_text()
+            .unwrap();
+        let sp_relayed_val: Value = serde_json::from_str(&sp_relayed).unwrap();
+        assert_eq!(sp_relayed_val["op"], "relay");
+        assert_eq!(sp_relayed_val["data"], "move_1");
+
+        // 5. Espectador intenta enviar {"op": "relay"} -> {"op": "error", "reason": "spectator_cannot_relay"}
+        spectators[0]
+            .send(Message::Text(
+                r#"{"op":"relay","data":"forged_move"}"#.into(),
+            ))
+            .await
+            .unwrap();
+        let err_resp = spectators[0]
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .into_text()
+            .unwrap();
+        let err_val: Value = serde_json::from_str(&err_resp).unwrap();
+        assert_eq!(err_val["op"], "error");
+        assert_eq!(err_val["reason"], "spectator_cannot_relay");
+
+        handle.abort();
         let _ = std::fs::remove_file(&db_file);
     }
 }

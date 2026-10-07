@@ -3,6 +3,8 @@
 //! Administra salas públicas/privadas en memoria y asigna códigos alfanuméricos
 //! de 4 caracteres sin caracteres ambiguos (`O`, `0`, `I`, `1`).
 
+use crate::anticheat::AntiCheatSession;
+use serde_json::Value;
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 
@@ -18,16 +20,30 @@ pub type ClientSender = mpsc::UnboundedSender<String>;
 /// Identificador único de conexión interna asignado por el servidor.
 pub type ConnectionId = u64;
 
-/// Identificador de jugador dentro de una sala (1 = host, 2..N = invitados).
+/// Identificador de jugador dentro de una sala (1 = host, 2..N = invitados, 0 = espectador).
 pub type RoomPlayerId = u32;
+
+/// Límite máximo de espectadores permitidos por sala.
+pub const MAX_SPECTATORS_PER_ROOM: usize = 10;
+
+/// Rol de un participante dentro de una sala Relay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParticipantRole {
+    /// Jugador activo con permisos de escritura/retransmisión.
+    Player,
+    /// Espectador de solo lectura (sin permisos para emitir `op: "relay"`).
+    Spectator,
+}
 
 /// Información de un participante conectado a una sala.
 #[derive(Debug, Clone)]
 pub struct Participant {
     /// Identificador único de la conexión.
     pub conn_id: ConnectionId,
-    /// Identificador de jugador dentro de la sala (1-indexed).
+    /// Identificador de jugador dentro de la sala (1-indexed para jugadores, 0 para espectadores).
     pub player_id: RoomPlayerId,
+    /// Rol del participante en la sala (`Player` o `Spectator`).
+    pub role: ParticipantRole,
     /// Canal para enviar mensajes JSON serializados al cliente.
     pub sender: ClientSender,
 }
@@ -45,6 +61,8 @@ pub struct Room {
     next_player_id: RoomPlayerId,
     /// Participantes activos indexados por `ConnectionId`.
     pub participants: HashMap<ConnectionId, Participant>,
+    /// Sesión autoritativa opcional para validación Anti-Cheat (`chess`, `checkers`).
+    pub anticheat: Option<AntiCheatSession>,
 }
 
 impl Room {
@@ -62,22 +80,27 @@ impl Room {
             Participant {
                 conn_id: host_conn_id,
                 player_id: 1,
+                role: ParticipantRole::Player,
                 sender: host_sender,
             },
         );
+        let anticheat = AntiCheatSession::for_game(game_id.as_deref());
         Self {
             code,
             game_id,
             is_public,
             next_player_id: 2,
             participants,
+            anticheat,
         }
     }
 
-    /// Añade un participante a la sala y devuelve el `player_id` asignado.
+    /// Añade un participante jugador a la sala y devuelve el `player_id` asignado.
     pub fn add_participant(&mut self, conn_id: ConnectionId, sender: ClientSender) -> RoomPlayerId {
         if let Some(existing) = self.participants.get(&conn_id) {
-            return existing.player_id;
+            if existing.role == ParticipantRole::Player {
+                return existing.player_id;
+            }
         }
         let assigned_id = self.next_player_id;
         self.next_player_id += 1;
@@ -86,10 +109,54 @@ impl Room {
             Participant {
                 conn_id,
                 player_id: assigned_id,
+                role: ParticipantRole::Player,
                 sender,
             },
         );
         assigned_id
+    }
+
+    /// Añade un espectador (solo lectura) a la sala y devuelve el `player_count` actual.
+    /// Falla con `RoomError::SpectatorLimit` si ya hay 10 espectadores en la sala.
+    pub fn add_spectator(
+        &mut self,
+        conn_id: ConnectionId,
+        sender: ClientSender,
+    ) -> Result<usize, RoomError> {
+        if let Some(existing) = self.participants.get(&conn_id) {
+            if existing.role == ParticipantRole::Spectator {
+                return Ok(self.player_count());
+            }
+        }
+        if self.spectator_count() >= MAX_SPECTATORS_PER_ROOM {
+            return Err(RoomError::SpectatorLimit);
+        }
+        self.participants.insert(
+            conn_id,
+            Participant {
+                conn_id,
+                player_id: 0,
+                role: ParticipantRole::Spectator,
+                sender,
+            },
+        );
+        Ok(self.player_count())
+    }
+
+    /// Cantidad de jugadores activos (no espectadores) en la sala.
+    pub fn player_count(&self) -> usize {
+        self.participants
+            .values()
+            .filter(|p| p.role == ParticipantRole::Player)
+            .count()
+    }
+
+    /// Cantidad de espectadores activos en la sala.
+    pub fn spectator_count(&self) -> usize {
+        self.participants
+            .values()
+            .filter(|p| p.role == ParticipantRole::Spectator)
+            .count()
     }
 
     /// Elimina un participante de la sala y devuelve su `player_id` si estaba presente.
@@ -97,7 +164,7 @@ impl Room {
         self.participants.remove(&conn_id).map(|p| p.player_id)
     }
 
-    /// Envía un mensaje JSON a todos los participantes de la sala excepto `exclude_conn`.
+    /// Envía un mensaje JSON a todos los participantes (jugadores y espectadores) excepto `exclude_conn`.
     pub fn broadcast_except(&self, exclude_conn: ConnectionId, message: &str) {
         for (&cid, participant) in &self.participants {
             if cid != exclude_conn {
@@ -156,6 +223,12 @@ pub enum RoomError {
     InvalidRoomCode,
     /// El cliente no se encuentra actualmente en ninguna sala.
     NotInRoom,
+    /// El movimiento fue rechazado por el validador Anti-Cheat del motor.
+    IllegalMove,
+    /// Un espectador intentó enviar un mensaje `relay`.
+    SpectatorCannotRelay,
+    /// Se superó el límite de 10 espectadores en la sala.
+    SpectatorLimit,
 }
 
 impl RoomManager {
@@ -223,6 +296,40 @@ impl RoomManager {
         Ok((normalized, player_id))
     }
 
+    /// Une un cliente como espectador de solo lectura a una sala existente por su código.
+    ///
+    /// Devuelve `(room_code_normalizado, player_count)`.
+    pub fn join_spectator(
+        &mut self,
+        conn_id: ConnectionId,
+        sender: ClientSender,
+        raw_code: &str,
+    ) -> Result<(String, usize), RoomError> {
+        let normalized = raw_code.trim().to_ascii_uppercase();
+        if !is_valid_room_code(&normalized) {
+            return Err(RoomError::InvalidRoomCode);
+        }
+
+        if !self.rooms.contains_key(&normalized) {
+            return Err(RoomError::RoomNotFound);
+        }
+
+        if let Some(prev_code) = self.conn_to_room.get(&conn_id) {
+            if prev_code != &normalized {
+                let _ = self.leave_room(conn_id);
+            }
+        }
+
+        let room = self
+            .rooms
+            .get_mut(&normalized)
+            .ok_or(RoomError::RoomNotFound)?;
+        let player_count = room.add_spectator(conn_id, sender)?;
+        self.conn_to_room.insert(conn_id, normalized.clone());
+
+        Ok((normalized, player_count))
+    }
+
     /// Retransmite un mensaje JSON a los demás miembros de la sala donde está `conn_id`.
     ///
     /// Devuelve el `(room_code, player_id)` del emisor.
@@ -236,14 +343,49 @@ impl RoomManager {
             .get(&conn_id)
             .ok_or(RoomError::NotInRoom)?;
         let room = self.rooms.get(code).ok_or(RoomError::RoomNotFound)?;
-        let sender_player_id = room
+        let participant = room
             .participants
             .get(&conn_id)
-            .map(|p| p.player_id)
             .ok_or(RoomError::NotInRoom)?;
+        if participant.role == ParticipantRole::Spectator {
+            return Err(RoomError::SpectatorCannotRelay);
+        }
+        let sender_player_id = participant.player_id;
 
         room.broadcast_except(conn_id, outbound_json);
         Ok((code.clone(), sender_player_id))
+    }
+
+    /// Valida el payload con `AntiCheatSession` (si aplica a la sala) y retransmite a los demás participantes.
+    pub fn validate_and_relay(
+        &mut self,
+        conn_id: ConnectionId,
+        payload: &Value,
+        outbound_json: &str,
+    ) -> Result<(String, RoomPlayerId), RoomError> {
+        let code = self
+            .conn_to_room
+            .get(&conn_id)
+            .cloned()
+            .ok_or(RoomError::NotInRoom)?;
+        let room = self.rooms.get_mut(&code).ok_or(RoomError::RoomNotFound)?;
+        let participant = room
+            .participants
+            .get(&conn_id)
+            .ok_or(RoomError::NotInRoom)?;
+        if participant.role == ParticipantRole::Spectator {
+            return Err(RoomError::SpectatorCannotRelay);
+        }
+        let sender_player_id = participant.player_id;
+
+        if let Some(ac) = room.anticheat.as_mut() {
+            if ac.validate_and_apply(sender_player_id, payload).is_err() {
+                return Err(RoomError::IllegalMove);
+            }
+        }
+
+        room.broadcast_except(conn_id, outbound_json);
+        Ok((code, sender_player_id))
     }
 
     /// Obtiene el `player_id` y código de sala de un cliente conectado.
@@ -266,13 +408,15 @@ impl RoomManager {
         if let Some(room) = self.rooms.get_mut(&code) {
             if let Some(pid) = room.remove_participant(conn_id) {
                 removed_player_id = Some(pid);
-                let notification = serde_json::json!({
-                    "op": "peer_left",
-                    "room_code": code,
-                    "player_id": pid,
-                })
-                .to_string();
-                room.broadcast_except(conn_id, &notification);
+                if pid > 0 {
+                    let notification = serde_json::json!({
+                        "op": "peer_left",
+                        "room_code": code,
+                        "player_id": pid,
+                    })
+                    .to_string();
+                    room.broadcast_except(conn_id, &notification);
+                }
             }
             should_remove_room = room.is_empty();
         }
@@ -339,5 +483,49 @@ mod tests {
         // Cliente 1 abandona -> la sala se elimina por quedar vacía
         manager.leave_room(100);
         assert_eq!(manager.active_room_count(), 0);
+    }
+
+    #[test]
+    fn test_room_spectator_join_relay_and_limit() {
+        let mut manager = RoomManager::new();
+        let (tx_host, _rx_host) = mpsc::unbounded_channel();
+        let (tx_guest, _rx_guest) = mpsc::unbounded_channel();
+
+        let code = manager.create_room(1, tx_host, Some("chess".to_string()), true);
+        let (_, guest_pid) = manager.join_room(2, tx_guest, &code).unwrap();
+        assert_eq!(guest_pid, 2);
+
+        // Unir hasta 10 espectadores
+        let mut spec_rxs = Vec::new();
+        for i in 0..MAX_SPECTATORS_PER_ROOM {
+            let (tx_spec, rx_spec) = mpsc::unbounded_channel();
+            let conn_id = 1000 + (i as u64);
+            let (joined_code, player_count) =
+                manager.join_spectator(conn_id, tx_spec, &code).unwrap();
+            assert_eq!(joined_code, code);
+            assert_eq!(player_count, 2);
+            spec_rxs.push(rx_spec);
+        }
+
+        // El 11.º espectador supera el límite de 10 y recibe SpectatorLimit
+        let (tx_spec_overflow, _rx_spec_overflow) = mpsc::unbounded_channel();
+        let err = manager
+            .join_spectator(2000, tx_spec_overflow, &code)
+            .unwrap_err();
+        assert_eq!(err, RoomError::SpectatorLimit);
+
+        // El host envía relay -> los espectadores lo reciben
+        manager
+            .relay_to_peers(1, r#"{"op":"relay","data":"e2e4"}"#)
+            .unwrap();
+        for rx_spec in &mut spec_rxs {
+            assert_eq!(rx_spec.try_recv().unwrap(), r#"{"op":"relay","data":"e2e4"}"#);
+        }
+
+        // Un espectador intenta hacer relay -> recibe SpectatorCannotRelay
+        let spec_relay_err = manager
+            .relay_to_peers(1000, r#"{"op":"relay","data":"illegal"}"#)
+            .unwrap_err();
+        assert_eq!(spec_relay_err, RoomError::SpectatorCannotRelay);
     }
 }

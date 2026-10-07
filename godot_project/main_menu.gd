@@ -20,14 +20,14 @@ const GAMES = [
 	{ "id": "shogi", "name": "Shogi", "method": "start_local_match_shogi", "ai_method": "start_local_match_shogi_vs_ai", "scene": "res://shogi_board.tscn", "color": Color(0.85, 0.65, 0.25) },
 	{ "id": "xiangqi", "name": "Xiangqi", "method": "start_local_match_xiangqi", "ai_method": "start_local_match_xiangqi_vs_ai", "scene": "res://xiangqi_board.tscn", "color": Color(0.85, 0.35, 0.15) },
 	{ "id": "go", "name": "Go", "method": "start_local_match_go", "ai_method": "start_local_match_go_vs_ai", "scene": "res://go_board.tscn", "color": Color(0.25, 0.65, 0.45) },
-	{ "id": "uno", "name": "Uno", "method": "start_local_match_uno", "ai_method": "", "scene": "res://uno_board.tscn", "color": Color(0.95, 0.25, 0.45) },
-	{ "id": "crisis", "name": "Crisis", "method": "start_local_match_crisis", "ai_method": "", "scene": "res://crisis_board.tscn", "color": Color(0.65, 0.25, 0.75) },
-	{ "id": "chinese_checkers", "name": "Damas Chinas", "method": "start_local_match_chinese_checkers", "ai_method": "", "scene": "res://chinese_checkers_board.tscn", "color": Color(0.25, 0.75, 0.75) },
-	{ "id": "mille_bornes", "name": "Mille Bornes", "method": "start_local_match_mille_bornes", "ai_method": "", "scene": "res://mille_bornes_board.tscn", "color": Color(0.45, 0.75, 0.25) },
+	{ "id": "uno", "name": "Uno", "method": "start_local_match_uno", "ai_method": "start_local_match_uno_vs_ai", "scene": "res://uno_board.tscn", "color": Color(0.95, 0.25, 0.45) },
+	{ "id": "crisis", "name": "Crisis", "method": "start_local_match_crisis", "ai_method": "start_local_match_crisis_vs_ai", "scene": "res://crisis_board.tscn", "color": Color(0.65, 0.25, 0.75) },
+	{ "id": "chinese_checkers", "name": "Damas Chinas", "method": "start_local_match_chinese_checkers", "ai_method": "start_local_match_chinese_checkers_vs_ai", "scene": "res://chinese_checkers_board.tscn", "color": Color(0.25, 0.75, 0.75) },
+	{ "id": "mille_bornes", "name": "Mille Bornes", "method": "start_local_match_mille_bornes", "ai_method": "start_local_match_mille_bornes_vs_ai", "scene": "res://mille_bornes_board.tscn", "color": Color(0.45, 0.75, 0.25) },
 	{ "id": "backgammon", "name": "Backgammon", "method": "start_local_match_backgammon", "ai_method": "start_local_match_backgammon_vs_ai", "scene": "res://backgammon_board.tscn", "color": Color(0.75, 0.45, 0.25) },
-	{ "id": "monopoly", "name": "Monopoly", "method": "start_local_match_monopoly", "ai_method": "", "scene": "res://monopoly_board.tscn", "color": Color(0.25, 0.65, 0.85) },
+	{ "id": "monopoly", "name": "Monopoly", "method": "start_local_match_monopoly", "ai_method": "start_local_match_monopoly_vs_ai", "scene": "res://monopoly_board.tscn", "color": Color(0.25, 0.65, 0.85) },
 	{ "id": "ludo", "name": "Ludo", "method": "start_local_match_ludo", "ai_method": "start_local_match_ludo_vs_ai", "scene": "res://ludo_board.tscn", "color": Color(0.85, 0.85, 0.25) },
-	{ "id": "battleship", "name": "Batalla Naval", "method": "start_local_match_battleship", "ai_method": "", "scene": "res://battleship_board.tscn", "color": Color(0.25, 0.45, 0.85) }
+	{ "id": "battleship", "name": "Batalla Naval", "method": "start_local_match_battleship", "ai_method": "start_local_match_battleship_vs_ai", "scene": "res://battleship_board.tscn", "color": Color(0.25, 0.45, 0.85) }
 ]
 
 @onready var grid_container: GridContainer = $GridContainer
@@ -538,6 +538,31 @@ func _show_mode_popup(game: Dictionary) -> void:
 	var saved_diff_level: int = _load_ai_difficulty_cfg()
 
 	if has_ai:
+		var game_hbox = HBoxContainer.new()
+		game_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		game_hbox.add_theme_constant_override("separation", 10)
+		vbox.add_child(game_hbox)
+
+		var game_lbl = Label.new()
+		game_lbl.text = "Juego (vs IA):"
+		game_lbl.add_theme_font_size_override("font_size", 14)
+		game_lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
+		game_hbox.add_child(game_lbl)
+
+		var game_option = OptionButton.new()
+		game_option.name = "AiGameOptionButton"
+		game_option.custom_minimum_size = Vector2(190, 32)
+		var selected_game_idx := 0
+		var ai_idx := 0
+		for g in GAMES:
+			if g.get("ai_method", "") != "":
+				game_option.add_item("%s (vs IA)" % g["name"], ai_idx)
+				if g["id"] == game["id"]:
+					selected_game_idx = ai_idx
+				ai_idx += 1
+		game_option.selected = selected_game_idx
+		game_hbox.add_child(game_option)
+
 		var diff_hbox = HBoxContainer.new()
 		diff_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 		diff_hbox.add_theme_constant_override("separation", 10)
@@ -630,7 +655,7 @@ func _launch_game(game: Dictionary, mode: String, difficulty_level: int = 1) -> 
 					bridge.call(ai_method, 1, 2, board_size, difficulty_level)
 				elif bridge.has_method(ai_method):
 					bridge.call(ai_method, 1, 2, difficulty_level)
-			elif game["id"] == "shogi":
+			elif game["id"] in ["shogi", "uno", "crisis", "chinese_checkers", "mille_bornes", "monopoly", "battleship"]:
 				if bridge.has_method(ai_method):
 					bridge.call(ai_method, 1, 2, difficulty_level)
 			elif bridge.has_method(ai_method):
