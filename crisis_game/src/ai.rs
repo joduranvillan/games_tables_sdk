@@ -659,11 +659,14 @@ mod tests {
         // Probar fortificación: Argentina (0) es interior con 5 ejércitos, conectada a Colombia (3, fronteriza con México 5 enemigo)
         {
             let mut map = session.world_mut().resource_mut::<TerritoryStateResource>();
-            for id in 0..30u8 {
-                map.set_owner_and_armies(TerritoryId(id), P1, 1);
+            for id in 0..5u8 {
+                map.set_owner_and_armies(TerritoryId(id), P1, 2);
+            }
+            for id in 5..30u8 {
+                map.set_owner_and_armies(TerritoryId(id), P2, 2);
             }
             map.set_owner_and_armies(TerritoryId(0), P1, 5); // Interior (vecinos 1, 2, 4 son de P1)
-            map.set_owner_and_armies(TerritoryId(3), P1, 2); // Frontera con México (5, de P2)
+            map.set_owner_and_armies(TerritoryId(3), P1, 1); // Frontera con México (5, de P2)
             map.set_owner_and_armies(TerritoryId(5), P2, 6);
 
             let mut turn_state = session.world_mut().resource_mut::<TurnStateResource>();
