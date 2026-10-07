@@ -8,6 +8,8 @@
 //!
 //! En `AiDifficulty::Easy`: juega la primera carta válida de su mano sin considerar estrategia.
 
+#![allow(clippy::needless_range_loop, clippy::large_enum_variant)]
+
 use open_table_engine::prelude::*;
 use serde::{Deserialize, Serialize};
 

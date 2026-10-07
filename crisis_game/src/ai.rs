@@ -8,6 +8,12 @@
 //!   la probabilidad de conquista. En `Expert`, prioriza objetivos que acercan al `ObjectiveCard` secreto.
 //! - **Fortificación (`Fortify`)**: mueve ejércitos excedentes al territorio fronterizo más débil conectado.
 
+#![allow(
+    clippy::needless_range_loop,
+    clippy::large_enum_variant,
+    clippy::too_many_arguments
+)]
+
 use std::collections::VecDeque;
 
 use open_table_engine::prelude::*;

@@ -22,6 +22,7 @@ use open_table_core::transport::Transport;
 
 /// Transporte P2P unificado (Host o Client) parametrizado sobre cualquier `RawByteLink`
 /// (por ejemplo `GodotRawByteLink` en `open_table_godot`).
+#[allow(clippy::large_enum_variant)]
 pub enum NativeBridgeTransport<L: RawByteLink> {
     Host(NativeHostTransport<L>),
     Client(NativeClientTransport<L>),

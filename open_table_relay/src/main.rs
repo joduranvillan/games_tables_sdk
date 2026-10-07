@@ -11,6 +11,12 @@
 //! - `GET /rankings/:game_id` -> JSON con top-50 jugadores por ELO
 //! - `GET /player/:player_id` -> JSON con todos los ratings del jugador por juego
 
+#![allow(
+    clippy::needless_range_loop,
+    clippy::large_enum_variant,
+    clippy::too_many_arguments
+)]
+
 pub mod anticheat;
 pub mod api;
 pub mod auth;

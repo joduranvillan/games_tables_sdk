@@ -509,8 +509,8 @@ mod tests {
 
         // El 11.º espectador supera el límite de 10 y recibe SpectatorLimit
         let (tx_spec_overflow, _rx_spec_overflow) = mpsc::unbounded_channel();
-        let err = manager.join_spectator(2000, tx_spec_overflow, &code).unwrap_err();
-        assert_eq!(err, RoomError::SpectatorLimit);
+        let overflow_res = manager.join_spectator(2000, tx_spec_overflow, &code);
+        assert_eq!(overflow_res, Err(RoomError::SpectatorLimit));
 
         // El host envía relay -> los espectadores lo reciben
         manager
@@ -522,7 +522,7 @@ mod tests {
 
         // Un espectador intenta hacer relay -> recibe SpectatorCannotRelay
         let illegal_msg = r#"{"op":"relay","data":"illegal"}"#;
-        let spec_relay_err = manager.relay_to_peers(1000, illegal_msg).unwrap_err();
-        assert_eq!(spec_relay_err, RoomError::SpectatorCannotRelay);
+        let spec_relay_res = manager.relay_to_peers(1000, illegal_msg);
+        assert_eq!(spec_relay_res, Err(RoomError::SpectatorCannotRelay));
     }
 }

@@ -7,6 +7,8 @@
 //! - **Cárcel**: paga la fianza (`50$`) si hay propiedades no hipotecadas/disponibles que se puedan desarrollar.
 //! - **Movimiento**: tira los dados y avanza (`RollAndMoveCommand`) cuando no hay decisiones pendientes.
 
+#![allow(clippy::needless_range_loop, clippy::large_enum_variant)]
+
 use open_table_engine::prelude::*;
 use serde::{Deserialize, Serialize};
 

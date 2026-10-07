@@ -8,6 +8,8 @@
 //!
 //! En `AiDifficulty::Easy`, ignora las prioridades 1 y 3.
 
+#![allow(clippy::needless_range_loop, clippy::large_enum_variant)]
+
 use open_table_engine::prelude::*;
 use serde::{Deserialize, Serialize};
 

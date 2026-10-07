@@ -9,6 +9,8 @@
 //!   celda no disparada (ponderando fuertemente las alineaciones que cubren impactos
 //!   activos sin hundir) y dispara a la celda de mayor densidad.
 
+#![allow(clippy::needless_range_loop)]
+
 use open_table_engine::prelude::*;
 
 use crate::board::BOARD_SIZE;

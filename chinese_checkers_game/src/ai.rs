@@ -4,6 +4,8 @@
 //! - Función de evaluación: distancia total hexagonal de los peones del jugador al objetivo
 //!   (minimizar suma de distancias al vértice objetivo).
 
+#![allow(clippy::needless_range_loop)]
+
 use std::collections::{HashSet, VecDeque};
 
 use open_table_engine::prelude::*;
