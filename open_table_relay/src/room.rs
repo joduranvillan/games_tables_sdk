@@ -517,7 +517,10 @@ mod tests {
             .relay_to_peers(1, r#"{"op":"relay","data":"e2e4"}"#)
             .unwrap();
         for rx_spec in &mut spec_rxs {
-            assert_eq!(rx_spec.try_recv().unwrap(), r#"{"op":"relay","data":"e2e4"}"#);
+            assert_eq!(
+                rx_spec.try_recv().unwrap(),
+                r#"{"op":"relay","data":"e2e4"}"#
+            );
         }
 
         // Un espectador intenta hacer relay -> recibe SpectatorCannotRelay

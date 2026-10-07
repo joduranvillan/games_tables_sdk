@@ -90,9 +90,10 @@ fn has_developable_unmortgaged_properties(
     ai: PlayerId,
 ) -> bool {
     let ai_owns_property = players.properties.values().any(|&owner| owner == ai);
-    let unowned_buyable_exists = board_spaces.iter().enumerate().any(|(idx, s)| {
-        space_market_price(s).is_some() && !players.properties.contains_key(&idx)
-    });
+    let unowned_buyable_exists = board_spaces
+        .iter()
+        .enumerate()
+        .any(|(idx, s)| space_market_price(s).is_some() && !players.properties.contains_key(&idx));
     ai_owns_property || unowned_buyable_exists
 }
 
@@ -158,8 +159,7 @@ pub fn best_move(
                 .get(decision.space)
                 .and_then(space_market_price)
                 .unwrap_or(0);
-            let completes_group =
-                completes_color_group(&board.spaces, players, ai, decision.space);
+            let completes_group = completes_color_group(&board.spaces, players, ai, decision.space);
             let affordable_double = cash > (price as i64) * 2;
             let can_afford = cash >= price as i64;
 

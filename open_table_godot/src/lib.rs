@@ -3773,9 +3773,9 @@ impl OpenTableBridge {
                                     .map(|f| f.has_placed_fleet(*ai_p))
                                     .unwrap_or(false);
                                 if !ai_has_fleet {
-                                    Some(Box::new(
-                                        battleship_game::default_ai_place_fleet_command(*ai_p),
-                                    ) as Box<dyn Command>)
+                                    Some(Box::new(battleship_game::default_ai_place_fleet_command(
+                                        *ai_p,
+                                    )) as Box<dyn Command>)
                                 } else {
                                     let both_placed = session
                                         .world()
@@ -3795,12 +3795,8 @@ impl OpenTableBridge {
                                 }
                             }
                             "mille_bornes" | "mille-bornes" | "millebornes" if is_ai_turn => {
-                                mille_bornes_game::ai::best_move(
-                                    session,
-                                    *ai_p,
-                                    self.ai_difficulty,
-                                )
-                                .map(|c| c.into_command())
+                                mille_bornes_game::ai::best_move(session, *ai_p, self.ai_difficulty)
+                                    .map(|c| c.into_command())
                             }
                             "uno" if is_ai_turn => {
                                 uno_game::ai::best_move(session, *ai_p, self.ai_difficulty)

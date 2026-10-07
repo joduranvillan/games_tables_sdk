@@ -28,7 +28,11 @@ struct FastRng {
 impl FastRng {
     fn new(seed: u64) -> Self {
         Self {
-            state: if seed == 0 { 0x243f_6a88_85a3_08d3 } else { seed },
+            state: if seed == 0 {
+                0x243f_6a88_85a3_08d3
+            } else {
+                seed
+            },
         }
     }
 

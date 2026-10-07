@@ -135,7 +135,11 @@ fn parse_checkers_command(val: &Value, default_player: PlayerId) -> Option<Box<d
         .map(PlayerId)
         .unwrap_or(default_player);
 
-    Some(Box::new(checkers_game::MovePieceCommand { player, from, to }))
+    Some(Box::new(checkers_game::MovePieceCommand {
+        player,
+        from,
+        to,
+    }))
 }
 
 fn parse_checkers_pos(v: &Value) -> Option<checkers_game::Position> {

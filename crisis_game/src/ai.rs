@@ -66,7 +66,11 @@ struct FastRng {
 impl FastRng {
     fn new(seed: u64) -> Self {
         Self {
-            state: if seed == 0 { 0x9e37_79b9_7f4a_7c15 } else { seed },
+            state: if seed == 0 {
+                0x9e37_79b9_7f4a_7c15
+            } else {
+                seed
+            },
         }
     }
 
@@ -117,11 +121,7 @@ pub fn enemy_neighbor_armies(
 /// Ratio `ejércitos_propios / ejércitos_vecinos_enemigos`.
 /// Cuanto menor es este valor, más amenazado está el territorio.
 /// Si no tiene vecinos enemigos (territorio interior), devuelve `f64::INFINITY`.
-pub fn threat_ratio(
-    map: &TerritoryStateResource,
-    player: PlayerId,
-    territory: TerritoryId,
-) -> f64 {
+pub fn threat_ratio(map: &TerritoryStateResource, player: PlayerId, territory: TerritoryId) -> f64 {
     let enemy_armies = enemy_neighbor_armies(map, player, territory);
     if enemy_armies == 0 {
         return f64::INFINITY;
@@ -241,8 +241,7 @@ fn mcts_evaluate_attack(att_armies: u32, def_armies: u32, rollouts: usize, seed:
             let remaining_ratio = (a as f64) / (att_armies.max(1) as f64);
             total_score += 1.0 + remaining_ratio;
         } else {
-            let damage_ratio =
-                ((def_armies.saturating_sub(d)) as f64) / (def_armies.max(1) as f64);
+            let damage_ratio = ((def_armies.saturating_sub(d)) as f64) / (def_armies.max(1) as f64);
             total_score += damage_ratio * 0.25;
         }
     }
@@ -640,7 +639,10 @@ mod tests {
                     ObjectiveCard::ConquerContinent(crate::board::CONTINENT_NORTH_AMERICA),
                 );
 
-            session.world_mut().resource_mut::<TurnStateResource>().phase = TurnPhase::Attack;
+            session
+                .world_mut()
+                .resource_mut::<TurnStateResource>()
+                .phase = TurnPhase::Attack;
         }
 
         let attack_cmd = best_move(&session, P1, AiDifficulty::Expert).unwrap();

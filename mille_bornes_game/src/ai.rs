@@ -108,8 +108,12 @@ fn can_play_distance_value(
     ai: PlayerId,
     value: u32,
 ) -> bool {
-    let has_row = right_of_way.map(|r| r.active.contains(&ai)).unwrap_or(false);
-    let is_speed_limited = speed_limit.map(|s| s.limited.contains(&ai)).unwrap_or(false)
+    let has_row = right_of_way
+        .map(|r| r.active.contains(&ai))
+        .unwrap_or(false);
+    let is_speed_limited = speed_limit
+        .map(|s| s.limited.contains(&ai))
+        .unwrap_or(false)
         || deck.hazard.get(&ai).copied().flatten() == Some(Hazard::SpeedLimit);
 
     if is_speed_limited && !has_row && value > 50 {
@@ -171,7 +175,9 @@ pub fn best_move(
 
     // 2) Remedy si bloqueado
     let current_hazard = deck.hazard.get(&ai).copied().flatten();
-    let is_speed_limited = speed_limit.map(|s| s.limited.contains(&ai)).unwrap_or(false)
+    let is_speed_limited = speed_limit
+        .map(|s| s.limited.contains(&ai))
+        .unwrap_or(false)
         || current_hazard == Some(Hazard::SpeedLimit);
 
     if let Some(h) = current_hazard {

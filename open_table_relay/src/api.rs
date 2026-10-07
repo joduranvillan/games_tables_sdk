@@ -47,10 +47,7 @@ async fn handle_http_connection(
     let (status_line, body_payload) = if method == "GET" {
         if path == "/metrics" {
             content_type = "text/plain; version=0.0.4; charset=utf-8";
-            (
-                "HTTP/1.1 200 OK",
-                global_metrics().render_prometheus_text(),
-            )
+            ("HTTP/1.1 200 OK", global_metrics().render_prometheus_text())
         } else if let Some(game_id) = path.strip_prefix("/rankings/") {
             let clean_game = game_id.trim_matches('/');
             let store = elo_store.lock().await;

@@ -502,7 +502,10 @@ async fn process_text_message(
                     let _ = normalized_code;
                 }
                 Err(RoomError::InvalidRoomCode) => {
-                    send_response(tx, &RelayResponse::error_message("invalid room code format"));
+                    send_response(
+                        tx,
+                        &RelayResponse::error_message("invalid room code format"),
+                    );
                 }
                 Err(RoomError::RoomNotFound) => {
                     send_response(tx, &RelayResponse::error_message("room not found"));
@@ -522,7 +525,10 @@ async fn process_text_message(
                     send_response(tx, &RelayResponse::error_reason("spectator_limit"));
                 }
                 Err(RoomError::InvalidRoomCode) => {
-                    send_response(tx, &RelayResponse::error_message("invalid room code format"));
+                    send_response(
+                        tx,
+                        &RelayResponse::error_message("invalid room code format"),
+                    );
                 }
                 Err(RoomError::RoomNotFound) => {
                     send_response(tx, &RelayResponse::error_message("room not found"));
@@ -933,18 +939,15 @@ mod tests {
         let addr = listener.local_addr().unwrap();
 
         let handle = tokio::spawn(async move {
-            let _ =
-                run_relay_server_with_config(listener, elo_store, AuthConfig::default(), None)
-                    .await;
+            let _ = run_relay_server_with_config(listener, elo_store, AuthConfig::default(), None)
+                .await;
         });
 
         let url = format!("ws://{addr}");
         let (mut ws_host, _) = connect_async(&url).await.unwrap();
 
         ws_host
-            .send(Message::Text(
-                r#"{"op":"create","game_id":"chess"}"#.into(),
-            ))
+            .send(Message::Text(r#"{"op":"create","game_id":"chess"}"#.into()))
             .await
             .unwrap();
         let _created = ws_host.next().await.unwrap().unwrap();
@@ -975,10 +978,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_websocket_spectator_flow_and_limits() {
-        let db_file = std::env::temp_dir().join(format!(
-            "opentable_ratings_spec_{}.db",
-            std::process::id()
-        ));
+        let db_file =
+            std::env::temp_dir().join(format!("opentable_ratings_spec_{}.db", std::process::id()));
         let _ = std::fs::remove_file(&db_file);
         let elo_store = Arc::new(Mutex::new(EloStore::new(&db_file).unwrap()));
 
@@ -986,9 +987,8 @@ mod tests {
         let addr = listener.local_addr().unwrap();
 
         let handle = tokio::spawn(async move {
-            let _ =
-                run_relay_server_with_config(listener, elo_store, AuthConfig::default(), None)
-                    .await;
+            let _ = run_relay_server_with_config(listener, elo_store, AuthConfig::default(), None)
+                .await;
         });
 
         let url = format!("ws://{addr}");
