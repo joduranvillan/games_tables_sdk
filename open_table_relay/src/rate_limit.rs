@@ -241,7 +241,7 @@ mod tests {
 
         // 5ª violación dentro de 10s: cierra conexión y bloquea IP por 60s
         assert_eq!(
-            limiter.check_message_at(ip, None, t0 + Duration::from_secs(2)),
+            limiter.check_message_at(ip, None, t0 + Duration::from_millis(500)),
             RateLimitDecision::Limited {
                 retry_after_ms: 1000,
                 disconnect: true,
