@@ -299,6 +299,8 @@ pub enum RelayResponse {
     },
     /// Respuesta a `{"op": "ping"}`.
     Pong,
+    /// Notificación enviada a todos los clientes conectados antes de un apagado ordenado (`SIGINT`/`SIGTERM`).
+    ServerShuttingDown,
     /// Error de protocolo o de estado de sala.
     Error {
         /// Código estructurado del motivo del error (`"spectator_cannot_relay"`, `"spectator_limit"`, etc.).
@@ -324,6 +326,42 @@ impl RelayResponse {
             message: Some(message.into()),
         }
     }
+}
+
+/// Espera una señal de parada del sistema (`SIGINT` / `Ctrl+C` o `SIGTERM` en contenedores Docker/Unix).
+pub async fn wait_for_shutdown_signal() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{signal, SignalKind};
+        match signal(SignalKind::terminate()) {
+            Ok(mut sigterm) => {
+                tokio::select! {
+                    _ = tokio::signal::ctrl_c() => {},
+                    _ = sigterm.recv() => {},
+                }
+            }
+            Err(_) => {
+                let _ = tokio::signal::ctrl_c().await;
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+    }
+}
+
+/// Ejecuta el protocolo de apagado ordenado (Graceful Shutdown):
+/// 1. Envía `{"op": "server_shutting_down"}` a todos los clientes conectados.
+/// 2. Ejecuta flush completo y sincronización de almacenamiento de SQLite (`wal_checkpoint_and_flush`).
+pub async fn perform_graceful_shutdown(state: &RelaySharedState) -> std::io::Result<()> {
+    if let Ok(shutdown_json) = serde_json::to_string(&RelayResponse::ServerShuttingDown) {
+        let mgr = state.manager.lock().await;
+        mgr.broadcast_all_rooms(&shutdown_json);
+    }
+    tokio::time::sleep(Duration::from_millis(25)).await;
+    let mut store = state.elo_store.lock().await;
+    store.wal_checkpoint_and_flush()
 }
 
 /// Inicia el servidor Relay sobre un `TcpListener` ya enlazado usando la base de datos por defecto.
@@ -362,19 +400,35 @@ pub async fn run_relay_server_with_config(
     run_relay_server_with_state(listener, state).await
 }
 
-/// Inicia el servidor Relay a partir de un [`RelaySharedState`] preconfigurado.
+/// Inicia el servidor Relay a partir de un [`RelaySharedState`] preconfigurado,
+/// deteniéndose limpiamente ante `SIGINT` o `SIGTERM`.
 pub async fn run_relay_server_with_state(
     listener: TcpListener,
     state: RelaySharedState,
 ) -> std::io::Result<()> {
+    run_relay_server_with_state_until(listener, state, wait_for_shutdown_signal()).await
+}
+
+/// Inicia el servidor Relay a partir de un [`RelaySharedState`] preconfigurado y ejecuta
+/// apagado ordenado cuando se resuelve la señal `shutdown_signal`.
+pub async fn run_relay_server_with_state_until<F>(
+    listener: TcpListener,
+    state: RelaySharedState,
+    shutdown_signal: F,
+) -> std::io::Result<()>
+where
+    F: std::future::Future<Output = ()>,
+{
     let next_conn_id = Arc::new(AtomicU64::new(1));
+    let accept_state = state.clone();
     let ticker_state = state.clone();
+    let gc_state = state.clone();
 
     let accept_loop = async move {
         loop {
             let (stream, peer_addr) = listener.accept().await?;
             let conn_id = next_conn_id.fetch_add(1, Ordering::Relaxed);
-            let state_clone = state.clone();
+            let state_clone = accept_state.clone();
 
             tokio::spawn(async move {
                 handle_connection(stream, peer_addr.ip(), conn_id, state_clone).await;
@@ -402,9 +456,36 @@ pub async fn run_relay_server_with_state(
         }
     };
 
+    // Recolector periódico cada 60s para salas inactivas (>30m) y cada 5m para RateLimitManager
+    let periodic_collector = async move {
+        let mut room_gc_interval =
+            tokio::time::interval(Duration::from_secs(room::ROOM_PRUNE_INTERVAL_SECS));
+        let mut rate_limit_gc_interval = tokio::time::interval(Duration::from_secs(
+            rate_limit::RATE_LIMIT_CLEANUP_INTERVAL_SECS,
+        ));
+        loop {
+            tokio::select! {
+                _ = room_gc_interval.tick() => {
+                    let mut mgr = gc_state.manager.lock().await;
+                    mgr.prune_stale_rooms(Duration::from_secs(room::DEFAULT_MAX_ROOM_IDLE_SECS));
+                    global_metrics().set_rooms_active(mgr.active_room_count());
+                }
+                _ = rate_limit_gc_interval.tick() => {
+                    let mut limiter = gc_state.rate_limiter.lock().await;
+                    limiter.prune_expired_now();
+                }
+            }
+        }
+    };
+
     tokio::select! {
         res = accept_loop => res,
         _ = periodic_watchdog => Ok(()),
+        _ = periodic_collector => Ok(()),
+        _ = shutdown_signal => {
+            perform_graceful_shutdown(&state).await?;
+            Ok(())
+        }
     }
 }
 
@@ -430,6 +511,11 @@ async fn handle_connection(
 
     let (mut ws_sink, mut ws_source) = ws_stream.split();
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+
+    {
+        let mut mgr = state.manager.lock().await;
+        mgr.register_client(conn_id, tx.clone());
+    }
 
     let writer_task = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
@@ -539,6 +625,7 @@ async fn handle_connection(
 
     let maybe_grace = {
         let mut mgr = state.manager.lock().await;
+        mgr.unregister_client(conn_id);
         let disconnected = mgr.disconnect_participant(conn_id);
         global_metrics().set_rooms_active(mgr.active_room_count());
         disconnected.map(|_| mgr.rejoin_grace_duration())
@@ -985,11 +1072,22 @@ async fn main() -> std::io::Result<()> {
     println!("open_table_relay WebSocket listening on ws://{ws_addr}");
     println!("open_table_relay HTTP ELO API listening on http://{http_addr}");
 
-    tokio::try_join!(
-        run_relay_server_with_store(ws_listener, Arc::clone(&elo_store)),
-        run_http_api_server(http_listener, elo_store),
-    )?;
-    Ok(())
+    let relay_fut = run_relay_server_with_store(ws_listener, Arc::clone(&elo_store));
+    let http_fut = run_http_api_server(http_listener, Arc::clone(&elo_store));
+
+    tokio::select! {
+        res = relay_fut => {
+            res?;
+        }
+        res = http_fut => {
+            res?;
+        }
+    }
+
+    let mut store = elo_store.lock().await;
+    let _ = store.wal_checkpoint_and_flush();
+    drop(store);
+    std::process::exit(0);
 }
 
 #[cfg(test)]
@@ -2138,6 +2236,93 @@ mod tests {
         assert_eq!(host_elo_val["loser_elo"], 1184);
 
         handle.abort();
+        let _ = std::fs::remove_file(&db_file);
+    }
+
+    #[tokio::test]
+    async fn test_prune_stale_rooms_and_graceful_shutdown_notifies_clients_and_flushes_wal() {
+        let db_file = std::env::temp_dir().join(format!(
+            "opentable_ratings_shutdown_{}.db",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&db_file);
+        let elo_store = Arc::new(Mutex::new(EloStore::new(&db_file).unwrap()));
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let state = RelaySharedState {
+            manager: Arc::new(Mutex::new(RoomManager::new())),
+            elo_store: Arc::clone(&elo_store),
+            tournaments: Arc::new(Mutex::new(TournamentManager::new())),
+            rate_limiter: Arc::new(Mutex::new(RelayRateLimiter::new())),
+            auth_config: AuthConfig::default(),
+            tls_config: None,
+        };
+
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+        let state_for_server = state.clone();
+        let handle = tokio::spawn(async move {
+            run_relay_server_with_state_until(listener, state_for_server, async move {
+                let _ = shutdown_rx.await;
+            })
+            .await
+        });
+
+        let url = format!("ws://{addr}");
+        let (mut ws_host, _) = connect_async(&url).await.unwrap();
+        let (mut ws_lobby, _) = connect_async(&url).await.unwrap();
+
+        // Host crea una sala mientras ws_lobby permanece conectado en el lobby
+        ws_host
+            .send(Message::Text(r#"{"op":"create","game_id":"chess"}"#.into()))
+            .await
+            .unwrap();
+        let created_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(created_val["op"], "created");
+
+        // Registrar un resultado en EloStore antes de apagar
+        {
+            let mut store = elo_store.lock().await;
+            store
+                .report_result("shutdown_winner", "shutdown_loser", "chess")
+                .unwrap();
+        }
+
+        // Disparar señal de parada (equivalente a SIGINT/SIGTERM)
+        let _ = shutdown_tx.send(());
+
+        // Ambos clientes reciben {"op": "server_shutting_down"}
+        let host_shutdown: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(host_shutdown["op"], "server_shutting_down");
+
+        let lobby_shutdown: Value = serde_json::from_str(
+            &ws_lobby
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .into_text()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(lobby_shutdown["op"], "server_shutting_down");
+
+        // El servidor finaliza limpiamente con Ok(()) tras hacer flush de SQLite
+        let server_res = handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        // Verificar que la base de datos en disco tiene el checkpoint persistido
+        let reopened = EloStore::new(&db_file).unwrap();
+        let rankings = reopened.get_rankings("chess", 10);
+        assert_eq!(rankings.len(), 2);
+        assert_eq!(rankings[0].player_id, "shutdown_winner");
+        assert_eq!(rankings[0].elo, 1216);
+
         let _ = std::fs::remove_file(&db_file);
     }
 }

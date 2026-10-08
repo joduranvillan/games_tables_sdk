@@ -48,6 +48,12 @@ pub const TURN_TIMEOUT_MATCHMAKING_SECS: u64 = 60;
 /// Tiempo por turno por defecto al crear una sala (`120` segundos).
 pub const DEFAULT_TURN_TIMEOUT_SECS: u64 = TURN_TIMEOUT_STANDARD_SECS;
 
+/// Tiempo máximo de inactividad de una sala antes de su recolección automática (`30` minutos = `1800` segundos).
+pub const DEFAULT_MAX_ROOM_IDLE_SECS: u64 = 30 * 60;
+
+/// Intervalo en segundos del recolector periódico de salas inactivas (`60` segundos).
+pub const ROOM_PRUNE_INTERVAL_SECS: u64 = 60;
+
 /// Normaliza el tiempo por turno solicitado según si la sala es pública o privada.
 ///
 /// - Si es `None`, aplica `120` segundos (`DEFAULT_TURN_TIMEOUT_SECS`).
@@ -160,6 +166,8 @@ pub struct Room {
     pub turn_timeout_secs: u64,
     /// Instante en el que se registró el último movimiento válido (o inicio de partida).
     pub last_move_at: Instant,
+    /// Instante en el que se registró la última actividad en la sala (creación, unión, movimiento o reconexión).
+    pub last_activity_at: Instant,
     /// Asiento (`1` o `2`) que posee actualmente el turno activo.
     pub active_turn_seat: u32,
     /// Indica si el ELO de esta sala ya fue reportado y persistido (garantiza idempotencia).
@@ -241,13 +249,15 @@ impl Room {
             .as_ref()
             .map(|ac| ac.active_turn_seat())
             .unwrap_or(1);
+        let now = Instant::now();
         Self {
             code,
             game_id,
             seed,
             is_public,
             turn_timeout_secs: resolve_turn_timeout_secs(turn_timeout_secs, is_public),
-            last_move_at: Instant::now(),
+            last_move_at: now,
+            last_activity_at: now,
             active_turn_seat,
             elo_reported: false,
             command_log: Vec::new(),
@@ -277,7 +287,9 @@ impl Room {
                 sender,
             },
         );
-        self.last_move_at = Instant::now();
+        let now = Instant::now();
+        self.last_move_at = now;
+        self.last_activity_at = now;
         assigned_id
     }
 
@@ -307,6 +319,7 @@ impl Room {
                 sender,
             },
         );
+        self.last_activity_at = Instant::now();
         Ok(self.player_count())
     }
 
@@ -435,6 +448,8 @@ pub struct RoomManager {
     rooms: HashMap<String, Room>,
     /// Mapa inverso de `ConnectionId` al código de sala en el que participa.
     conn_to_room: HashMap<ConnectionId, String>,
+    /// Canales de todos los clientes WebSocket conectados (incluyendo los que aún están en el lobby).
+    connected_clients: HashMap<ConnectionId, ClientSender>,
     /// Ventana de gracia máxima para reconexión (`90s` por defecto).
     rejoin_grace_duration: Duration,
 }
@@ -444,6 +459,7 @@ impl Default for RoomManager {
         Self {
             rooms: HashMap::new(),
             conn_to_room: HashMap::new(),
+            connected_clients: HashMap::new(),
             rejoin_grace_duration: Duration::from_secs(DEFAULT_REJOIN_GRACE_SECONDS),
         }
     }
@@ -699,7 +715,9 @@ impl RoomManager {
             room.active_turn_seat = if sender_player_id == 1 { 2 } else { 1 };
         }
 
-        room.last_move_at = Instant::now();
+        let now = Instant::now();
+        room.last_move_at = now;
+        room.last_activity_at = now;
         room.command_log.push(payload.clone());
         room.broadcast_except(conn_id, outbound_json);
         Ok((code, sender_player_id))
@@ -822,6 +840,7 @@ impl RoomManager {
         let winner = room.resolve_player_identity(winner_pid);
         let loser = room.resolve_player_identity(resigning_pid);
         room.elo_reported = true;
+        room.last_activity_at = Instant::now();
 
         Ok(Some(AuthoritativeMatchOutcome {
             room_code: code,
@@ -852,7 +871,18 @@ impl RoomManager {
             }
         }
         room.elo_reported = true;
+        room.last_activity_at = Instant::now();
         ReportResultCheck::Allowed
+    }
+
+    /// Registra un canal de cliente conectado para notificaciones globales (ej. `server_shutting_down`).
+    pub fn register_client(&mut self, conn_id: ConnectionId, sender: ClientSender) {
+        self.connected_clients.insert(conn_id, sender);
+    }
+
+    /// Elimina el canal de un cliente al cerrarse su conexión WebSocket.
+    pub fn unregister_client(&mut self, conn_id: ConnectionId) {
+        self.connected_clients.remove(&conn_id);
     }
 
     /// Envía un mensaje JSON a todos los miembros de la sala `raw_code`.
@@ -860,6 +890,22 @@ impl RoomManager {
         let normalized = raw_code.trim().to_ascii_uppercase();
         if let Some(room) = self.rooms.get(&normalized) {
             room.broadcast_all(message);
+        }
+    }
+
+    /// Envía un mensaje JSON a todos los clientes conectados al servidor (en salas o en el lobby).
+    pub fn broadcast_all_rooms(&self, message: &str) {
+        for sender in self.connected_clients.values() {
+            let _ = sender.send(message.to_string());
+        }
+        for room in self.rooms.values() {
+            for (&cid, participant) in &room.participants {
+                if !self.connected_clients.contains_key(&cid)
+                    && matches!(participant.state, ParticipantConnectionState::Connected)
+                {
+                    let _ = participant.sender.send(message.to_string());
+                }
+            }
         }
     }
 
@@ -885,11 +931,11 @@ impl RoomManager {
                     should_remove_room = room.is_empty();
                 }
                 Some((ParticipantRole::Player, pid)) => {
+                    let now = Instant::now();
                     if let Some(participant) = room.participants.get_mut(&conn_id) {
-                        participant.state = Disconnected {
-                            since: Instant::now(),
-                        };
+                        participant.state = Disconnected { since: now };
                     }
+                    room.last_activity_at = now;
                     disconnected_player_id = Some(pid);
                     let notice = serde_json::json!({
                         "op": "opponent_disconnected",
@@ -1020,6 +1066,7 @@ impl RoomManager {
                 sender,
             },
         );
+        room.last_activity_at = Instant::now();
         self.conn_to_room.insert(conn_id, normalized.clone());
 
         let notice = serde_json::json!({
@@ -1034,6 +1081,38 @@ impl RoomManager {
             seed: room.seed,
             commands: room.command_log.clone(),
         })
+    }
+
+    /// Elimina automáticamente todas las salas cuya última actividad (`last_activity_at`) supere `max_idle`
+    /// (por defecto 30 minutos en el recolector periódico) y limpia el índice inverso `conn_to_room`.
+    ///
+    /// Devuelve la cantidad de salas inactivas eliminadas.
+    pub fn prune_stale_rooms(&mut self, max_idle: Duration) -> usize {
+        let stale_codes: Vec<String> = self
+            .rooms
+            .iter()
+            .filter_map(|(code, room)| {
+                if room.last_activity_at.elapsed() >= max_idle {
+                    Some(code.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let removed_count = stale_codes.len();
+        for code in stale_codes {
+            if let Some(room) = self.rooms.remove(&code) {
+                for cid in room.participants.keys() {
+                    self.conn_to_room.remove(cid);
+                }
+            }
+        }
+
+        self.conn_to_room
+            .retain(|_, room_code| self.rooms.contains_key(room_code));
+
+        removed_count
     }
 
     /// Verifica todos los asientos desconectados cuyo tiempo en `Disconnected { since }` haya
@@ -1522,5 +1601,31 @@ mod tests {
         assert_eq!(msg_guest["op"], "match_timeout");
         assert_eq!(msg_guest["winner_seat"], 1);
         assert_eq!(msg_guest["reason"], "turn_timeout");
+    }
+
+    #[test]
+    fn test_prune_stale_rooms_removes_idle_and_preserves_active() {
+        let mut manager = RoomManager::new();
+        let (tx_stale, _rx_stale) = mpsc::unbounded_channel();
+        let (tx_active, _rx_active) = mpsc::unbounded_channel();
+
+        let stale_code = manager.create_room(100, tx_stale, Some("chess".to_string()), true);
+        let active_code = manager.create_room(200, tx_active, Some("go".to_string()), true);
+        assert_eq!(manager.active_room_count(), 2);
+
+        // Simular que stale_code lleva 31 minutos sin actividad (> 30 minutos)
+        if let Some(stale_room) = manager.rooms.get_mut(&stale_code) {
+            stale_room.last_activity_at =
+                Instant::now() - Duration::from_secs(DEFAULT_MAX_ROOM_IDLE_SECS + 60);
+        }
+
+        let removed = manager.prune_stale_rooms(Duration::from_secs(DEFAULT_MAX_ROOM_IDLE_SECS));
+        assert_eq!(removed, 1);
+        assert_eq!(manager.active_room_count(), 1);
+        assert!(manager.participant_info(100).is_none());
+        assert_eq!(
+            manager.participant_info(200),
+            Some((active_code.clone(), 1))
+        );
     }
 }
