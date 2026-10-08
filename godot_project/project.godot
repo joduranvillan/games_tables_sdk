@@ -29,6 +29,7 @@ AchievementManager="*res://achievement_manager.gd"
 SaveManager="*res://scripts/save_manager.gd"
 SteamManager="*res://scripts/steam_manager.gd"
 TutorialManager="*res://scripts/tutorial_manager.gd"
+AuthClient="*res://scripts/auth_client.gd"
 
 [display]
 

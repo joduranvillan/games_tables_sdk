@@ -330,6 +330,9 @@ fn local_relay_hub() -> &'static Mutex<HashMap<String, InProcessRoom>> {
 }
 
 enum OutboundRelayCommand {
+    Auth {
+        token: String,
+    },
     Create {
         game_id: String,
         reply: oneshot::Sender<Result<String, String>>,
@@ -367,8 +370,21 @@ impl WsRelayClient {
     /// cada 15 segundos. Si no hay servidor remoto escuchando, habilita el hub local
     /// en memoria como fallback determinista.
     pub fn connect(relay_url: &str) -> Self {
+        let env_token = std::env::var("OPEN_TABLE_JWT_TOKEN")
+            .ok()
+            .filter(|t| !t.trim().is_empty());
+        Self::connect_with_token(relay_url, env_token.as_deref())
+    }
+
+    /// Conecta al servidor Relay en `relay_url` y, si se provee `auth_token`, envía
+    /// automáticamente `{"op": "auth", "token": "<jwt>"}` como primer mensaje al conectar.
+    pub fn connect_with_token(relay_url: &str, auth_token: Option<&str>) -> Self {
         let client_id = LOCAL_HUB_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
         let url = relay_url.trim().to_string();
+        let initial_token = auth_token
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+            .map(ToOwned::to_owned);
         let events: Arc<Mutex<VecDeque<RelayClientEvent>>> = Arc::new(Mutex::new(VecDeque::new()));
         let incoming_payloads: IncomingQueue = Arc::new(Mutex::new(VecDeque::new()));
         let connected_remote = Arc::new(AtomicBool::new(false));
@@ -410,6 +426,17 @@ impl WsRelayClient {
                     };
 
                 let (mut ws_sink, mut ws_source) = ws_stream.split();
+                if let Some(tok) = initial_token {
+                    let auth_msg = serde_json::json!({
+                        "op": "auth",
+                        "token": tok,
+                    })
+                    .to_string();
+                    if ws_sink.send(Message::Text(auth_msg.into())).await.is_err() {
+                        connected_flag.store(false, Ordering::SeqCst);
+                        return;
+                    }
+                }
                 let mut heartbeat = tokio::time::interval(HEARTBEAT_INTERVAL);
                 heartbeat.tick().await;
 
@@ -420,6 +447,15 @@ impl WsRelayClient {
                     tokio::select! {
                         maybe_cmd = cmd_rx.recv() => {
                             match maybe_cmd {
+                                Some(OutboundRelayCommand::Auth { token }) => {
+                                    let msg = serde_json::json!({
+                                        "op": "auth",
+                                        "token": token,
+                                    }).to_string();
+                                    if ws_sink.send(Message::Text(msg.into())).await.is_err() {
+                                        break;
+                                    }
+                                }
                                 Some(OutboundRelayCommand::Create { game_id, reply }) => {
                                     pending_create = Some(reply);
                                     let msg = serde_json::json!({
@@ -623,6 +659,24 @@ impl WsRelayClient {
     /// `PlayerId` asignado en la sala actual (`PlayerId(1)` para host, `PlayerId(2..)` para invitado).
     pub fn player_id(&self) -> PlayerId {
         self.player_id
+    }
+
+    /// Envía el mensaje de autenticación `{"op": "auth", "token": "<jwt>"}` al servidor Relay.
+    pub fn authenticate(&mut self, token: &str) -> EngineResult<()> {
+        let trimmed = token.trim();
+        if trimmed.is_empty() {
+            return Ok(());
+        }
+        if self.is_remote_connected() {
+            if let Some(tx) = &self.cmd_tx {
+                return tx
+                    .send(OutboundRelayCommand::Auth {
+                        token: trimmed.to_string(),
+                    })
+                    .map_err(|e| EngineError::Network(e.to_string()));
+            }
+        }
+        Ok(())
     }
 
     /// Solicita la creación de una sala para `game_id` y devuelve el código de 4 caracteres.

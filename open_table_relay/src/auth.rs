@@ -9,13 +9,37 @@
 
 use hmac::{Hmac, KeyInit, Mac};
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 type HmacSha256 = Hmac<Sha256>;
 
 /// Tiempo máximo permitido para recibir el primer mensaje `{"op": "auth"}` cuando `JWT_SECRET` está activo.
 pub const AUTH_HANDSHAKE_TIMEOUT_SECS: u64 = 5;
+
+/// Tiempo de vida de los tokens JWT de invitado emitidos por `POST /auth/guest` (7 días en segundos).
+pub const GUEST_TOKEN_TTL_SECS: u64 = 7 * 24 * 60 * 60;
+
+/// Secreto de desarrollo utilizado para firmar tokens locales cuando `JWT_SECRET` no está configurado.
+pub const DEV_DEFAULT_JWT_SECRET: &str = "open_table_dev_local_secret";
+
+/// Solicitud JSON recibida en `POST /auth/guest`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GuestAuthRequest {
+    /// Identificador único persistente (UUID v4) del dispositivo cliente.
+    pub device_id: String,
+}
+
+/// Respuesta JSON emitida por `POST /auth/guest`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GuestAuthResponse {
+    /// Token JWT firmado con `HS256`.
+    pub token: String,
+    /// Identificador canónico de invitado (`guest_<hash8>`).
+    pub player_id: String,
+    /// Timestamp UNIX (en segundos) de expiración del token (`now + 7 días`).
+    pub expires_at: u64,
+}
 
 /// Claims mínimos requeridos en el token JWT del cliente.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -78,13 +102,68 @@ impl AuthConfig {
 
     /// Verifica un token JWT contra el secreto configurado usando el reloj actual del sistema.
     pub fn verify_token(&self, token: &str) -> Result<JwtClaims, AuthError> {
+        let now = current_unix_timestamp();
         let Some(secret) = self.jwt_secret.as_deref() else {
-            return Ok(JwtClaims {
-                sub: "anonymous".to_string(),
-                exp: u64::MAX,
-            });
+            return match verify_jwt_hs256(token, DEV_DEFAULT_JWT_SECRET, now) {
+                Ok(claims) => Ok(claims),
+                Err(AuthError::Expired) => Err(AuthError::Expired),
+                Err(_) => Ok(JwtClaims {
+                    sub: "anonymous".to_string(),
+                    exp: u64::MAX,
+                }),
+            };
         };
-        verify_jwt_hs256(token, secret, current_unix_timestamp())
+        verify_jwt_hs256(token, secret, now)
+    }
+
+    /// Emite un token JWT de invitado válido por 7 días (`GUEST_TOKEN_TTL_SECS`) a partir de `device_id`.
+    ///
+    /// Si `JWT_SECRET` no está configurado en el servidor, firma un token de desarrollo válido en modo local.
+    pub fn issue_guest_token(&self, device_id: &str) -> GuestAuthResponse {
+        self.issue_guest_token_at(device_id, current_unix_timestamp())
+    }
+
+    /// Emite un token JWT de invitado válido por 7 días a partir del timestamp `now_unix_secs`.
+    pub fn issue_guest_token_at(&self, device_id: &str, now_unix_secs: u64) -> GuestAuthResponse {
+        issue_guest_token_with_secret(device_id, self.jwt_secret.as_deref(), now_unix_secs)
+    }
+}
+
+/// Deriva un identificador canónico `guest_<hash8>` determinista a partir del `device_id`.
+pub fn derive_guest_player_id(device_id: &str) -> String {
+    let clean = device_id.trim();
+    let input = if clean.is_empty() { "anonymous" } else { clean };
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_bytes());
+    let digest = hasher.finalize();
+    format!(
+        "guest_{:02x}{:02x}{:02x}{:02x}",
+        digest[0], digest[1], digest[2], digest[3]
+    )
+}
+
+/// Emite una respuesta `GuestAuthResponse` con un JWT firmado con `HS256` y expiración de 7 días.
+///
+/// Si `secret` es `None` o vacío, utiliza `DEV_DEFAULT_JWT_SECRET` para producir un token de desarrollo válido.
+pub fn issue_guest_token_with_secret(
+    device_id: &str,
+    secret: Option<&str>,
+    now_unix_secs: u64,
+) -> GuestAuthResponse {
+    let player_id = derive_guest_player_id(device_id);
+    let expires_at = now_unix_secs.saturating_add(GUEST_TOKEN_TTL_SECS);
+    let signing_secret = secret
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(DEV_DEFAULT_JWT_SECRET);
+    let claims = JwtClaims {
+        sub: player_id.clone(),
+        exp: expires_at,
+    };
+    let token = encode_jwt_hs256(&claims, signing_secret);
+    GuestAuthResponse {
+        token,
+        player_id,
+        expires_at,
     }
 }
 
@@ -263,5 +342,35 @@ mod tests {
         let token = encode_jwt_hs256(&claims, "secret_a");
         let err = verify_jwt_hs256(&token, "secret_b", now).unwrap_err();
         assert_eq!(err, AuthError::InvalidSignature);
+    }
+
+    #[test]
+    fn test_guest_auth_token_generation_7_days_and_hash8() {
+        let now = 1_735_084_800;
+        let cfg = AuthConfig::with_secret("prod_guest_secret");
+        let resp = cfg.issue_guest_token_at("550e8400-e29b-41d4-a716-446655440000", now);
+
+        assert!(resp.player_id.starts_with("guest_"));
+        assert_eq!(resp.player_id.len(), "guest_".len() + 8);
+        assert_eq!(resp.expires_at, now + GUEST_TOKEN_TTL_SECS);
+        assert_eq!(resp.expires_at, 1_735_689_600);
+
+        let decoded = verify_jwt_hs256(&resp.token, "prod_guest_secret", now).unwrap();
+        assert_eq!(decoded.sub, resp.player_id);
+        assert_eq!(decoded.exp, resp.expires_at);
+    }
+
+    #[test]
+    fn test_guest_auth_dev_fallback_when_jwt_secret_not_set() {
+        let cfg = AuthConfig::default();
+        assert!(!cfg.is_enabled());
+
+        let resp = cfg.issue_guest_token("123e4567-e89b-12d3-a456-426614174000");
+        assert!(resp.player_id.starts_with("guest_"));
+        assert_eq!(resp.player_id.len(), 14);
+
+        let verified = cfg.verify_token(&resp.token).unwrap();
+        assert_eq!(verified.sub, resp.player_id);
+        assert_eq!(verified.exp, resp.expires_at);
     }
 }

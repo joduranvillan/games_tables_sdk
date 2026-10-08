@@ -238,6 +238,8 @@ func _apply_connection_mode(index: int) -> void:
 		if ip_port_label != null:
 			ip_port_label.text = "Relay: %s" % relay_url
 		if bridge != null:
+			if has_node("/root/AuthClient"):
+				get_node("/root/AuthClient").call("configure_bridge_auth", bridge)
 			if bridge.has_method("connect_to_relay"):
 				bridge.call("connect_to_relay", relay_url)
 			if bridge.has_method("create_relay_room"):

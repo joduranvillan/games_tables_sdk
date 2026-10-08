@@ -329,6 +329,7 @@ pub struct OpenTableBridge {
     base: Base<Node>,
     mode: BridgeMode,
     relay_client: Option<WsRelayClient>,
+    relay_auth_token: Option<String>,
     current_game_type: String,
     undone_commands: Vec<(PlayerId, String)>,
     recent_events: Vec<Dictionary<Variant, Variant>>,
@@ -343,6 +344,7 @@ impl INode for OpenTableBridge {
             base,
             mode: BridgeMode::None,
             relay_client: None,
+            relay_auth_token: None,
             current_game_type: String::from("checkers"),
             undone_commands: Vec::new(),
             recent_events: Vec::new(),
@@ -1526,6 +1528,20 @@ impl OpenTableBridge {
     // RELAY WEBSOCKET
     // ------------------------------------------------------------------
     #[func]
+    pub fn set_relay_auth_token(&mut self, token: GString) {
+        let tok = token.to_string();
+        let clean = tok.trim().to_string();
+        if clean.is_empty() {
+            self.relay_auth_token = None;
+        } else {
+            if let Some(relay) = &mut self.relay_client {
+                let _ = relay.authenticate(&clean);
+            }
+            self.relay_auth_token = Some(clean);
+        }
+    }
+
+    #[func]
     pub fn connect_to_relay(&mut self, relay_url: GString) {
         let url = relay_url.to_string();
         let target_url = if url.trim().is_empty() {
@@ -1533,7 +1549,10 @@ impl OpenTableBridge {
         } else {
             url
         };
-        self.relay_client = Some(WsRelayClient::connect(&target_url));
+        self.relay_client = Some(WsRelayClient::connect_with_token(
+            &target_url,
+            self.relay_auth_token.as_deref(),
+        ));
     }
 
     #[func]
@@ -1547,7 +1566,10 @@ impl OpenTableBridge {
         self.current_game_type = effective_game.clone();
 
         if self.relay_client.is_none() {
-            self.relay_client = Some(WsRelayClient::connect("ws://127.0.0.1:8080"));
+            self.relay_client = Some(WsRelayClient::connect_with_token(
+                "ws://127.0.0.1:8080",
+                self.relay_auth_token.as_deref(),
+            ));
         }
 
         let code = if let Some(relay) = &mut self.relay_client {
@@ -1572,7 +1594,10 @@ impl OpenTableBridge {
     #[func]
     pub fn join_relay_room(&mut self, code: GString) {
         if self.relay_client.is_none() {
-            self.relay_client = Some(WsRelayClient::connect("ws://127.0.0.1:8080"));
+            self.relay_client = Some(WsRelayClient::connect_with_token(
+                "ws://127.0.0.1:8080",
+                self.relay_auth_token.as_deref(),
+            ));
         }
 
         let join_result = if let Some(relay) = &mut self.relay_client {
