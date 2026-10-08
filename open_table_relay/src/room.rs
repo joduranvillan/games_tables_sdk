@@ -55,24 +55,45 @@ pub struct Room {
     pub code: String,
     /// Identificador opcional del juego (ej. `"chess"`, `"go"`).
     pub game_id: Option<String>,
+    /// Semilla determinista generada por el servidor para sincronizar dados y mazos.
+    pub seed: u64,
     /// Indica si la sala es pública o privada.
     pub is_public: bool,
     /// Contador incremental para asignar `player_id` a nuevos participantes.
     next_player_id: RoomPlayerId,
     /// Participantes activos indexados por `ConnectionId`.
     pub participants: HashMap<ConnectionId, Participant>,
-    /// Sesión autoritativa opcional para validación Anti-Cheat (`chess`, `checkers`).
+    /// Sesión autoritativa opcional para validación Anti-Cheat de los 13 juegos.
     pub anticheat: Option<AntiCheatSession>,
 }
 
 impl Room {
-    /// Crea una nueva sala con el anfitrión inicial (`player_id = 1`).
+    /// Crea una nueva sala con el anfitrión inicial (`player_id = 1`) y una semilla generada por el servidor.
     pub fn new(
         code: String,
         host_conn_id: ConnectionId,
         host_sender: ClientSender,
         game_id: Option<String>,
         is_public: bool,
+    ) -> Self {
+        Self::with_seed(
+            code,
+            host_conn_id,
+            host_sender,
+            game_id,
+            is_public,
+            generate_room_seed(),
+        )
+    }
+
+    /// Crea una nueva sala con una semilla explícita (`seed`) para la sesión autoritativa.
+    pub fn with_seed(
+        code: String,
+        host_conn_id: ConnectionId,
+        host_sender: ClientSender,
+        game_id: Option<String>,
+        is_public: bool,
+        seed: u64,
     ) -> Self {
         let mut participants = HashMap::new();
         participants.insert(
@@ -84,10 +105,11 @@ impl Room {
                 sender: host_sender,
             },
         );
-        let anticheat = AntiCheatSession::for_game(game_id.as_deref());
+        let anticheat = AntiCheatSession::for_game_with_seed(game_id.as_deref(), seed);
         Self {
             code,
             game_id,
+            seed,
             is_public,
             next_player_id: 2,
             participants,
@@ -177,6 +199,22 @@ impl Room {
     pub fn is_empty(&self) -> bool {
         self.participants.is_empty()
     }
+}
+
+/// Genera una semilla determinista de 64 bits no nula en el servidor.
+pub fn generate_room_seed() -> u64 {
+    let mut buf = [0u8; 8];
+    if getrandom::fill(&mut buf).is_ok() {
+        let val = u64::from_le_bytes(buf);
+        if val != 0 {
+            return val;
+        }
+    }
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(42)
+        .max(1)
 }
 
 /// Genera un código de sala aleatorio de 4 caracteres usando [`ROOM_CODE_ALPHABET`].
@@ -394,6 +432,21 @@ impl RoomManager {
         let room = self.rooms.get(code)?;
         let participant = room.participants.get(&conn_id)?;
         Some((code.clone(), participant.player_id))
+    }
+
+    /// Devuelve la semilla (`seed`) de una sala activa por su código.
+    pub fn room_seed(&self, raw_code: &str) -> Option<u64> {
+        let normalized = raw_code.trim().to_ascii_uppercase();
+        self.rooms.get(&normalized).map(|r| r.seed)
+    }
+
+    /// Devuelve el ganador autoritativo (`AntiCheatSession::winner`) de una sala si la partida ha terminado.
+    pub fn room_winner(&self, raw_code: &str) -> Option<open_table_core::ids::PlayerId> {
+        let normalized = raw_code.trim().to_ascii_uppercase();
+        self.rooms
+            .get(&normalized)
+            .and_then(|r| r.anticheat.as_ref())
+            .and_then(|ac| ac.winner())
     }
 
     /// Retira a un cliente de su sala actual (por `{"op": "leave"}` o desconexión)

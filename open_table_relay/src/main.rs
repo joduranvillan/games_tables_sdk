@@ -170,11 +170,17 @@ pub enum RelayResponse {
     Created {
         /// Código asignado a la sala.
         room_code: String,
+        /// Semilla generada por el servidor para sincronización determinista de dados y mazos.
+        #[serde(default)]
+        seed: u64,
     },
     /// Confirmación de unión exitosa a una sala.
     Joined {
         /// Identificador de jugador asignado dentro de la sala (2..N).
         player_id: u32,
+        /// Semilla generada por el servidor para sincronización determinista de dados y mazos.
+        #[serde(default)]
+        seed: u64,
     },
     /// Confirmación de unión exitosa como espectador a una sala.
     Spectating {
@@ -486,20 +492,21 @@ async fn process_text_message(
             global_metrics().inc_messages_total(game_id.as_deref());
             let mut mgr = state.manager.lock().await;
             let room_code = mgr.create_room(conn_id, tx.clone(), game_id, is_public);
+            let seed = mgr.room_seed(&room_code).unwrap_or(42);
             global_metrics().set_rooms_active(mgr.active_room_count());
-            send_response(tx, &RelayResponse::Created { room_code });
+            send_response(tx, &RelayResponse::Created { room_code, seed });
         }
         RelayRequest::Join { room_code } => {
             let mut mgr = state.manager.lock().await;
             match mgr.join_room(conn_id, tx.clone(), &room_code) {
                 Ok((normalized_code, player_id)) => {
-                    send_response(tx, &RelayResponse::Joined { player_id });
+                    let seed = mgr.room_seed(&normalized_code).unwrap_or(42);
+                    send_response(tx, &RelayResponse::Joined { player_id, seed });
                     if let Ok(peer_notice) =
                         serde_json::to_string(&RelayResponse::PeerJoined { player_id })
                     {
                         let _ = mgr.relay_to_peers(conn_id, &peer_notice);
                     }
-                    let _ = normalized_code;
                 }
                 Err(RoomError::InvalidRoomCode) => {
                     send_response(
@@ -945,12 +952,30 @@ mod tests {
 
         let url = format!("ws://{addr}");
         let (mut ws_host, _) = connect_async(&url).await.unwrap();
+        let (mut ws_guest, _) = connect_async(&url).await.unwrap();
 
         ws_host
             .send(Message::Text(r#"{"op":"create","game_id":"chess"}"#.into()))
             .await
             .unwrap();
-        let _created = ws_host.next().await.unwrap().unwrap();
+        let created_txt = ws_host.next().await.unwrap().unwrap().into_text().unwrap();
+        let created_val: Value = serde_json::from_str(&created_txt).unwrap();
+        let room_code = created_val["room_code"].as_str().unwrap().to_string();
+        let host_seed = created_val["seed"].as_u64().unwrap();
+        assert!(host_seed > 0);
+
+        let join_msg = serde_json::json!({
+            "op": "join",
+            "room_code": room_code,
+        })
+        .to_string();
+        ws_guest.send(Message::Text(join_msg.into())).await.unwrap();
+        let joined_txt = ws_guest.next().await.unwrap().unwrap().into_text().unwrap();
+        let joined_val: Value = serde_json::from_str(&joined_txt).unwrap();
+        assert_eq!(joined_val["seed"].as_u64().unwrap(), host_seed);
+
+        // Consumir peer_joined en el host
+        let _ = ws_host.next().await.unwrap().unwrap();
 
         // Enviar movimiento ilegal en Ajedrez (rey e1 -> e5)
         let illegal_relay = serde_json::json!({
@@ -971,6 +996,26 @@ mod tests {
         let rej_val: Value = serde_json::from_str(&rej_txt).unwrap();
         assert_eq!(rej_val["op"], "move_rejected");
         assert_eq!(rej_val["reason"], "illegal_move");
+
+        // Enviar movimiento fuera de turno desde Guest (P2 intenta mover en turno de P1)
+        let out_of_turn = serde_json::json!({
+            "op": "relay",
+            "data": {
+                "player": 2,
+                "from": { "row": 6, "col": 4 },
+                "to": { "row": 4, "col": 4 }
+            }
+        })
+        .to_string();
+        ws_guest
+            .send(Message::Text(out_of_turn.into()))
+            .await
+            .unwrap();
+
+        let rej_guest_txt = ws_guest.next().await.unwrap().unwrap().into_text().unwrap();
+        let rej_guest_val: Value = serde_json::from_str(&rej_guest_txt).unwrap();
+        assert_eq!(rej_guest_val["op"], "move_rejected");
+        assert_eq!(rej_guest_val["reason"], "illegal_move");
 
         handle.abort();
         let _ = std::fs::remove_file(&db_file);
