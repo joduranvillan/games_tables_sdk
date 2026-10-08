@@ -90,6 +90,15 @@ pub enum RelayRequest {
         /// Código de la sala.
         room_code: String,
     },
+    /// Reconecta a un jugador desconectado a su asiento original dentro de la ventana de gracia de 90 segundos.
+    #[serde(alias = "rejoin")]
+    RejoinRoom {
+        /// Código de la sala activa.
+        room_code: String,
+        /// Identificador canónico opcional del jugador (si se omite, se emplea el del JWT autenticado).
+        #[serde(default)]
+        player_id: Option<String>,
+    },
     /// Une al cliente como espectador de solo lectura a una sala existente.
     JoinSpectator {
         /// Código de la sala.
@@ -187,6 +196,25 @@ pub enum RelayResponse {
         #[serde(default)]
         seed: u64,
     },
+    /// Confirmación de reconexión exitosa a una sala activa con el historial de comandos validados.
+    Rejoined {
+        /// Código de la sala.
+        room_code: String,
+        /// Asiento original recuperado (`1` o `2`).
+        #[serde(default)]
+        player_id: u32,
+        /// Semilla determinista de la sala.
+        seed: u64,
+        /// Lista ordenada de comandos validados hasta el momento.
+        commands: Vec<Value>,
+    },
+    /// Notificación al rival cuando el oponente se desconecta durante la partida (90s de gracia).
+    OpponentDisconnected {
+        /// Segundos de gracia antes de adjudicar victoria por abandono (`90`).
+        grace_seconds: u64,
+    },
+    /// Notificación al rival cuando el oponente desconectado recupera su asiento.
+    OpponentReconnected,
     /// Confirmación de unión exitosa como espectador a una sala.
     Spectating {
         /// Cantidad de jugadores activos en la sala.
@@ -313,6 +341,14 @@ pub async fn run_relay_server_with_config(
         auth_config,
         tls_config,
     };
+    run_relay_server_with_state(listener, state).await
+}
+
+/// Inicia el servidor Relay a partir de un [`RelaySharedState`] preconfigurado.
+pub async fn run_relay_server_with_state(
+    listener: TcpListener,
+    state: RelaySharedState,
+) -> std::io::Result<()> {
     let next_conn_id = Arc::new(AtomicU64::new(1));
 
     loop {
@@ -455,10 +491,27 @@ async fn handle_connection(
         }
     }
 
-    {
+    let maybe_grace = {
         let mut mgr = state.manager.lock().await;
-        mgr.leave_room(conn_id);
+        let disconnected = mgr.disconnect_participant(conn_id);
         global_metrics().set_rooms_active(mgr.active_room_count());
+        disconnected.map(|_| mgr.rejoin_grace_duration())
+    };
+
+    if let Some(grace_duration) = maybe_grace {
+        let state_for_timer = state.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(grace_duration).await;
+            let outcomes = {
+                let mut mgr = state_for_timer.manager.lock().await;
+                let expired = mgr.expire_disconnected_seats();
+                global_metrics().set_rooms_active(mgr.active_room_count());
+                expired
+            };
+            for outcome in outcomes {
+                persist_and_broadcast_elo_outcome(outcome, &state_for_timer).await;
+            }
+        });
     }
 
     global_metrics().dec_connections_active();
@@ -541,6 +594,62 @@ async fn process_text_message(
                 }
                 Err(_) => {
                     send_response(tx, &RelayResponse::error_message("not in room"));
+                }
+            }
+        }
+        RelayRequest::RejoinRoom {
+            room_code,
+            player_id,
+        } => {
+            if let (Some(auth_id), Some(req_id)) = (&canonical_player_id, &player_id) {
+                let trimmed = req_id.trim();
+                if !trimmed.is_empty() && trimmed != auth_id {
+                    send_response(tx, &RelayResponse::error_reason("seat_not_found"));
+                    return;
+                }
+            }
+            let effective_id = canonical_player_id.clone().or(player_id);
+            let mut expired_outcomes = Vec::new();
+            let rejoin_res = {
+                let mut mgr = state.manager.lock().await;
+                let res = mgr.rejoin_room(conn_id, tx.clone(), &room_code, effective_id.as_deref());
+                if matches!(res, Err(RoomError::RejoinExpired)) {
+                    expired_outcomes = mgr.expire_disconnected_seats();
+                }
+                res
+            };
+            for outcome in expired_outcomes {
+                persist_and_broadcast_elo_outcome(outcome, state).await;
+            }
+            match rejoin_res {
+                Ok(outcome) => {
+                    if canonical_player_id.is_none() && effective_id.is_some() {
+                        *canonical_player_id = effective_id;
+                    }
+                    send_response(
+                        tx,
+                        &RelayResponse::Rejoined {
+                            room_code: outcome.room_code,
+                            player_id: outcome.player_id,
+                            seed: outcome.seed,
+                            commands: outcome.commands,
+                        },
+                    );
+                }
+                Err(RoomError::RejoinExpired) => {
+                    send_response(tx, &RelayResponse::error_reason("rejoin_expired"));
+                }
+                Err(RoomError::InvalidRoomCode) => {
+                    send_response(
+                        tx,
+                        &RelayResponse::error_message("invalid room code format"),
+                    );
+                }
+                Err(RoomError::RoomNotFound) => {
+                    send_response(tx, &RelayResponse::error_message("room not found"));
+                }
+                Err(_) => {
+                    send_response(tx, &RelayResponse::error_reason("seat_not_found"));
                 }
             }
         }
@@ -1565,6 +1674,275 @@ mod tests {
         assert_eq!(guest_elo_msg["loser"], host_id);
         assert_eq!(guest_elo_msg["winner_elo"], 1216);
         assert_eq!(guest_elo_msg["loser_elo"], 1184);
+
+        handle.abort();
+        let _ = std::fs::remove_file(&db_file);
+    }
+
+    #[tokio::test]
+    async fn test_websocket_rejoin_room_restores_seat_and_command_log() {
+        let db_file = std::env::temp_dir().join(format!(
+            "opentable_ratings_rejoin_ws_{}.db",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&db_file);
+        let elo_store = Arc::new(Mutex::new(EloStore::new(&db_file).unwrap()));
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = tokio::spawn(async move {
+            let _ = run_relay_server_with_config(listener, elo_store, AuthConfig::default(), None)
+                .await;
+        });
+
+        let url = format!("ws://{addr}");
+        let (mut ws_host, _) = connect_async(&url).await.unwrap();
+        let (mut ws_guest, _) = connect_async(&url).await.unwrap();
+
+        let host_token = auth::AuthConfig::default()
+            .issue_guest_token("device-rejoin-host")
+            .token;
+        let guest_token = auth::AuthConfig::default()
+            .issue_guest_token("device-rejoin-guest")
+            .token;
+
+        ws_host
+            .send(Message::Text(
+                serde_json::json!({"op": "auth", "token": host_token})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_host.next().await.unwrap().unwrap();
+
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({"op": "auth", "token": guest_token})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_guest.next().await.unwrap().unwrap();
+
+        // Host crea sala de ajedrez y Guest se une
+        ws_host
+            .send(Message::Text(r#"{"op":"create","game_id":"chess"}"#.into()))
+            .await
+            .unwrap();
+        let created_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let room_code = created_val["room_code"].as_str().unwrap().to_string();
+        let seed = created_val["seed"].as_u64().unwrap();
+
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({"op": "join", "room_code": room_code})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_guest.next().await.unwrap().unwrap(); // joined
+        let _ = ws_host.next().await.unwrap().unwrap(); // peer_joined
+
+        // 1. Host juega e2 -> e4
+        let move_1 = serde_json::json!({
+            "player": 1,
+            "from": { "row": 1, "col": 4 },
+            "to": { "row": 3, "col": 4 }
+        });
+        ws_host
+            .send(Message::Text(
+                serde_json::json!({ "op": "relay", "data": move_1 })
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_guest.next().await.unwrap().unwrap();
+
+        // 2. Guest juega e7 -> e5
+        let move_2 = serde_json::json!({
+            "player": 2,
+            "from": { "row": 6, "col": 4 },
+            "to": { "row": 4, "col": 4 }
+        });
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({ "op": "relay", "data": move_2 })
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_host.next().await.unwrap().unwrap();
+
+        // 3. Guest sufre caída accidental del socket -> Host recibe opponent_disconnected (90s)
+        let _ = ws_guest.close(None).await;
+        drop(ws_guest);
+
+        let disc_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(disc_val["op"], "opponent_disconnected");
+        assert_eq!(disc_val["grace_seconds"], 90);
+
+        // 4. Guest se reconecta en un nuevo socket, se autentica y envía rejoin_room
+        let (mut ws_guest_reconn, _) = connect_async(&url).await.unwrap();
+        ws_guest_reconn
+            .send(Message::Text(
+                serde_json::json!({"op": "auth", "token": guest_token})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_guest_reconn.next().await.unwrap().unwrap();
+
+        ws_guest_reconn
+            .send(Message::Text(
+                serde_json::json!({"op": "rejoin_room", "room_code": room_code})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+
+        let rejoined_val: Value = serde_json::from_str(
+            &ws_guest_reconn
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .into_text()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(rejoined_val["op"], "rejoined");
+        assert_eq!(rejoined_val["room_code"], room_code);
+        assert_eq!(rejoined_val["player_id"], 2);
+        assert_eq!(rejoined_val["seed"], seed);
+        let cmds = rejoined_val["commands"].as_array().unwrap();
+        assert_eq!(cmds.len(), 2);
+        assert_eq!(cmds[0], move_1);
+        assert_eq!(cmds[1], move_2);
+
+        // 5. Host recibe {"op": "opponent_reconnected"}
+        let reconn_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(reconn_val["op"], "opponent_reconnected");
+
+        handle.abort();
+        let _ = std::fs::remove_file(&db_file);
+    }
+
+    #[tokio::test]
+    async fn test_websocket_rejoin_grace_timeout_awards_victory_by_abandonment() {
+        let db_file = std::env::temp_dir().join(format!(
+            "opentable_ratings_rejoin_timeout_{}.db",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&db_file);
+        let elo_store = Arc::new(Mutex::new(EloStore::new(&db_file).unwrap()));
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let mut room_mgr = RoomManager::new();
+        room_mgr.set_rejoin_grace_duration(Duration::from_millis(60));
+        let state = RelaySharedState {
+            manager: Arc::new(Mutex::new(room_mgr)),
+            elo_store: Arc::clone(&elo_store),
+            tournaments: Arc::new(Mutex::new(TournamentManager::new())),
+            rate_limiter: Arc::new(Mutex::new(RelayRateLimiter::new())),
+            auth_config: AuthConfig::default(),
+            tls_config: None,
+        };
+
+        let handle = tokio::spawn(async move {
+            let _ = run_relay_server_with_state(listener, state).await;
+        });
+
+        let url = format!("ws://{addr}");
+        let (mut ws_host, _) = connect_async(&url).await.unwrap();
+        let (mut ws_guest, _) = connect_async(&url).await.unwrap();
+
+        let host_token = auth::AuthConfig::default()
+            .issue_guest_token("device-timeout-host")
+            .token;
+        let guest_token = auth::AuthConfig::default()
+            .issue_guest_token("device-timeout-guest")
+            .token;
+
+        ws_host
+            .send(Message::Text(
+                serde_json::json!({"op": "auth", "token": host_token})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let host_auth: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let host_id = host_auth["player_id"].as_str().unwrap().to_string();
+
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({"op": "auth", "token": guest_token})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let guest_auth: Value =
+            serde_json::from_str(&ws_guest.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let guest_id = guest_auth["player_id"].as_str().unwrap().to_string();
+
+        ws_host
+            .send(Message::Text(r#"{"op":"create","game_id":"chess"}"#.into()))
+            .await
+            .unwrap();
+        let created_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let room_code = created_val["room_code"].as_str().unwrap().to_string();
+
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({"op": "join", "room_code": room_code})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_guest.next().await.unwrap().unwrap();
+        let _ = ws_host.next().await.unwrap().unwrap(); // peer_joined
+
+        // Guest se desconecta y no vuelve a conectarse dentro de la ventana de gracia
+        let _ = ws_guest.close(None).await;
+        drop(ws_guest);
+
+        let disc_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(disc_val["op"], "opponent_disconnected");
+
+        // Al expirar la ventana de gracia, Host gana por abandono y recibe elo_updated
+        let elo_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(elo_val["op"], "elo_updated");
+        assert_eq!(elo_val["winner"], host_id);
+        assert_eq!(elo_val["loser"], guest_id);
+        assert_eq!(elo_val["winner_elo"], 1216);
+        assert_eq!(elo_val["loser_elo"], 1184);
 
         handle.abort();
         let _ = std::fs::remove_file(&db_file);

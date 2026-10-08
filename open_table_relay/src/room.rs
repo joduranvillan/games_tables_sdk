@@ -6,6 +6,7 @@
 use crate::anticheat::AntiCheatSession;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 /// Alfabeto legible de 32 caracteres: excluye `O`, `0`, `I`, `1` para evitar confusiones visuales.
@@ -26,6 +27,9 @@ pub type RoomPlayerId = u32;
 /// Límite máximo de espectadores permitidos por sala.
 pub const MAX_SPECTATORS_PER_ROOM: usize = 10;
 
+/// Ventana de gracia por defecto en segundos para que un jugador desconectado se reconecte (`90`).
+pub const DEFAULT_REJOIN_GRACE_SECONDS: u64 = 90;
+
 /// Rol de un participante dentro de una sala Relay.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParticipantRole {
@@ -35,7 +39,21 @@ pub enum ParticipantRole {
     Spectator,
 }
 
-/// Información de un participante conectado a una sala.
+/// Estado de conexión de un participante dentro de una sala.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParticipantConnectionState {
+    /// Participante conectado activamente.
+    Connected,
+    /// Jugador desconectado temporalmente dentro de la ventana de gracia de reconexión.
+    Disconnected {
+        /// Instante en que se registró la desconexión del socket.
+        since: Instant,
+    },
+}
+
+pub use ParticipantConnectionState::Disconnected;
+
+/// Información de un participante conectado o en ventana de reconexión dentro de una sala.
 #[derive(Debug, Clone)]
 pub struct Participant {
     /// Identificador único de la conexión.
@@ -46,8 +64,23 @@ pub struct Participant {
     pub authenticated_player_id: Option<String>,
     /// Rol del participante en la sala (`Player` o `Spectator`).
     pub role: ParticipantRole,
+    /// Estado de conexión actual (`Connected` o `Disconnected { since }`).
+    pub state: ParticipantConnectionState,
     /// Canal para enviar mensajes JSON serializados al cliente.
     pub sender: ClientSender,
+}
+
+/// Datos de estado devueltos al reconectar exitosamente un jugador con `rejoin_room`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RejoinOutcome {
+    /// Código normalizado de la sala.
+    pub room_code: String,
+    /// Identificador de asiento original recuperado (`1` o `2`).
+    pub player_id: RoomPlayerId,
+    /// Semilla determinista de la sala.
+    pub seed: u64,
+    /// Lista ordenada de comandos validados aplicados hasta el momento.
+    pub commands: Vec<Value>,
 }
 
 /// Resultado autoritativo listo para persistirse en `EloStore` y notificarse con `op: "elo_updated"`.
@@ -87,9 +120,11 @@ pub struct Room {
     pub is_public: bool,
     /// Indica si el ELO de esta sala ya fue reportado y persistido (garantiza idempotencia).
     pub elo_reported: bool,
+    /// Buffer ordenado de comandos validados aplicados en la partida.
+    pub command_log: Vec<Value>,
     /// Contador incremental para asignar `player_id` a nuevos participantes.
     next_player_id: RoomPlayerId,
-    /// Participantes activos indexados por `ConnectionId`.
+    /// Participantes activos o en ventana de gracia indexados por `ConnectionId`.
     pub participants: HashMap<ConnectionId, Participant>,
     /// Sesión autoritativa opcional para validación Anti-Cheat de los 13 juegos.
     pub anticheat: Option<AntiCheatSession>,
@@ -131,6 +166,7 @@ impl Room {
                 player_id: 1,
                 authenticated_player_id: None,
                 role: ParticipantRole::Player,
+                state: ParticipantConnectionState::Connected,
                 sender: host_sender,
             },
         );
@@ -141,6 +177,7 @@ impl Room {
             seed,
             is_public,
             elo_reported: false,
+            command_log: Vec::new(),
             next_player_id: 2,
             participants,
             anticheat,
@@ -163,6 +200,7 @@ impl Room {
                 player_id: assigned_id,
                 authenticated_player_id: None,
                 role: ParticipantRole::Player,
+                state: ParticipantConnectionState::Connected,
                 sender,
             },
         );
@@ -191,17 +229,29 @@ impl Room {
                 player_id: 0,
                 authenticated_player_id: None,
                 role: ParticipantRole::Spectator,
+                state: ParticipantConnectionState::Connected,
                 sender,
             },
         );
         Ok(self.player_count())
     }
 
-    /// Cantidad de jugadores activos (no espectadores) en la sala.
+    /// Cantidad de jugadores (conectados o en ventana de reconexión) en la sala.
     pub fn player_count(&self) -> usize {
         self.participants
             .values()
             .filter(|p| p.role == ParticipantRole::Player)
+            .count()
+    }
+
+    /// Cantidad de jugadores actualmente conectados en la sala.
+    pub fn connected_player_count(&self) -> usize {
+        self.participants
+            .values()
+            .filter(|p| {
+                p.role == ParticipantRole::Player
+                    && matches!(p.state, ParticipantConnectionState::Connected)
+            })
             .count()
     }
 
@@ -218,19 +268,23 @@ impl Room {
         self.participants.remove(&conn_id).map(|p| p.player_id)
     }
 
-    /// Envía un mensaje JSON a todos los participantes (jugadores y espectadores) excepto `exclude_conn`.
+    /// Envía un mensaje JSON a todos los participantes conectados excepto `exclude_conn`.
     pub fn broadcast_except(&self, exclude_conn: ConnectionId, message: &str) {
         for (&cid, participant) in &self.participants {
-            if cid != exclude_conn {
+            if cid != exclude_conn
+                && matches!(participant.state, ParticipantConnectionState::Connected)
+            {
                 let _ = participant.sender.send(message.to_string());
             }
         }
     }
 
-    /// Envía un mensaje JSON a todos los participantes de la sala (incluyendo al emisor).
+    /// Envía un mensaje JSON a todos los participantes conectados de la sala (incluyendo al emisor).
     pub fn broadcast_all(&self, message: &str) {
         for participant in self.participants.values() {
-            let _ = participant.sender.send(message.to_string());
+            if matches!(participant.state, ParticipantConnectionState::Connected) {
+                let _ = participant.sender.send(message.to_string());
+            }
         }
     }
 
@@ -244,9 +298,17 @@ impl Room {
             .unwrap_or_else(|| format!("player{room_player_id}"))
     }
 
-    /// Devuelve `true` si no quedan participantes conectados en la sala.
+    /// Devuelve `true` si no quedan participantes en la sala.
     pub fn is_empty(&self) -> bool {
         self.participants.is_empty()
+    }
+
+    /// Devuelve `true` si no queda ningún participante en estado `Connected`.
+    pub fn has_no_connected_participants(&self) -> bool {
+        !self
+            .participants
+            .values()
+            .any(|p| matches!(p.state, ParticipantConnectionState::Connected))
     }
 }
 
@@ -293,12 +355,24 @@ pub fn is_valid_room_code(code: &str) -> bool {
 }
 
 /// Gestor central de salas activas y membresía de conexiones.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RoomManager {
     /// Salas activas por código (en mayúsculas).
     rooms: HashMap<String, Room>,
     /// Mapa inverso de `ConnectionId` al código de sala en el que participa.
     conn_to_room: HashMap<ConnectionId, String>,
+    /// Ventana de gracia máxima para reconexión (`90s` por defecto).
+    rejoin_grace_duration: Duration,
+}
+
+impl Default for RoomManager {
+    fn default() -> Self {
+        Self {
+            rooms: HashMap::new(),
+            conn_to_room: HashMap::new(),
+            rejoin_grace_duration: Duration::from_secs(DEFAULT_REJOIN_GRACE_SECONDS),
+        }
+    }
 }
 
 /// Errores posibles en las operaciones de sala.
@@ -316,12 +390,26 @@ pub enum RoomError {
     SpectatorCannotRelay,
     /// Se superó el límite de 10 espectadores en la sala.
     SpectatorLimit,
+    /// No existe un asiento desconectado asociado al jugador en la sala indicada.
+    SeatNotFound,
+    /// La ventana de gracia de 90 segundos para reconectarse ha expirado.
+    RejoinExpired,
 }
 
 impl RoomManager {
-    /// Crea un nuevo gestor de salas vacío.
+    /// Crea un nuevo gestor de salas vacío con ventana de gracia de 90 segundos.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Devuelve la duración configurada para la ventana de gracia de reconexión.
+    pub fn rejoin_grace_duration(&self) -> Duration {
+        self.rejoin_grace_duration
+    }
+
+    /// Configura la duración de la ventana de gracia de reconexión (útil para pruebas deterministas).
+    pub fn set_rejoin_grace_duration(&mut self, duration: Duration) {
+        self.rejoin_grace_duration = duration;
     }
 
     /// Crea una nueva sala con un código único de 4 caracteres y registra al anfitrión.
@@ -443,7 +531,8 @@ impl RoomManager {
         Ok((code.clone(), sender_player_id))
     }
 
-    /// Valida el payload con `AntiCheatSession` (si aplica a la sala) y retransmite a los demás participantes.
+    /// Valida el payload con `AntiCheatSession` (si aplica a la sala), registra el comando en `command_log`
+    /// y retransmite a los demás participantes conectados.
     pub fn validate_and_relay(
         &mut self,
         conn_id: ConnectionId,
@@ -471,6 +560,7 @@ impl RoomManager {
             }
         }
 
+        room.command_log.push(payload.clone());
         room.broadcast_except(conn_id, outbound_json);
         Ok((code, sender_player_id))
     }
@@ -627,10 +717,268 @@ impl RoomManager {
         }
     }
 
-    /// Retira a un cliente de su sala actual (por `{"op": "leave"}` o desconexión)
+    /// Marca el asiento de un jugador como `Disconnected { since: Instant::now() }` al cerrarse su socket
+    /// sin destruir la sala, y notifica al rival `{"op": "opponent_disconnected", "grace_seconds": 90}`.
+    pub fn disconnect_participant(
+        &mut self,
+        conn_id: ConnectionId,
+    ) -> Option<(String, RoomPlayerId)> {
+        let code = self.conn_to_room.remove(&conn_id)?;
+        let grace_secs = self.rejoin_grace_duration.as_secs().max(1);
+        let mut should_remove_room = false;
+        let mut disconnected_player_id = None;
+
+        if let Some(room) = self.rooms.get_mut(&code) {
+            let role_and_pid = room
+                .participants
+                .get(&conn_id)
+                .map(|p| (p.role, p.player_id));
+            match role_and_pid {
+                Some((ParticipantRole::Spectator, _)) => {
+                    room.remove_participant(conn_id);
+                    should_remove_room = room.is_empty();
+                }
+                Some((ParticipantRole::Player, pid)) => {
+                    if let Some(participant) = room.participants.get_mut(&conn_id) {
+                        participant.state = Disconnected {
+                            since: Instant::now(),
+                        };
+                    }
+                    disconnected_player_id = Some(pid);
+                    let notice = serde_json::json!({
+                        "op": "opponent_disconnected",
+                        "grace_seconds": grace_secs,
+                    })
+                    .to_string();
+                    room.broadcast_except(conn_id, &notice);
+                }
+                None => {}
+            }
+        }
+
+        if should_remove_room {
+            self.rooms.remove(&code);
+        }
+
+        disconnected_player_id.map(|pid| (code, pid))
+    }
+
+    /// Permite a un jugador desconectado recuperar su asiento original (`1` o `2`) antes de que
+    /// expire la ventana de gracia (90 segundos), devolviendo la semilla y el `command_log` acumulado.
+    pub fn rejoin_room(
+        &mut self,
+        conn_id: ConnectionId,
+        sender: ClientSender,
+        raw_code: &str,
+        authenticated_player_id: Option<&str>,
+    ) -> Result<RejoinOutcome, RoomError> {
+        let normalized = raw_code.trim().to_ascii_uppercase();
+        if !is_valid_room_code(&normalized) {
+            return Err(RoomError::InvalidRoomCode);
+        }
+
+        if let Some(prev_code) = self.conn_to_room.get(&conn_id).cloned() {
+            if prev_code != normalized {
+                let _ = self.leave_room(conn_id);
+            }
+        }
+
+        let grace = self.rejoin_grace_duration;
+        let room = self
+            .rooms
+            .get_mut(&normalized)
+            .ok_or(RoomError::RoomNotFound)?;
+
+        let req_id = authenticated_player_id
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+
+        let mut matched_conn: Option<(ConnectionId, Participant)> = None;
+
+        // 1. Buscar asiento desconectado cuyo authenticated_player_id o alias ("player1"/"player2") coincida
+        let mut candidates: Vec<(ConnectionId, Participant)> = room
+            .participants
+            .iter()
+            .filter(|(_, p)| p.role == ParticipantRole::Player)
+            .map(|(&cid, p)| (cid, p.clone()))
+            .collect();
+        candidates.sort_by_key(|(_, p)| p.player_id);
+
+        if let Some(target_id) = req_id {
+            for (cid, p) in &candidates {
+                let is_disconnected = matches!(p.state, Disconnected { .. });
+                let exact_match = p.authenticated_player_id.as_deref() == Some(target_id);
+                let fallback_match = p.authenticated_player_id.is_none()
+                    && (target_id == format!("player{}", p.player_id)
+                        || target_id == p.player_id.to_string());
+                if is_disconnected && (exact_match || fallback_match) {
+                    matched_conn = Some((*cid, p.clone()));
+                    break;
+                }
+            }
+            // Si el asiento se desconectó antes de asociar authenticated_player_id, enlazar al asiento desconectado libre
+            if matched_conn.is_none() {
+                for (cid, p) in &candidates {
+                    if matches!(p.state, Disconnected { .. })
+                        && p.authenticated_player_id.is_none()
+                    {
+                        matched_conn = Some((*cid, p.clone()));
+                        break;
+                    }
+                }
+            }
+            // Reconexión rápida antes de que el socket previo notificara cierre TCP
+            if matched_conn.is_none() {
+                for (cid, p) in &candidates {
+                    if p.authenticated_player_id.as_deref() == Some(target_id) {
+                        matched_conn = Some((*cid, p.clone()));
+                        break;
+                    }
+                }
+            }
+        } else {
+            for (cid, p) in &candidates {
+                if matches!(p.state, Disconnected { .. }) {
+                    matched_conn = Some((*cid, p.clone()));
+                    break;
+                }
+            }
+        }
+
+        let Some((old_conn_id, prev_participant)) = matched_conn else {
+            return Err(RoomError::SeatNotFound);
+        };
+
+        if let Disconnected { since } = prev_participant.state {
+            if since.elapsed() > grace {
+                return Err(RoomError::RejoinExpired);
+            }
+        }
+
+        room.participants.remove(&old_conn_id);
+        self.conn_to_room.remove(&old_conn_id);
+
+        let resolved_auth = prev_participant
+            .authenticated_player_id
+            .or_else(|| req_id.map(str::to_string));
+
+        let recovered_player_id = prev_participant.player_id;
+        room.participants.insert(
+            conn_id,
+            Participant {
+                conn_id,
+                player_id: recovered_player_id,
+                authenticated_player_id: resolved_auth,
+                role: ParticipantRole::Player,
+                state: ParticipantConnectionState::Connected,
+                sender,
+            },
+        );
+        self.conn_to_room.insert(conn_id, normalized.clone());
+
+        let notice = serde_json::json!({
+            "op": "opponent_reconnected",
+        })
+        .to_string();
+        room.broadcast_except(conn_id, &notice);
+
+        Ok(RejoinOutcome {
+            room_code: normalized,
+            player_id: recovered_player_id,
+            seed: room.seed,
+            commands: room.command_log.clone(),
+        })
+    }
+
+    /// Verifica todos los asientos desconectados cuyo tiempo en `Disconnected { since }` haya
+    /// alcanzado o superado la ventana de gracia (`90s` por defecto).
+    ///
+    /// Si expiran los 90 segundos sin reconexión, el jugador conectado gana por abandono.
+    pub fn expire_disconnected_seats(&mut self) -> Vec<AuthoritativeMatchOutcome> {
+        let grace = self.rejoin_grace_duration;
+        let mut outcomes = Vec::new();
+        let mut empty_rooms = Vec::new();
+
+        for (code, room) in &mut self.rooms {
+            let mut expired_conns: Vec<(ConnectionId, RoomPlayerId)> = room
+                .participants
+                .values()
+                .filter_map(|p| match p.state {
+                    Disconnected { since }
+                        if p.role == ParticipantRole::Player && since.elapsed() >= grace =>
+                    {
+                        Some((p.conn_id, p.player_id))
+                    }
+                    _ => None,
+                })
+                .collect();
+            expired_conns.sort_by_key(|(_, pid)| *pid);
+
+            if expired_conns.is_empty() {
+                continue;
+            }
+
+            let connected_player = room
+                .participants
+                .values()
+                .find(|p| {
+                    p.role == ParticipantRole::Player
+                        && matches!(p.state, ParticipantConnectionState::Connected)
+                })
+                .map(|p| p.player_id);
+
+            if !room.elo_reported {
+                if let Some(winner_pid) = connected_player {
+                    let loser_pid = expired_conns
+                        .iter()
+                        .map(|(_, pid)| *pid)
+                        .find(|&pid| pid != winner_pid)
+                        .unwrap_or(if winner_pid == 1 { 2 } else { 1 });
+
+                    if let Some(ac) = room.anticheat.as_mut() {
+                        ac.force_resign(loser_pid);
+                    }
+
+                    let game_id = room
+                        .anticheat
+                        .as_ref()
+                        .map(|ac| ac.game_id().to_string())
+                        .or_else(|| room.game_id.clone())
+                        .unwrap_or_else(|| "chess".to_string());
+                    let winner = room.resolve_player_identity(winner_pid);
+                    let loser = room.resolve_player_identity(loser_pid);
+                    room.elo_reported = true;
+
+                    outcomes.push(AuthoritativeMatchOutcome {
+                        room_code: code.clone(),
+                        game_id,
+                        winner,
+                        loser,
+                    });
+                }
+            }
+
+            for (exp_cid, _) in expired_conns {
+                room.participants.remove(&exp_cid);
+                self.conn_to_room.remove(&exp_cid);
+            }
+
+            if room.has_no_connected_participants() {
+                empty_rooms.push(code.clone());
+            }
+        }
+
+        for code in empty_rooms {
+            self.rooms.remove(&code);
+        }
+
+        outcomes
+    }
+
+    /// Retira a un cliente de su sala actual (por `{"op": "leave"}` voluntario)
     /// y notifica a los participantes restantes.
     ///
-    /// Si la sala queda vacía, se elimina de memoria automáticamente.
+    /// Si la sala queda sin participantes conectados, se elimina de memoria automáticamente.
     pub fn leave_room(&mut self, conn_id: ConnectionId) -> Option<(String, RoomPlayerId)> {
         let code = self.conn_to_room.remove(&conn_id)?;
         let mut should_remove_room = false;
@@ -649,7 +997,7 @@ impl RoomManager {
                     room.broadcast_except(conn_id, &notification);
                 }
             }
-            should_remove_room = room.is_empty();
+            should_remove_room = room.has_no_connected_participants();
         }
 
         if should_remove_room {
@@ -798,5 +1146,93 @@ mod tests {
             manager.check_manual_report_result(10),
             ReportResultCheck::AlreadyReported
         );
+    }
+
+    #[test]
+    fn test_room_rejoin_within_grace_window_and_command_log() {
+        let mut manager = RoomManager::new();
+        let (tx_host, mut rx_host) = mpsc::unbounded_channel();
+        let (tx_guest, _rx_guest) = mpsc::unbounded_channel();
+
+        let code = manager.create_room(10, tx_host, Some("chess".to_string()), true);
+        let seed = manager.room_seed(&code).unwrap();
+        manager.set_authenticated_player_id(10, Some("guest_11111111".to_string()));
+        manager.join_room(20, tx_guest, &code).unwrap();
+        manager.set_authenticated_player_id(20, Some("guest_22222222".to_string()));
+
+        // Aplicar jugada válida de P1 (e2 -> e4)
+        let move_1 = serde_json::json!({
+            "player": 1,
+            "from": { "row": 1, "col": 4 },
+            "to": { "row": 3, "col": 4 }
+        });
+        manager
+            .validate_and_relay(10, &move_1, r#"{"op":"relay"}"#)
+            .unwrap();
+
+        // Guest (conn 20, player_id 2) se desconecta accidentalmente
+        let (_, disc_pid) = manager.disconnect_participant(20).unwrap();
+        assert_eq!(disc_pid, 2);
+
+        // Host recibe {"op": "opponent_disconnected", "grace_seconds": 90}
+        let disc_msg: Value = serde_json::from_str(&rx_host.try_recv().unwrap()).unwrap();
+        assert_eq!(disc_msg["op"], "opponent_disconnected");
+        assert_eq!(disc_msg["grace_seconds"], 90);
+
+        // Guest se reconecta con nuevo conn_id = 30 antes de 90s y recupera asiento 2 + command_log
+        let (tx_rejoin, _rx_rejoin) = mpsc::unbounded_channel();
+        let rejoin_outcome = manager
+            .rejoin_room(30, tx_rejoin, &code, Some("guest_22222222"))
+            .unwrap();
+        assert_eq!(rejoin_outcome.room_code, code);
+        assert_eq!(rejoin_outcome.player_id, 2);
+        assert_eq!(rejoin_outcome.seed, seed);
+        assert_eq!(rejoin_outcome.commands.len(), 1);
+        assert_eq!(rejoin_outcome.commands[0], move_1);
+
+        // Host recibe {"op": "opponent_reconnected"}
+        let reconn_msg: Value = serde_json::from_str(&rx_host.try_recv().unwrap()).unwrap();
+        assert_eq!(reconn_msg["op"], "opponent_reconnected");
+
+        // Guest puede enviar su jugada del turno 2 desde la nueva conexión 30
+        let move_2 = serde_json::json!({
+            "player": 2,
+            "from": { "row": 6, "col": 4 },
+            "to": { "row": 4, "col": 4 }
+        });
+        manager
+            .validate_and_relay(30, &move_2, r#"{"op":"relay"}"#)
+            .unwrap();
+    }
+
+    #[test]
+    fn test_room_rejoin_expired_awards_abandonment_victory() {
+        let mut manager = RoomManager::new();
+        manager.set_rejoin_grace_duration(Duration::from_millis(10));
+
+        let (tx_host, _rx_host) = mpsc::unbounded_channel();
+        let (tx_guest, _rx_guest) = mpsc::unbounded_channel();
+
+        let code = manager.create_room(10, tx_host, Some("chess".to_string()), true);
+        manager.set_authenticated_player_id(10, Some("guest_host_win".to_string()));
+        manager.join_room(20, tx_guest, &code).unwrap();
+        manager.set_authenticated_player_id(20, Some("guest_drop_lose".to_string()));
+
+        manager.disconnect_participant(20).unwrap();
+        std::thread::sleep(Duration::from_millis(20));
+
+        // Intentar rejoin tras expirar la ventana de gracia falla con RejoinExpired
+        let (tx_late, _rx_late) = mpsc::unbounded_channel();
+        assert_eq!(
+            manager.rejoin_room(30, tx_late, &code, Some("guest_drop_lose")),
+            Err(RoomError::RejoinExpired)
+        );
+
+        // Expirar asientos adjudica la victoria por abandono al jugador conectado
+        let outcomes = manager.expire_disconnected_seats();
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].room_code, code);
+        assert_eq!(outcomes[0].winner, "guest_host_win");
+        assert_eq!(outcomes[0].loser, "guest_drop_lose");
     }
 }
