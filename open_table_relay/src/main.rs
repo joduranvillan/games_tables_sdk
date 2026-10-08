@@ -33,7 +33,10 @@ use elo::EloStore;
 use futures_util::{SinkExt, StreamExt};
 use metrics::global_metrics;
 use rate_limit::{RateLimitDecision, RelayRateLimiter};
-use room::{ClientSender, ConnectionId, RoomError, RoomManager};
+use room::{
+    AuthoritativeMatchOutcome, ClientSender, ConnectionId, ReportResultCheck, RoomError,
+    RoomManager,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -134,6 +137,8 @@ pub enum RelayRequest {
     },
     /// Abandona voluntariamente la sala actual.
     Leave,
+    /// Se rinde en la partida activa y adjudica inmediatamente la victoria al oponente.
+    Resign,
     /// Ping de mantenimiento de conexión.
     Ping,
 }
@@ -199,6 +204,17 @@ pub enum RelayResponse {
         /// Identificador del jugador que originó el mensaje.
         #[serde(skip_serializing_if = "Option::is_none")]
         from: Option<u32>,
+    },
+    /// Notificación automática de actualización de ELO emitida por el servidor tras finalizar una partida autoritativa o rendición.
+    EloUpdated {
+        /// Identificador del ganador.
+        winner: String,
+        /// Identificador del perdedor.
+        loser: String,
+        /// Nuevo ELO del ganador.
+        winner_elo: i32,
+        /// Nuevo ELO del perdedor.
+        loser_elo: i32,
     },
     /// Confirmación de actualización de ELO tras reportar un resultado.
     ResultReported {
@@ -472,6 +488,10 @@ async fn process_text_message(
         RelayRequest::Auth { token } => match state.auth_config.verify_token(&token) {
             Ok(claims) => {
                 *canonical_player_id = Some(claims.sub.clone());
+                {
+                    let mut mgr = state.manager.lock().await;
+                    mgr.set_authenticated_player_id(conn_id, canonical_player_id.clone());
+                }
                 send_response(
                     tx,
                     &RelayResponse::AuthOk {
@@ -492,6 +512,7 @@ async fn process_text_message(
             global_metrics().inc_messages_total(game_id.as_deref());
             let mut mgr = state.manager.lock().await;
             let room_code = mgr.create_room(conn_id, tx.clone(), game_id, is_public);
+            mgr.set_authenticated_player_id(conn_id, canonical_player_id.clone());
             let seed = mgr.room_seed(&room_code).unwrap_or(42);
             global_metrics().set_rooms_active(mgr.active_room_count());
             send_response(tx, &RelayResponse::Created { room_code, seed });
@@ -500,6 +521,7 @@ async fn process_text_message(
             let mut mgr = state.manager.lock().await;
             match mgr.join_room(conn_id, tx.clone(), &room_code) {
                 Ok((normalized_code, player_id)) => {
+                    mgr.set_authenticated_player_id(conn_id, canonical_player_id.clone());
                     let seed = mgr.room_seed(&normalized_code).unwrap_or(42);
                     send_response(tx, &RelayResponse::Joined { player_id, seed });
                     if let Ok(peer_notice) =
@@ -546,29 +568,61 @@ async fn process_text_message(
             }
         }
         RelayRequest::Relay { data } => {
-            let mut mgr = state.manager.lock().await;
-            let from_player = mgr.participant_info(conn_id).map(|(_, pid)| pid);
-            let outbound = RelayResponse::Relay {
-                data: data.clone(),
-                from: from_player,
+            let mut maybe_outcome = None;
+            {
+                let mut mgr = state.manager.lock().await;
+                let from_player = mgr.participant_info(conn_id).map(|(_, pid)| pid);
+                let outbound = RelayResponse::Relay {
+                    data: data.clone(),
+                    from: from_player,
+                };
+                if let Ok(serialized) = serde_json::to_string(&outbound) {
+                    match mgr.validate_and_relay(conn_id, &data, &serialized) {
+                        Ok(_) => {
+                            maybe_outcome = mgr.claim_authoritative_outcome(conn_id);
+                        }
+                        Err(RoomError::SpectatorCannotRelay) => {
+                            send_response(
+                                tx,
+                                &RelayResponse::error_reason("spectator_cannot_relay"),
+                            );
+                        }
+                        Err(RoomError::IllegalMove) => {
+                            send_response(
+                                tx,
+                                &RelayResponse::MoveRejected {
+                                    reason: "illegal_move".to_string(),
+                                },
+                            );
+                        }
+                        Err(_) => {
+                            send_response(
+                                tx,
+                                &RelayResponse::error_message("client is not in a room"),
+                            );
+                        }
+                    }
+                }
+            }
+            if let Some(outcome) = maybe_outcome {
+                persist_and_broadcast_elo_outcome(outcome, state).await;
+            }
+        }
+        RelayRequest::Resign => {
+            let resign_res = {
+                let mut mgr = state.manager.lock().await;
+                mgr.resign(conn_id)
             };
-            if let Ok(serialized) = serde_json::to_string(&outbound) {
-                match mgr.validate_and_relay(conn_id, &data, &serialized) {
-                    Ok(_) => {}
-                    Err(RoomError::SpectatorCannotRelay) => {
-                        send_response(tx, &RelayResponse::error_reason("spectator_cannot_relay"));
-                    }
-                    Err(RoomError::IllegalMove) => {
-                        send_response(
-                            tx,
-                            &RelayResponse::MoveRejected {
-                                reason: "illegal_move".to_string(),
-                            },
-                        );
-                    }
-                    Err(_) => {
-                        send_response(tx, &RelayResponse::error_message("client is not in a room"));
-                    }
+            match resign_res {
+                Ok(Some(outcome)) => {
+                    persist_and_broadcast_elo_outcome(outcome, state).await;
+                }
+                Ok(None) => {}
+                Err(RoomError::SpectatorCannotRelay) => {
+                    send_response(tx, &RelayResponse::error_reason("spectator_cannot_relay"));
+                }
+                Err(_) => {
+                    send_response(tx, &RelayResponse::error_message("client is not in a room"));
                 }
             }
         }
@@ -577,6 +631,20 @@ async fn process_text_message(
             loser,
             game_id,
         } => {
+            let report_check = {
+                let mut mgr = state.manager.lock().await;
+                mgr.check_manual_report_result(conn_id)
+            };
+            match report_check {
+                ReportResultCheck::MatchNotFinished => {
+                    send_response(tx, &RelayResponse::error_reason("match_not_finished"));
+                    return;
+                }
+                ReportResultCheck::AlreadyReported => {
+                    return;
+                }
+                ReportResultCheck::Allowed => {}
+            }
             global_metrics().inc_messages_total(Some(&game_id));
             let mut store = state.elo_store.lock().await;
             match store.report_result(&winner, &loser, &game_id) {
@@ -676,6 +744,30 @@ async fn process_text_message(
         }
         RelayRequest::Ping => {
             send_response(tx, &RelayResponse::Pong);
+        }
+    }
+}
+
+async fn persist_and_broadcast_elo_outcome(
+    outcome: AuthoritativeMatchOutcome,
+    state: &RelaySharedState,
+) {
+    global_metrics().inc_messages_total(Some(&outcome.game_id));
+    let elo_res = {
+        let mut store = state.elo_store.lock().await;
+        store.report_result(&outcome.winner, &outcome.loser, &outcome.game_id)
+    };
+    if let Ok((w_rating, l_rating)) = elo_res {
+        global_metrics().inc_elo_updates_total();
+        let response = RelayResponse::EloUpdated {
+            winner: outcome.winner,
+            loser: outcome.loser,
+            winner_elo: w_rating.elo,
+            loser_elo: l_rating.elo,
+        };
+        if let Ok(json_str) = serde_json::to_string(&response) {
+            let mgr = state.manager.lock().await;
+            mgr.broadcast_to_room(&outcome.room_code, &json_str);
         }
     }
 }
@@ -1140,6 +1232,339 @@ mod tests {
         let err_val: Value = serde_json::from_str(&err_resp).unwrap();
         assert_eq!(err_val["op"], "error");
         assert_eq!(err_val["reason"], "spectator_cannot_relay");
+
+        handle.abort();
+        let _ = std::fs::remove_file(&db_file);
+    }
+
+    #[tokio::test]
+    async fn test_elo_autoverify_on_gameover_resign_and_anti_spoofing() {
+        let db_file = std::env::temp_dir().join(format!(
+            "opentable_ratings_elo_autoverify_{}.db",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&db_file);
+        let elo_store = Arc::new(Mutex::new(EloStore::new(&db_file).unwrap()));
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let store_clone = Arc::clone(&elo_store);
+        let handle = tokio::spawn(async move {
+            let _ =
+                run_relay_server_with_config(listener, store_clone, AuthConfig::default(), None)
+                    .await;
+        });
+
+        let url = format!("ws://{addr}");
+        let (mut ws_host, _) = connect_async(&url).await.unwrap();
+        let (mut ws_guest, _) = connect_async(&url).await.unwrap();
+
+        // Autenticar ambos jugadores con identidades canónicas
+        let host_token = auth::AuthConfig::default()
+            .issue_guest_token("device-host-1")
+            .token;
+        let guest_token = auth::AuthConfig::default()
+            .issue_guest_token("device-guest-2")
+            .token;
+
+        ws_host
+            .send(Message::Text(
+                serde_json::json!({"op": "auth", "token": host_token})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let host_auth_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let host_id = host_auth_val["player_id"].as_str().unwrap().to_string();
+
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({"op": "auth", "token": guest_token})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let guest_auth_val: Value =
+            serde_json::from_str(&ws_guest.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let guest_id = guest_auth_val["player_id"].as_str().unwrap().to_string();
+
+        // Crear sala de ajedrez con Anti-Cheat activo
+        ws_host
+            .send(Message::Text(r#"{"op":"create","game_id":"chess"}"#.into()))
+            .await
+            .unwrap();
+        let created_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let room_code = created_val["room_code"].as_str().unwrap().to_string();
+
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({"op": "join", "room_code": room_code})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_guest.next().await.unwrap().unwrap();
+        let _ = ws_host.next().await.unwrap().unwrap(); // peer_joined
+
+        // 1. Intento de spoofing: Guest envía report_result antes de que la partida termine -> match_not_finished
+        let spoof_msg = serde_json::json!({
+            "op": "report_result",
+            "winner": guest_id,
+            "loser": host_id,
+            "game_id": "chess"
+        })
+        .to_string();
+        ws_guest
+            .send(Message::Text(spoof_msg.into()))
+            .await
+            .unwrap();
+        let spoof_resp: Value =
+            serde_json::from_str(&ws_guest.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(spoof_resp["op"], "error");
+        assert_eq!(spoof_resp["reason"], "match_not_finished");
+
+        // 2. Host envía {"op": "resign"} -> servidor adjudica victoria a Guest y emite elo_updated a toda la sala
+        ws_host
+            .send(Message::Text(r#"{"op":"resign"}"#.into()))
+            .await
+            .unwrap();
+
+        let host_elo_msg: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(host_elo_msg["op"], "elo_updated");
+        assert_eq!(host_elo_msg["winner"], guest_id);
+        assert_eq!(host_elo_msg["loser"], host_id);
+        assert_eq!(host_elo_msg["winner_elo"], 1216);
+        assert_eq!(host_elo_msg["loser_elo"], 1184);
+
+        let guest_elo_msg: Value =
+            serde_json::from_str(&ws_guest.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(guest_elo_msg["op"], "elo_updated");
+        assert_eq!(guest_elo_msg["winner"], guest_id);
+        assert_eq!(guest_elo_msg["loser"], host_id);
+        assert_eq!(guest_elo_msg["winner_elo"], 1216);
+        assert_eq!(guest_elo_msg["loser_elo"], 1184);
+
+        // 3. Idempotencia: segundos envíos de resign o report_result no alteran el ELO en SQLite
+        ws_host
+            .send(Message::Text(r#"{"op":"resign"}"#.into()))
+            .await
+            .unwrap();
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({
+                    "op": "report_result",
+                    "winner": guest_id,
+                    "loser": host_id,
+                    "game_id": "chess"
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(30)).await;
+
+        {
+            let store = elo_store.lock().await;
+            let ratings = store.get_rankings("chess", 10);
+            let winner_entry = ratings.iter().find(|r| r.player_id == guest_id).unwrap();
+            let loser_entry = ratings.iter().find(|r| r.player_id == host_id).unwrap();
+            assert_eq!(winner_entry.elo, 1216);
+            assert_eq!(winner_entry.wins, 1);
+            assert_eq!(loser_entry.elo, 1184);
+            assert_eq!(loser_entry.losses, 1);
+        }
+
+        handle.abort();
+        let _ = std::fs::remove_file(&db_file);
+    }
+
+    #[tokio::test]
+    async fn test_elo_autoverify_on_fools_mate_checkmate() {
+        let db_file = std::env::temp_dir().join(format!(
+            "opentable_ratings_elo_autoverify_mate_{}.db",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&db_file);
+        let elo_store = Arc::new(Mutex::new(EloStore::new(&db_file).unwrap()));
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let store_clone = Arc::clone(&elo_store);
+        let handle = tokio::spawn(async move {
+            let _ =
+                run_relay_server_with_config(listener, store_clone, AuthConfig::default(), None)
+                    .await;
+        });
+
+        let url = format!("ws://{addr}");
+        let (mut ws_host, _) = connect_async(&url).await.unwrap();
+        let (mut ws_guest, _) = connect_async(&url).await.unwrap();
+
+        let host_token = auth::AuthConfig::default()
+            .issue_guest_token("device-fools-white")
+            .token;
+        let guest_token = auth::AuthConfig::default()
+            .issue_guest_token("device-fools-black")
+            .token;
+
+        ws_host
+            .send(Message::Text(
+                serde_json::json!({"op": "auth", "token": host_token})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let host_auth_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let host_id = host_auth_val["player_id"].as_str().unwrap().to_string();
+
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({"op": "auth", "token": guest_token})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let guest_auth_val: Value =
+            serde_json::from_str(&ws_guest.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let guest_id = guest_auth_val["player_id"].as_str().unwrap().to_string();
+
+        // Host crea sala de ajedrez y Guest se une
+        ws_host
+            .send(Message::Text(r#"{"op":"create","game_id":"chess"}"#.into()))
+            .await
+            .unwrap();
+        let created_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let room_code = created_val["room_code"].as_str().unwrap().to_string();
+
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({"op": "join", "room_code": room_code})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_guest.next().await.unwrap().unwrap(); // joined
+        let _ = ws_host.next().await.unwrap().unwrap(); // peer_joined
+
+        // Mate del Loco (Fool's Mate):
+        // 1. f2 -> f3 (P1: row 1 col 5 -> row 2 col 5)
+        ws_host
+            .send(Message::Text(
+                serde_json::json!({
+                    "op": "relay",
+                    "data": {
+                        "player": 1,
+                        "from": { "row": 1, "col": 5 },
+                        "to": { "row": 2, "col": 5 }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_guest.next().await.unwrap().unwrap(); // relay 1
+
+        // 2. e7 -> e5 (P2: row 6 col 4 -> row 4 col 4)
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({
+                    "op": "relay",
+                    "data": {
+                        "player": 2,
+                        "from": { "row": 6, "col": 4 },
+                        "to": { "row": 4, "col": 4 }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_host.next().await.unwrap().unwrap(); // relay 2
+
+        // 3. g2 -> g4 (P1: row 1 col 6 -> row 3 col 6)
+        ws_host
+            .send(Message::Text(
+                serde_json::json!({
+                    "op": "relay",
+                    "data": {
+                        "player": 1,
+                        "from": { "row": 1, "col": 6 },
+                        "to": { "row": 3, "col": 6 }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_guest.next().await.unwrap().unwrap(); // relay 3
+
+        // 4. Qd8 -> h4# (P2: row 7 col 3 -> row 3 col 7) -> Jaque mate autoritativo
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({
+                    "op": "relay",
+                    "data": {
+                        "player": 2,
+                        "from": { "row": 7, "col": 3 },
+                        "to": { "row": 3, "col": 7 }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+
+        // Host recibe primero el movimiento retransmitido y luego elo_updated
+        let host_relay_4: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(host_relay_4["op"], "relay");
+
+        let host_elo_msg: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(host_elo_msg["op"], "elo_updated");
+        assert_eq!(host_elo_msg["winner"], guest_id);
+        assert_eq!(host_elo_msg["loser"], host_id);
+        assert_eq!(host_elo_msg["winner_elo"], 1216);
+        assert_eq!(host_elo_msg["loser_elo"], 1184);
+
+        // Guest (emisor del jaque mate) recibe elo_updated
+        let guest_elo_msg: Value =
+            serde_json::from_str(&ws_guest.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(guest_elo_msg["op"], "elo_updated");
+        assert_eq!(guest_elo_msg["winner"], guest_id);
+        assert_eq!(guest_elo_msg["loser"], host_id);
+        assert_eq!(guest_elo_msg["winner_elo"], 1216);
+        assert_eq!(guest_elo_msg["loser_elo"], 1184);
 
         handle.abort();
         let _ = std::fs::remove_file(&db_file);

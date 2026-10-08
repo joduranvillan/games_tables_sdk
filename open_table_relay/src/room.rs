@@ -42,10 +42,36 @@ pub struct Participant {
     pub conn_id: ConnectionId,
     /// Identificador de jugador dentro de la sala (1-indexed para jugadores, 0 para espectadores).
     pub player_id: RoomPlayerId,
+    /// Identificador canónico autenticado del jugador (ej. `"guest_a1b2c3d4"` o `"player1"`).
+    pub authenticated_player_id: Option<String>,
     /// Rol del participante en la sala (`Player` o `Spectator`).
     pub role: ParticipantRole,
     /// Canal para enviar mensajes JSON serializados al cliente.
     pub sender: ClientSender,
+}
+
+/// Resultado autoritativo listo para persistirse en `EloStore` y notificarse con `op: "elo_updated"`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoritativeMatchOutcome {
+    /// Código de la sala donde concluyó la partida.
+    pub room_code: String,
+    /// Identificador del juego.
+    pub game_id: String,
+    /// Identificador canónico del jugador ganador.
+    pub winner: String,
+    /// Identificador canónico del jugador perdedor.
+    pub loser: String,
+}
+
+/// Resultado de validar si un cliente puede reportar manualmente el resultado con `op: "report_result"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReportResultCheck {
+    /// El reporte manual está permitido (sala sin Anti-Cheat, partida terminada no reportada o cliente fuera de sala).
+    Allowed,
+    /// La sala tiene una sesión Anti-Cheat activa que aún no ha finalizado (`match_not_finished`).
+    MatchNotFinished,
+    /// El ELO de esta sala ya fue actualizado previamente (`elo_reported == true`).
+    AlreadyReported,
 }
 
 /// Representa una sala activa en el servidor Relay.
@@ -59,6 +85,8 @@ pub struct Room {
     pub seed: u64,
     /// Indica si la sala es pública o privada.
     pub is_public: bool,
+    /// Indica si el ELO de esta sala ya fue reportado y persistido (garantiza idempotencia).
+    pub elo_reported: bool,
     /// Contador incremental para asignar `player_id` a nuevos participantes.
     next_player_id: RoomPlayerId,
     /// Participantes activos indexados por `ConnectionId`.
@@ -101,6 +129,7 @@ impl Room {
             Participant {
                 conn_id: host_conn_id,
                 player_id: 1,
+                authenticated_player_id: None,
                 role: ParticipantRole::Player,
                 sender: host_sender,
             },
@@ -111,6 +140,7 @@ impl Room {
             game_id,
             seed,
             is_public,
+            elo_reported: false,
             next_player_id: 2,
             participants,
             anticheat,
@@ -131,6 +161,7 @@ impl Room {
             Participant {
                 conn_id,
                 player_id: assigned_id,
+                authenticated_player_id: None,
                 role: ParticipantRole::Player,
                 sender,
             },
@@ -158,6 +189,7 @@ impl Room {
             Participant {
                 conn_id,
                 player_id: 0,
+                authenticated_player_id: None,
                 role: ParticipantRole::Spectator,
                 sender,
             },
@@ -193,6 +225,23 @@ impl Room {
                 let _ = participant.sender.send(message.to_string());
             }
         }
+    }
+
+    /// Envía un mensaje JSON a todos los participantes de la sala (incluyendo al emisor).
+    pub fn broadcast_all(&self, message: &str) {
+        for participant in self.participants.values() {
+            let _ = participant.sender.send(message.to_string());
+        }
+    }
+
+    /// Resuelve el identificador canónico de un jugador por su `player_id` de sala (1 o 2).
+    pub fn resolve_player_identity(&self, room_player_id: RoomPlayerId) -> String {
+        self.participants
+            .values()
+            .find(|p| p.role == ParticipantRole::Player && p.player_id == room_player_id)
+            .and_then(|p| p.authenticated_player_id.clone())
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| format!("player{room_player_id}"))
     }
 
     /// Devuelve `true` si no quedan participantes conectados en la sala.
@@ -449,6 +498,135 @@ impl RoomManager {
             .and_then(|ac| ac.winner())
     }
 
+    /// Asocia el `authenticated_player_id` canónico al participante conectado en su sala actual.
+    pub fn set_authenticated_player_id(
+        &mut self,
+        conn_id: ConnectionId,
+        authenticated_id: Option<String>,
+    ) {
+        let Some(code) = self.conn_to_room.get(&conn_id).cloned() else {
+            return;
+        };
+        if let Some(room) = self.rooms.get_mut(&code) {
+            if let Some(participant) = room.participants.get_mut(&conn_id) {
+                participant.authenticated_player_id = authenticated_id;
+            }
+        }
+    }
+
+    /// Si la `AntiCheatSession` de la sala donde está `conn_id` ya tiene un ganador y aún no se ha
+    /// reportado el ELO (`elo_reported == false`), marca `elo_reported = true` y devuelve el resultado.
+    pub fn claim_authoritative_outcome(
+        &mut self,
+        conn_id: ConnectionId,
+    ) -> Option<AuthoritativeMatchOutcome> {
+        let code = self.conn_to_room.get(&conn_id)?.clone();
+        let room = self.rooms.get_mut(&code)?;
+        if room.elo_reported {
+            return None;
+        }
+        let winner_pid = room.anticheat.as_ref()?.winner()?.0;
+        let loser_pid = if winner_pid == 1 { 2 } else { 1 };
+        let game_id = room
+            .anticheat
+            .as_ref()
+            .map(|ac| ac.game_id().to_string())
+            .or_else(|| room.game_id.clone())
+            .unwrap_or_else(|| "chess".to_string());
+        let winner = room.resolve_player_identity(winner_pid);
+        let loser = room.resolve_player_identity(loser_pid);
+        room.elo_reported = true;
+        Some(AuthoritativeMatchOutcome {
+            room_code: code,
+            game_id,
+            winner,
+            loser,
+        })
+    }
+
+    /// Procesa la rendición (`op: "resign"`) del participante `conn_id`, adjudicando la victoria al oponente.
+    /// Garantiza idempotencia: si `elo_reported` ya era `true`, devuelve `Ok(None)`.
+    pub fn resign(
+        &mut self,
+        conn_id: ConnectionId,
+    ) -> Result<Option<AuthoritativeMatchOutcome>, RoomError> {
+        let code = self
+            .conn_to_room
+            .get(&conn_id)
+            .cloned()
+            .ok_or(RoomError::NotInRoom)?;
+        let room = self.rooms.get_mut(&code).ok_or(RoomError::RoomNotFound)?;
+        let participant = room
+            .participants
+            .get(&conn_id)
+            .ok_or(RoomError::NotInRoom)?;
+        if participant.role == ParticipantRole::Spectator {
+            return Err(RoomError::SpectatorCannotRelay);
+        }
+        let resigning_pid = participant.player_id;
+
+        if room.elo_reported {
+            return Ok(None);
+        }
+
+        let winner_pid = if let Some(ac) = room.anticheat.as_mut() {
+            ac.force_resign(resigning_pid).0
+        } else if resigning_pid == 1 {
+            2
+        } else {
+            1
+        };
+
+        let game_id = room
+            .anticheat
+            .as_ref()
+            .map(|ac| ac.game_id().to_string())
+            .or_else(|| room.game_id.clone())
+            .unwrap_or_else(|| "chess".to_string());
+        let winner = room.resolve_player_identity(winner_pid);
+        let loser = room.resolve_player_identity(resigning_pid);
+        room.elo_reported = true;
+
+        Ok(Some(AuthoritativeMatchOutcome {
+            room_code: code,
+            game_id,
+            winner,
+            loser,
+        }))
+    }
+
+    /// Valida si un cliente puede reportar manualmente un resultado (`op: "report_result"`).
+    ///
+    /// - Si la sala tiene `AntiCheatSession` activa y aún no ha finalizado, devuelve `MatchNotFinished`.
+    /// - Si la sala ya reportó su ELO (`elo_reported == true`), devuelve `AlreadyReported`.
+    /// - En caso contrario, marca `elo_reported = true` (si está en sala) y devuelve `Allowed`.
+    pub fn check_manual_report_result(&mut self, conn_id: ConnectionId) -> ReportResultCheck {
+        let Some(code) = self.conn_to_room.get(&conn_id).cloned() else {
+            return ReportResultCheck::Allowed;
+        };
+        let Some(room) = self.rooms.get_mut(&code) else {
+            return ReportResultCheck::Allowed;
+        };
+        if room.elo_reported {
+            return ReportResultCheck::AlreadyReported;
+        }
+        if let Some(ac) = room.anticheat.as_ref() {
+            if ac.winner().is_none() {
+                return ReportResultCheck::MatchNotFinished;
+            }
+        }
+        room.elo_reported = true;
+        ReportResultCheck::Allowed
+    }
+
+    /// Envía un mensaje JSON a todos los miembros de la sala `raw_code`.
+    pub fn broadcast_to_room(&self, raw_code: &str, message: &str) {
+        let normalized = raw_code.trim().to_ascii_uppercase();
+        if let Some(room) = self.rooms.get(&normalized) {
+            room.broadcast_all(message);
+        }
+    }
+
     /// Retira a un cliente de su sala actual (por `{"op": "leave"}` o desconexión)
     /// y notifica a los participantes restantes.
     ///
@@ -580,5 +758,45 @@ mod tests {
         let illegal_msg = r#"{"op":"relay","data":"illegal"}"#;
         let spec_relay_res = manager.relay_to_peers(1000, illegal_msg);
         assert_eq!(spec_relay_res, Err(RoomError::SpectatorCannotRelay));
+    }
+
+    #[test]
+    fn test_room_elo_autoverify_gameover_and_idempotency() {
+        let mut manager = RoomManager::new();
+        let (tx_host, _rx_host) = mpsc::unbounded_channel();
+        let (tx_guest, _rx_guest) = mpsc::unbounded_channel();
+
+        let code = manager.create_room(10, tx_host, Some("chess".to_string()), true);
+        manager.set_authenticated_player_id(10, Some("guest_11111111".to_string()));
+        manager.join_room(20, tx_guest, &code).unwrap();
+        manager.set_authenticated_player_id(20, Some("guest_22222222".to_string()));
+
+        // Antes de terminar la partida, report_result manual es rechazado con MatchNotFinished
+        assert_eq!(
+            manager.check_manual_report_result(10),
+            ReportResultCheck::MatchNotFinished
+        );
+
+        // Movimiento de rendición válido dentro del motor autoritativo de Ajedrez
+        let resign_payload = serde_json::json!({
+            "player": 1,
+            "resign": true
+        });
+        manager
+            .validate_and_relay(10, &resign_payload, r#"{"op":"relay"}"#)
+            .unwrap();
+
+        let outcome = manager.claim_authoritative_outcome(10).unwrap();
+        assert_eq!(outcome.game_id, "chess");
+        assert_eq!(outcome.winner, "guest_22222222");
+        assert_eq!(outcome.loser, "guest_11111111");
+
+        // Idempotencia: una segunda llamada a claim_authoritative_outcome o resign devuelve None
+        assert!(manager.claim_authoritative_outcome(10).is_none());
+        assert_eq!(manager.resign(10).unwrap(), None);
+        assert_eq!(
+            manager.check_manual_report_result(10),
+            ReportResultCheck::AlreadyReported
+        );
     }
 }
