@@ -77,6 +77,7 @@ pub enum RelayRequest {
         token: String,
     },
     /// Crea una nueva sala y registra al cliente como anfitrión (`player_id = 1`).
+    #[serde(alias = "create_room")]
     Create {
         /// Identificador opcional del juego.
         #[serde(default)]
@@ -84,6 +85,16 @@ pub enum RelayRequest {
         /// Indica si la sala es pública (por defecto `true`).
         #[serde(default = "default_true")]
         is_public: bool,
+        /// Tiempo máximo por turno en segundos (`120` por defecto; presets: `30`, `60`, `120`, `0` en salas privadas).
+        #[serde(default)]
+        turn_timeout_secs: Option<u64>,
+    },
+    /// Encola al jugador en una partida de matchmaking público (`turn_timeout_secs = 60`).
+    #[serde(alias = "matchmaking")]
+    Queue {
+        /// Identificador opcional del juego.
+        #[serde(default)]
+        game_id: Option<String>,
     },
     /// Une al cliente a una sala existente mediante su código.
     Join {
@@ -215,6 +226,13 @@ pub enum RelayResponse {
     },
     /// Notificación al rival cuando el oponente desconectado recupera su asiento.
     OpponentReconnected,
+    /// Notificación emitida cuando el jugador en turno supera `turn_timeout_secs` sin jugar.
+    MatchTimeout {
+        /// Asiento ganador (`1` o `2`).
+        winner_seat: u32,
+        /// Motivo del fin por tiempo (`"turn_timeout"`).
+        reason: String,
+    },
     /// Confirmación de unión exitosa como espectador a una sala.
     Spectating {
         /// Cantidad de jugadores activos en la sala.
@@ -350,15 +368,43 @@ pub async fn run_relay_server_with_state(
     state: RelaySharedState,
 ) -> std::io::Result<()> {
     let next_conn_id = Arc::new(AtomicU64::new(1));
+    let ticker_state = state.clone();
 
-    loop {
-        let (stream, peer_addr) = listener.accept().await?;
-        let conn_id = next_conn_id.fetch_add(1, Ordering::Relaxed);
-        let state_clone = state.clone();
+    let accept_loop = async move {
+        loop {
+            let (stream, peer_addr) = listener.accept().await?;
+            let conn_id = next_conn_id.fetch_add(1, Ordering::Relaxed);
+            let state_clone = state.clone();
 
-        tokio::spawn(async move {
-            handle_connection(stream, peer_addr.ip(), conn_id, state_clone).await;
-        });
+            tokio::spawn(async move {
+                handle_connection(stream, peer_addr.ip(), conn_id, state_clone).await;
+            });
+        }
+        #[allow(unreachable_code)]
+        Ok::<(), std::io::Error>(())
+    };
+
+    // Tarea periódica cada 1s que verifica timeouts de turno y desconexiones expiradas
+    let periodic_watchdog = async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
+        loop {
+            interval.tick().await;
+            let outcomes = {
+                let mut mgr = ticker_state.manager.lock().await;
+                let mut out = mgr.expire_turn_timeouts();
+                out.extend(mgr.expire_disconnected_seats());
+                global_metrics().set_rooms_active(mgr.active_room_count());
+                out
+            };
+            for outcome in outcomes {
+                persist_and_broadcast_elo_outcome(outcome, &ticker_state).await;
+            }
+        }
+    };
+
+    tokio::select! {
+        res = accept_loop => res,
+        _ = periodic_watchdog => Ok(()),
     }
 }
 
@@ -561,14 +607,43 @@ async fn process_text_message(
                 );
             }
         },
-        RelayRequest::Create { game_id, is_public } => {
+        RelayRequest::Create {
+            game_id,
+            is_public,
+            turn_timeout_secs,
+        } => {
             global_metrics().inc_messages_total(game_id.as_deref());
             let mut mgr = state.manager.lock().await;
-            let room_code = mgr.create_room(conn_id, tx.clone(), game_id, is_public);
+            let room_code = mgr.create_room_with_timeout(
+                conn_id,
+                tx.clone(),
+                game_id,
+                is_public,
+                turn_timeout_secs,
+            );
             mgr.set_authenticated_player_id(conn_id, canonical_player_id.clone());
             let seed = mgr.room_seed(&room_code).unwrap_or(42);
             global_metrics().set_rooms_active(mgr.active_room_count());
             send_response(tx, &RelayResponse::Created { room_code, seed });
+        }
+        RelayRequest::Queue { game_id } => {
+            global_metrics().inc_messages_total(game_id.as_deref());
+            let mut mgr = state.manager.lock().await;
+            let (room_code, player_id, is_new) =
+                mgr.queue_matchmaking(conn_id, tx.clone(), game_id);
+            mgr.set_authenticated_player_id(conn_id, canonical_player_id.clone());
+            let seed = mgr.room_seed(&room_code).unwrap_or(42);
+            global_metrics().set_rooms_active(mgr.active_room_count());
+            if is_new {
+                send_response(tx, &RelayResponse::Created { room_code, seed });
+            } else {
+                send_response(tx, &RelayResponse::Joined { player_id, seed });
+                if let Ok(peer_notice) =
+                    serde_json::to_string(&RelayResponse::PeerJoined { player_id })
+                {
+                    let _ = mgr.relay_to_peers(conn_id, &peer_notice);
+                }
+            }
         }
         RelayRequest::Join { room_code } => {
             let mut mgr = state.manager.lock().await;
@@ -1943,6 +2018,124 @@ mod tests {
         assert_eq!(elo_val["loser"], guest_id);
         assert_eq!(elo_val["winner_elo"], 1216);
         assert_eq!(elo_val["loser_elo"], 1184);
+
+        handle.abort();
+        let _ = std::fs::remove_file(&db_file);
+    }
+
+    #[tokio::test]
+    async fn test_websocket_turn_timeout_awards_victory_and_updates_elo() {
+        let db_file = std::env::temp_dir().join(format!(
+            "opentable_ratings_turn_timeout_{}.db",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&db_file);
+        let elo_store = Arc::new(Mutex::new(EloStore::new(&db_file).unwrap()));
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let store_clone = Arc::clone(&elo_store);
+        let handle = tokio::spawn(async move {
+            let _ =
+                run_relay_server_with_config(listener, store_clone, AuthConfig::default(), None)
+                    .await;
+        });
+
+        let url = format!("ws://{addr}");
+        let (mut ws_host, _) = connect_async(&url).await.unwrap();
+        let (mut ws_guest, _) = connect_async(&url).await.unwrap();
+
+        let host_token = auth::AuthConfig::default()
+            .issue_guest_token("device-afk-host")
+            .token;
+        let guest_token = auth::AuthConfig::default()
+            .issue_guest_token("device-afk-guest")
+            .token;
+
+        ws_host
+            .send(Message::Text(
+                serde_json::json!({"op": "auth", "token": host_token})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let host_auth: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let host_id = host_auth["player_id"].as_str().unwrap().to_string();
+
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({"op": "auth", "token": guest_token})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let guest_auth: Value =
+            serde_json::from_str(&ws_guest.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let guest_id = guest_auth["player_id"].as_str().unwrap().to_string();
+
+        // Host crea sala con turn_timeout_secs = 1 segundo
+        ws_host
+            .send(Message::Text(
+                r#"{"op":"create","game_id":"chess","turn_timeout_secs":1}"#.into(),
+            ))
+            .await
+            .unwrap();
+        let created_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        let room_code = created_val["room_code"].as_str().unwrap().to_string();
+
+        ws_guest
+            .send(Message::Text(
+                serde_json::json!({"op": "join", "room_code": room_code})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_guest.next().await.unwrap().unwrap();
+        let _ = ws_host.next().await.unwrap().unwrap(); // peer_joined
+
+        // Host (P1) juega e2 -> e4; ahora el turno activo pasa a Guest (asiento 2)
+        ws_host
+            .send(Message::Text(
+                serde_json::json!({
+                    "op": "relay",
+                    "data": {
+                        "player": 1,
+                        "from": { "row": 1, "col": 4 },
+                        "to": { "row": 3, "col": 4 }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+        let _ = ws_guest.next().await.unwrap().unwrap(); // relay 1
+
+        // Guest se queda AFK (>1s) -> el reloj autoritativo del servidor declara ganador a Host (winner_seat: 1)
+        let host_timeout_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(host_timeout_val["op"], "match_timeout");
+        assert_eq!(host_timeout_val["winner_seat"], 1);
+        assert_eq!(host_timeout_val["reason"], "turn_timeout");
+
+        let host_elo_val: Value =
+            serde_json::from_str(&ws_host.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
+        assert_eq!(host_elo_val["op"], "elo_updated");
+        assert_eq!(host_elo_val["winner"], host_id);
+        assert_eq!(host_elo_val["loser"], guest_id);
+        assert_eq!(host_elo_val["winner_elo"], 1216);
+        assert_eq!(host_elo_val["loser_elo"], 1184);
 
         handle.abort();
         let _ = std::fs::remove_file(&db_file);

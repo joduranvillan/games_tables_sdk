@@ -129,9 +129,35 @@ impl AntiCheatSession {
         })
     }
 
+    /// Adjudica inmediatamente la victoria al oponente cuando `resigning_player_id` se rinde (`op: "resign"`).
+    pub fn force_resign(&mut self, resigning_player_id: u32) -> PlayerId {
+        let winner = if resigning_player_id == 1 {
+            PlayerId(2)
+        } else {
+            PlayerId(1)
+        };
+        self.winner = Some(winner);
+        self.session
+            .world_mut()
+            .insert_resource(WinnerResource(Some(winner)));
+        self.session
+            .world_mut()
+            .insert_resource(open_table_engine::session::GameOverResource(true));
+        winner
+    }
+
     /// Referencia de solo lectura a la `Session` subyacente.
     pub fn session(&self) -> &Session {
         &self.session
+    }
+
+    /// Devuelve el asiento (`1` o `2`) que tiene actualmente el turno activo en la sesión autoritativa.
+    pub fn active_turn_seat(&self) -> u32 {
+        self.session
+            .world()
+            .get_resource::<open_table_engine::session::TurnResource>()
+            .map(|tr| tr.0.current_player().0)
+            .unwrap_or(1)
     }
 
     /// Deserializa y aplica un comando sobre la `Session` local del juego.
@@ -448,15 +474,13 @@ fn parse_backgammon_command(val: &Value, default_player: PlayerId) -> Option<Box
             player: default_player,
         }));
     }
-    if action == "accept_double"
-        || val.get("accept_double").and_then(|v| v.as_bool()) == Some(true)
+    if action == "accept_double" || val.get("accept_double").and_then(|v| v.as_bool()) == Some(true)
     {
         return Some(Box::new(backgammon_game::AcceptDoubleCommand {
             player: default_player,
         }));
     }
-    if action == "reject_double"
-        || val.get("reject_double").and_then(|v| v.as_bool()) == Some(true)
+    if action == "reject_double" || val.get("reject_double").and_then(|v| v.as_bool()) == Some(true)
     {
         return Some(Box::new(backgammon_game::RejectDoubleCommand {
             player: default_player,

@@ -30,6 +30,44 @@ pub const MAX_SPECTATORS_PER_ROOM: usize = 10;
 /// Ventana de gracia por defecto en segundos para que un jugador desconectado se reconecte (`90`).
 pub const DEFAULT_REJOIN_GRACE_SECONDS: u64 = 90;
 
+/// Preset Blitz de tiempo por turno en segundos (`30`).
+pub const TURN_TIMEOUT_BLITZ_SECS: u64 = 30;
+
+/// Preset Rápido de tiempo por turno en segundos (`60`).
+pub const TURN_TIMEOUT_RAPID_SECS: u64 = 60;
+
+/// Preset Estándar de tiempo por turno en segundos (`120`).
+pub const TURN_TIMEOUT_STANDARD_SECS: u64 = 120;
+
+/// Preset Sin límite de tiempo por turno (`0`, permitido únicamente en salas privadas).
+pub const TURN_TIMEOUT_UNLIMITED_SECS: u64 = 0;
+
+/// Tiempo por turno fijo para partidas de matchmaking (`60` segundos).
+pub const TURN_TIMEOUT_MATCHMAKING_SECS: u64 = 60;
+
+/// Tiempo por turno por defecto al crear una sala (`120` segundos).
+pub const DEFAULT_TURN_TIMEOUT_SECS: u64 = TURN_TIMEOUT_STANDARD_SECS;
+
+/// Normaliza el tiempo por turno solicitado según si la sala es pública o privada.
+///
+/// - Si es `None`, aplica `120` segundos (`DEFAULT_TURN_TIMEOUT_SECS`).
+/// - Si es `Some(0)` y la sala es privada (`!is_public`), permite `0` (sin límite).
+/// - Si es `Some(0)` y la sala es pública (`is_public`), aplica `120` segundos.
+/// - En cualquier otro caso positivo, devuelve los segundos indicados.
+pub fn resolve_turn_timeout_secs(requested: Option<u64>, is_public: bool) -> u64 {
+    match requested {
+        None => DEFAULT_TURN_TIMEOUT_SECS,
+        Some(0) => {
+            if is_public {
+                DEFAULT_TURN_TIMEOUT_SECS
+            } else {
+                TURN_TIMEOUT_UNLIMITED_SECS
+            }
+        }
+        Some(secs) => secs,
+    }
+}
+
 /// Rol de un participante dentro de una sala Relay.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParticipantRole {
@@ -118,6 +156,12 @@ pub struct Room {
     pub seed: u64,
     /// Indica si la sala es pública o privada.
     pub is_public: bool,
+    /// Tiempo máximo permitido por turno en segundos (`0` = sin límite en salas privadas).
+    pub turn_timeout_secs: u64,
+    /// Instante en el que se registró el último movimiento válido (o inicio de partida).
+    pub last_move_at: Instant,
+    /// Asiento (`1` o `2`) que posee actualmente el turno activo.
+    pub active_turn_seat: u32,
     /// Indica si el ELO de esta sala ya fue reportado y persistido (garantiza idempotencia).
     pub elo_reported: bool,
     /// Buffer ordenado de comandos validados aplicados en la partida.
@@ -139,13 +183,14 @@ impl Room {
         game_id: Option<String>,
         is_public: bool,
     ) -> Self {
-        Self::with_seed(
+        Self::with_seed_and_timeout(
             code,
             host_conn_id,
             host_sender,
             game_id,
             is_public,
             generate_room_seed(),
+            None,
         )
     }
 
@@ -157,6 +202,27 @@ impl Room {
         game_id: Option<String>,
         is_public: bool,
         seed: u64,
+    ) -> Self {
+        Self::with_seed_and_timeout(
+            code,
+            host_conn_id,
+            host_sender,
+            game_id,
+            is_public,
+            seed,
+            None,
+        )
+    }
+
+    /// Crea una nueva sala con semilla explícita y configuración opcional de `turn_timeout_secs`.
+    pub fn with_seed_and_timeout(
+        code: String,
+        host_conn_id: ConnectionId,
+        host_sender: ClientSender,
+        game_id: Option<String>,
+        is_public: bool,
+        seed: u64,
+        turn_timeout_secs: Option<u64>,
     ) -> Self {
         let mut participants = HashMap::new();
         participants.insert(
@@ -171,11 +237,18 @@ impl Room {
             },
         );
         let anticheat = AntiCheatSession::for_game_with_seed(game_id.as_deref(), seed);
+        let active_turn_seat = anticheat
+            .as_ref()
+            .map(|ac| ac.active_turn_seat())
+            .unwrap_or(1);
         Self {
             code,
             game_id,
             seed,
             is_public,
+            turn_timeout_secs: resolve_turn_timeout_secs(turn_timeout_secs, is_public),
+            last_move_at: Instant::now(),
+            active_turn_seat,
             elo_reported: false,
             command_log: Vec::new(),
             next_player_id: 2,
@@ -204,6 +277,7 @@ impl Room {
                 sender,
             },
         );
+        self.last_move_at = Instant::now();
         assigned_id
     }
 
@@ -412,13 +486,25 @@ impl RoomManager {
         self.rejoin_grace_duration = duration;
     }
 
-    /// Crea una nueva sala con un código único de 4 caracteres y registra al anfitrión.
+    /// Crea una nueva sala con un código único de 4 caracteres y registra al anfitrión (`turn_timeout_secs = 120` por defecto).
     pub fn create_room(
         &mut self,
         host_conn_id: ConnectionId,
         host_sender: ClientSender,
         game_id: Option<String>,
         is_public: bool,
+    ) -> String {
+        self.create_room_with_timeout(host_conn_id, host_sender, game_id, is_public, None)
+    }
+
+    /// Crea una nueva sala configurando explícitamente el reloj de turno (`turn_timeout_secs`).
+    pub fn create_room_with_timeout(
+        &mut self,
+        host_conn_id: ConnectionId,
+        host_sender: ClientSender,
+        game_id: Option<String>,
+        is_public: bool,
+        turn_timeout_secs: Option<u64>,
     ) -> String {
         // Si el cliente ya estaba en otra sala, lo sacamos primero limpiamente
         let _ = self.leave_room(host_conn_id);
@@ -430,10 +516,60 @@ impl RoomManager {
             }
         };
 
-        let room = Room::new(code.clone(), host_conn_id, host_sender, game_id, is_public);
+        let room = Room::with_seed_and_timeout(
+            code.clone(),
+            host_conn_id,
+            host_sender,
+            game_id,
+            is_public,
+            generate_room_seed(),
+            turn_timeout_secs,
+        );
         self.rooms.insert(code.clone(), room);
         self.conn_to_room.insert(host_conn_id, code.clone());
         code
+    }
+
+    /// Empareja al jugador en una partida de matchmaking público (`turn_timeout_secs = 60`).
+    ///
+    /// Devuelve `(room_code, player_id_asignado, es_sala_nueva)`.
+    pub fn queue_matchmaking(
+        &mut self,
+        conn_id: ConnectionId,
+        sender: ClientSender,
+        game_id: Option<String>,
+    ) -> (String, RoomPlayerId, bool) {
+        let _ = self.leave_room(conn_id);
+
+        let waiting_code = self
+            .rooms
+            .iter()
+            .find(|(_, r)| {
+                r.is_public
+                    && !r.elo_reported
+                    && r.player_count() == 1
+                    && r.connected_player_count() == 1
+                    && r.game_id == game_id
+            })
+            .map(|(c, _)| c.clone());
+
+        if let Some(code) = waiting_code {
+            if let Some(room) = self.rooms.get_mut(&code) {
+                room.turn_timeout_secs = TURN_TIMEOUT_MATCHMAKING_SECS;
+                let pid = room.add_participant(conn_id, sender);
+                self.conn_to_room.insert(conn_id, code.clone());
+                return (code, pid, false);
+            }
+        }
+
+        let code = self.create_room_with_timeout(
+            conn_id,
+            sender,
+            game_id,
+            true,
+            Some(TURN_TIMEOUT_MATCHMAKING_SECS),
+        );
+        (code, 1, true)
     }
 
     /// Une un cliente a una sala existente por su código.
@@ -558,11 +694,21 @@ impl RoomManager {
             if ac.validate_and_apply(sender_player_id, payload).is_err() {
                 return Err(RoomError::IllegalMove);
             }
+            room.active_turn_seat = ac.active_turn_seat();
+        } else {
+            room.active_turn_seat = if sender_player_id == 1 { 2 } else { 1 };
         }
 
+        room.last_move_at = Instant::now();
         room.command_log.push(payload.clone());
         room.broadcast_except(conn_id, outbound_json);
         Ok((code, sender_player_id))
+    }
+
+    /// Devuelve el `turn_timeout_secs` configurado para una sala activa.
+    pub fn room_turn_timeout_secs(&self, raw_code: &str) -> Option<u64> {
+        let normalized = raw_code.trim().to_ascii_uppercase();
+        self.rooms.get(&normalized).map(|r| r.turn_timeout_secs)
     }
 
     /// Obtiene el `player_id` y código de sala de un cliente conectado.
@@ -975,6 +1121,59 @@ impl RoomManager {
         outcomes
     }
 
+    /// Verifica todas las salas activas con al menos 2 jugadores cuyo reloj de turno (`turn_timeout_secs > 0`)
+    /// haya sido superado sin recibir un movimiento válido (`last_move_at.elapsed() >= turn_timeout_secs`).
+    ///
+    /// Declara ganador al oponente del jugador en turno (`active_turn_seat`), emite
+    /// `{"op": "match_timeout", "winner_seat": ..., "reason": "turn_timeout"}` a la sala y devuelve
+    /// los `AuthoritativeMatchOutcome` para actualizar ELO.
+    pub fn expire_turn_timeouts(&mut self) -> Vec<AuthoritativeMatchOutcome> {
+        let mut outcomes = Vec::new();
+
+        for (code, room) in &mut self.rooms {
+            if room.elo_reported || room.turn_timeout_secs == 0 || room.player_count() < 2 {
+                continue;
+            }
+            if room.last_move_at.elapsed() < Duration::from_secs(room.turn_timeout_secs) {
+                continue;
+            }
+
+            let timed_out_seat = room.active_turn_seat;
+            let winner_seat = if timed_out_seat == 1 { 2 } else { 1 };
+
+            if let Some(ac) = room.anticheat.as_mut() {
+                ac.force_resign(timed_out_seat);
+            }
+
+            let game_id = room
+                .anticheat
+                .as_ref()
+                .map(|ac| ac.game_id().to_string())
+                .or_else(|| room.game_id.clone())
+                .unwrap_or_else(|| "chess".to_string());
+            let winner = room.resolve_player_identity(winner_seat);
+            let loser = room.resolve_player_identity(timed_out_seat);
+            room.elo_reported = true;
+
+            let timeout_notice = serde_json::json!({
+                "op": "match_timeout",
+                "winner_seat": winner_seat,
+                "reason": "turn_timeout",
+            })
+            .to_string();
+            room.broadcast_all(&timeout_notice);
+
+            outcomes.push(AuthoritativeMatchOutcome {
+                room_code: code.clone(),
+                game_id,
+                winner,
+                loser,
+            });
+        }
+
+        outcomes
+    }
+
     /// Retira a un cliente de su sala actual (por `{"op": "leave"}` voluntario)
     /// y notifica a los participantes restantes.
     ///
@@ -1234,5 +1433,94 @@ mod tests {
         assert_eq!(outcomes[0].room_code, code);
         assert_eq!(outcomes[0].winner, "guest_host_win");
         assert_eq!(outcomes[0].loser, "guest_drop_lose");
+    }
+
+    #[test]
+    fn test_room_turn_timeout_presets_and_matchmaking_queue() {
+        let mut manager = RoomManager::new();
+        let (tx1, _rx1) = mpsc::unbounded_channel();
+        let (tx2, _rx2) = mpsc::unbounded_channel();
+        let (tx3, _rx3) = mpsc::unbounded_channel();
+        let (tx4, _rx4) = mpsc::unbounded_channel();
+        let (tx5, _rx5) = mpsc::unbounded_channel();
+        let (tx6, _rx6) = mpsc::unbounded_channel();
+
+        // Por defecto = 120s Estándar
+        let c_default = manager.create_room(1, tx1, Some("chess".to_string()), true);
+        assert_eq!(manager.room_turn_timeout_secs(&c_default), Some(120));
+
+        // Preset Blitz = 30s
+        let c_blitz =
+            manager.create_room_with_timeout(2, tx2, Some("chess".to_string()), true, Some(30));
+        assert_eq!(manager.room_turn_timeout_secs(&c_blitz), Some(30));
+
+        // Preset Sin límite (0s) en sala privada (!is_public)
+        let c_priv =
+            manager.create_room_with_timeout(3, tx3, Some("chess".to_string()), false, Some(0));
+        assert_eq!(manager.room_turn_timeout_secs(&c_priv), Some(0));
+
+        // 0s en sala pública se normaliza a 120s
+        let c_pub_zero =
+            manager.create_room_with_timeout(4, tx4, Some("chess".to_string()), true, Some(0));
+        assert_eq!(manager.room_turn_timeout_secs(&c_pub_zero), Some(120));
+
+        // Matchmaking (queue) fija turn_timeout_secs = 60
+        let (q_code, q_pid, is_new) = manager.queue_matchmaking(5, tx5, Some("go".to_string()));
+        assert!(is_new);
+        assert_eq!(q_pid, 1);
+        assert_eq!(manager.room_turn_timeout_secs(&q_code), Some(60));
+
+        let (q_code_2, q_pid_2, is_new_2) =
+            manager.queue_matchmaking(6, tx6, Some("go".to_string()));
+        assert!(!is_new_2);
+        assert_eq!(q_code_2, q_code);
+        assert_eq!(q_pid_2, 2);
+        assert_eq!(manager.room_turn_timeout_secs(&q_code), Some(60));
+    }
+
+    #[test]
+    fn test_room_turn_timeout_awards_victory_and_emits_match_timeout() {
+        let mut manager = RoomManager::new();
+        let (tx_host, mut rx_host) = mpsc::unbounded_channel();
+        let (tx_guest, mut rx_guest) = mpsc::unbounded_channel();
+
+        let code =
+            manager.create_room_with_timeout(10, tx_host, Some("chess".to_string()), true, Some(1));
+        manager.set_authenticated_player_id(10, Some("guest_p1".to_string()));
+        manager.join_room(20, tx_guest, &code).unwrap();
+        manager.set_authenticated_player_id(20, Some("guest_p2".to_string()));
+
+        // P1 realiza un movimiento válido (e2 -> e4); ahora el turno activo pasa al asiento 2
+        let move_1 = serde_json::json!({
+            "player": 1,
+            "from": { "row": 1, "col": 4 },
+            "to": { "row": 3, "col": 4 }
+        });
+        manager
+            .validate_and_relay(10, &move_1, r#"{"op":"relay"}"#)
+            .unwrap();
+        let _ = rx_guest.try_recv().unwrap();
+
+        // Simular que el jugador en turno (asiento 2) supera turn_timeout_secs (1s)
+        if let Some(room) = manager.rooms.get_mut(&code) {
+            assert_eq!(room.active_turn_seat, 2);
+            room.last_move_at = Instant::now() - Duration::from_secs(2);
+        }
+
+        let outcomes = manager.expire_turn_timeouts();
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].winner, "guest_p1");
+        assert_eq!(outcomes[0].loser, "guest_p2");
+
+        // Ambos jugadores reciben {"op": "match_timeout", "winner_seat": 1, "reason": "turn_timeout"}
+        let msg_host: Value = serde_json::from_str(&rx_host.try_recv().unwrap()).unwrap();
+        assert_eq!(msg_host["op"], "match_timeout");
+        assert_eq!(msg_host["winner_seat"], 1);
+        assert_eq!(msg_host["reason"], "turn_timeout");
+
+        let msg_guest: Value = serde_json::from_str(&rx_guest.try_recv().unwrap()).unwrap();
+        assert_eq!(msg_guest["op"], "match_timeout");
+        assert_eq!(msg_guest["winner_seat"], 1);
+        assert_eq!(msg_guest["reason"], "turn_timeout");
     }
 }
