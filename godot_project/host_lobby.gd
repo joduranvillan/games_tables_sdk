@@ -1,5 +1,7 @@
 extends Control
 
+const LanDiscoveryScript = preload("res://scripts/lan_discovery.gd")
+
 enum ConnectionMode {
 	LOCAL_LAN = 0,
 	ONLINE_RELAY = 1,
@@ -12,10 +14,13 @@ enum ConnectionMode {
 @export var relay_url: String = "ws://127.0.0.1:8080"
 
 var bridge
+var lan_discovery: Node = null
 var connection_mode: int = ConnectionMode.LOCAL_LAN
 var room_code: String = "ABCD"
 var player_count: int = 1  # Host counts as 1 initial player
 var connected_players: Array = [1] # Array of player_ids
+var discovered_lan_rooms: Array = []
+var last_joined_lan_endpoint: String = ""
 
 var mode_selector: OptionButton
 var room_code_container: HBoxContainer
@@ -27,6 +32,10 @@ var qr_fallback_label: Label
 var ip_port_label: Label
 var player_count_label: Label
 var player_list_vbox: VBoxContainer
+var lan_rooms_section: VBoxContainer
+var lan_rooms_title_label: Label
+var lan_rooms_list_vbox: VBoxContainer
+var lan_empty_label: Label
 var start_game_button: Button
 var join_room_button: Button
 var status_label: Label
@@ -44,6 +53,15 @@ func _ready() -> void:
 		else:
 			bridge = Node.new()
 		add_child(bridge)
+
+	if lan_discovery == null:
+		lan_discovery = LanDiscoveryScript.new()
+		lan_discovery.name = "LanDiscovery"
+		add_child(lan_discovery)
+	if lan_discovery.has_signal("lan_rooms_updated"):
+		var cb := Callable(self, "_on_lan_rooms_updated")
+		if not lan_discovery.is_connected("lan_rooms_updated", cb):
+			lan_discovery.connect("lan_rooms_updated", cb)
 
 	if bridge.has_signal("player_joined"):
 		bridge.connect("player_joined", _on_player_joined)
@@ -187,6 +205,28 @@ func _setup_ui() -> void:
 	player_list_vbox.custom_minimum_size = Vector2(300, 70)
 	vbox.add_child(player_list_vbox)
 
+	# Sección de Auto-Descubrimiento LAN: "Salas en tu Wi-Fi"
+	lan_rooms_section = VBoxContainer.new()
+	lan_rooms_section.name = "LanRoomsSection"
+	lan_rooms_section.add_theme_constant_override("separation", 6)
+	vbox.add_child(lan_rooms_section)
+
+	lan_rooms_title_label = Label.new()
+	lan_rooms_title_label.name = "LanRoomsTitleLabel"
+	lan_rooms_title_label.text = "📡 Salas en tu Wi-Fi"
+	lan_rooms_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lan_rooms_title_label.add_theme_font_size_override("font_size", 17)
+	lan_rooms_title_label.add_theme_color_override("font_color", Color(0.55, 0.92, 1.0))
+	lan_rooms_section.add_child(lan_rooms_title_label)
+
+	lan_rooms_list_vbox = VBoxContainer.new()
+	lan_rooms_list_vbox.name = "LanRoomsListVBox"
+	lan_rooms_list_vbox.custom_minimum_size = Vector2(360, 48)
+	lan_rooms_list_vbox.add_theme_constant_override("separation", 6)
+	lan_rooms_section.add_child(lan_rooms_list_vbox)
+
+	_render_lan_rooms_list(discovered_lan_rooms)
+
 	# Action buttons
 	var hbox = HBoxContainer.new()
 	hbox.add_theme_constant_override("separation", 12)
@@ -235,6 +275,11 @@ func _on_mode_selected(index: int) -> void:
 
 func _apply_connection_mode(index: int) -> void:
 	if index == ConnectionMode.ONLINE_RELAY:
+		if lan_discovery != null:
+			lan_discovery.stop_broadcasting()
+			lan_discovery.stop_listening()
+		if lan_rooms_section != null:
+			lan_rooms_section.hide()
 		if ip_port_label != null:
 			ip_port_label.text = "Relay: %s" % relay_url
 		if bridge != null:
@@ -249,14 +294,94 @@ func _apply_connection_mode(index: int) -> void:
 		if status_label != null:
 			status_label.text = "En Línea | SALA: %s" % room_code
 	else:
+		if lan_rooms_section != null:
+			lan_rooms_section.show()
 		var local_ip = _get_local_ip()
 		if ip_port_label != null:
 			ip_port_label.text = "IP: %s  |  Puerto: %d" % [local_ip, port]
 		if bridge != null and bridge.has_method("start_hosting"):
 			bridge.start_hosting(port, 1, 2)
+		if lan_discovery != null:
+			lan_discovery.start_listening()
+			lan_discovery.start_broadcasting(host_name, game_type, port, "%d/2" % player_count)
 		_set_room_code(join_code)
 		if status_label != null:
 			status_label.text = "Hosting en puerto %d | Código: %s" % [port, join_code]
+
+func _on_lan_rooms_updated(rooms: Array) -> void:
+	discovered_lan_rooms = rooms.duplicate(true)
+	_render_lan_rooms_list(discovered_lan_rooms)
+
+func _render_lan_rooms_list(rooms: Array) -> void:
+	if lan_rooms_list_vbox == null:
+		return
+	for child in lan_rooms_list_vbox.get_children():
+		lan_rooms_list_vbox.remove_child(child)
+		child.queue_free()
+
+	if rooms.is_empty():
+		lan_empty_label = Label.new()
+		lan_empty_label.name = "LanEmptyLabel"
+		lan_empty_label.text = "Buscando salas en tu Wi-Fi..."
+		lan_empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lan_empty_label.add_theme_font_size_override("font_size", 14)
+		lan_empty_label.add_theme_color_override("font_color", Color(0.7, 0.75, 0.82))
+		lan_rooms_list_vbox.add_child(lan_empty_label)
+		return
+
+	for room_info in rooms:
+		if not (room_info is Dictionary):
+			continue
+		var room_ip: String = String(room_info.get("ip", "127.0.0.1"))
+		var room_port: int = int(room_info.get("port", 7000))
+		var room_host: String = String(room_info.get("host_name", "Host"))
+		var room_game: String = String(room_info.get("game_id", "chess"))
+		var room_players: String = String(room_info.get("players", "1/2"))
+
+		var row := HBoxContainer.new()
+		row.name = "LanRoom_%s_%d" % [room_ip.replace(".", "_"), room_port]
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 10)
+		lan_rooms_list_vbox.add_child(row)
+
+		var info_lbl := Label.new()
+		info_lbl.name = "RoomInfoLabel"
+		info_lbl.text = "%s — %s (%s) [%s:%d]" % [room_host, room_game, room_players, room_ip, room_port]
+		info_lbl.add_theme_font_size_override("font_size", 14)
+		row.add_child(info_lbl)
+
+		var join_btn := Button.new()
+		join_btn.name = "JoinLanButton"
+		join_btn.text = "Unirse"
+		join_btn.custom_minimum_size = Vector2(88, 32)
+		join_btn.pressed.connect(func():
+			join_lan_room(room_ip, room_port)
+		)
+		row.add_child(join_btn)
+
+func join_lan_room(target_ip: String, target_port: int) -> bool:
+	var clean_ip := target_ip.strip_edges()
+	if clean_ip.is_empty():
+		clean_ip = "127.0.0.1"
+	last_joined_lan_endpoint = "%s:%d" % [clean_ip, target_port]
+
+	if lan_discovery != null:
+		lan_discovery.stop_broadcasting()
+
+	var connected := false
+	if bridge != null:
+		if bridge.has_method("connect_to_host"):
+			connected = bool(bridge.call("connect_to_host", clean_ip, target_port, host_name))
+		elif bridge.has_method("connect_as_client"):
+			connected = bool(bridge.call("connect_as_client", clean_ip, target_port))
+
+	if status_label != null:
+		if connected:
+			status_label.text = "Conectado a %s:%d" % [clean_ip, target_port]
+		else:
+			status_label.text = "Conectando a %s:%d..." % [clean_ip, target_port]
+
+	return connected
 
 func _set_room_code(code: String) -> void:
 	room_code = code.strip_edges().to_upper()
@@ -410,6 +535,8 @@ func _on_peer_disconnected(player_id: int) -> void:
 
 func _update_player_list() -> void:
 	player_count = connected_players.size()
+	if lan_discovery != null and lan_discovery.has_method("update_broadcast_players"):
+		lan_discovery.update_broadcast_players(player_count, 2)
 	if player_count_label:
 		player_count_label.text = "Jugadores conectados: %d" % player_count
 

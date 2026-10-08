@@ -65,6 +65,11 @@ impl RelayMetrics {
         self.rooms_active.store(count as i64, Ordering::Relaxed);
     }
 
+    /// Devuelve el número actual de salas activas registradas en el gauge `relay_rooms_active`.
+    pub fn rooms_active(&self) -> usize {
+        self.rooms_active.load(Ordering::Relaxed).max(0) as usize
+    }
+
     /// Incrementa el contador `relay_messages_total` etiquetado por `game_id`.
     pub fn inc_messages_total(&self, game_id: Option<&str>) {
         let label = game_id

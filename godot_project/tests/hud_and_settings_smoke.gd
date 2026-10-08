@@ -37,7 +37,23 @@ func _init() -> void:
 	assert(TranslationServer.get_locale().begins_with("fr"), "TranslationServer debe cambiar a fr en tiempo real")
 	settings._on_lang_selected(1) # Español ("es")
 	assert(TranslationServer.get_locale().begins_with("es"), "TranslationServer debe cambiar a es en tiempo real")
-	print("SettingsMenu instantiated and real-time language selector verified.")
+
+	# Verificar campo Relay Server URL, resolución de /health y diagnóstico Probar Conexión (Prompt 476)
+	assert(settings.relay_url_line != null, "SettingsMenu debe incluir el campo RelayUrlLineEdit")
+	assert(settings.test_relay_button != null and settings.test_relay_button.text == "Probar Conexión", "SettingsMenu debe incluir botón Probar Conexión")
+	var resolved_health := SettingsMenu.resolve_health_url("ws://127.0.0.1:8080")
+	assert(resolved_health == "http://127.0.0.1:8081/health", "resolve_health_url debe mapear ws://127.0.0.1:8080 a http://127.0.0.1:8081/health")
+	var probe_msg: String = settings.simulate_health_probe_response(200, '{"status":"ok","version":"0.1.0","active_rooms":2}', 28)
+	assert(probe_msg == "Conectado — 28 ms" and settings.relay_health_label.text == "Conectado — 28 ms", "Probar Conexión debe mostrar 'Conectado — 28 ms'")
+
+	var test_settings_cfg := "user://test_settings_476.cfg"
+	SettingsMenu.save_relay_url_to_config("wss://relay.opentable.gg", test_settings_cfg)
+	var loaded_cfg: Dictionary = SettingsMenu.get_saved_settings(test_settings_cfg)
+	assert(loaded_cfg.get("relay_url") == "wss://relay.opentable.gg", "user://settings.cfg debe persistir relay_url")
+	if FileAccess.file_exists(test_settings_cfg):
+		DirAccess.remove_absolute(test_settings_cfg)
+
+	print("SettingsMenu instantiated, language selector and Relay health diagnostics verified.")
 	settings.free()
 	
 	# 4. SceneTransition

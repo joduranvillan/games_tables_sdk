@@ -26,6 +26,14 @@ var sfx_label: Label
 var theme_label: Label
 var p1_label: Label
 var p2_label: Label
+var relay_url_label: Label
+var relay_url_line: LineEdit
+var test_relay_button: Button
+var relay_health_label: Label
+var _health_http: HTTPRequest = null
+var _ping_started_usec: int = 0
+
+const DEFAULT_RELAY_URL: String = "ws://127.0.0.1:8080"
 
 const LANG_KEYS = [
 	{"code": "en", "name": "English"},
@@ -259,6 +267,37 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	parent.add_child(colorblind_checkbox)
 
 	parent.add_child(HSeparator.new())
+	relay_url_label = Label.new()
+	relay_url_label.name = "RelayUrlLabel"
+	relay_url_label.text = "Relay Server URL"
+	parent.add_child(relay_url_label)
+
+	var relay_hbox = HBoxContainer.new()
+	relay_hbox.add_theme_constant_override("separation", 8)
+	parent.add_child(relay_hbox)
+
+	relay_url_line = LineEdit.new()
+	relay_url_line.name = "RelayUrlLineEdit"
+	relay_url_line.text = DEFAULT_RELAY_URL
+	relay_url_line.placeholder_text = DEFAULT_RELAY_URL
+	relay_url_line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	relay_hbox.add_child(relay_url_line)
+
+	test_relay_button = Button.new()
+	test_relay_button.name = "TestRelayButton"
+	test_relay_button.text = "Probar Conexión"
+	test_relay_button.custom_minimum_size = Vector2(135, 34)
+	test_relay_button.pressed.connect(_on_test_relay_connection_pressed)
+	relay_hbox.add_child(test_relay_button)
+
+	relay_health_label = Label.new()
+	relay_health_label.name = "RelayHealthLabel"
+	relay_health_label.text = ""
+	relay_health_label.add_theme_font_size_override("font_size", 13)
+	relay_health_label.add_theme_color_override("font_color", Color(0.45, 0.95, 0.55))
+	parent.add_child(relay_health_label)
+
+	parent.add_child(HSeparator.new())
 	var save_load_lbl = Label.new()
 	save_load_lbl.text = "Persistencia Local de Partida"
 	parent.add_child(save_load_lbl)
@@ -424,6 +463,8 @@ func _load_current_settings() -> void:
 	p1_line.text = settings["player1_name"]
 	p2_line.text = settings["player2_name"]
 	highlight_checkbox.button_pressed = settings.get("highlight_moves", true)
+	if relay_url_line != null:
+		relay_url_line.text = String(settings.get("relay_url", DEFAULT_RELAY_URL))
 	
 	var theme_key = settings["board_theme"]
 	for i in range(THEME_KEYS.size()):
@@ -437,9 +478,86 @@ func _load_current_settings() -> void:
 			lang_option.selected = i
 			break
 
-static func get_saved_settings() -> Dictionary:
+static func resolve_health_url(raw_relay_url: String) -> String:
+	var cleaned := raw_relay_url.strip_edges()
+	if cleaned.is_empty():
+		cleaned = DEFAULT_RELAY_URL
+	while cleaned.ends_with("/"):
+		cleaned = cleaned.left(cleaned.length() - 1)
+	if cleaned.begins_with("wss://"):
+		cleaned = "https://" + cleaned.substr(6)
+	elif cleaned.begins_with("ws://"):
+		cleaned = "http://" + cleaned.substr(5)
+	elif not cleaned.begins_with("http://") and not cleaned.begins_with("https://"):
+		cleaned = "http://" + cleaned
+	if cleaned.ends_with(":8080"):
+		cleaned = cleaned.left(cleaned.length() - 5) + ":8081"
+	if not cleaned.ends_with("/health"):
+		cleaned += "/health"
+	return cleaned
+
+func format_health_probe_result(http_code: int, body_text: String, rtt_ms: int) -> String:
+	var safe_rtt: int = maxi(1, rtt_ms)
+	if http_code == 200:
+		var parsed = JSON.parse_string(body_text)
+		if parsed is Dictionary and String(parsed.get("status", "")) == "ok":
+			return "Conectado — %d ms" % safe_rtt
+	return "Error de conexión (HTTP %d)" % http_code
+
+func simulate_health_probe_response(http_code: int, body_text: String, rtt_ms: int) -> String:
+	var formatted := format_health_probe_result(http_code, body_text, rtt_ms)
+	if relay_health_label != null:
+		relay_health_label.text = formatted
+	return formatted
+
+func _on_test_relay_connection_pressed() -> void:
+	var target_relay := DEFAULT_RELAY_URL
+	if relay_url_line != null and not relay_url_line.text.strip_edges().is_empty():
+		target_relay = relay_url_line.text.strip_edges()
+	var health_url := resolve_health_url(target_relay)
+	if relay_health_label != null:
+		relay_health_label.text = "Probando conexión..."
+	_ping_started_usec = Time.get_ticks_usec()
+
+	if is_inside_tree():
+		if _health_http == null:
+			_health_http = HTTPRequest.new()
+			_health_http.timeout = 5.0
+			add_child(_health_http)
+			_health_http.request_completed.connect(_on_health_request_completed)
+		var err: Error = _health_http.request(health_url)
+		if err != OK and relay_health_label != null:
+			relay_health_label.text = "Error de conexión"
+
+func _on_health_request_completed(
+	result: int,
+	response_code: int,
+	_headers: PackedStringArray,
+	body: PackedByteArray
+) -> void:
+	var elapsed_ms: int = maxi(1, int(round(float(Time.get_ticks_usec() - _ping_started_usec) / 1000.0)))
+	if result != HTTPRequest.RESULT_SUCCESS:
+		if relay_health_label != null:
+			relay_health_label.text = "Error de conexión"
+		return
+	var body_text: String = body.get_string_from_utf8()
+	simulate_health_probe_response(response_code, body_text, elapsed_ms)
+
+static func save_relay_url_to_config(
+	new_relay_url: String,
+	cfg_path: String = "user://settings.cfg"
+) -> Error:
+	var cfg := ConfigFile.new()
+	cfg.load(cfg_path)
+	var sanitized := new_relay_url.strip_edges()
+	if sanitized.is_empty():
+		sanitized = DEFAULT_RELAY_URL
+	cfg.set_value("network", "relay_url", sanitized)
+	return cfg.save(cfg_path)
+
+static func get_saved_settings(cfg_path: String = "user://settings.cfg") -> Dictionary:
 	var cfg = ConfigFile.new()
-	var err = cfg.load("user://settings.cfg")
+	var err = cfg.load(cfg_path)
 	var sys_lang = OS.get_locale_language()
 	var valid_codes = ["es", "en", "de", "fr", "it", "pt", "zh", "ja", "ko"]
 	var default_lang = sys_lang if sys_lang in valid_codes else "es"
@@ -455,7 +573,8 @@ static func get_saved_settings() -> Dictionary:
 			"player1_name": "Jugador 1",
 			"player2_name": "Jugador 2",
 			"language": default_lang,
-			"highlight_moves": true
+			"highlight_moves": true,
+			"relay_url": DEFAULT_RELAY_URL
 		}
 	return {
 		"sfx_volume": cfg.get_value("audio", "sfx_volume", 0.8),
@@ -467,7 +586,8 @@ static func get_saved_settings() -> Dictionary:
 		"player1_name": cfg.get_value("players", "player1_name", "Jugador 1"),
 		"player2_name": cfg.get_value("players", "player2_name", "Jugador 2"),
 		"language": cfg.get_value("locale", "language", default_lang),
-		"highlight_moves": cfg.get_value("gameplay", "highlight_moves", true)
+		"highlight_moves": cfg.get_value("gameplay", "highlight_moves", true),
+		"relay_url": cfg.get_value("network", "relay_url", DEFAULT_RELAY_URL)
 	}
 
 func _on_save_pressed() -> void:
@@ -484,6 +604,9 @@ func _on_save_pressed() -> void:
 	var lang_idx = lang_option.selected
 	var lang_code = LANG_KEYS[lang_idx]["code"] if lang_idx >= 0 and lang_idx < LANG_KEYS.size() else "es"
 	var highlight_moves = highlight_checkbox.button_pressed
+	var relay_url_val = relay_url_line.text.strip_edges() if relay_url_line != null else DEFAULT_RELAY_URL
+	if relay_url_val.is_empty():
+		relay_url_val = DEFAULT_RELAY_URL
 	
 	var cfg = ConfigFile.new()
 	cfg.set_value("audio", "music_volume", music_vol)
@@ -497,6 +620,7 @@ func _on_save_pressed() -> void:
 	cfg.set_value("players", "player2_name", p2_name)
 	cfg.set_value("locale", "language", lang_code)
 	cfg.set_value("gameplay", "highlight_moves", highlight_moves)
+	cfg.set_value("network", "relay_url", relay_url_val)
 	cfg.save("user://settings.cfg")
 	
 	if DisplayServer.has_method("window_set_mode"):

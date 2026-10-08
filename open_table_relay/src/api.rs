@@ -1,6 +1,7 @@
-//! Servidor HTTP ligero en el puerto 8081 para consultar rankings ELO, métricas Prometheus y autenticación de invitados.
+//! Servidor HTTP ligero en el puerto 8081 para consultar rankings ELO, métricas Prometheus, salud y autenticación de invitados.
 //!
 //! Endpoints soportados:
+//! - `GET /health` -> Devuelve `{"status": "ok", "version": "0.1.0", "active_rooms": N}`.
 //! - `POST /auth/guest` -> Recibe `{"device_id": "<uuid_persistente>"}` y devuelve `{"token": "<jwt>", "player_id": "guest_<hash8>", "expires_at": ...}`.
 //! - `GET /rankings/:game_id` -> JSON con el top-50 de jugadores por ELO para ese juego.
 //! - `GET /player/:player_id` -> JSON con todos los ratings del jugador por juego.
@@ -9,10 +10,22 @@
 use crate::auth::{AuthConfig, GuestAuthRequest};
 use crate::elo::EloStore;
 use crate::metrics::global_metrics;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
+
+/// Respuesta JSON del endpoint de diagnóstico `GET /health`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HealthResponse {
+    /// Estado operacional del servidor (`"ok"`).
+    pub status: String,
+    /// Versión del servidor `open_table_relay` (`"0.1.0"`).
+    pub version: String,
+    /// Número actual de salas activas en memoria.
+    pub active_rooms: usize,
+}
 
 /// Ejecuta el servidor HTTP de consulta de rankings ELO y emisión de JWT sobre el `TcpListener` indicado.
 pub async fn run_http_api_server(
@@ -77,7 +90,17 @@ async fn handle_http_connection(
             ),
         }
     } else if method == "GET" {
-        if path == "/metrics" {
+        if path == "/health" {
+            let health = HealthResponse {
+                status: "ok".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                active_rooms: global_metrics().rooms_active(),
+            };
+            let body = serde_json::to_string(&health).unwrap_or_else(|_| {
+                r#"{"status":"ok","version":"0.1.0","active_rooms":0}"#.to_string()
+            });
+            ("HTTP/1.1 200 OK", body)
+        } else if path == "/metrics" {
             content_type = "text/plain; version=0.0.4; charset=utf-8";
             ("HTTP/1.1 200 OK", global_metrics().render_prometheus_text())
         } else if let Some(game_id) = path.strip_prefix("/rankings/") {
@@ -192,6 +215,42 @@ mod tests {
         let verified = AuthConfig::from_env().verify_token(&parsed.token).unwrap();
         assert_eq!(verified.sub, parsed.player_id);
         assert_eq!(verified.exp, parsed.expires_at);
+
+        handle.abort();
+        let _ = std::fs::remove_file(&db_file);
+    }
+
+    #[tokio::test]
+    async fn test_health_http_get_endpoint() {
+        let db_file =
+            std::env::temp_dir().join(format!("opentable_api_health_{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&db_file);
+        let elo_store = Arc::new(Mutex::new(EloStore::new(&db_file).unwrap()));
+
+        global_metrics().set_rooms_active(4);
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = tokio::spawn(async move {
+            let _ = run_http_api_server(listener, elo_store).await;
+        });
+
+        let http_req = format!("GET /health HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n");
+
+        let mut client = TcpStream::connect(addr).await.unwrap();
+        client.write_all(http_req.as_bytes()).await.unwrap();
+        let mut resp_bytes = Vec::new();
+        client.read_to_end(&mut resp_bytes).await.unwrap();
+        let resp_str = String::from_utf8_lossy(&resp_bytes);
+
+        assert!(resp_str.starts_with("HTTP/1.1 200 OK"));
+        let body = extract_http_body(&resp_str);
+        let parsed: HealthResponse = serde_json::from_str(body).unwrap();
+
+        assert_eq!(parsed.status, "ok");
+        assert_eq!(parsed.version, "0.1.0");
+        assert_eq!(parsed.active_rooms, 4);
 
         handle.abort();
         let _ = std::fs::remove_file(&db_file);
