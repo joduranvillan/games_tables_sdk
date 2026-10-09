@@ -155,7 +155,7 @@ impl AntiCheatSession {
     pub fn active_turn_seat(&self) -> u32 {
         self.session
             .world()
-            .get_resource::<open_table_engine::session::TurnResource>()
+            .get_resource::<open_table_engine::turn::TurnResource>()
             .map(|tr| tr.0.current_player().0)
             .unwrap_or(1)
     }

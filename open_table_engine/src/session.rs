@@ -32,7 +32,7 @@ use sha2::Sha256;
 type HmacSha256 = Hmac<Sha256>;
 
 use crate::rule_engine::RuleEngine;
-use crate::turn::{TurnOrder, TurnResource};
+pub use crate::turn::{TurnOrder, TurnResource};
 
 /// Recurso de bevy_ecs que indica el ganador de la partida.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Resource)]
