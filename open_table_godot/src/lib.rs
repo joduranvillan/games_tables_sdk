@@ -3071,8 +3071,7 @@ impl OpenTableBridge {
 
         let events: Vec<Box<dyn Event>> = vec![Box::new(go_game::GameOverEvent {
             winner: None,
-            black_score: 0.0,
-            white_score: 0.0,
+            reason: "draw".to_string(),
         })];
         let serialized = serde_json::to_vec(&events).unwrap_or_default();
         match &mut self.mode {
