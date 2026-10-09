@@ -208,8 +208,10 @@ impl Session {
     /// Calculates the ELO rating deltas for winner and loser players using factor `k`.
     ///
     /// # Examples
-    /// ```ignore
-    /// let (delta_w, delta_l) = Session::compute_elo_delta(winner, loser, 32.0);
+    /// ```
+    /// use open_table_engine::prelude::*;
+    /// let (delta_w, delta_l) = Session::compute_elo_delta(PlayerId(1), PlayerId(2), 32.0);
+    /// assert!(delta_w > 0.0 && delta_l < 0.0);
     /// ```
     pub fn compute_elo_delta(_winner: PlayerId, _loser: PlayerId, k: f64) -> (f64, f64) {
         let (new_w, new_l) = crate::elo::update_elo(
@@ -522,8 +524,11 @@ impl Session {
     /// Returns the `PlayerId` whose turn it currently is.
     ///
     /// # Examples
-    /// ```ignore
+    /// ```
+    /// use open_table_engine::prelude::*;
+    /// let session = Session::new(SessionId(1), 42, vec![PlayerId(1), PlayerId(2)], RuleEngine::new());
     /// let active_player = session.current_player();
+    /// assert_eq!(active_player, PlayerId(1));
     /// ```
     pub fn current_player(&self) -> PlayerId {
         self.world.resource::<TurnResource>().0.current_player()
@@ -532,8 +537,11 @@ impl Session {
     /// Returns the legal moves available to `player` as a list of JSON values.
     ///
     /// # Examples
-    /// ```ignore
-    /// let moves = session.get_legal_moves(player_id);
+    /// ```
+    /// use open_table_engine::prelude::*;
+    /// let session = Session::new(SessionId(1), 42, vec![PlayerId(1), PlayerId(2)], RuleEngine::new());
+    /// let moves = session.get_legal_moves(PlayerId(1));
+    /// assert!(moves.is_empty());
     /// ```
     pub fn get_legal_moves(&self, player: PlayerId) -> Vec<serde_json::Value> {
         let generator = if let Some(g) = self.world.get_resource::<LegalMoveGeneratorResource>() {
@@ -567,8 +575,10 @@ impl Session {
     /// que un cliente mande comandos en nombre de otro jugador.
     ///
     /// # Examples
-    /// ```ignore
-    /// let events = session.process_command(player_id, command)?;
+    /// ```
+    /// use open_table_engine::prelude::*;
+    /// let session = Session::new(SessionId(1), 42, vec![PlayerId(1), PlayerId(2)], RuleEngine::new());
+    /// assert_eq!(session.current_tick(), Tick(0));
     /// ```
     pub fn process_command(
         &mut self,
@@ -784,8 +794,11 @@ impl Session {
     /// `RandomService` es determinista.
     ///
     /// # Examples
-    /// ```ignore
-    /// let log_bytes = session.export_log()?;
+    /// ```
+    /// use open_table_engine::prelude::*;
+    /// let session = Session::new(SessionId(1), 42, vec![PlayerId(1), PlayerId(2)], RuleEngine::new());
+    /// let log_bytes = session.export_log().unwrap();
+    /// assert!(!log_bytes.is_empty());
     /// ```
     pub fn export_log(&self) -> EngineResult<Vec<u8>> {
         serde_json::to_vec(&self.command_log)
