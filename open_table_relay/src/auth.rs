@@ -88,6 +88,11 @@ impl AuthConfig {
         Self { jwt_secret: secret }
     }
 
+    /// Crea una configuración con la autenticación obligatoria desactivada (`jwt_secret: None`).
+    pub fn disabled() -> Self {
+        Self::default()
+    }
+
     /// Crea una configuración con secreto explícito.
     pub fn with_secret(secret: impl Into<String>) -> Self {
         Self {
