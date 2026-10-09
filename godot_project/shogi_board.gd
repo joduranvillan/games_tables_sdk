@@ -108,9 +108,10 @@ func _ready() -> void:
 
 	# --- Botón de reglas ---
 	var btn_rules := Button.new()
-	btn_rules.text = " ? "
-	btn_rules.position = Vector2(700, 10)
-	btn_rules.custom_minimum_size = Vector2(36, 36)
+	btn_rules.name = "RulesButton"
+	btn_rules.text = "📖 Reglas"
+	btn_rules.position = Vector2(650, 10)
+	btn_rules.custom_minimum_size = Vector2(90, 36)
 	btn_rules.pressed.connect(func(): _rules_popup.show_for_game("shogi"))
 	add_child(btn_rules)
 

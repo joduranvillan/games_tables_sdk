@@ -10,6 +10,7 @@ const RENEWAL_THRESHOLD_SECS := 86400 # 24 horas (24 * 3600)
 const DEV_DEFAULT_SECRET := "open_table_dev_local_secret"
 
 var relay_http_url: String = "http://127.0.0.1:8081"
+var online_enabled: bool = true
 var device_id: String = ""
 var token: String = ""
 var player_id: String = ""
@@ -19,8 +20,23 @@ var _http_request: HTTPRequest = null
 var _request_in_flight: bool = false
 
 func _ready() -> void:
+	_load_privacy_online_preference()
 	load_or_init_identity()
-	ensure_valid_token()
+	if online_enabled:
+		ensure_valid_token()
+
+func _load_privacy_online_preference(settings_path: String = "user://settings.cfg") -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(settings_path) == OK:
+		var offline_only := bool(cfg.get_value("privacy", "offline_only_mode", false))
+		var allow_online := bool(cfg.get_value("privacy", "online_enabled", not offline_only))
+		online_enabled = allow_online and not offline_only
+
+func set_online_enabled(enabled: bool) -> void:
+	online_enabled = enabled
+
+func is_online_enabled() -> bool:
+	return online_enabled
 
 func load_or_init_identity(config_path: String = IDENTITY_CONFIG_PATH) -> void:
 	var cfg := ConfigFile.new()
@@ -106,7 +122,8 @@ func ensure_valid_token(now_unix: int = -1, config_path: String = IDENTITY_CONFI
 	if should_renew_token(now_unix):
 		var now_secs := now_unix if now_unix >= 0 else int(Time.get_unix_time_from_system())
 		_issue_local_dev_token(now_secs, config_path)
-		request_guest_token_from_relay()
+		if online_enabled:
+			request_guest_token_from_relay()
 
 	return token
 
@@ -124,6 +141,8 @@ func _issue_local_dev_token(now_secs: int, config_path: String = IDENTITY_CONFIG
 	save_identity(config_path)
 
 func request_guest_token_from_relay(custom_http_url: String = "") -> bool:
+	if not online_enabled:
+		return false
 	if _request_in_flight:
 		return false
 	if not is_inside_tree() or OS.has_feature("headless"):

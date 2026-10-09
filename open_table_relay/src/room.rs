@@ -943,6 +943,10 @@ impl RoomManager {
                     })
                     .to_string();
                     room.broadcast_except(conn_id, &notice);
+                    if self.rejoin_grace_duration.is_zero() && room.has_no_connected_participants()
+                    {
+                        should_remove_room = true;
+                    }
                 }
                 None => {}
             }
@@ -1011,8 +1015,7 @@ impl RoomManager {
             // Si el asiento se desconectó antes de asociar authenticated_player_id, enlazar al asiento desconectado libre
             if matched_conn.is_none() {
                 for (cid, p) in &candidates {
-                    if matches!(p.state, Disconnected { .. })
-                        && p.authenticated_player_id.is_none()
+                    if matches!(p.state, Disconnected { .. }) && p.authenticated_player_id.is_none()
                     {
                         matched_conn = Some((*cid, p.clone()));
                         break;

@@ -207,9 +207,10 @@ func _setup_ui_layers() -> void:
 	add_child(turn_indicator)
 
 	var btn_rules = Button.new()
-	btn_rules.text = " ? "
-	btn_rules.position = Vector2(740, 20)
-	btn_rules.custom_minimum_size = Vector2(40, 40)
+	btn_rules.name = "RulesButton"
+	btn_rules.text = "📖 Reglas"
+	btn_rules.position = Vector2(690, 20)
+	btn_rules.custom_minimum_size = Vector2(90, 40)
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("chinese_checkers"))
 	add_child(btn_rules)
 
@@ -259,13 +260,33 @@ func _setup_peg_buttons() -> void:
 
 		var grid_pos = pos
 		btn.pressed.connect(func(): _on_peg_clicked(grid_pos))
+		btn.draw.connect(func():
+			var pid: int = int(board_pegs.get(grid_pos, 0))
+			if pid > 0:
+				var sym := _get_peg_symbol(pid)
+				btn.draw_string(ThemeDB.fallback_font, Vector2(0, 20), sym, HORIZONTAL_ALIGNMENT_CENTER, 30, 12, Color.WHITE)
+		)
 		add_child(btn)
 		peg_buttons[pos] = btn
 
 func _get_peg_color(p_id: int) -> Color:
-	if PLAYER_COLORS.has(p_id):
-		return PLAYER_COLORS[p_id]
-	return GameManager.get_player_color(p_id)
+	var fallback: Color = PLAYER_COLORS.get(p_id, GameManager.get_player_color(p_id))
+	if has_node("/root/ThemeManager"):
+		var tm = get_node("/root/ThemeManager")
+		if tm.has_method("is_colorblind_mode") and bool(tm.call("is_colorblind_mode")):
+			if tm.has_method("get_player_color"):
+				return tm.call("get_player_color", p_id, fallback)
+	return fallback
+
+func _get_peg_symbol(p_id: int) -> String:
+	match p_id:
+		1: return "▲" # Rojo
+		2: return "●" # Azul
+		3: return "■" # Verde
+		4: return "◆" # Amarillo
+		5: return "⬟" # Violeta / Púrpura
+		6: return "★" # Naranja
+		_: return "●"
 
 func _update_peg_visuals() -> void:
 	var slot_color = current_theme.dark_color if current_theme else Color(0.3, 0.25, 0.2, 0.6)

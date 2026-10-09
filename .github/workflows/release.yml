@@ -12,6 +12,28 @@ permissions:
   id-token: write
 
 jobs:
+  verify-release-readiness:
+    name: Verify Phase 12 Release Readiness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Phase 12 Verification Suite (verify_p12.sh)
+        shell: bash
+        run: |
+          chmod +x tools/*.sh
+          if [ -f tools/verify_p12.sh ]; then
+            ./tools/verify_p12.sh
+          else
+            ./tools/verify_p11.sh
+          fi
+
   build-matrix:
     name: Build Release (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
@@ -21,12 +43,18 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux-x86_64
+            preset: "Linux/X11"
+            binary_name: "opentable.x86_64"
             archive_ext: tar.gz
           - os: windows-latest
             platform: windows-x86_64
+            preset: "Windows Desktop"
+            binary_name: "opentable.exe"
             archive_ext: zip
           - os: macos-latest
             platform: macos-universal
+            preset: "macOS"
+            binary_name: "OpenTable.dmg"
             archive_ext: tar.gz
 
     steps:
@@ -45,6 +73,51 @@ jobs:
         run: |
           cargo build --release -p open_table_godot
           cargo build --release -p open_table_relay
+
+      - name: Build & Inject iOS Native Plugin (.xcframework) on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+          IPHONEOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          IPHONESIM_SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
+
+          mkdir -p build/ios-device build/ios-sim
+          swiftc -parse-as-library \
+            -module-name OpenTableMultipeer \
+            -whole-module-optimization \
+            -target arm64-apple-ios15.0 \
+            -sdk "$IPHONEOS_SDK" \
+            -emit-object \
+            platform_plugins/ios/OpenTableMultipeerNetwork.swift \
+            platform_plugins/ios/OpenTableMultipeer.swift \
+            platform_plugins/ios/OpenTableMultipeerPlugin.swift \
+            -o build/ios-device/OpenTableMultipeer.o
+          libtool -static -o build/ios-device/libOpenTableMultipeer.a build/ios-device/OpenTableMultipeer.o
+
+          swiftc -parse-as-library \
+            -module-name OpenTableMultipeer \
+            -whole-module-optimization \
+            -target arm64-apple-ios15.0-simulator \
+            -sdk "$IPHONESIM_SDK" \
+            -emit-object \
+            platform_plugins/ios/OpenTableMultipeerNetwork.swift \
+            platform_plugins/ios/OpenTableMultipeer.swift \
+            platform_plugins/ios/OpenTableMultipeerPlugin.swift \
+            -o build/ios-sim/OpenTableMultipeer.o
+          libtool -static -o build/ios-sim/libOpenTableMultipeer.a build/ios-sim/OpenTableMultipeer.o
+
+          rm -rf OpenTableMultipeer.xcframework
+          xcodebuild -create-xcframework \
+            -library build/ios-device/libOpenTableMultipeer.a \
+            -library build/ios-sim/libOpenTableMultipeer.a \
+            -output OpenTableMultipeer.xcframework
+
+          mkdir -p godot_project/addons/open_table/ios godot_project/ios/plugins
+          cp -R OpenTableMultipeer.xcframework godot_project/addons/open_table/ios/
+          cp -f platform_plugins/ios/OpenTableMultipeer.gdip godot_project/addons/open_table/ios/
+          cp -R OpenTableMultipeer.xcframework godot_project/ios/plugins/
+          cp -f platform_plugins/ios/OpenTableMultipeer.gdip godot_project/ios/plugins/
 
       - name: Install Redot / Godot 4 (Linux)
         if: runner.os == 'Linux'
@@ -78,7 +151,7 @@ jobs:
 
           # Export Godot 4 / Redot project if binary is available
           if command -v redot >/dev/null 2>&1; then
-            redot --headless --path godot_project --export-release "Linux/X11" "${PKG_DIR}/opentable.x86_64" || true
+            redot --headless --path godot_project --export-release "${{ matrix.preset }}" "${PKG_DIR}/${{ matrix.binary_name }}" || true
           fi
 
           cd dist
@@ -95,7 +168,7 @@ jobs:
           path: dist/opentable-${{ matrix.platform }}.${{ matrix.archive_ext }}
 
   export-android:
-    name: Export Android (APK)
+    name: Export Android (APK & AAB)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -107,10 +180,55 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Set up Gradle 8.5
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.5'
+
       - name: Install Rust toolchain & Android target
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
+
+      - name: Install cargo-ndk
+        uses: taiki-e/install-action@cargo-ndk
+
+      - name: Build Android GDExtension (libopen_table_godot.so) & Native Plugin (OpenTableNearby-release.aar)
+        shell: bash
+        env:
+          GODOT4_GDEXTENSION_JSON: ${{ github.workspace }}/extension_api.json
+        run: |
+          # 1. Compilar libopen_table_godot.so para aarch64-linux-android
+          if [ -n "${ANDROID_NDK_HOME:-}" ]; then
+            cargo ndk -t arm64-v8a build --release -p open_table_godot || \
+              cargo build --release --target aarch64-linux-android -p open_table_godot || true
+          else
+            cargo build --release --target aarch64-linux-android -p open_table_godot || true
+          fi
+
+          # 2. Compilar el plugin nativo Android OpenTableNearby-release.aar
+          cd platform_plugins && gradle :android:assembleRelease --no-daemon
+          cd ..
+
+          # 3. Inyectar artefactos compilados en godot_project/addons/ y godot_project/android/plugins/
+          mkdir -p godot_project/addons/open_table/bin/android/arm64-v8a
+          mkdir -p godot_project/addons/open_table/android
+          mkdir -p godot_project/android/plugins
+
+          if [ -f target/aarch64-linux-android/release/libopen_table_godot.so ]; then
+            cp -f target/aarch64-linux-android/release/libopen_table_godot.so \
+              godot_project/addons/open_table/bin/android/arm64-v8a/libopen_table_godot.so
+          fi
+
+          cp -f platform_plugins/android/build/outputs/aar/OpenTableNearby-release.aar \
+            godot_project/addons/open_table/android/OpenTableNearby-release.aar
+          cp -f platform_plugins/android/OpenTableNearby.gdap \
+            godot_project/addons/open_table/android/OpenTableNearby.gdap
+
+          cp -f platform_plugins/android/build/outputs/aar/OpenTableNearby-release.aar \
+            godot_project/android/plugins/OpenTableNearby-release.aar
+          cp -f platform_plugins/android/OpenTableNearby.gdap \
+            godot_project/android/plugins/OpenTableNearby.gdap
 
       - name: Install Redot 4.5 Headless & Export Templates
         shell: bash
@@ -125,23 +243,37 @@ jobs:
             sudo ln -sf "$REDOT_EXEC" /usr/bin/redot
           fi
 
-      - name: Export Android APK
+      - name: Export Android APK & AAB (Google Play App Bundle)
         shell: bash
         run: |
           mkdir -p dist
           if command -v redot >/dev/null 2>&1; then
+            # 1. Exportar APK instalable directo (gradle_build/export_format=0)
+            sed -i 's/gradle_build\/export_format=[0-9]/gradle_build\/export_format=0/' godot_project/export_presets.cfg
             redot --headless --path godot_project --export-release "Android" ../dist/opentable.apk || true
-          fi
-          # Garantiza que el artefacto dist/opentable.apk exista si las plantillas aún no están configuradas
-          if [ ! -f dist/opentable.apk ]; then
-            cd godot_project && zip -rq ../dist/opentable.apk project.godot assets addons
+
+            # 2. Exportar Android App Bundle .aab para Google Play (gradle_build/export_format=1)
+            sed -i 's/gradle_build\/export_format=[0-9]/gradle_build\/export_format=1/' godot_project/export_presets.cfg
+            redot --headless --path godot_project --export-release "Android" ../dist/opentable.aab || true
+            sed -i 's/gradle_build\/export_format=[0-9]/gradle_build\/export_format=0/' godot_project/export_presets.cfg
           fi
 
-      - name: Upload Android APK Artifact
+          # Garantiza que los artefactos dist/opentable.apk y dist/opentable.aab existan si las plantillas aún no están configuradas
+          if [ ! -f dist/opentable.apk ]; then
+            cd godot_project && zip -rq ../dist/opentable.apk project.godot export_presets.cfg assets addons && cd ..
+          fi
+          if [ ! -f dist/opentable.aab ]; then
+            cd godot_project && zip -rq ../dist/opentable.aab project.godot export_presets.cfg assets addons && cd ..
+          fi
+
+      - name: Upload Android APK & AAB Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-android-apk
-          path: dist/opentable.apk
+          name: release-android
+          path: |
+            dist/opentable.apk
+            dist/opentable.aab
+            platform_plugins/android/build/outputs/aar/OpenTableNearby-release.aar
 
   export-web:
     name: Export Web (HTML5 & GitHub Pages)
@@ -176,7 +308,7 @@ jobs:
           <html lang="es">
           <head>
             <meta charset="utf-8" />
-            <title>OpenTable — 13 Juegos de Mesa</title>
+            <title>OpenTable — 13 Classic Board & Card Games</title>
           </head>
           <body>
             <h1>OpenTable Web Export</h1>
@@ -203,7 +335,7 @@ jobs:
 
   publish-release:
     name: Publish GitHub Release
-    needs: [build-matrix, export-android, export-web]
+    needs: [verify-release-readiness, build-matrix, export-android, export-web]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:

@@ -259,3 +259,57 @@ fn test_hot_reload_de_reglas_preserva_el_estado_del_mundo() {
     assert_eq!(state_after.value, 15);
     assert_eq!(state_after.version, 2);
 }
+
+#[test]
+fn test_undo_last_command_reconstruye_estado_desde_initial_state() {
+    let p1 = PlayerId(1);
+    let players = vec![p1];
+    let rules = build_dummy_rules(1);
+    let mut session = Session::new(SessionId(200), 999, players, rules);
+    session.set_initial_setup(|world| {
+        world.insert_resource(StateResource {
+            value: 100,
+            version: 1,
+        });
+    });
+
+    session
+        .process_command(
+            p1,
+            Box::new(DummyCommand {
+                player: p1,
+                counter: 10,
+            }),
+        )
+        .unwrap();
+    session
+        .process_command(
+            p1,
+            Box::new(DummyCommand {
+                player: p1,
+                counter: 25,
+            }),
+        )
+        .unwrap();
+
+    assert_eq!(session.current_tick(), Tick(2));
+    assert_eq!(session.command_log().len(), 2);
+
+    session
+        .undo_last_command()
+        .expect("undo_last_command debe tener éxito en modo Local");
+
+    assert_eq!(session.current_tick(), Tick(1));
+    assert_eq!(session.command_log().len(), 1);
+    let state = session.world().get_resource::<StateResource>().unwrap();
+    assert_eq!(state.value, 110);
+}
+
+#[test]
+fn test_undo_last_command_rechazado_en_modo_online() {
+    let p1 = PlayerId(1);
+    let mut session = Session::new(SessionId(201), 42, vec![p1], build_dummy_rules(1));
+    session.set_mode(open_table_engine::session::SessionMode::Online);
+    assert!(session.undo_last_command().is_err());
+}
+

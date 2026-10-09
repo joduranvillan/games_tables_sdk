@@ -13,6 +13,8 @@ var demo_bridge: Node
 var demo_timer: Timer
 var demo_overlay: CanvasLayer
 var current_popup_overlay: Control = null
+var privacy_modal: Node = null
+var online_action_buttons: Array[Button] = []
 
 const GAMES = [
 	{ "id": "checkers", "name": "Damas (Checkers)", "method": "start_local_match_checkers", "ai_method": "start_local_match_checkers_vs_ai", "scene": "res://checkers_board.tscn", "color": Color(0.85, 0.25, 0.25) },
@@ -20,14 +22,14 @@ const GAMES = [
 	{ "id": "shogi", "name": "Shogi", "method": "start_local_match_shogi", "ai_method": "start_local_match_shogi_vs_ai", "scene": "res://shogi_board.tscn", "color": Color(0.85, 0.65, 0.25) },
 	{ "id": "xiangqi", "name": "Xiangqi", "method": "start_local_match_xiangqi", "ai_method": "start_local_match_xiangqi_vs_ai", "scene": "res://xiangqi_board.tscn", "color": Color(0.85, 0.35, 0.15) },
 	{ "id": "go", "name": "Go", "method": "start_local_match_go", "ai_method": "start_local_match_go_vs_ai", "scene": "res://go_board.tscn", "color": Color(0.25, 0.65, 0.45) },
-	{ "id": "uno", "name": "Uno", "method": "start_local_match_uno", "ai_method": "", "scene": "res://uno_board.tscn", "color": Color(0.95, 0.25, 0.45) },
-	{ "id": "crisis", "name": "Crisis", "method": "start_local_match_crisis", "ai_method": "", "scene": "res://crisis_board.tscn", "color": Color(0.65, 0.25, 0.75) },
-	{ "id": "chinese_checkers", "name": "Damas Chinas", "method": "start_local_match_chinese_checkers", "ai_method": "", "scene": "res://chinese_checkers_board.tscn", "color": Color(0.25, 0.75, 0.75) },
-	{ "id": "mille_bornes", "name": "Mille Bornes", "method": "start_local_match_mille_bornes", "ai_method": "", "scene": "res://mille_bornes_board.tscn", "color": Color(0.45, 0.75, 0.25) },
+	{ "id": "uno", "name": "Uno", "method": "start_local_match_uno", "ai_method": "start_local_match_uno_vs_ai", "scene": "res://uno_board.tscn", "color": Color(0.95, 0.25, 0.45) },
+	{ "id": "crisis", "name": "Crisis", "method": "start_local_match_crisis", "ai_method": "start_local_match_crisis_vs_ai", "scene": "res://crisis_board.tscn", "color": Color(0.65, 0.25, 0.75) },
+	{ "id": "chinese_checkers", "name": "Damas Chinas", "method": "start_local_match_chinese_checkers", "ai_method": "start_local_match_chinese_checkers_vs_ai", "scene": "res://chinese_checkers_board.tscn", "color": Color(0.25, 0.75, 0.75) },
+	{ "id": "mille_bornes", "name": "Mille Bornes", "method": "start_local_match_mille_bornes", "ai_method": "start_local_match_mille_bornes_vs_ai", "scene": "res://mille_bornes_board.tscn", "color": Color(0.45, 0.75, 0.25) },
 	{ "id": "backgammon", "name": "Backgammon", "method": "start_local_match_backgammon", "ai_method": "start_local_match_backgammon_vs_ai", "scene": "res://backgammon_board.tscn", "color": Color(0.75, 0.45, 0.25) },
-	{ "id": "monopoly", "name": "Monopoly", "method": "start_local_match_monopoly", "ai_method": "", "scene": "res://monopoly_board.tscn", "color": Color(0.25, 0.65, 0.85) },
+	{ "id": "monopoly", "name": "Monopoly", "method": "start_local_match_monopoly", "ai_method": "start_local_match_monopoly_vs_ai", "scene": "res://monopoly_board.tscn", "color": Color(0.25, 0.65, 0.85) },
 	{ "id": "ludo", "name": "Ludo", "method": "start_local_match_ludo", "ai_method": "start_local_match_ludo_vs_ai", "scene": "res://ludo_board.tscn", "color": Color(0.85, 0.85, 0.25) },
-	{ "id": "battleship", "name": "Batalla Naval", "method": "start_local_match_battleship", "ai_method": "", "scene": "res://battleship_board.tscn", "color": Color(0.25, 0.45, 0.85) }
+	{ "id": "battleship", "name": "Batalla Naval", "method": "start_local_match_battleship", "ai_method": "start_local_match_battleship_vs_ai", "scene": "res://battleship_board.tscn", "color": Color(0.25, 0.45, 0.85) }
 ]
 
 @onready var grid_container: GridContainer = $GridContainer
@@ -40,6 +42,7 @@ func _ready() -> void:
 	_setup_buttons()
 	_play_entry_animation()
 	_setup_multiplayer_row()
+	_check_and_show_privacy_modal()
 
 func _process(delta: float) -> void:
 	if not is_attract_mode:
@@ -198,6 +201,7 @@ func _apply_button_theme(btn: Button, color: Color) -> void:
 	btn.add_theme_stylebox_override("focus", style_hover)
 
 func _setup_buttons() -> void:
+	online_action_buttons.clear()
 	for child in grid_container.get_children():
 		child.queue_free()
 
@@ -330,12 +334,39 @@ func _setup_buttons() -> void:
 		tw.tween_property(leaderboard_btn, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	)
 	leaderboard_btn.pressed.connect(func():
+		if not is_online_mode_allowed():
+			return
 		if has_node("/root/SceneManager"):
 			get_node("/root/SceneManager").transition_to("res://scenes/leaderboard.tscn")
 		else:
 			get_tree().change_scene_to_file("res://scenes/leaderboard.tscn")
 	)
 	grid_container.add_child(leaderboard_btn)
+	online_action_buttons.append(leaderboard_btn)
+
+	# Mis Estadísticas Locales button
+	var stats_btn = Button.new()
+	stats_btn.name = "StatsButton"
+	stats_btn.text = "📊 Mis Estadísticas"
+	_apply_button_theme(stats_btn, Color(0.22, 0.54, 0.72))
+	stats_btn.custom_minimum_size = Vector2(310, 60)
+	stats_btn.pivot_offset = Vector2(155, 30)
+	stats_btn.add_theme_font_size_override("font_size", 18)
+	stats_btn.mouse_entered.connect(func():
+		var tw = stats_btn.create_tween()
+		tw.tween_property(stats_btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	)
+	stats_btn.mouse_exited.connect(func():
+		var tw = stats_btn.create_tween()
+		tw.tween_property(stats_btn, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	)
+	stats_btn.pressed.connect(func():
+		if has_node("/root/SceneManager"):
+			get_node("/root/SceneManager").transition_to("res://scenes/stats_screen.tscn")
+		else:
+			get_tree().change_scene_to_file("res://scenes/stats_screen.tscn")
+	)
+	grid_container.add_child(stats_btn)
 
 	# Torneo button
 	var tournament_btn = Button.new()
@@ -353,12 +384,15 @@ func _setup_buttons() -> void:
 		tw.tween_property(tournament_btn, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	)
 	tournament_btn.pressed.connect(func():
+		if not is_online_mode_allowed():
+			return
 		if has_node("/root/SceneManager"):
 			get_node("/root/SceneManager").transition_to("res://scenes/tournament_lobby.tscn")
 		else:
 			get_tree().change_scene_to_file("res://scenes/tournament_lobby.tscn")
 	)
 	grid_container.add_child(tournament_btn)
+	online_action_buttons.append(tournament_btn)
 
 func _play_entry_animation() -> void:
 	var buttons = grid_container.get_children()
@@ -538,6 +572,31 @@ func _show_mode_popup(game: Dictionary) -> void:
 	var saved_diff_level: int = _load_ai_difficulty_cfg()
 
 	if has_ai:
+		var game_hbox = HBoxContainer.new()
+		game_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		game_hbox.add_theme_constant_override("separation", 10)
+		vbox.add_child(game_hbox)
+
+		var game_lbl = Label.new()
+		game_lbl.text = "Juego (vs IA):"
+		game_lbl.add_theme_font_size_override("font_size", 14)
+		game_lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
+		game_hbox.add_child(game_lbl)
+
+		var game_option = OptionButton.new()
+		game_option.name = "AiGameOptionButton"
+		game_option.custom_minimum_size = Vector2(190, 32)
+		var selected_game_idx := 0
+		var ai_idx := 0
+		for g in GAMES:
+			if g.get("ai_method", "") != "":
+				game_option.add_item("%s (vs IA)" % g["name"], ai_idx)
+				if g["id"] == game["id"]:
+					selected_game_idx = ai_idx
+				ai_idx += 1
+		game_option.selected = selected_game_idx
+		game_hbox.add_child(game_option)
+
 		var diff_hbox = HBoxContainer.new()
 		diff_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 		diff_hbox.add_theme_constant_override("separation", 10)
@@ -630,7 +689,7 @@ func _launch_game(game: Dictionary, mode: String, difficulty_level: int = 1) -> 
 					bridge.call(ai_method, 1, 2, board_size, difficulty_level)
 				elif bridge.has_method(ai_method):
 					bridge.call(ai_method, 1, 2, difficulty_level)
-			elif game["id"] == "shogi":
+			elif game["id"] in ["shogi", "uno", "crisis", "chinese_checkers", "mille_bornes", "monopoly", "battleship"]:
 				if bridge.has_method(ai_method):
 					bridge.call(ai_method, 1, 2, difficulty_level)
 			elif bridge.has_method(ai_method):
@@ -664,28 +723,34 @@ func _setup_multiplayer_row() -> void:
 	add_child(hbox)
 
 	var host_btn := Button.new()
+	host_btn.name = "HostNetworkButton"
 	host_btn.text = "🌐 Crear partida en red"
 	host_btn.custom_minimum_size = Vector2(220, 44)
 	host_btn.add_theme_font_size_override("font_size", 15)
 	_apply_button_theme(host_btn, Color(0.25, 0.45, 0.75))
 	host_btn.pressed.connect(_on_host_pressed)
 	hbox.add_child(host_btn)
+	online_action_buttons.append(host_btn)
 
 	var join_code_btn := Button.new()
+	join_code_btn.name = "JoinCodeButton"
 	join_code_btn.text = "🔑 Unirse con Código"
 	join_code_btn.custom_minimum_size = Vector2(200, 44)
 	join_code_btn.add_theme_font_size_override("font_size", 15)
 	_apply_button_theme(join_code_btn, Color(0.25, 0.60, 0.55))
 	join_code_btn.pressed.connect(_on_join_code_pressed)
 	hbox.add_child(join_code_btn)
+	online_action_buttons.append(join_code_btn)
 
 	var join_btn := Button.new()
+	join_btn.name = "JoinQrButton"
 	join_btn.text = "📷 Unirse (código QR)"
 	join_btn.custom_minimum_size = Vector2(200, 44)
 	join_btn.add_theme_font_size_override("font_size", 15)
 	_apply_button_theme(join_btn, Color(0.35, 0.55, 0.35))
 	join_btn.pressed.connect(_on_join_pressed)
 	hbox.add_child(join_btn)
+	online_action_buttons.append(join_btn)
 
 	var about_btn := Button.new()
 	about_btn.text = "ℹ️ Acerca de"
@@ -701,9 +766,13 @@ func _setup_multiplayer_row() -> void:
 	hbox.add_child(about_btn)
 
 func _on_host_pressed() -> void:
+	if not is_online_mode_allowed():
+		return
 	_show_game_selector_for_network()
 
 func _on_join_code_pressed() -> void:
+	if not is_online_mode_allowed():
+		return
 	var dialog_script = load("res://join_dialog.gd")
 	if dialog_script == null:
 		return
@@ -782,11 +851,53 @@ func _show_game_selector_for_network() -> void:
 	vbox.add_child(cancel)
 
 func _launch_host_lobby(game_id: String) -> void:
+	if not is_online_mode_allowed():
+		return
 	GameManager.set_active_game(game_id)
 	GameManager.set_game_mode("host")
 	if has_node("/root/SceneManager"):
 		get_node("/root/SceneManager").transition_to("res://host_lobby.tscn")
 	else:
 		get_tree().change_scene_to_file("res://host_lobby.tscn")
+
+func _check_and_show_privacy_modal(settings_path: String = "user://settings.cfg") -> bool:
+	var modal_script = load("res://scenes/privacy_consent_modal.gd")
+	if modal_script == null:
+		return false
+	if not modal_script.should_show_on_startup(settings_path):
+		var allow_online: bool = modal_script.is_online_enabled(settings_path)
+		_apply_online_mode_state(allow_online)
+		return false
+
+	if is_instance_valid(privacy_modal):
+		privacy_modal.queue_free()
+
+	privacy_modal = modal_script.new(settings_path)
+	privacy_modal.name = "PrivacyConsentModal"
+	add_child(privacy_modal)
+	privacy_modal.consent_completed.connect(func(allow_online: bool):
+		_apply_online_mode_state(allow_online)
+	)
+	return true
+
+func is_online_mode_allowed(settings_path: String = "user://settings.cfg") -> bool:
+	var modal_script = load("res://scenes/privacy_consent_modal.gd")
+	if modal_script != null:
+		return modal_script.is_online_enabled(settings_path)
+	return true
+
+func _apply_online_mode_state(allow_online: bool) -> void:
+	if has_node("/root/GameManager"):
+		var gm = get_node("/root/GameManager")
+		if gm.has_method("set_online_features_enabled"):
+			gm.call("set_online_features_enabled", allow_online)
+	if has_node("/root/AuthClient"):
+		var auth = get_node("/root/AuthClient")
+		if auth.has_method("set_online_enabled"):
+			auth.call("set_online_enabled", allow_online)
+	for btn in online_action_buttons:
+		if is_instance_valid(btn):
+			btn.disabled = not allow_online
+			btn.tooltip_text = "" if allow_online else "Deshabilitado en Modo Solo Local / Offline"
 
 

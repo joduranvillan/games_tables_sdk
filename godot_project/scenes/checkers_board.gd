@@ -141,11 +141,20 @@ func _setup_ui_layers() -> void:
 	add_child(turn_indicator)
 
 	var btn_rules = Button.new()
-	btn_rules.text = " ? "
-	btn_rules.position = Vector2(BOARD * CELL - 45, BOARD * CELL + 45)
-	btn_rules.custom_minimum_size = Vector2(36, 36)
+	btn_rules.name = "RulesButton"
+	btn_rules.text = "📖 Reglas"
+	btn_rules.position = Vector2(BOARD * CELL - 95, BOARD * CELL + 45)
+	btn_rules.custom_minimum_size = Vector2(90, 36)
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("checkers"))
 	add_child(btn_rules)
+
+	var tutorial_btn := Button.new()
+	tutorial_btn.name = "CheckersTutorialButton"
+	tutorial_btn.text = "🎓 Tutorial"
+	tutorial_btn.position = Vector2(BOARD * CELL - 205, BOARD * CELL + 45)
+	tutorial_btn.custom_minimum_size = Vector2(105, 36)
+	tutorial_btn.pressed.connect(start_checkers_tutorial)
+	add_child(tutorial_btn)
 
 	rules_popup = RulesPopup.new()
 	rules_popup.visible = false
@@ -156,6 +165,11 @@ func _setup_ui_layers() -> void:
 		_pause_menu = load("res://pause_menu.tscn").instantiate()
 		_pause_menu.connect("quit_game_requested", _on_quit_to_menu)
 		add_child(_pause_menu)
+
+func start_checkers_tutorial() -> void:
+	var CheckersTut = load("res://scripts/tutorials/checkers_tutorial.gd")
+	if CheckersTut != null:
+		CheckersTut.start_on_board(self)
 
 func _on_quit_to_menu() -> void:
 	if has_node("/root/SceneManager"):

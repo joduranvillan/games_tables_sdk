@@ -251,6 +251,7 @@ func _setup_ui() -> void:
 	top_bar.add_child(title_lbl)
 
 	var btn_rules = Button.new()
+	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.custom_minimum_size = Vector2(90, 36)
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("monopoly"))
@@ -353,7 +354,7 @@ func _setup_ui() -> void:
 		token.pivot_offset = Vector2(11, 11)
 
 		var img = Image.create(22, 22, false, Image.FORMAT_RGBA8)
-		var p_col = PLAYER_COLORS[p]
+		var p_col = _get_player_token_color(p)
 		for x in range(22):
 			for y in range(22):
 				var dist = Vector2(x - 11, y - 11).length()
@@ -368,6 +369,16 @@ func _setup_ui() -> void:
 		tex.texture = ImageTexture.create_from_image(img)
 		tex.size = Vector2(22, 22)
 		token.add_child(tex)
+
+		var sym_lbl = Label.new()
+		sym_lbl.text = "▲" if p == P1 else "●"
+		sym_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+		sym_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sym_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		sym_lbl.add_theme_font_size_override("font_size", 10)
+		sym_lbl.add_theme_color_override("font_color", Color.WHITE)
+		token.add_child(sym_lbl)
+
 		add_child(token)
 		player_tokens[p] = token
 
@@ -895,7 +906,7 @@ func _draw() -> void:
 		draw_rect(rect, border_col, false, 1.2)
 
 		# Color Bar (b) based on orientation
-		var grp_color = GROUP_COLORS.get(grp, Color.TRANSPARENT)
+		var grp_color = _get_group_color(grp)
 		if grp_color != Color.TRANSPARENT and grp not in ["Especial", "Impuesto"]:
 			var bar_rect: Rect2
 			if i < 10: # Bottom row: color bar on top
@@ -908,6 +919,9 @@ func _draw() -> void:
 				bar_rect = Rect2(rect.position.x, rect.position.y, 14.0, rect.size.y)
 
 			draw_rect(bar_rect, grp_color)
+			var grp_sym := _get_group_symbol(grp)
+			if not grp_sym.is_empty():
+				draw_string(ThemeDB.fallback_font, bar_rect.position + Vector2(2, 11), grp_sym, HORIZONTAL_ALIGNMENT_LEFT, 14, 9, Color.WHITE)
 
 			# House / Hotel Tokens (c)
 			if property_houses.has(i):
@@ -941,6 +955,36 @@ func _draw() -> void:
 		if prop["price"] > 0 and not property_owners.has(i):
 			var pr_pos = rect.position + Vector2(2, rect.size.y - 3)
 			draw_string(ThemeDB.fallback_font, pr_pos, "$%d" % prop["price"], HORIZONTAL_ALIGNMENT_CENTER, int(rect.size.x - 4), 9, Color(0.1, 0.5, 0.1))
+
+func _get_player_token_color(p_id: int) -> Color:
+	var fallback: Color = PLAYER_COLORS.get(p_id, Color.WHITE)
+	if has_node("/root/ThemeManager"):
+		var tm = get_node("/root/ThemeManager")
+		if tm.has_method("is_colorblind_mode") and bool(tm.call("is_colorblind_mode")):
+			if tm.has_method("get_player_color"):
+				return tm.call("get_player_color", p_id, fallback)
+	return fallback
+
+func _get_group_color(grp: String) -> Color:
+	var fallback: Color = GROUP_COLORS.get(grp, Color.TRANSPARENT)
+	if fallback == Color.TRANSPARENT or grp in ["Especial", "Impuesto", "Ferrocarril"]:
+		return fallback
+	if has_node("/root/ThemeManager"):
+		var tm = get_node("/root/ThemeManager")
+		if tm.has_method("is_colorblind_mode") and bool(tm.call("is_colorblind_mode")):
+			if tm.has_method("get_accessible_color"):
+				return tm.call("get_accessible_color", grp, fallback)
+	return fallback
+
+func _get_group_symbol(grp: String) -> String:
+	match grp:
+		"Rojo": return "▲"
+		"Azul Oscuro", "Celeste": return "●"
+		"Verde": return "■"
+		"Amarillo": return "◆"
+		"Naranja", "Marrón", "Suministros": return "★"
+		"Rosa": return "⬟"
+		_: return ""
 
 func _update_status() -> void:
 	if status == null:

@@ -810,7 +810,7 @@ func _on_rules_pressed() -> void:
 	if rules_popup == null:
 		rules_popup = RulesPopup.new()
 		add_child(rules_popup)
-	rules_popup.popup_for_game("xiangqi")
+	rules_popup.show_for_game("xiangqi")
 
 func _on_reset_pressed() -> void:
 	_on_mode_selected(mode_option_button.selected if mode_option_button else 0)

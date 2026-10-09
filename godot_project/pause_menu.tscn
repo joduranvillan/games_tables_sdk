@@ -12,17 +12,34 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -120.0
-offset_top = -90.0
-offset_right = 120.0
-offset_bottom = 90.0
+offset_left = -150.0
+offset_top = -170.0
+offset_right = 150.0
+offset_bottom = 170.0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
 layout_mode = 2
+theme_override_constants/separation = 8
 
 [node name="ContinueButton" type="Button" parent="Panel/VBoxContainer"]
 layout_mode = 2
 text = "Continuar"
+
+[node name="UndoMoveButton" type="Button" parent="Panel/VBoxContainer"]
+layout_mode = 2
+text = "↩️ Deshacer Jugada"
+
+[node name="RulesButton" type="Button" parent="Panel/VBoxContainer"]
+layout_mode = 2
+text = "📖 Ver Reglas del Juego"
+
+[node name="ResignButton" type="Button" parent="Panel/VBoxContainer"]
+layout_mode = 2
+text = "🏳️ Rendirse"
+
+[node name="OfferDrawButton" type="Button" parent="Panel/VBoxContainer"]
+layout_mode = 2
+text = "🤝 Ofrecer Tablas"
 
 [node name="SettingsButton" type="Button" parent="Panel/VBoxContainer"]
 layout_mode = 2

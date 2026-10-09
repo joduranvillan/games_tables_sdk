@@ -2,11 +2,140 @@ extends Node
 
 signal theme_changed(theme: BoardTheme)
 signal font_size_changed(tier: int)
+signal font_scale_changed(scale: float)
 @warning_ignore("unused_signal")
 signal sfx_toggled(enabled: bool)
 @warning_ignore("unused_signal")
 signal animations_toggled(enabled: bool)
 signal colorblind_mode_toggled(enabled: bool)
+signal colorblind_mode_changed(mode: String)
+
+const VALID_COLORBLIND_MODES: Array[String] = [
+	"none",
+	"deuteranopia",
+	"protanopia",
+	"tritanopia",
+	"high_contrast"
+]
+
+const VALID_FONT_SCALES: Array[float] = [1.0, 1.15, 1.3]
+
+# Símbolos geométricos superpuestos sobre fichas y cartas de colores (Prompt 490):
+# ▲ Rojo, ● Azul, ■ Verde, ◆ Amarillo, ★ Naranja, ⬟ Violeta
+const COLORBLIND_SYMBOLS := {
+	"Red": "▲",
+	"red": "▲",
+	"Rojo": "▲",
+	"rojo": "▲",
+	"HAZARD": "▲",
+	"Blue": "●",
+	"blue": "●",
+	"Azul": "●",
+	"azul": "●",
+	"Azul Oscuro": "●",
+	"Celeste": "●",
+	"DISTANCE": "●",
+	"Green": "■",
+	"green": "■",
+	"Verde": "■",
+	"verde": "■",
+	"REMEDY": "■",
+	"Yellow": "◆",
+	"yellow": "◆",
+	"Amarillo": "◆",
+	"amarillo": "◆",
+	"SAFETY": "◆",
+	"Orange": "★",
+	"orange": "★",
+	"Naranja": "★",
+	"naranja": "★",
+	"Suministros": "★",
+	"Marrón": "★",
+	"Violet": "⬟",
+	"violet": "⬟",
+	"Purple": "⬟",
+	"purple": "⬟",
+	"Violeta": "⬟",
+	"violeta": "⬟",
+	"Púrpura": "⬟",
+	"Rosa": "⬟",
+	"Wild": "✦",
+	"WildColor": "✦",
+}
+
+const UNO_COLORBLIND_SYMBOLS := {
+	"Red": "▲",
+	"Blue": "●",
+	"Green": "■",
+	"Yellow": "◆",
+	"Orange": "★",
+	"Violet": "⬟",
+	"Wild": "✦",
+	"WildColor": "✦",
+}
+
+const PLAYER_COLORBLIND_SYMBOLS := {
+	1: "▲", # Rojo
+	2: "●", # Azul
+	3: "■", # Verde
+	4: "◆", # Amarillo
+	5: "⬟", # Violeta / Púrpura
+	6: "★", # Naranja
+}
+
+# Paletas Okabe-Ito y Alto Contraste por modo daltónico
+const OKABE_ITO_PALETTES := {
+	"none": {
+		"red": Color("#D32F2F"),
+		"blue": Color("#1976D2"),
+		"green": Color("#388E3C"),
+		"yellow": Color("#FBC02D"),
+		"orange": Color("#FB8C00"),
+		"violet": Color("#8E24AA"),
+		"sky_blue": Color("#5DADE2"),
+		"brown": Color("#8B4513"),
+	},
+	"deuteranopia": {
+		"red": Color("#D55E00"),      # Okabe-Ito Vermilion
+		"blue": Color("#0072B2"),     # Okabe-Ito Blue
+		"green": Color("#009E73"),    # Okabe-Ito Bluish Green
+		"yellow": Color("#F0E442"),   # Okabe-Ito Yellow
+		"orange": Color("#E69F00"),   # Okabe-Ito Orange
+		"violet": Color("#CC79A7"),   # Okabe-Ito Reddish Purple
+		"sky_blue": Color("#56B4E9"), # Okabe-Ito Sky Blue
+		"brown": Color("#7F4F24"),
+	},
+	"protanopia": {
+		"red": Color("#D55E00"),      # Okabe-Ito Vermilion
+		"blue": Color("#0072B2"),     # Okabe-Ito Blue
+		"green": Color("#009E73"),    # Okabe-Ito Bluish Green
+		"yellow": Color("#F0E442"),   # Okabe-Ito Yellow
+		"orange": Color("#E69F00"),   # Okabe-Ito Orange
+		"violet": Color("#CC79A7"),   # Okabe-Ito Reddish Purple
+		"sky_blue": Color("#56B4E9"), # Okabe-Ito Sky Blue
+		"brown": Color("#6B4C35"),
+	},
+	"tritanopia": {
+		"red": Color("#D55E00"),      # Okabe-Ito Vermilion
+		"blue": Color("#0072B2"),     # Okabe-Ito Blue
+		"green": Color("#009E73"),    # Okabe-Ito Bluish Green
+		"yellow": Color("#F0E442"),   # Okabe-Ito Yellow
+		"orange": Color("#E69F00"),   # Okabe-Ito Orange
+		"violet": Color("#CC79A7"),   # Okabe-Ito Reddish Purple
+		"sky_blue": Color("#56B4E9"), # Okabe-Ito Sky Blue
+		"brown": Color("#5C3A21"),
+	},
+	"high_contrast": {
+		"red": Color("#FF2E00"),
+		"blue": Color("#0088FF"),
+		"green": Color("#00E676"),
+		"yellow": Color("#FFEA00"),
+		"orange": Color("#FF9100"),
+		"violet": Color("#E040FB"),
+		"sky_blue": Color("#00E5FF"),
+		"brown": Color("#A1887F"),
+	}
+}
 
 # Overrides de color primario por juego (se mezclan sobre el tema global)
 const GAME_COLOR_OVERRIDES := {
@@ -28,31 +157,100 @@ const GAME_COLOR_OVERRIDES := {
 var themes: Dictionary = {}
 var current_theme_key: String = "wood"
 var current_theme: BoardTheme
-var current_font_tier: int = 1 # 0: Pequeño, 1: Mediano, 2: Grande
+var current_font_tier: int = 0 # 0: 1.0x, 1: 1.15x, 2: 1.3x
+var ui_font_scale: float = 1.0
 var sfx_enabled: bool = true
 var animations_enabled: bool = true
-var colorblind_mode: bool = false
+var colorblind_mode: String = "none"
 
-const UNO_COLORBLIND_SYMBOLS := {
-	"Red": "●",
-	"Blue": "■",
-	"Green": "▲",
-	"Yellow": "★",
-	"Wild": "◆",
-	"WildColor": "◆",
-}
+func set_colorblind_mode(mode_or_enabled: Variant) -> void:
+	if typeof(mode_or_enabled) == TYPE_BOOL:
+		colorblind_mode = "deuteranopia" if bool(mode_or_enabled) else "none"
+	else:
+		var m := String(mode_or_enabled).strip_edges().to_lower()
+		if m in VALID_COLORBLIND_MODES:
+			colorblind_mode = m
+		elif m == "true" or m == "1":
+			colorblind_mode = "deuteranopia"
+		else:
+			colorblind_mode = "none"
 
-func set_colorblind_mode(enabled: bool) -> void:
-	colorblind_mode = enabled
-	colorblind_mode_toggled.emit(colorblind_mode)
+	colorblind_mode_toggled.emit(is_colorblind_mode())
+	colorblind_mode_changed.emit(colorblind_mode)
 	if current_theme != null:
 		theme_changed.emit(current_theme)
 
-func is_colorblind_mode() -> bool:
+func get_colorblind_mode() -> String:
 	return colorblind_mode
 
+func is_colorblind_mode() -> bool:
+	return colorblind_mode != "none"
+
+func get_palette(mode: String = "") -> Dictionary:
+	var target_mode := mode if not mode.is_empty() else colorblind_mode
+	if OKABE_ITO_PALETTES.has(target_mode):
+		return OKABE_ITO_PALETTES[target_mode]
+	return OKABE_ITO_PALETTES["none"]
+
+func _normalize_color_key(color_name: String) -> String:
+	var key := color_name.strip_edges().to_lower()
+	match key:
+		"red", "rojo", "hazard":
+			return "red"
+		"blue", "azul", "azul oscuro", "distance":
+			return "blue"
+		"green", "verde", "remedy":
+			return "green"
+		"yellow", "amarillo", "safety":
+			return "yellow"
+		"orange", "naranja", "suministros":
+			return "orange"
+		"violet", "violeta", "purple", "púrpura", "purpura", "rosa":
+			return "violet"
+		"celeste", "sky_blue":
+			return "sky_blue"
+		"marrón", "marron", "brown":
+			return "brown"
+		_:
+			return key
+
+func get_accessible_color(color_name: String, fallback: Color = Color.WHITE) -> Color:
+	var norm_key := _normalize_color_key(color_name)
+	var pal := get_palette()
+	if pal.has(norm_key):
+		return pal[norm_key]
+	return fallback
+
+func get_player_color(player_id: int, fallback: Color = Color.WHITE) -> Color:
+	var idx := posmod(player_id - 1, 6) + 1
+	match idx:
+		1: return get_accessible_color("red", fallback)
+		2: return get_accessible_color("blue", fallback)
+		3: return get_accessible_color("green", fallback)
+		4: return get_accessible_color("yellow", fallback)
+		5: return get_accessible_color("violet", fallback)
+		6: return get_accessible_color("orange", fallback)
+		_: return fallback
+
+func get_color_symbol(color_name: String) -> String:
+	if COLORBLIND_SYMBOLS.has(color_name):
+		return COLORBLIND_SYMBOLS[color_name]
+	var norm := _normalize_color_key(color_name)
+	match norm:
+		"red": return "▲"
+		"blue", "sky_blue": return "●"
+		"green": return "■"
+		"yellow": return "◆"
+		"orange", "brown": return "★"
+		"violet": return "⬟"
+		_: return "◆"
+
 func get_uno_color_symbol(color_name: String) -> String:
-	return UNO_COLORBLIND_SYMBOLS.get(color_name, "◆")
+	return UNO_COLORBLIND_SYMBOLS.get(color_name, get_color_symbol(color_name))
+
+func get_player_symbol(player_id: int) -> String:
+	var idx := posmod(player_id - 1, 6) + 1
+	return PLAYER_COLORBLIND_SYMBOLS.get(idx, "●")
 
 func get_player_pattern_type(player_id: int) -> String:
 	match player_id:
@@ -78,7 +276,6 @@ func apply_game_theme(game_id: String) -> void:
 		if get_tree().root != null:
 			get_tree().root.theme = base
 
-
 func _init() -> void:
 	_create_presets()
 
@@ -91,17 +288,35 @@ func _ready() -> void:
 func _on_layout_changed(_layout: int) -> void:
 	font_size_changed.emit(current_font_tier)
 
+func set_ui_font_scale(scale_val: float) -> void:
+	if scale_val < 1.075:
+		ui_font_scale = 1.0
+		current_font_tier = 0
+	elif scale_val < 1.225:
+		ui_font_scale = 1.15
+		current_font_tier = 1
+	else:
+		ui_font_scale = 1.3
+		current_font_tier = 2
+	font_scale_changed.emit(ui_font_scale)
+	font_size_changed.emit(current_font_tier)
+
+func get_ui_font_scale() -> float:
+	return ui_font_scale
+
 func get_font_scale() -> float:
 	var layout = 0
 	if has_node("/root/GameManager"):
 		layout = get_node("/root/GameManager").get_layout()
 	elif Engine.has_singleton("GameManager"):
 		layout = GameManager.get_layout()
+	var base_layout_scale := 1.0
 	match layout:
-		2: return 0.75  # PHONE
-		1: return 1.0   # TABLET
-		0: return 1.25  # DESKTOP
-		_: return 1.0
+		2: base_layout_scale = 0.75  # PHONE
+		1: base_layout_scale = 1.0   # TABLET
+		0: base_layout_scale = 1.0   # DESKTOP
+		_: base_layout_scale = 1.0
+	return base_layout_scale * ui_font_scale
 
 func apply_font_scale_to_board(board_node: Node, base_size: int = 16) -> void:
 	var scale_factor = get_font_scale()
@@ -209,14 +424,12 @@ func _apply_theme(key: String) -> void:
 
 func set_font_tier(tier: int) -> void:
 	current_font_tier = clamp(tier, 0, 2)
+	ui_font_scale = VALID_FONT_SCALES[current_font_tier]
+	font_scale_changed.emit(ui_font_scale)
 	font_size_changed.emit(current_font_tier)
 
 func get_font_size(base_size: int = 16) -> int:
-	match current_font_tier:
-		0: return max(10, base_size - 3)
-		1: return base_size
-		2: return base_size + 4
-		_: return base_size
+	return maxi(10, int(round(float(base_size) * ui_font_scale)))
 
 func apply_font_size_to_node(node: Node, base_size: int = 16) -> void:
 	if node is Label or node is Button or node is LineEdit:

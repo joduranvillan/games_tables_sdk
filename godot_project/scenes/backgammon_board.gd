@@ -164,11 +164,20 @@ func _setup_ui() -> void:
 
 	# Rules Button
 	var rules_btn = Button.new()
-	rules_btn.text = " ? "
-	rules_btn.position = Vector2(675, 10)
-	rules_btn.custom_minimum_size = Vector2(36, 36)
+	rules_btn.name = "RulesButton"
+	rules_btn.text = "📖 Reglas"
+	rules_btn.position = Vector2(620, 10)
+	rules_btn.custom_minimum_size = Vector2(90, 36)
 	rules_btn.pressed.connect(func(): rules_popup.show_for_game("backgammon"))
 	add_child(rules_btn)
+
+	var tutorial_btn := Button.new()
+	tutorial_btn.name = "BackgammonTutorialButton"
+	tutorial_btn.text = "🎓 Tutorial"
+	tutorial_btn.position = Vector2(510, 10)
+	tutorial_btn.custom_minimum_size = Vector2(105, 36)
+	tutorial_btn.pressed.connect(start_backgammon_tutorial)
+	add_child(tutorial_btn)
 
 	rules_popup = RulesPopup.new()
 	rules_popup.visible = false
@@ -180,6 +189,11 @@ func _setup_ui() -> void:
 	turn_indicator.name = "TurnIndicator"
 	turn_indicator.position = Vector2(40, 535)
 	add_child(turn_indicator)
+
+func start_backgammon_tutorial() -> void:
+	var BackgammonTut = load("res://scripts/tutorials/backgammon_tutorial.gd")
+	if BackgammonTut != null:
+		BackgammonTut.start_on_board(self)
 
 func _get_point_base_pos(pt_idx: int) -> Vector2:
 	var col_width = 38.0

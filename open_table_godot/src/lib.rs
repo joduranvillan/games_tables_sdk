@@ -471,6 +471,12 @@ impl OpenTableBridge {
     #[signal]
     fn room_joined(success: bool, player_id: i64);
 
+    #[signal]
+    fn connection_reconnecting(attempt: i64);
+
+    #[signal]
+    fn connection_restored();
+
     // ------------------------------------------------------------------
     // LOCAL (hotseat)
     // ------------------------------------------------------------------
@@ -1660,6 +1666,31 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn rejoin_relay_room(&mut self, code: GString) -> bool {
+        let Some(relay) = &mut self.relay_client else {
+            return false;
+        };
+        match relay.rejoin_room(&code.to_string()) {
+            Ok(_pid) => {
+                self.poll_relay_events();
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    #[func]
+    pub fn emit_connection_reconnecting(&mut self, attempt: i64) {
+        self.base_mut()
+            .emit_signal("connection_reconnecting", &[Variant::from(attempt)]);
+    }
+
+    #[func]
+    pub fn emit_connection_restored(&mut self) {
+        self.base_mut().emit_signal("connection_restored", &[]);
+    }
+
+    #[func]
     fn start_spectating(&mut self, host_addr: GString) -> bool {
         let addr = host_addr.to_string();
         match TcpClientTransport::connect_as_new_player(&addr, "Spectator") {
@@ -2463,19 +2494,24 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn is_network_mode(&self) -> bool {
+        self.is_multiplayer() || self.relay_client.is_some()
+    }
+
+    #[func]
     pub fn can_undo(&self) -> bool {
-        if self.is_multiplayer() {
+        if self.is_network_mode() {
             return false;
         }
         if let BridgeMode::Local { session, .. } = &self.mode {
-            return session.export_log().map(|b| !b.is_empty()).unwrap_or(false);
+            return !session.command_log().is_empty();
         }
         false
     }
 
     #[func]
     pub fn can_redo(&self) -> bool {
-        if self.is_multiplayer() {
+        if self.is_network_mode() {
             return false;
         }
         !self.undone_commands.is_empty()
@@ -2486,9 +2522,54 @@ impl OpenTableBridge {
         self.undo()
     }
 
+    /// Deshace la última jugada en modo Hotseat o vs IA.
+    /// En modo vs IA, si el último comando corresponde a la respuesta de la IA,
+    /// deshace tanto la respuesta de la IA como la jugada humana previa.
+    /// En partidas de red (`is_network_mode() == true`), retorna `false`.
+    #[func]
+    pub fn undo_last_move(&mut self) -> bool {
+        if self.is_network_mode() {
+            return false;
+        }
+
+        let steps_to_undo = match &self.mode {
+            BridgeMode::Local { session, ai_player } => {
+                if session.command_log().is_empty() {
+                    return false;
+                }
+                if let Some(ai_p) = ai_player {
+                    let last_is_ai = session
+                        .command_log()
+                        .last()
+                        .and_then(|(_, _, cmd)| cmd.issuer())
+                        .map(|issuer| issuer == *ai_p)
+                        .unwrap_or(true);
+                    if last_is_ai && session.command_log().len() >= 2 {
+                        2
+                    } else {
+                        1
+                    }
+                } else {
+                    1
+                }
+            }
+            _ => return false,
+        };
+
+        let mut any_undone = false;
+        for _ in 0..steps_to_undo {
+            if self.undo() {
+                any_undone = true;
+            } else {
+                break;
+            }
+        }
+        any_undone
+    }
+
     #[func]
     pub fn undo(&mut self) -> bool {
-        if self.is_multiplayer() {
+        if self.is_network_mode() {
             return false;
         }
 
@@ -2879,6 +2960,144 @@ impl OpenTableBridge {
         false
     }
 
+    /// Declara la rendición formal del jugador `player_id`, adjudicando la victoria al rival
+    /// y emitiendo la señal `game_over(winner_id)`.
+    #[func]
+    pub fn resign_match(&mut self, player_id: i64) -> i64 {
+        let resigning = PlayerId(player_id.max(1) as u32);
+        let mut winner_id: i64 = if player_id == 1 { 2 } else { 1 };
+
+        match &mut self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::RelayHost { session }
+            | BridgeMode::Tournament { session, .. } => {
+                if let Some(turn_res) = session
+                    .world()
+                    .get_resource::<open_table_engine::turn::TurnResource>()
+                {
+                    if let Some(opp) = turn_res.0.players().iter().find(|&&p| p != resigning) {
+                        winner_id = opp.0 as i64;
+                    }
+                }
+                session
+                    .world_mut()
+                    .insert_resource(open_table_engine::session::GameOverResource(true));
+                session.world_mut().insert_resource(
+                    open_table_engine::session::WinnerResource(Some(PlayerId(winner_id as u32))),
+                );
+            }
+            BridgeMode::MultiSession { sessions, active } => {
+                if let Some((_, session)) = sessions.get_mut(*active) {
+                    if let Some(turn_res) = session
+                        .world()
+                        .get_resource::<open_table_engine::turn::TurnResource>()
+                    {
+                        if let Some(opp) = turn_res.0.players().iter().find(|&&p| p != resigning) {
+                            winner_id = opp.0 as i64;
+                        }
+                    }
+                    session
+                        .world_mut()
+                        .insert_resource(open_table_engine::session::GameOverResource(true));
+                    session.world_mut().insert_resource(
+                        open_table_engine::session::WinnerResource(Some(PlayerId(
+                            winner_id as u32,
+                        ))),
+                    );
+                }
+            }
+            _ => {}
+        }
+
+        let events: Vec<Box<dyn Event>> = vec![Box::new(GameOverEvent {
+            winner: PlayerId(winner_id as u32),
+        })];
+        let serialized = serde_json::to_vec(&events).unwrap_or_default();
+        match &mut self.mode {
+            BridgeMode::Host { transport, .. } => {
+                let _ = transport.broadcast(&serialized);
+            }
+            BridgeMode::NativeHost { transport, .. } => {
+                let _ = transport.broadcast(&serialized);
+            }
+            BridgeMode::MultipeerHost { transport, .. } => {
+                let _ = transport.broadcast(&serialized);
+            }
+            BridgeMode::RelayHost { .. } => {
+                if let Some(relay) = &mut self.relay_client {
+                    let _ = relay.send_relay_data(&serialized);
+                }
+            }
+            _ => {}
+        }
+
+        self.emit_bridge_signal("game_over", &[Variant::from(winner_id)]);
+        self.check_advance_tournament(winner_id);
+        winner_id
+    }
+
+    /// Declara tablas (empate formal) en la partida activa y emite `game_over(0)`.
+    #[func]
+    pub fn declare_draw(&mut self) -> bool {
+        match &mut self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::RelayHost { session }
+            | BridgeMode::Tournament { session, .. } => {
+                session
+                    .world_mut()
+                    .insert_resource(open_table_engine::session::GameOverResource(true));
+                session
+                    .world_mut()
+                    .insert_resource(open_table_engine::session::WinnerResource(None));
+            }
+            BridgeMode::MultiSession { sessions, active } => {
+                if let Some((_, session)) = sessions.get_mut(*active) {
+                    session
+                        .world_mut()
+                        .insert_resource(open_table_engine::session::GameOverResource(true));
+                    session
+                        .world_mut()
+                        .insert_resource(open_table_engine::session::WinnerResource(None));
+                }
+            }
+            _ => {}
+        }
+
+        let events: Vec<Box<dyn Event>> = vec![Box::new(go_game::GameOverEvent {
+            winner: None,
+            black_score: 0.0,
+            white_score: 0.0,
+        })];
+        let serialized = serde_json::to_vec(&events).unwrap_or_default();
+        match &mut self.mode {
+            BridgeMode::Host { transport, .. } => {
+                let _ = transport.broadcast(&serialized);
+            }
+            BridgeMode::NativeHost { transport, .. } => {
+                let _ = transport.broadcast(&serialized);
+            }
+            BridgeMode::MultipeerHost { transport, .. } => {
+                let _ = transport.broadcast(&serialized);
+            }
+            BridgeMode::RelayHost { .. } => {
+                if let Some(relay) = &mut self.relay_client {
+                    let _ = relay.send_relay_data(&serialized);
+                }
+            }
+            _ => {}
+        }
+
+        self.emit_bridge_signal("game_over", &[Variant::from(0_i64)]);
+        self.check_advance_tournament(0);
+        true
+    }
+
     #[func]
     fn poll_events(&mut self) {
         match &mut self.mode {
@@ -3000,6 +3219,60 @@ impl OpenTableBridge {
                     }
                     _ => {}
                 },
+                RelayClientEvent::Reconnecting { attempt, .. } => {
+                    self.base_mut()
+                        .emit_signal("connection_reconnecting", &[Variant::from(attempt as i64)]);
+                }
+                RelayClientEvent::ConnectionRestored {
+                    room_code: _,
+                    player_id,
+                    seed,
+                    commands,
+                } => {
+                    if !commands.is_empty() {
+                        let gtype = if self.current_game_type.is_empty() {
+                            "checkers".to_string()
+                        } else {
+                            self.current_game_type.clone()
+                        };
+                        let (_, _, players, rules) =
+                            get_session_init_params(&gtype, PlayerId(1), PlayerId(2));
+                        let mut restored_session = Session::new(SessionId(1), seed, players, rules);
+                        let mut collected_events = Vec::new();
+                        for cmd_val in &commands {
+                            if let Ok(cmd_str) = serde_json::to_string(cmd_val) {
+                                if let Ok(cmd) = parse_command_json(&cmd_str, &gtype) {
+                                    let issuer = cmd
+                                        .issuer()
+                                        .unwrap_or_else(|| restored_session.current_player());
+                                    if let Ok(evs) = restored_session.process_command(issuer, cmd) {
+                                        collected_events.extend(evs);
+                                    }
+                                }
+                            }
+                        }
+                        let current_p = restored_session.current_player().0 as i64;
+                        match &mut self.mode {
+                            BridgeMode::RelayHost { session } => {
+                                *session = restored_session;
+                            }
+                            BridgeMode::RelayClient {
+                                player_id: pid,
+                                client_current_player,
+                            } => {
+                                *pid = player_id;
+                                *client_current_player = current_p;
+                            }
+                            _ => {}
+                        }
+                        if !collected_events.is_empty() {
+                            self.emit_game_events(&collected_events);
+                        }
+                        self.base_mut()
+                            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+                    }
+                    self.base_mut().emit_signal("connection_restored", &[]);
+                }
                 RelayClientEvent::Disconnected => {
                     self.base_mut().emit_signal("disconnected", &[]);
                 }

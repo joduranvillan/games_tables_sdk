@@ -145,11 +145,20 @@ func _setup_ui() -> void:
 
 	# Rules Button
 	var rules_btn = Button.new()
-	rules_btn.text = " ? "
-	rules_btn.position = Vector2(675, 10)
-	rules_btn.custom_minimum_size = Vector2(36, 36)
+	rules_btn.name = "RulesButton"
+	rules_btn.text = "📖 Reglas"
+	rules_btn.position = Vector2(620, 10)
+	rules_btn.custom_minimum_size = Vector2(90, 36)
 	rules_btn.pressed.connect(func(): rules_popup.show_for_game("ludo"))
 	add_child(rules_btn)
+
+	var tutorial_btn := Button.new()
+	tutorial_btn.name = "LudoTutorialButton"
+	tutorial_btn.text = "🎓 Tutorial"
+	tutorial_btn.position = Vector2(510, 10)
+	tutorial_btn.custom_minimum_size = Vector2(105, 36)
+	tutorial_btn.pressed.connect(start_ludo_tutorial)
+	add_child(tutorial_btn)
 
 	rules_popup = RulesPopup.new()
 	rules_popup.visible = false
@@ -174,7 +183,7 @@ func _setup_ui() -> void:
 			btn.pivot_offset = Vector2(15, 15)
 			
 			var img = Image.create(32, 32, false, Image.FORMAT_RGBA8)
-			var p_col = GameManager.get_player_color(p)
+			var p_col = _get_token_color(p)
 			for x in range(32):
 				for y in range(32):
 					var dist = Vector2(x - 16, y - 16).length()
@@ -196,12 +205,37 @@ func _setup_ui() -> void:
 					font = current_theme.piece_font
 				if font == null:
 					font = ThemeDB.fallback_font
-				btn.draw_string(font, Vector2(0, 20), str(pid), HORIZONTAL_ALIGNMENT_CENTER, 30, 14, Color.WHITE)
+				var label_txt := _get_token_symbol(pid)
+				btn.draw_string(font, Vector2(0, 20), label_txt, HORIZONTAL_ALIGNMENT_CENTER, 30, 13, Color.WHITE)
 			)
 			
 			btn.pressed.connect(func(): _on_token_pressed(pid, tid))
 			add_child(btn)
 			token_buttons[p].append(btn)
+
+func _get_token_color(player_id: int) -> Color:
+	var fallback := GameManager.get_player_color(player_id)
+	if has_node("/root/ThemeManager"):
+		var tm = get_node("/root/ThemeManager")
+		if tm.has_method("is_colorblind_mode") and bool(tm.call("is_colorblind_mode")):
+			if tm.has_method("get_player_color"):
+				return tm.call("get_player_color", player_id, fallback)
+	return fallback
+
+func _get_token_symbol(player_id: int) -> String:
+	match player_id:
+		1: return "▲"
+		2: return "●"
+		3: return "■"
+		4: return "◆"
+		5: return "⬟"
+		6: return "★"
+		_: return str(player_id)
+
+func start_ludo_tutorial() -> void:
+	var LudoTut = load("res://scripts/tutorials/ludo_tutorial.gd")
+	if LudoTut != null:
+		LudoTut.start_on_board(self)
 
 func _is_colorblind_pattern_pixel(player_id: int, x: int, y: int) -> bool:
 	match player_id:

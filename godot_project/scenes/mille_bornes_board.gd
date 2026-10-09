@@ -207,6 +207,7 @@ func _setup_ui() -> void:
 	top_bar.add_child(title_lbl)
 
 	var btn_rules = Button.new()
+	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.custom_minimum_size = Vector2(90, 36)
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("mille_bornes"))
@@ -418,6 +419,22 @@ func _get_card_info(raw_card_name: String) -> Dictionary:
 		"style": cat_style
 	}
 
+func _get_accessible_category_color(category: String, fallback: Color) -> Color:
+	if has_node("/root/ThemeManager"):
+		var tm = get_node("/root/ThemeManager")
+		if tm.has_method("is_colorblind_mode") and bool(tm.call("is_colorblind_mode")):
+			if tm.has_method("get_accessible_color"):
+				return tm.call("get_accessible_color", category, fallback)
+	return fallback
+
+func _get_category_symbol(category: String) -> String:
+	match category:
+		"HAZARD": return "▲"   # Rojo
+		"DISTANCE": return "●" # Azul
+		"REMEDY": return "■"   # Verde
+		"SAFETY": return "◆"   # Amarillo
+		_: return "★"
+
 func _create_card_button(card_info: Dictionary, idx: int) -> PanelContainer:
 	var panel = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(95, 115)
@@ -426,8 +443,9 @@ func _create_card_button(card_info: Dictionary, idx: int) -> PanelContainer:
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var style_info = card_info["style"]
+	var category_key: String = String(card_info.get("category", "DEFAULT"))
 	var sb = StyleBoxFlat.new()
-	sb.bg_color = style_info["color"]
+	sb.bg_color = _get_accessible_category_color(category_key, style_info["color"])
 	sb.border_color = style_info["border"]
 	sb.set_border_width_all(2)
 	sb.corner_radius_top_left = 8
@@ -446,9 +464,10 @@ func _create_card_button(card_info: Dictionary, idx: int) -> PanelContainer:
 	panel.add_child(vbox)
 
 	var icon_lbl = Label.new()
-	icon_lbl.text = card_info["icon"]
+	var geom_sym := _get_category_symbol(category_key)
+	icon_lbl.text = "%s %s" % [geom_sym, card_info["icon"]]
 	icon_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	icon_lbl.add_theme_font_size_override("font_size", 22)
+	icon_lbl.add_theme_font_size_override("font_size", 19)
 	vbox.add_child(icon_lbl)
 
 	var title_lbl = Label.new()

@@ -241,10 +241,18 @@ func _setup_ui() -> void:
 	status_header_panel.add_child(top_info_label)
 
 	var btn_rules = Button.new()
+	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.custom_minimum_size = Vector2(90, 36)
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("uno"))
 	top_bar.add_child(btn_rules)
+
+	var tutorial_btn := Button.new()
+	tutorial_btn.name = "UnoTutorialButton"
+	tutorial_btn.text = "🎓 Tutorial"
+	tutorial_btn.custom_minimum_size = Vector2(105, 36)
+	tutorial_btn.pressed.connect(start_uno_tutorial)
+	top_bar.add_child(tutorial_btn)
 
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
@@ -510,6 +518,11 @@ func _setup_draw_deck_visual() -> void:
 
 	draw_pile_button.pressed.connect(_on_draw_pile_pressed)
 
+func start_uno_tutorial() -> void:
+	var UnoTut = load("res://scripts/tutorials/uno_tutorial.gd")
+	if UnoTut != null:
+		UnoTut.start_on_board(self)
+
 # -------------------------------------------------------------------------
 # WILD COLOR SELECTOR MODAL (a, d)
 # -------------------------------------------------------------------------
@@ -613,8 +626,8 @@ func _create_card_visual(card: Dictionary, is_playable: bool = true, is_large: b
 	card_panel.pivot_offset = Vector2(width / 2.0, height) # Fan pivot at bottom center
 	card_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Base card color
-	var base_col = CARD_COLORS.get(c_color, CARD_COLORS["Wild"])
+	# Base card color (soporta paleta Okabe-Ito / Alto Contraste de ThemeManager)
+	var base_col = _get_accessible_card_color(c_color)
 	var style = StyleBoxFlat.new()
 	style.bg_color = base_col
 	style.set_corner_radius_all(10)
@@ -741,13 +754,26 @@ func _create_card_back_visual() -> Control:
 
 	return card_panel
 
+func _get_accessible_card_color(c_color: String) -> Color:
+	var fallback: Color = CARD_COLORS.get(c_color, CARD_COLORS["Wild"])
+	if c_color in ["Wild", "WildColor"]:
+		return fallback
+	if has_node("/root/ThemeManager"):
+		var tm = get_node("/root/ThemeManager")
+		if tm.has_method("is_colorblind_mode") and bool(tm.call("is_colorblind_mode")):
+			if tm.has_method("get_accessible_color"):
+				return tm.call("get_accessible_color", c_color, fallback)
+	return fallback
+
 func _get_colorblind_symbol(c_color: String) -> String:
 	match c_color:
-		"Red": return "●"
-		"Blue": return "■"
-		"Green": return "▲"
-		"Yellow": return "★"
-		_: return "◆"
+		"Red": return "▲"
+		"Blue": return "●"
+		"Green": return "■"
+		"Yellow": return "◆"
+		"Orange": return "★"
+		"Violet": return "⬟"
+		_: return "✦"
 
 func _get_card_display_symbol(val: String) -> String:
 	match val:

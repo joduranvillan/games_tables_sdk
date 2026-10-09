@@ -7,7 +7,9 @@ mod handshake;
 mod host;
 
 pub use client::{
-    RelayClientEvent, WsClientTransport, WsRelayClient, HEARTBEAT_INTERVAL, HOST_PLAYER_ID,
+    reconnect_backoff_duration, ReconnectPolicy, ReconnectState, RelayClientEvent,
+    WsClientTransport, WsRelayClient, HEARTBEAT_INTERVAL, HOST_PLAYER_ID, MAX_RECONNECT_ATTEMPTS,
+    RECONNECT_BACKOFF_MS,
 };
 pub use handshake::{HandshakeRequest, HandshakeResponse, PROTOCOL_VERSION};
 pub use host::{ConnectionEvent, WsHostTransport};

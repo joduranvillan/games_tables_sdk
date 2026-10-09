@@ -2,11 +2,14 @@
 class_name TurnIndicator
 extends HBoxContainer
 
+const TurnTimerHudScript = preload("res://scenes/turn_timer_hud.gd")
+
 @export var default_time: float = 30.0
 
 var color_rect: ColorRect
 var label: Label
 var timer_bar: ProgressBar
+var turn_timer_hud: TurnTimerHud
 var theme_btn: Button
 var undo_btn: Button
 var redo_btn: Button
@@ -88,7 +91,7 @@ func _setup_nodes() -> void:
 	label.add_theme_font_size_override("font_size", 16)
 	add_child(label)
 	
-	# 3. Timer ProgressBar
+	# 3. Timer ProgressBar & TurnTimerHud (MM:SS)
 	timer_bar = ProgressBar.new()
 	timer_bar.name = "TurnTimer"
 	timer_bar.custom_minimum_size = Vector2(100, 20)
@@ -96,6 +99,11 @@ func _setup_nodes() -> void:
 	timer_bar.show_percentage = false
 	timer_bar.value = 100.0
 	add_child(timer_bar)
+
+	turn_timer_hud = TurnTimerHudScript.new()
+	turn_timer_hud.size_flags_vertical = SIZE_SHRINK_CENTER
+	turn_timer_hud.progress_bar.visible = false
+	add_child(turn_timer_hud)
 	
 	# 4. Undo button
 	undo_btn = Button.new()
@@ -180,10 +188,14 @@ func start_timer(seconds: float) -> void:
 	time_left = seconds
 	timer_active = true
 	timer_bar.value = 100.0
+	if turn_timer_hud != null:
+		turn_timer_hud.start_turn_timer(current_player_id, seconds)
 
 func stop_timer() -> void:
 	timer_active = false
 	timer_bar.value = 0.0
+	if turn_timer_hud != null:
+		turn_timer_hud.stop_turn_timer()
 	if pulse_tween != null and pulse_tween.is_valid():
 		pulse_tween.kill()
 

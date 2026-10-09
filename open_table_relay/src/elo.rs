@@ -187,6 +187,12 @@ impl EloStore {
                 writeln!(file, "{json}")?;
             }
         }
-        file.flush()
+        file.flush()?;
+        file.sync_all()
+    }
+
+    /// Ejecuta un flush completo y sincronización de almacenamiento (`WAL checkpoint`) antes de apagar el servidor.
+    pub fn wal_checkpoint_and_flush(&mut self) -> std::io::Result<()> {
+        self.flush_to_disk()
     }
 }

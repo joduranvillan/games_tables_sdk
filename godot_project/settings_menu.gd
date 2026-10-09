@@ -9,6 +9,7 @@ var music_slider: HSlider
 var sfx_slider: HSlider
 var sfx_checkbox: CheckBox
 var anim_checkbox: CheckBox
+var haptics_checkbox: CheckBox
 var fullscreen_check: CheckButton
 var font_size_slider: HSlider
 var font_size_label: Label
@@ -18,6 +19,10 @@ var p2_line: LineEdit
 var lang_option: OptionButton
 var highlight_checkbox: CheckBox
 var colorblind_checkbox: CheckBox
+var colorblind_mode_label: Label
+var colorblind_mode_option: OptionButton
+var font_scale_label: Label
+var font_scale_option: OptionButton
 var save_button: Button
 var close_button: Button
 var title_label: Label
@@ -56,7 +61,21 @@ const THEME_KEYS = [
 	{"key": "jade", "name": "THEME_JADE"}
 ]
 
-const FONT_TIER_NAMES = ["Pequeño", "Mediano", "Grande"]
+const FONT_TIER_NAMES = ["Pequeño (1.0x)", "Mediano (1.15x)", "Grande (1.3x)"]
+
+const COLORBLIND_MODE_OPTIONS = [
+	{"mode": "none", "name": "Ninguno (Estándar)"},
+	{"mode": "deuteranopia", "name": "Deuteranopia (Okabe-Ito)"},
+	{"mode": "protanopia", "name": "Protanopia (Okabe-Ito)"},
+	{"mode": "tritanopia", "name": "Tritanopia (Okabe-Ito)"},
+	{"mode": "high_contrast", "name": "Alto Contraste"}
+]
+
+const FONT_SCALE_OPTIONS = [
+	{"scale": 1.0, "name": "100% (1.0x)"},
+	{"scale": 1.15, "name": "115% (1.15x)"},
+	{"scale": 1.3, "name": "130% (1.3x)"}
+]
 
 func _ready() -> void:
 	_setup_ui()
@@ -151,18 +170,31 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	lang_option.item_selected.connect(_on_lang_selected)
 	parent.add_child(lang_option)
 
-	# Font size tier slider
+	# Font size tier slider & selector de Tamaño de Texto (1.0, 1.15, 1.3)
 	font_size_label = Label.new()
-	font_size_label.text = "Tamaño de fuente: Mediano"
+	font_size_label.text = "Tamaño de fuente: Pequeño (1.0x)"
 	parent.add_child(font_size_label)
 
 	font_size_slider = HSlider.new()
 	font_size_slider.min_value = 0
 	font_size_slider.max_value = 2
 	font_size_slider.step = 1
-	font_size_slider.value = 1
+	font_size_slider.value = 0
 	font_size_slider.value_changed.connect(_on_font_size_changed)
 	parent.add_child(font_size_slider)
+
+	font_scale_label = Label.new()
+	font_scale_label.name = "FontScaleLabel"
+	font_scale_label.text = "Tamaño de Texto (Escalado UI)"
+	parent.add_child(font_scale_label)
+
+	font_scale_option = OptionButton.new()
+	font_scale_option.name = "FontScaleOptionButton"
+	for fs_item in FONT_SCALE_OPTIONS:
+		font_scale_option.add_item(fs_item["name"])
+	font_scale_option.selected = 0
+	font_scale_option.item_selected.connect(_on_font_scale_selected)
+	parent.add_child(font_scale_option)
 	
 	# Audio settings: Música & SFX independientes (en decibelios)
 	music_label = Label.new()
@@ -209,6 +241,19 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	anim_checkbox.text = "Habilitar animaciones visuales"
 	anim_checkbox.button_pressed = true
 	parent.add_child(anim_checkbox)
+
+	# Haptics Checkbox (Móvil)
+	haptics_checkbox = CheckBox.new()
+	haptics_checkbox.name = "HapticsCheckBox"
+	haptics_checkbox.text = "Vibración háptica (Móvil)"
+	haptics_checkbox.button_pressed = true
+	haptics_checkbox.toggled.connect(func(on: bool):
+		if has_node("/root/HapticsManager"):
+			var hm = get_node("/root/HapticsManager")
+			if hm.has_method("set_haptics_enabled"):
+				hm.call("set_haptics_enabled", on)
+	)
+	parent.add_child(haptics_checkbox)
 
 	# Fullscreen CheckButton
 	fullscreen_check = CheckButton.new()
@@ -257,13 +302,29 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	highlight_checkbox.text = "Resaltar movimientos válidos"
 	parent.add_child(highlight_checkbox)
 
+	colorblind_mode_label = Label.new()
+	colorblind_mode_label.name = "ColorblindModeLabel"
+	colorblind_mode_label.text = "Modo Daltónico / Contraste"
+	parent.add_child(colorblind_mode_label)
+
+	colorblind_mode_option = OptionButton.new()
+	colorblind_mode_option.name = "ColorblindModeOptionButton"
+	for cb_item in COLORBLIND_MODE_OPTIONS:
+		colorblind_mode_option.add_item(cb_item["name"])
+	colorblind_mode_option.selected = 0
+	colorblind_mode_option.item_selected.connect(_on_colorblind_mode_selected)
+	parent.add_child(colorblind_mode_option)
+
 	colorblind_checkbox = CheckBox.new()
 	colorblind_checkbox.text = "Modo Accesibilidad Daltónicos"
 	colorblind_checkbox.toggled.connect(func(on: bool):
+		var target_mode := "deuteranopia" if on else "none"
+		if colorblind_mode_option != null:
+			colorblind_mode_option.selected = 1 if on else 0
 		if has_node("/root/ThemeManager"):
 			var tm = get_node("/root/ThemeManager")
 			if tm.has_method("set_colorblind_mode"):
-				tm.call("set_colorblind_mode", on)
+				tm.call("set_colorblind_mode", target_mode)
 	)
 	parent.add_child(colorblind_checkbox)
 
@@ -441,12 +502,40 @@ func _refresh_localized_texts() -> void:
 			theme_option.selected = sel
 
 func _on_font_size_changed(value: float) -> void:
-	var tier = int(value)
+	var tier = clampi(int(value), 0, 2)
 	font_size_label.text = "Tamaño de fuente: %s" % FONT_TIER_NAMES[tier]
+	if font_scale_option != null and font_scale_option.selected != tier:
+		font_scale_option.selected = tier
 	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
 		var tm = get_node_or_null("/root/ThemeManager")
 		if tm != null:
 			tm.set_font_tier(tier)
+
+func _on_font_scale_selected(index: int) -> void:
+	if index < 0 or index >= FONT_SCALE_OPTIONS.size():
+		return
+	var scale_val: float = float(FONT_SCALE_OPTIONS[index]["scale"])
+	if font_size_slider != null and int(font_size_slider.value) != index:
+		font_size_slider.value = index
+	if font_size_label != null:
+		font_size_label.text = "Tamaño de fuente: %s" % FONT_TIER_NAMES[index]
+	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
+		var tm = get_node_or_null("/root/ThemeManager")
+		if tm != null and tm.has_method("set_ui_font_scale"):
+			tm.call("set_ui_font_scale", scale_val)
+
+func _on_colorblind_mode_selected(index: int) -> void:
+	if index < 0 or index >= COLORBLIND_MODE_OPTIONS.size():
+		return
+	var mode_val: String = String(COLORBLIND_MODE_OPTIONS[index]["mode"])
+	if colorblind_checkbox != null:
+		colorblind_checkbox.set_block_signals(true)
+		colorblind_checkbox.button_pressed = (mode_val != "none")
+		colorblind_checkbox.set_block_signals(false)
+	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
+		var tm = get_node_or_null("/root/ThemeManager")
+		if tm != null and tm.has_method("set_colorblind_mode"):
+			tm.call("set_colorblind_mode", mode_val)
 
 func _load_current_settings() -> void:
 	var settings = get_saved_settings()
@@ -455,11 +544,31 @@ func _load_current_settings() -> void:
 	sfx_slider.value = settings["sfx_volume"]
 	sfx_checkbox.button_pressed = settings.get("sfx_enabled", true)
 	anim_checkbox.button_pressed = settings.get("animations_enabled", true)
+	if haptics_checkbox != null:
+		haptics_checkbox.button_pressed = bool(settings.get("haptics_enabled", true))
 	if fullscreen_check != null:
 		var fs_val: bool = settings.get("fullscreen", false)
 		fullscreen_check.button_pressed = fs_val
-	font_size_slider.value = settings.get("font_size_tier", 1)
-	font_size_label.text = "Tamaño de fuente: %s" % FONT_TIER_NAMES[int(font_size_slider.value)]
+	var tier_val: int = clampi(int(settings.get("font_size_tier", 0)), 0, 2)
+	font_size_slider.value = tier_val
+	font_size_label.text = "Tamaño de fuente: %s" % FONT_TIER_NAMES[tier_val]
+	if font_scale_option != null:
+		var saved_scale: float = float(settings.get("ui_font_scale", 1.0))
+		for i in range(FONT_SCALE_OPTIONS.size()):
+			if is_equal_approx(float(FONT_SCALE_OPTIONS[i]["scale"]), saved_scale):
+				font_scale_option.selected = i
+				break
+
+	var saved_cb_mode: String = String(settings.get("colorblind_mode", "none"))
+	if colorblind_mode_option != null:
+		for i in range(COLORBLIND_MODE_OPTIONS.size()):
+			if COLORBLIND_MODE_OPTIONS[i]["mode"] == saved_cb_mode:
+				colorblind_mode_option.selected = i
+				break
+	if colorblind_checkbox != null:
+		colorblind_checkbox.set_block_signals(true)
+		colorblind_checkbox.button_pressed = (saved_cb_mode != "none")
+		colorblind_checkbox.set_block_signals(false)
 	
 	p1_line.text = settings["player1_name"]
 	p2_line.text = settings["player2_name"]
@@ -568,8 +677,11 @@ static func get_saved_settings(cfg_path: String = "user://settings.cfg") -> Dict
 			"sfx_volume": 0.8,
 			"sfx_enabled": true,
 			"animations_enabled": true,
+			"haptics_enabled": true,
 			"fullscreen": false,
-			"font_size_tier": 1,
+			"font_size_tier": 0,
+			"ui_font_scale": 1.0,
+			"colorblind_mode": "none",
 			"board_theme": "wood",
 			"player1_name": "Jugador 1",
 			"player2_name": "Jugador 2",
@@ -581,8 +693,11 @@ static func get_saved_settings(cfg_path: String = "user://settings.cfg") -> Dict
 		"sfx_volume": cfg.get_value("audio", "sfx_volume", 0.8),
 		"sfx_enabled": cfg.get_value("audio", "sfx_enabled", true),
 		"animations_enabled": cfg.get_value("display", "animations_enabled", true),
+		"haptics_enabled": bool(cfg.get_value("accessibility", "haptics_enabled", true)),
 		"fullscreen": cfg.get_value("display", "fullscreen", false),
-		"font_size_tier": cfg.get_value("display", "font_size_tier", 1),
+		"font_size_tier": cfg.get_value("display", "font_size_tier", 0),
+		"ui_font_scale": float(cfg.get_value("accessibility", "ui_font_scale", 1.0)),
+		"colorblind_mode": String(cfg.get_value("accessibility", "colorblind_mode", "none")),
 		"board_theme": cfg.get_value("theme", "board_theme", "wood"),
 		"player1_name": cfg.get_value("players", "player1_name", "Jugador 1"),
 		"player2_name": cfg.get_value("players", "player2_name", "Jugador 2"),
@@ -596,8 +711,13 @@ func _on_save_pressed() -> void:
 	var sfx_vol = sfx_slider.value
 	var sfx_on = sfx_checkbox.button_pressed
 	var anim_on = anim_checkbox.button_pressed
+	var haptics_on = haptics_checkbox.button_pressed if haptics_checkbox != null else true
 	var is_fs = fullscreen_check.button_pressed if fullscreen_check != null else false
 	var font_tier = int(font_size_slider.value)
+	var fs_idx = font_scale_option.selected if font_scale_option != null else font_tier
+	var ui_scale_val: float = float(FONT_SCALE_OPTIONS[fs_idx]["scale"]) if fs_idx >= 0 and fs_idx < FONT_SCALE_OPTIONS.size() else 1.0
+	var cb_idx = colorblind_mode_option.selected if colorblind_mode_option != null else 0
+	var cb_mode_val: String = String(COLORBLIND_MODE_OPTIONS[cb_idx]["mode"]) if cb_idx >= 0 and cb_idx < COLORBLIND_MODE_OPTIONS.size() else "none"
 	var theme_idx = theme_option.selected
 	var theme_key = THEME_KEYS[theme_idx]["key"] if theme_idx >= 0 and theme_idx < THEME_KEYS.size() else "wood"
 	var p1_name = p1_line.text
@@ -616,6 +736,9 @@ func _on_save_pressed() -> void:
 	cfg.set_value("display", "animations_enabled", anim_on)
 	cfg.set_value("display", "fullscreen", is_fs)
 	cfg.set_value("display", "font_size_tier", font_tier)
+	cfg.set_value("accessibility", "ui_font_scale", ui_scale_val)
+	cfg.set_value("accessibility", "colorblind_mode", cb_mode_val)
+	cfg.set_value("accessibility", "haptics_enabled", haptics_on)
 	cfg.set_value("theme", "board_theme", theme_key)
 	cfg.set_value("players", "player1_name", p1_name)
 	cfg.set_value("players", "player2_name", p2_name)
@@ -645,7 +768,13 @@ func _on_save_pressed() -> void:
 		var tm = get_node_or_null("/root/ThemeManager")
 		if tm != null:
 			tm.set_theme(theme_key)
-			tm.set_font_tier(font_tier)
+			tm.set_ui_font_scale(ui_scale_val)
+			tm.set_colorblind_mode(cb_mode_val)
+
+	if has_node("/root/HapticsManager"):
+		var hm = get_node("/root/HapticsManager")
+		if hm.has_method("set_haptics_enabled"):
+			hm.call("set_haptics_enabled", haptics_on)
 
 	if has_node("/root/GameManager"):
 		var gm = get_node("/root/GameManager")

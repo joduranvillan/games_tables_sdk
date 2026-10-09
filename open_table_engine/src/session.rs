@@ -182,6 +182,14 @@ pub trait LegalMoveGenerator: Send + Sync + 'static {
 #[derive(Resource, Clone)]
 pub struct LegalMoveGeneratorResource(pub std::sync::Arc<dyn LegalMoveGenerator>);
 
+#[derive(Clone, Debug)]
+struct InitialSessionState {
+    seed: u64,
+    players: Vec<PlayerId>,
+    variant: GameVariant,
+    metadata: SessionMetadata,
+}
+
 pub struct Session {
     pub id: SessionId,
     pub mode: SessionMode,
@@ -189,6 +197,7 @@ pub struct Session {
     rules: RuleEngine,
     clock: GameClock,
     command_log: Vec<LoggedCommand>,
+    initial_state: InitialSessionState,
     initial_setup: Option<InitialSetupFn>,
     paused: bool,
     watchers: Vec<Box<dyn ResourceWatcher + Send + Sync>>,
@@ -248,7 +257,7 @@ impl Session {
         world.insert_resource(TurnResource(TurnOrder::new(players.clone())));
         world.insert_resource(GameOverResource(false));
         world.insert_resource(WinnerResource(None));
-        world.insert_resource(GameVariantResource(variant));
+        world.insert_resource(GameVariantResource(variant.clone()));
 
         let started_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -260,7 +269,14 @@ impl Session {
             started_at,
             max_players: players.len(),
         };
-        world.insert_resource(SessionMetadataResource(metadata));
+        world.insert_resource(SessionMetadataResource(metadata.clone()));
+
+        let initial_state = InitialSessionState {
+            seed,
+            players,
+            variant,
+            metadata,
+        };
 
         Self {
             id,
@@ -269,6 +285,7 @@ impl Session {
             rules,
             clock: GameClock::new(),
             command_log: Vec::new(),
+            initial_state,
             initial_setup: None,
             paused: false,
             watchers: Vec::new(),
@@ -669,9 +686,10 @@ impl Session {
         None
     }
 
-    /// Revierte el último comando del log replaying desde cero.
+    /// Revierte el último comando del log reconstruyendo el estado determinísticamente
+    /// desde un clon de `initial_state` + `history[..len-1]`.
     /// Disponible solo si `SessionMode::Local`.
-    pub fn undo_last_command(&mut self) -> EngineResult<()> {
+    pub fn undo_last_command(&mut self) -> Result<(), EngineError> {
         if self.mode != SessionMode::Local {
             return Err(EngineError::InvalidCommand {
                 reason: "Undo solo disponible en modo Local".into(),
@@ -682,44 +700,30 @@ impl Session {
             return Ok(());
         }
 
-        self.command_log.pop();
-        let remaining_commands: Vec<_> =
-            self.command_log.drain(..).map(|(_, _, cmd)| cmd).collect();
+        let target_len = self.command_log.len() - 1;
+        let remaining_commands: Vec<_> = self
+            .command_log
+            .drain(..)
+            .take(target_len)
+            .map(|(_, _, cmd)| cmd)
+            .collect();
 
-        let seed = self
+        let init = self.initial_state.clone();
+        let legal_gen = self
             .world
-            .get_resource::<RandomResource>()
-            .map(|r| r.0.seed())
-            .unwrap_or(0);
-        let players = self
-            .world
-            .get_resource::<TurnResource>()
-            .map(|t| t.0.players().to_vec())
-            .unwrap_or_default();
-        let variant = self
-            .world
-            .get_resource::<GameVariantResource>()
-            .map(|v| v.0.clone())
-            .unwrap_or(GameVariant::Standard);
-        let game_name = self.metadata().game_name.clone();
+            .get_resource::<LegalMoveGeneratorResource>()
+            .cloned();
 
         let mut new_world = BevyWorld::new();
-        new_world.insert_resource(RandomResource(RandomService::from_seed(seed)));
-        new_world.insert_resource(TurnResource(TurnOrder::new(players.clone())));
+        new_world.insert_resource(RandomResource(RandomService::from_seed(init.seed)));
+        new_world.insert_resource(TurnResource(TurnOrder::new(init.players)));
         new_world.insert_resource(GameOverResource(false));
-        new_world.insert_resource(GameVariantResource(variant));
-
-        let started_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-
-        let metadata = SessionMetadata {
-            game_name,
-            started_at,
-            max_players: players.len(),
-        };
-        new_world.insert_resource(SessionMetadataResource(metadata));
+        new_world.insert_resource(WinnerResource(None));
+        new_world.insert_resource(GameVariantResource(init.variant));
+        new_world.insert_resource(SessionMetadataResource(init.metadata));
+        if let Some(g) = legal_gen {
+            new_world.insert_resource(g);
+        }
 
         if let Some(ref setup) = self.initial_setup {
             setup(&mut new_world);
@@ -950,6 +954,27 @@ impl Session {
             world.insert_resource(sm);
         }
 
+        let seed = world
+            .get_resource::<RandomResource>()
+            .map(|r| r.0.seed())
+            .unwrap_or(0);
+        let players = world
+            .get_resource::<TurnResource>()
+            .map(|t| t.0.players().to_vec())
+            .unwrap_or_default();
+        let variant = world
+            .get_resource::<GameVariantResource>()
+            .map(|v| v.0.clone())
+            .unwrap_or(GameVariant::Standard);
+        let metadata = world
+            .get_resource::<SessionMetadataResource>()
+            .map(|m| m.0.clone())
+            .unwrap_or(SessionMetadata {
+                game_name: "Unknown".into(),
+                started_at: 0,
+                max_players: players.len(),
+            });
+
         Ok(Session {
             id: snapshot.id,
             mode: SessionMode::Local,
@@ -957,6 +982,12 @@ impl Session {
             rules,
             clock: snapshot.clock,
             command_log: snapshot.command_log,
+            initial_state: InitialSessionState {
+                seed,
+                players,
+                variant,
+                metadata,
+            },
             initial_setup: None,
             paused: false,
             watchers: Vec::new(),

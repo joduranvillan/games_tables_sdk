@@ -504,9 +504,10 @@ func _setup_ui() -> void:
 	header_hbox.add_child(title_lbl)
 
 	var btn_rules = Button.new()
+	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.custom_minimum_size = Vector2(85, 32)
-	btn_rules.pressed.connect(func(): rules_popup.show_for_game("teg"))
+	btn_rules.pressed.connect(func(): rules_popup.show_for_game("crisis"))
 	header_hbox.add_child(btn_rules)
 
 	turn_indicator = TurnIndicator.new()

@@ -68,6 +68,7 @@ func _build_procedural_bank() -> void:
 	procedural_cache["check_alert"] = _synth_check_alert()
 	procedural_cache["victory_fanfare"] = _synth_victory_fanfare()
 	procedural_cache["error_buzz"] = _synth_error_buzz()
+	procedural_cache["timer_tick"] = _synth_timer_tick()
 
 func _create_wav_from_samples(samples: PackedFloat32Array) -> AudioStreamWAV:
 	var wav := AudioStreamWAV.new()
@@ -250,22 +251,34 @@ func _play_stream(stream: AudioStream, event_tag: String = "", boost_db: float =
 	player.stream = stream
 	player.play()
 
+func _notify_haptics(method_name: String) -> void:
+	if is_inside_tree() and has_node("/root/HapticsManager"):
+		var hm = get_node("/root/HapticsManager")
+		if hm != null and hm.has_method(method_name):
+			hm.call(method_name)
+
 func play_piece_slide() -> void:
+	_notify_haptics("light_tap")
 	_play_stream(get_procedural_stream("piece_slide"), "piece_slide")
 
 func play_piece_place(boost_db: float = 0.0) -> void:
+	_notify_haptics("medium_impact" if boost_db > 0.5 else "light_tap")
 	_play_stream(get_procedural_stream("piece_place"), "piece_place", boost_db)
 
 func play_dice_roll() -> void:
+	_notify_haptics("medium_impact")
 	_play_stream(get_procedural_stream("dice_roll"), "dice_roll")
 
 func play_card_flip() -> void:
+	_notify_haptics("light_tap")
 	_play_stream(get_procedural_stream("card_flip"), "card_flip")
 
 func play_check_alert() -> void:
+	_notify_haptics("medium_impact")
 	_play_stream(get_procedural_stream("check_alert"), "check_alert")
 
 func play_victory_fanfare() -> void:
+	_notify_haptics("victory_pulse")
 	_play_stream(get_procedural_stream("victory_fanfare"), "victory_fanfare")
 
 func play_error_buzz() -> void:
@@ -297,3 +310,19 @@ func play_net_connect() -> void:
 
 func play_net_disconnect() -> void:
 	play_error_buzz()
+
+func _synth_timer_tick() -> AudioStreamWAV:
+	var duration := 0.06
+	var count := int(MIX_RATE * duration)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	for i in range(count):
+		var t := float(i) / float(MIX_RATE)
+		var env := exp(-40.0 * t)
+		var pulse := sin(TAU * 660.0 * t) * 0.40 + sin(TAU * 990.0 * t) * 0.18
+		samples[i] = pulse * env
+	return _create_wav_from_samples(samples)
+
+func play_timer_tick() -> void:
+	_play_stream(get_procedural_stream("timer_tick"), "timer_tick", -4.0)
+

@@ -1,0 +1,14 @@
+"AppBuild"
+{
+	"AppID" "480"
+	"Desc" "OpenTable v3.0.0 — 13 Classic Board & Card Games"
+	"ContentRoot" "../../dist"
+	"BuildOutput" "./output"
+	"SetLive" "default"
+	"Depots"
+	{
+		"481" "depot_build_windows.vdf"
+		"482" "depot_build_linux.vdf"
+		"483" "depot_build_macos.vdf"
+	}
+}

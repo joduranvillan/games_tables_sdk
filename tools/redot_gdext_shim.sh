@@ -192,6 +192,17 @@ if [ -n "$SCRIPT_ARG" ]; then
 		done
 		echo "PASS: AI extended OK"
 	fi
+	if [ "$(basename "$TARGET_FILE")" = "online_viability_smoke.gd" ]; then
+		for token in \
+			"auth_client.gd" \
+			"lan_discovery.gd" \
+			"device_id" \
+			"start_broadcasting" \
+			"rejoin_relay_room"; do
+			grep -q "$token" "$TARGET_FILE" || { echo "FAIL  Missing $token in $TARGET_FILE"; exit 1; }
+		done
+		echo "PASS: online_viability_smoke.gd OK"
+	fi
 	echo "PASS  $(basename "$TARGET_FILE"): validación y aserciones OK"
 	echo "=== RESULTADO: TODO OK ==="
 fi

@@ -25,6 +25,64 @@ pub const HOST_PLAYER_ID: PlayerId = PlayerId(0);
 /// detrás de proxies reversos y routers NAT.
 pub const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 
+/// Número máximo de intentos de reconexión automática antes de declarar desconexión definitiva.
+pub const MAX_RECONNECT_ATTEMPTS: u32 = 5;
+
+/// Secuencia de backoff exponencial por intento en milisegundos (`500ms`, `1s`, `2s`, `4s`, hasta 5 intentos).
+pub const RECONNECT_BACKOFF_MS: [u64; 5] = [500, 1000, 2000, 4000, 4000];
+
+/// Devuelve la duración de espera de backoff para el intento `attempt` (`1..=5`).
+pub const fn reconnect_backoff_duration(attempt: u32) -> Duration {
+    let idx = if attempt == 0 {
+        0
+    } else if (attempt as usize) <= RECONNECT_BACKOFF_MS.len() {
+        (attempt as usize) - 1
+    } else {
+        RECONNECT_BACKOFF_MS.len() - 1
+    };
+    Duration::from_millis(RECONNECT_BACKOFF_MS[idx])
+}
+
+/// Estado de reconexión automática del cliente WebSocket Relay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReconnectState {
+    /// Conexión establecida normalmente.
+    Connected,
+    /// Reconectando automáticamente con backoff exponencial (`attempt` de `1` a `max_attempts`).
+    Reconnecting { attempt: u32, max_attempts: u32 },
+    /// Desconectado definitivamente (sin sala activa o tras agotar los `max_attempts` intentos).
+    Disconnected,
+}
+
+/// Política configurable de reconexión con backoff exponencial para [`WsRelayClient`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReconnectPolicy {
+    pub max_attempts: u32,
+    pub backoff_ms: [u64; 5],
+}
+
+impl Default for ReconnectPolicy {
+    fn default() -> Self {
+        Self {
+            max_attempts: MAX_RECONNECT_ATTEMPTS,
+            backoff_ms: RECONNECT_BACKOFF_MS,
+        }
+    }
+}
+
+impl ReconnectPolicy {
+    /// Duración de espera antes de ejecutar el intento `attempt` (`1..=max_attempts`).
+    pub fn delay_for_attempt(&self, attempt: u32) -> Duration {
+        if self.backoff_ms.is_empty() {
+            return Duration::from_millis(500);
+        }
+        let idx = attempt
+            .saturating_sub(1)
+            .min((self.backoff_ms.len() - 1) as u32) as usize;
+        Duration::from_millis(self.backoff_ms[idx])
+    }
+}
+
 /// Alfabeto legible de 32 caracteres (sin `O`, `0`, `I`, `1`).
 const RELAY_CODE_ALPHABET: &[u8; 32] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -240,7 +298,16 @@ pub enum RelayClientEvent {
     PayloadReceived { from: PlayerId, data: Vec<u8> },
     /// Respuesta Pong recibida del servidor Relay.
     PongReceived,
-    /// Desconexión del servidor Relay.
+    /// Intento de reconexión automática en curso (`attempt` en `1..=max_attempts`).
+    Reconnecting { attempt: u32, max_attempts: u32 },
+    /// Conexión restaurada exitosamente mediante `rejoin_room`.
+    ConnectionRestored {
+        room_code: String,
+        player_id: PlayerId,
+        seed: u64,
+        commands: Vec<Value>,
+    },
+    /// Desconexión definitiva del servidor Relay (tras agotar los intentos o sin partida activa).
     Disconnected,
     /// Mensaje de error reportado por el Relay.
     Error { message: String },
@@ -341,6 +408,11 @@ enum OutboundRelayCommand {
         room_code: String,
         reply: oneshot::Sender<Result<u32, String>>,
     },
+    Rejoin {
+        room_code: String,
+        player_id: Option<String>,
+        reply: oneshot::Sender<Result<(u32, u64, Vec<Value>), String>>,
+    },
     Relay {
         data: Value,
     },
@@ -350,7 +422,9 @@ enum OutboundRelayCommand {
 /// Cliente de transporte WebSocket preparado para comunicarse con `open_table_relay`.
 ///
 /// Incluye un bucle de heartbeat automático cada [`HEARTBEAT_INTERVAL`] (15 segundos)
-/// enviando `{"op":"ping"}` y tramas `Ping` de WebSocket para evitar cierres por inactividad.
+/// enviando `{"op":"ping"}` y tramas `Ping` de WebSocket para evitar cierres por inactividad,
+/// así como reconexión automática con backoff exponencial (`500ms`, `1s`, `2s`, `4s`, hasta 5 intentos)
+/// enviando `{"op": "rejoin_room"}` cuando la conexión cae durante una partida activa.
 pub struct WsRelayClient {
     client_id: u64,
     relay_url: String,
@@ -358,6 +432,8 @@ pub struct WsRelayClient {
     events: Arc<Mutex<VecDeque<RelayClientEvent>>>,
     incoming_payloads: IncomingQueue,
     connected_remote: Arc<AtomicBool>,
+    reconnect_state: Arc<Mutex<ReconnectState>>,
+    shutdown_flag: Arc<AtomicBool>,
     current_room: Option<String>,
     player_id: PlayerId,
     _worker: Option<thread::JoinHandle<()>>,
@@ -379,6 +455,15 @@ impl WsRelayClient {
     /// Conecta al servidor Relay en `relay_url` y, si se provee `auth_token`, envía
     /// automáticamente `{"op": "auth", "token": "<jwt>"}` como primer mensaje al conectar.
     pub fn connect_with_token(relay_url: &str, auth_token: Option<&str>) -> Self {
+        Self::connect_with_policy(relay_url, auth_token, ReconnectPolicy::default())
+    }
+
+    /// Conecta al servidor Relay en `relay_url` con token opcional y una [`ReconnectPolicy`] específica.
+    pub fn connect_with_policy(
+        relay_url: &str,
+        auth_token: Option<&str>,
+        policy: ReconnectPolicy,
+    ) -> Self {
         let client_id = LOCAL_HUB_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
         let url = relay_url.trim().to_string();
         let initial_token = auth_token
@@ -388,6 +473,8 @@ impl WsRelayClient {
         let events: Arc<Mutex<VecDeque<RelayClientEvent>>> = Arc::new(Mutex::new(VecDeque::new()));
         let incoming_payloads: IncomingQueue = Arc::new(Mutex::new(VecDeque::new()));
         let connected_remote = Arc::new(AtomicBool::new(false));
+        let reconnect_state = Arc::new(Mutex::new(ReconnectState::Connected));
+        let shutdown_flag = Arc::new(AtomicBool::new(false));
 
         let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<OutboundRelayCommand>();
         let (conn_init_tx, conn_init_rx) = oneshot::channel::<bool>();
@@ -395,6 +482,8 @@ impl WsRelayClient {
         let events_clone = Arc::clone(&events);
         let incoming_clone = Arc::clone(&incoming_payloads);
         let connected_flag = Arc::clone(&connected_remote);
+        let reconnect_state_clone = Arc::clone(&reconnect_state);
+        let shutdown_flag_clone = Arc::clone(&shutdown_flag);
         let url_for_thread = url.clone();
 
         let worker = thread::spawn(move || {
@@ -415,6 +504,7 @@ impl WsRelayClient {
                     match tokio::time::timeout(Duration::from_millis(400), connect_fut).await {
                         Ok(Ok((ws, _))) => {
                             connected_flag.store(true, Ordering::SeqCst);
+                            *reconnect_state_clone.lock().unwrap() = ReconnectState::Connected;
                             let _ = conn_init_tx.send(true);
                             ws
                         }
@@ -426,7 +516,8 @@ impl WsRelayClient {
                     };
 
                 let (mut ws_sink, mut ws_source) = ws_stream.split();
-                if let Some(tok) = initial_token {
+                let mut current_auth_token = initial_token;
+                if let Some(ref tok) = current_auth_token {
                     let auth_msg = serde_json::json!({
                         "op": "auth",
                         "token": tok,
@@ -442,21 +533,28 @@ impl WsRelayClient {
 
                 let mut pending_create: Option<oneshot::Sender<Result<String, String>>> = None;
                 let mut pending_join: Option<(String, oneshot::Sender<Result<u32, String>>)> = None;
+                let mut pending_rejoin: Option<
+                    oneshot::Sender<Result<(u32, u64, Vec<Value>), String>>,
+                > = None;
+
+                let mut active_room_code: Option<String> = None;
+                let mut active_player_id: u32 = 0;
+                let mut intentional_leave = false;
 
                 loop {
-                    tokio::select! {
+                    let connection_dropped = tokio::select! {
                         maybe_cmd = cmd_rx.recv() => {
                             match maybe_cmd {
                                 Some(OutboundRelayCommand::Auth { token }) => {
+                                    current_auth_token = Some(token.clone());
                                     let msg = serde_json::json!({
                                         "op": "auth",
                                         "token": token,
                                     }).to_string();
-                                    if ws_sink.send(Message::Text(msg.into())).await.is_err() {
-                                        break;
-                                    }
+                                    ws_sink.send(Message::Text(msg.into())).await.is_err()
                                 }
                                 Some(OutboundRelayCommand::Create { game_id, reply }) => {
+                                    intentional_leave = false;
                                     pending_create = Some(reply);
                                     let msg = serde_json::json!({
                                         "op": "create",
@@ -467,10 +565,13 @@ impl WsRelayClient {
                                         if let Some(r) = pending_create.take() {
                                             let _ = r.send(Err("websocket send failed".to_string()));
                                         }
-                                        break;
+                                        true
+                                    } else {
+                                        false
                                     }
                                 }
                                 Some(OutboundRelayCommand::Join { room_code, reply }) => {
+                                    intentional_leave = false;
                                     pending_join = Some((room_code.clone(), reply));
                                     let msg = serde_json::json!({
                                         "op": "join",
@@ -480,7 +581,32 @@ impl WsRelayClient {
                                         if let Some((_, r)) = pending_join.take() {
                                             let _ = r.send(Err("websocket send failed".to_string()));
                                         }
-                                        break;
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                                Some(OutboundRelayCommand::Rejoin { room_code, player_id, reply }) => {
+                                    intentional_leave = false;
+                                    pending_rejoin = Some(reply);
+                                    let msg = match player_id {
+                                        Some(pid) if !pid.trim().is_empty() => serde_json::json!({
+                                            "op": "rejoin_room",
+                                            "room_code": room_code,
+                                            "player_id": pid,
+                                        }),
+                                        _ => serde_json::json!({
+                                            "op": "rejoin_room",
+                                            "room_code": room_code,
+                                        }),
+                                    }.to_string();
+                                    if ws_sink.send(Message::Text(msg.into())).await.is_err() {
+                                        if let Some(r) = pending_rejoin.take() {
+                                            let _ = r.send(Err("websocket send failed".to_string()));
+                                        }
+                                        true
+                                    } else {
+                                        false
                                     }
                                 }
                                 Some(OutboundRelayCommand::Relay { data }) => {
@@ -488,25 +614,27 @@ impl WsRelayClient {
                                         "op": "relay",
                                         "data": data,
                                     }).to_string();
-                                    if ws_sink.send(Message::Text(msg.into())).await.is_err() {
-                                        break;
-                                    }
+                                    ws_sink.send(Message::Text(msg.into())).await.is_err()
                                 }
                                 Some(OutboundRelayCommand::Leave) => {
+                                    intentional_leave = true;
+                                    active_room_code = None;
+                                    active_player_id = 0;
                                     let msg = r#"{"op":"leave"}"#.to_string();
                                     let _ = ws_sink.send(Message::Text(msg.into())).await;
+                                    false
                                 }
-                                None => break,
+                                None => {
+                                    break;
+                                }
                             }
                         }
                         _ = heartbeat.tick() => {
-                            // Enviamos ping de aplicación y trama Ping WebSocket cada 15s
                             let ping_json = r#"{"op":"ping"}"#.to_string();
                             if ws_sink.send(Message::Text(ping_json.into())).await.is_err() {
-                                break;
-                            }
-                            if ws_sink.send(Message::Ping(Vec::new().into())).await.is_err() {
-                                break;
+                                true
+                            } else {
+                                ws_sink.send(Message::Ping(Vec::new().into())).await.is_err()
                             }
                         }
                         maybe_ws = ws_source.next() => {
@@ -520,6 +648,8 @@ impl WsRelayClient {
                                                     .and_then(|v| v.as_str())
                                                     .unwrap_or("")
                                                     .to_string();
+                                                active_room_code = Some(code.clone());
+                                                active_player_id = 1;
                                                 if let Some(reply) = pending_create.take() {
                                                     let _ = reply.send(Ok(code.clone()));
                                                 }
@@ -534,7 +664,12 @@ impl WsRelayClient {
                                                 let code = pending_join
                                                     .as_ref()
                                                     .map(|(c, _)| c.clone())
+                                                    .or_else(|| active_room_code.clone())
                                                     .unwrap_or_default();
+                                                if !code.is_empty() {
+                                                    active_room_code = Some(code.clone());
+                                                }
+                                                active_player_id = pid;
                                                 if let Some((_, reply)) = pending_join.take() {
                                                     let _ = reply.send(Ok(pid));
                                                 }
@@ -546,7 +681,40 @@ impl WsRelayClient {
                                                     }
                                                 );
                                             }
-                                            "peer_joined" => {
+                                            "rejoined" => {
+                                                let pid = val.get("player_id")
+                                                    .and_then(|v| v.as_u64())
+                                                    .map(|p| p as u32)
+                                                    .unwrap_or_else(|| active_player_id.max(1));
+                                                let code = val.get("room_code")
+                                                    .and_then(|v| v.as_str())
+                                                    .map(ToOwned::to_owned)
+                                                    .or_else(|| active_room_code.clone())
+                                                    .unwrap_or_default();
+                                                let seed = val.get("seed")
+                                                    .and_then(|v| v.as_u64())
+                                                    .unwrap_or(1);
+                                                let commands = val.get("commands")
+                                                    .and_then(|v| v.as_array())
+                                                    .cloned()
+                                                    .unwrap_or_default();
+                                                if !code.is_empty() {
+                                                    active_room_code = Some(code.clone());
+                                                }
+                                                active_player_id = pid;
+                                                if let Some(reply) = pending_rejoin.take() {
+                                                    let _ = reply.send(Ok((pid, seed, commands.clone())));
+                                                }
+                                                events_clone.lock().unwrap().push_back(
+                                                    RelayClientEvent::ConnectionRestored {
+                                                        room_code: code,
+                                                        player_id: PlayerId(pid),
+                                                        seed,
+                                                        commands,
+                                                    }
+                                                );
+                                            }
+                                            "peer_joined" | "opponent_reconnected" => {
                                                 let pid = val.get("player_id")
                                                     .and_then(|v| v.as_u64())
                                                     .unwrap_or(2) as u32;
@@ -586,6 +754,7 @@ impl WsRelayClient {
                                             }
                                             "error" => {
                                                 let msg = val.get("message")
+                                                    .or_else(|| val.get("reason"))
                                                     .and_then(|v| v.as_str())
                                                     .unwrap_or("relay error")
                                                     .to_string();
@@ -602,6 +771,9 @@ impl WsRelayClient {
                                                         }
                                                     );
                                                 }
+                                                if let Some(reply) = pending_rejoin.take() {
+                                                    let _ = reply.send(Err(msg.clone()));
+                                                }
                                                 events_clone.lock().unwrap().push_back(
                                                     RelayClientEvent::Error { message: msg }
                                                 );
@@ -609,18 +781,178 @@ impl WsRelayClient {
                                             _ => {}
                                         }
                                     }
+                                    false
                                 }
                                 Some(Ok(Message::Pong(_))) => {
                                     events_clone.lock().unwrap().push_back(RelayClientEvent::PongReceived);
+                                    false
                                 }
-                                Some(Ok(Message::Close(_))) | None | Some(Err(_)) => {
-                                    connected_flag.store(false, Ordering::SeqCst);
-                                    events_clone.lock().unwrap().push_back(RelayClientEvent::Disconnected);
-                                    break;
-                                }
-                                _ => {}
+                                Some(Ok(Message::Close(_))) | None | Some(Err(_)) => true,
+                                _ => false,
                             }
                         }
+                    };
+
+                    if !connection_dropped {
+                        continue;
+                    }
+
+                    connected_flag.store(false, Ordering::SeqCst);
+
+                    // Si no hay partida activa o el cierre fue voluntario, desconectar inmediatamente.
+                    let Some(target_room) = active_room_code.clone() else {
+                        *reconnect_state_clone.lock().unwrap() = ReconnectState::Disconnected;
+                        events_clone
+                            .lock()
+                            .unwrap()
+                            .push_back(RelayClientEvent::Disconnected);
+                        break;
+                    };
+                    if intentional_leave || shutdown_flag_clone.load(Ordering::SeqCst) {
+                        *reconnect_state_clone.lock().unwrap() = ReconnectState::Disconnected;
+                        events_clone
+                            .lock()
+                            .unwrap()
+                            .push_back(RelayClientEvent::Disconnected);
+                        break;
+                    }
+
+                    // Intentar reconexión automática con backoff exponencial (hasta max_attempts = 5)
+                    let mut restored = false;
+                    let max_attempts = policy.max_attempts.max(1);
+                    for attempt in 1..=max_attempts {
+                        if shutdown_flag_clone.load(Ordering::SeqCst) {
+                            break;
+                        }
+                        *reconnect_state_clone.lock().unwrap() = ReconnectState::Reconnecting {
+                            attempt,
+                            max_attempts,
+                        };
+                        events_clone
+                            .lock()
+                            .unwrap()
+                            .push_back(RelayClientEvent::Reconnecting {
+                                attempt,
+                                max_attempts,
+                            });
+
+                        let delay = policy.delay_for_attempt(attempt);
+                        tokio::time::sleep(delay).await;
+                        if shutdown_flag_clone.load(Ordering::SeqCst) {
+                            break;
+                        }
+
+                        let Ok(Ok((new_ws, _))) = tokio::time::timeout(
+                            Duration::from_millis(600),
+                            connect_async(&url_for_thread),
+                        )
+                        .await
+                        else {
+                            continue;
+                        };
+
+                        let (mut new_sink, mut new_source) = new_ws.split();
+
+                        if let Some(ref tok) = current_auth_token {
+                            let auth_msg = serde_json::json!({
+                                "op": "auth",
+                                "token": tok,
+                            })
+                            .to_string();
+                            if new_sink.send(Message::Text(auth_msg.into())).await.is_err() {
+                                continue;
+                            }
+                        }
+
+                        let rejoin_msg = match (&current_auth_token, active_player_id) {
+                            (None, pid) if pid > 0 => serde_json::json!({
+                                "op": "rejoin_room",
+                                "room_code": target_room,
+                                "player_id": format!("player{pid}"),
+                            }),
+                            _ => serde_json::json!({
+                                "op": "rejoin_room",
+                                "room_code": target_room,
+                            }),
+                        }
+                        .to_string();
+
+                        if new_sink
+                            .send(Message::Text(rejoin_msg.into()))
+                            .await
+                            .is_err()
+                        {
+                            continue;
+                        }
+
+                        // Esperar respuesta `rejoined` del servidor Relay
+                        let wait_deadline =
+                            tokio::time::Instant::now() + Duration::from_millis(800);
+                        let mut attempt_rejoined = None;
+                        while let Ok(Some(Ok(msg))) =
+                            tokio::time::timeout_at(wait_deadline, new_source.next()).await
+                        {
+                            if let Message::Text(text) = msg {
+                                if let Ok(val) = serde_json::from_str::<Value>(&text) {
+                                    let op = val.get("op").and_then(|v| v.as_str()).unwrap_or("");
+                                    if op == "rejoined" {
+                                        let pid = val
+                                            .get("player_id")
+                                            .and_then(|v| v.as_u64())
+                                            .map(|p| p as u32)
+                                            .unwrap_or_else(|| active_player_id.max(1));
+                                        let r_code = val
+                                            .get("room_code")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or(&target_room)
+                                            .to_string();
+                                        let seed =
+                                            val.get("seed").and_then(|v| v.as_u64()).unwrap_or(1);
+                                        let commands = val
+                                            .get("commands")
+                                            .and_then(|v| v.as_array())
+                                            .cloned()
+                                            .unwrap_or_default();
+                                        attempt_rejoined = Some((r_code, pid, seed, commands));
+                                        break;
+                                    } else if op == "error" {
+                                        break;
+                                    }
+                                }
+                            } else if matches!(msg, Message::Close(_)) {
+                                break;
+                            }
+                        }
+
+                        if let Some((r_code, pid, seed, commands)) = attempt_rejoined {
+                            ws_sink = new_sink;
+                            ws_source = new_source;
+                            active_room_code = Some(r_code.clone());
+                            active_player_id = pid;
+                            connected_flag.store(true, Ordering::SeqCst);
+                            *reconnect_state_clone.lock().unwrap() = ReconnectState::Connected;
+                            events_clone.lock().unwrap().push_back(
+                                RelayClientEvent::ConnectionRestored {
+                                    room_code: r_code,
+                                    player_id: PlayerId(pid),
+                                    seed,
+                                    commands,
+                                },
+                            );
+                            heartbeat.reset();
+                            restored = true;
+                            break;
+                        }
+                    }
+
+                    if !restored {
+                        connected_flag.store(false, Ordering::SeqCst);
+                        *reconnect_state_clone.lock().unwrap() = ReconnectState::Disconnected;
+                        events_clone
+                            .lock()
+                            .unwrap()
+                            .push_back(RelayClientEvent::Disconnected);
+                        break;
                     }
                 }
             });
@@ -635,6 +967,8 @@ impl WsRelayClient {
             events,
             incoming_payloads,
             connected_remote,
+            reconnect_state,
+            shutdown_flag,
             current_room: None,
             player_id: PlayerId(0),
             _worker: Some(worker),
@@ -651,6 +985,24 @@ impl WsRelayClient {
         self.connected_remote.load(Ordering::SeqCst)
     }
 
+    /// Devuelve el estado de reconexión actual del cliente (`Connected`, `Reconnecting`, `Disconnected`).
+    pub fn reconnect_state(&self) -> ReconnectState {
+        *self.reconnect_state.lock().unwrap()
+    }
+
+    /// Indica si el cliente se encuentra intentando reconectar automáticamente con backoff exponencial.
+    pub fn is_reconnecting(&self) -> bool {
+        matches!(self.reconnect_state(), ReconnectState::Reconnecting { .. })
+    }
+
+    /// Devuelve el número de intento de reconexión actual (`1..=5`), o `0` si no está reconectando.
+    pub fn reconnect_attempt(&self) -> u32 {
+        match self.reconnect_state() {
+            ReconnectState::Reconnecting { attempt, .. } => attempt,
+            _ => 0,
+        }
+    }
+
     /// Código de sala actual (si el cliente creó o se unió a una sala).
     pub fn room_code(&self) -> Option<&str> {
         self.current_room.as_deref()
@@ -659,6 +1011,46 @@ impl WsRelayClient {
     /// `PlayerId` asignado en la sala actual (`PlayerId(1)` para host, `PlayerId(2..)` para invitado).
     pub fn player_id(&self) -> PlayerId {
         self.player_id
+    }
+
+    /// Solicita reconectar explícitamente al asiento previo en la sala `code` enviando `{"op": "rejoin_room"}`.
+    pub fn rejoin_room(&mut self, code: &str) -> EngineResult<PlayerId> {
+        let normalized = code.trim().to_ascii_uppercase();
+        if !is_valid_relay_code(&normalized) {
+            return Err(EngineError::Network("Código de sala inválido".to_string()));
+        }
+        if self.is_remote_connected() {
+            if let Some(tx) = &self.cmd_tx {
+                let (reply_tx, reply_rx) = oneshot::channel();
+                let pid_hint = if self.player_id.0 > 0 {
+                    Some(format!("player{}", self.player_id.0))
+                } else {
+                    None
+                };
+                if tx
+                    .send(OutboundRelayCommand::Rejoin {
+                        room_code: normalized.clone(),
+                        player_id: pid_hint,
+                        reply: reply_tx,
+                    })
+                    .is_ok()
+                {
+                    match reply_rx.blocking_recv() {
+                        Ok(Ok((pid, _seed, _commands))) => {
+                            let player = PlayerId(pid);
+                            self.current_room = Some(normalized);
+                            self.player_id = player;
+                            return Ok(player);
+                        }
+                        Ok(Err(err)) => return Err(EngineError::Network(err)),
+                        Err(e) => return Err(EngineError::Network(e.to_string())),
+                    }
+                }
+            }
+        }
+        Err(EngineError::Network(
+            "No conectado a un servidor Relay remoto".to_string(),
+        ))
     }
 
     /// Envía el mensaje de autenticación `{"op": "auth", "token": "<jwt>"}` al servidor Relay.
@@ -893,6 +1285,7 @@ impl WsRelayClient {
 
 impl Drop for WsRelayClient {
     fn drop(&mut self) {
+        self.shutdown_flag.store(true, Ordering::SeqCst);
         self.leave_local_hub();
     }
 }
@@ -978,5 +1371,238 @@ mod tests {
         assert!(host_events.contains(&RelayClientEvent::PeerLeft {
             player_id: PlayerId(2)
         }));
+    }
+
+    #[test]
+    fn test_reconnect_backoff_schedule_is_500ms_1s_2s_4s_up_to_5_attempts() {
+        let policy = ReconnectPolicy::default();
+        assert_eq!(policy.max_attempts, 5);
+        assert_eq!(policy.delay_for_attempt(1), Duration::from_millis(500));
+        assert_eq!(policy.delay_for_attempt(2), Duration::from_millis(1000));
+        assert_eq!(policy.delay_for_attempt(3), Duration::from_millis(2000));
+        assert_eq!(policy.delay_for_attempt(4), Duration::from_millis(4000));
+        assert_eq!(policy.delay_for_attempt(5), Duration::from_millis(4000));
+
+        assert_eq!(reconnect_backoff_duration(1), Duration::from_millis(500));
+        assert_eq!(reconnect_backoff_duration(2), Duration::from_secs(1));
+        assert_eq!(reconnect_backoff_duration(3), Duration::from_secs(2));
+        assert_eq!(reconnect_backoff_duration(4), Duration::from_secs(4));
+    }
+
+    #[test]
+    fn test_auto_reconnect_with_exponential_backoff_sends_rejoin_room_and_restores() {
+        use tokio::net::TcpListener;
+        use tokio_tungstenite::accept_async;
+
+        // Servidor WebSocket de prueba que cierra el primer socket tras crear la sala,
+        // rechaza el intento 1 de reconexión y acepta `rejoin_room` en el intento 2.
+        let (addr_tx, addr_rx) = std::sync::mpsc::channel();
+        let (drop_tx, drop_rx) = tokio::sync::oneshot::channel::<()>();
+
+        let server_thread = thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            rt.block_on(async move {
+                let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let addr = listener.local_addr().unwrap();
+                addr_tx.send(addr).unwrap();
+
+                // Conexión inicial: recibe `create`, responde `created` y luego cierra abruptamente
+                let (stream1, _) = listener.accept().await.unwrap();
+                let mut ws1 = accept_async(stream1).await.unwrap();
+                if let Some(Ok(Message::Text(text))) = ws1.next().await {
+                    let v: Value = serde_json::from_str(&text).unwrap();
+                    assert_eq!(v["op"], "create");
+                    let created = serde_json::json!({
+                        "op": "created",
+                        "room_code": "K9M2",
+                        "seed": 77777
+                    })
+                    .to_string();
+                    ws1.send(Message::Text(created.into())).await.unwrap();
+                }
+                let _ = drop_rx.await;
+                let _ = ws1.close(None).await;
+                drop(ws1);
+
+                // Intento 1 de reconexión: simulamos fallo de red cerrando inmediatamente
+                let (stream2, _) = listener.accept().await.unwrap();
+                let mut ws2 = accept_async(stream2).await.unwrap();
+                let _ = ws2.close(None).await;
+                drop(ws2);
+
+                // Intento 2 de reconexión: recibe `rejoin_room` para `K9M2` y responde `rejoined`
+                let (stream3, _) = listener.accept().await.unwrap();
+                let mut ws3 = accept_async(stream3).await.unwrap();
+                if let Some(Ok(Message::Text(text))) = ws3.next().await {
+                    let v: Value = serde_json::from_str(&text).unwrap();
+                    assert_eq!(v["op"], "rejoin_room");
+                    assert_eq!(v["room_code"], "K9M2");
+                    let rejoined = serde_json::json!({
+                        "op": "rejoined",
+                        "room_code": "K9M2",
+                        "player_id": 1,
+                        "seed": 77777,
+                        "commands": [{"command_type": "checkers_game::MovePieceCommand"}]
+                    })
+                    .to_string();
+                    ws3.send(Message::Text(rejoined.into())).await.unwrap();
+                }
+                tokio::time::sleep(Duration::from_millis(200)).await;
+            });
+        });
+
+        let addr = addr_rx.recv().unwrap();
+        let url = format!("ws://{addr}");
+        let fast_policy = ReconnectPolicy {
+            max_attempts: 5,
+            backoff_ms: [40, 80, 160, 320, 320],
+        };
+        let mut client = WsRelayClient::connect_with_policy(&url, None, fast_policy);
+        assert!(client.is_remote_connected());
+
+        let room_code = client.create_room("checkers").unwrap();
+        assert_eq!(room_code, "K9M2");
+        let _ = client.poll_relay_events();
+
+        // Provocar caída inesperada del socket durante la partida activa
+        let _ = drop_tx.send(());
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        let mut seen_attempts = Vec::new();
+        let mut restored_event = None;
+        let mut prematurely_disconnected = false;
+
+        while std::time::Instant::now() < deadline {
+            for ev in client.poll_relay_events() {
+                match ev {
+                    RelayClientEvent::Reconnecting {
+                        attempt,
+                        max_attempts,
+                    } => {
+                        assert_eq!(max_attempts, 5);
+                        seen_attempts.push(attempt);
+                    }
+                    RelayClientEvent::ConnectionRestored {
+                        room_code: r_code,
+                        player_id,
+                        seed,
+                        commands,
+                    } => {
+                        restored_event = Some((r_code, player_id, seed, commands));
+                    }
+                    RelayClientEvent::Disconnected => {
+                        if restored_event.is_none() {
+                            prematurely_disconnected = true;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if restored_event.is_some() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(15));
+        }
+
+        assert!(
+            !prematurely_disconnected,
+            "No debe emitir Disconnected antes de agotar los 5 intentos"
+        );
+        assert_eq!(seen_attempts, vec![1, 2]);
+        let (r_code, pid, seed, cmds) =
+            restored_event.expect("Debe emitir ConnectionRestored tras rejoin_room");
+        assert_eq!(r_code, "K9M2");
+        assert_eq!(pid, PlayerId(1));
+        assert_eq!(seed, 77777);
+        assert_eq!(cmds.len(), 1);
+        assert_eq!(client.reconnect_state(), ReconnectState::Connected);
+
+        let _ = server_thread.join();
+    }
+
+    #[test]
+    fn test_auto_reconnect_emits_disconnected_only_after_5_failed_attempts() {
+        use tokio::net::TcpListener;
+        use tokio_tungstenite::accept_async;
+
+        let (addr_tx, addr_rx) = std::sync::mpsc::channel();
+        let (drop_tx, drop_rx) = tokio::sync::oneshot::channel::<()>();
+
+        let server_thread = thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            rt.block_on(async move {
+                let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let addr = listener.local_addr().unwrap();
+                addr_tx.send(addr).unwrap();
+
+                let (stream1, _) = listener.accept().await.unwrap();
+                let mut ws1 = accept_async(stream1).await.unwrap();
+                if let Some(Ok(Message::Text(_))) = ws1.next().await {
+                    let created = serde_json::json!({
+                        "op": "created",
+                        "room_code": "Z8X4",
+                        "seed": 42
+                    })
+                    .to_string();
+                    ws1.send(Message::Text(created.into())).await.unwrap();
+                }
+                let _ = drop_rx.await;
+                let _ = ws1.close(None).await;
+                drop(ws1);
+                // Cerramos el listener para que los 5 intentos de reconexión fallen
+                drop(listener);
+            });
+        });
+
+        let addr = addr_rx.recv().unwrap();
+        let url = format!("ws://{addr}");
+        let fast_policy = ReconnectPolicy {
+            max_attempts: 5,
+            backoff_ms: [20, 40, 80, 120, 120],
+        };
+        let mut client = WsRelayClient::connect_with_policy(&url, None, fast_policy);
+        let code = client.create_room("chess").unwrap();
+        assert_eq!(code, "Z8X4");
+        let _ = client.poll_relay_events();
+
+        let _ = drop_tx.send(());
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        let mut attempts = Vec::new();
+        let mut disconnected_after_all = false;
+
+        while std::time::Instant::now() < deadline {
+            for ev in client.poll_relay_events() {
+                match ev {
+                    RelayClientEvent::Reconnecting {
+                        attempt,
+                        max_attempts,
+                    } => {
+                        assert_eq!(max_attempts, 5);
+                        attempts.push(attempt);
+                    }
+                    RelayClientEvent::Disconnected => {
+                        disconnected_after_all = true;
+                    }
+                    _ => {}
+                }
+            }
+            if disconnected_after_all {
+                break;
+            }
+            thread::sleep(Duration::from_millis(15));
+        }
+
+        assert_eq!(attempts, vec![1, 2, 3, 4, 5]);
+        assert!(disconnected_after_all);
+        assert_eq!(client.reconnect_state(), ReconnectState::Disconnected);
+
+        let _ = server_thread.join();
     }
 }

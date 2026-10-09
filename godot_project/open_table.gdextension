@@ -1,0 +1,49 @@
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.1
+reloadable = true
+
+[libraries]
+linux.debug.x86_64 = "res://../target/debug/libopen_table_godot.so"
+linux.release.x86_64 = "res://../target/release/libopen_table_godot.so"
+linux.debug.arm64 = "res://../target/aarch64-unknown-linux-gnu/debug/libopen_table_godot.so"
+linux.release.arm64 = "res://../target/aarch64-unknown-linux-gnu/release/libopen_table_godot.so"
+windows.debug.x86_64 = "res://../target/x86_64-pc-windows-msvc/debug/open_table_godot.dll"
+windows.release.x86_64 = "res://../target/x86_64-pc-windows-msvc/release/open_table_godot.dll"
+windows.debug.arm64 = "res://../target/aarch64-pc-windows-msvc/debug/open_table_godot.dll"
+windows.release.arm64 = "res://../target/aarch64-pc-windows-msvc/release/open_table_godot.dll"
+macos.debug = "res://../target/debug/libopen_table_godot.dylib"
+macos.release = "res://../target/release/libopen_table_godot.dylib"
+macos.debug.x86_64 = "res://../target/x86_64-apple-darwin/debug/libopen_table_godot.dylib"
+macos.release.x86_64 = "res://../target/x86_64-apple-darwin/release/libopen_table_godot.dylib"
+macos.debug.arm64 = "res://../target/aarch64-apple-darwin/debug/libopen_table_godot.dylib"
+macos.release.arm64 = "res://../target/aarch64-apple-darwin/release/libopen_table_godot.dylib"
+android.debug.arm64 = "res://../target/aarch64-linux-android/debug/libopen_table_godot.so"
+android.release.arm64 = "res://../target/aarch64-linux-android/release/libopen_table_godot.so"
+android.debug.aarch64 = "res://../target/aarch64-linux-android/debug/libopen_table_godot.so"
+android.release.aarch64 = "res://../target/aarch64-linux-android/release/libopen_table_godot.so"
+android.debug.x86_64 = "res://../target/x86_64-linux-android/debug/libopen_table_godot.so"
+android.release.x86_64 = "res://../target/x86_64-linux-android/release/libopen_table_godot.so"
+ios.debug.arm64 = "res://bin/ios/libopen_table_godot.dylib"
+ios.release.arm64 = "res://bin/ios/libopen_table_godot.dylib"
+web.debug.threads.wasm32 = "res://../target/wasm32-unknown-emscripten/debug/open_table_godot.wasm"
+web.release.threads.wasm32 = "res://../target/wasm32-unknown-emscripten/release/open_table_godot.wasm"
+web.debug.wasm32 = "res://../target/wasm32-unknown-emscripten/debug/open_table_godot.wasm"
+web.release.wasm32 = "res://../target/wasm32-unknown-emscripten/release/open_table_godot.wasm"
+
+[dependencies]
+android.debug.arm64 = {
+	"res://../platform_plugins/android/OpenTableNearby.gdap": ""
+}
+android.release.arm64 = {
+	"res://../platform_plugins/android/OpenTableNearby.gdap": ""
+}
+android.release.x86_64 = {
+	"res://../platform_plugins/android/OpenTableNearby.gdap": ""
+}
+ios.debug.arm64 = {
+	"res://../platform_plugins/ios/OpenTableMultipeer.gdip": ""
+}
+ios.release.arm64 = {
+	"res://../platform_plugins/ios/OpenTableMultipeer.gdip": ""
+}

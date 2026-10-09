@@ -26,3 +26,24 @@ android.debug.x86_64 = "res://../target/x86_64-linux-android/debug/libopen_table
 android.release.x86_64 = "res://../target/x86_64-linux-android/release/libopen_table_godot.so"
 ios.debug.arm64 = "res://bin/ios/libopen_table_godot.dylib"
 ios.release.arm64 = "res://bin/ios/libopen_table_godot.dylib"
+web.debug.threads.wasm32 = "res://../target/wasm32-unknown-emscripten/debug/open_table_godot.wasm"
+web.release.threads.wasm32 = "res://../target/wasm32-unknown-emscripten/release/open_table_godot.wasm"
+web.debug.wasm32 = "res://../target/wasm32-unknown-emscripten/debug/open_table_godot.wasm"
+web.release.wasm32 = "res://../target/wasm32-unknown-emscripten/release/open_table_godot.wasm"
+
+[dependencies]
+android.debug.arm64 = {
+	"res://../platform_plugins/android/OpenTableNearby.gdap": ""
+}
+android.release.arm64 = {
+	"res://../platform_plugins/android/OpenTableNearby.gdap": ""
+}
+android.release.x86_64 = {
+	"res://../platform_plugins/android/OpenTableNearby.gdap": ""
+}
+ios.debug.arm64 = {
+	"res://../platform_plugins/ios/OpenTableMultipeer.gdip": ""
+}
+ios.release.arm64 = {
+	"res://../platform_plugins/ios/OpenTableMultipeer.gdip": ""
+}

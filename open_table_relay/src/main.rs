@@ -2300,16 +2300,9 @@ mod tests {
                 .unwrap();
         assert_eq!(host_shutdown["op"], "server_shutting_down");
 
-        let lobby_shutdown: Value = serde_json::from_str(
-            &ws_lobby
-                .next()
-                .await
-                .unwrap()
-                .unwrap()
-                .into_text()
-                .unwrap(),
-        )
-        .unwrap();
+        let lobby_shutdown: Value =
+            serde_json::from_str(&ws_lobby.next().await.unwrap().unwrap().into_text().unwrap())
+                .unwrap();
         assert_eq!(lobby_shutdown["op"], "server_shutting_down");
 
         // El servidor finaliza limpiamente con Ok(()) tras hacer flush de SQLite

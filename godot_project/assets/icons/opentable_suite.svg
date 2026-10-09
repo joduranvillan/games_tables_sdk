@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="slateBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="55%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#090D16"/>
+    </linearGradient>
+    <linearGradient id="goldPrimary" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F7E396"/>
+      <stop offset="45%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#9A721C"/>
+    </linearGradient>
+    <linearGradient id="goldAccent" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#B8860B"/>
+      <stop offset="50%" stop-color="#E6C35C"/>
+      <stop offset="100%" stop-color="#FFF2B2"/>
+    </linearGradient>
+    <linearGradient id="slateCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#26354D"/>
+      <stop offset="100%" stop-color="#131C2E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Base Medallion (Dark Slate with Gold Rim) -->
+  <rect x="48" y="48" width="928" height="928" rx="208" fill="url(#slateBg)" stroke="url(#goldPrimary)" stroke-width="28"/>
+  <rect x="88" y="88" width="848" height="848" rx="172" fill="none" stroke="#D4AF37" stroke-width="6" opacity="0.45"/>
+
+  <!-- Perspective Game Board Grid (Bottom Half) -->
+  <g transform="translate(0, 20)">
+    <polygon points="260,600 764,600 864,800 160,800" fill="#131C2E" stroke="url(#goldPrimary)" stroke-width="16" stroke-linejoin="round"/>
+    <!-- Checkered Tiles Row 1 -->
+    <polygon points="386,600 512,600 512,660 361,660" fill="#D4AF37" opacity="0.85"/>
+    <polygon points="638,600 764,600 794,660 663,660" fill="#D4AF37" opacity="0.85"/>
+    <!-- Checkered Tiles Row 2 -->
+    <polygon points="230,660 361,660 331,725 198,725" fill="#D4AF37" opacity="0.85"/>
+    <polygon points="512,660 663,660 693,725 512,725" fill="#D4AF37" opacity="0.85"/>
+    <!-- Checkered Tiles Row 3 -->
+    <polygon points="331,725 512,725 512,800 295,800" fill="#D4AF37" opacity="0.85"/>
+    <polygon points="693,725 826,725 864,800 729,800" fill="#D4AF37" opacity="0.85"/>
+    <!-- Grid Dividers -->
+    <line x1="230" y1="660" x2="794" y2="660" stroke="#D4AF37" stroke-width="6" opacity="0.6"/>
+    <line x1="198" y1="725" x2="826" y2="725" stroke="#D4AF37" stroke-width="6" opacity="0.6"/>
+    <line x1="386" y1="600" x2="295" y2="800" stroke="#D4AF37" stroke-width="6" opacity="0.6"/>
+    <line x1="512" y1="600" x2="512" y2="800" stroke="#D4AF37" stroke-width="6" opacity="0.6"/>
+    <line x1="638" y1="600" x2="729" y2="800" stroke="#D4AF37" stroke-width="6" opacity="0.6"/>
+  </g>
+
+  <!-- Playing Cards (Upper Left) -->
+  <g transform="translate(330, 390) rotate(-18)">
+    <rect x="-120" y="-175" width="220" height="310" rx="26" fill="url(#slateCard)" stroke="url(#goldPrimary)" stroke-width="16"/>
+    <!-- Diamond Suit Emblem -->
+    <polygon points="-10,-85 45,-20 -10,45 -65,-20" fill="url(#goldAccent)"/>
+    <circle cx="-80" cy="-130" r="12" fill="#F7E396"/>
+    <circle cx="60" cy="90" r="12" fill="#F7E396"/>
+  </g>
+
+  <g transform="translate(465, 355) rotate(-3)">
+    <rect x="-120" y="-175" width="220" height="310" rx="26" fill="#0F172A" stroke="url(#goldPrimary)" stroke-width="16"/>
+    <rect x="-94" y="-149" width="168" height="258" rx="14" fill="none" stroke="#D4AF37" stroke-width="4" opacity="0.45"/>
+    <!-- Spade/Crown Centerpiece -->
+    <path d="M-10,-95 C-10,-95 -75,-20 -75,20 C-75,48 -52,65 -28,65 C-14,65 -4,56 -2,48 L-18,95 L2,95 L-18,95 L22,95 L6,48 C8,56 18,65 32,65 C56,65 79,48 79,20 C79,-20 14,-95 -10,-95 Z" fill="url(#goldPrimary)"/>
+  </g>
+
+  <!-- Isometric Dice (Right Side) -->
+  <g transform="translate(690, 445)">
+    <!-- Top Face -->
+    <polygon points="0,-135 130,-65 0,5 -130,-65" fill="#26354D" stroke="url(#goldPrimary)" stroke-width="14" stroke-linejoin="round"/>
+    <!-- Left Face -->
+    <polygon points="-130,-65 0,5 0,145 -130,75" fill="#182235" stroke="url(#goldPrimary)" stroke-width="14" stroke-linejoin="round"/>
+    <!-- Right Face -->
+    <polygon points="0,5 130,-65 130,75 0,145" fill="#0F172A" stroke="url(#goldPrimary)" stroke-width="14" stroke-linejoin="round"/>
+    <!-- Dice Pips (Gold) -->
+    <!-- Top: 1 pip -->
+    <ellipse cx="0" cy="-65" rx="18" ry="12" fill="#F7E396"/>
+    <!-- Left: 2 pips -->
+    <circle cx="-82" cy="10" r="14" fill="#D4AF37"/>
+    <circle cx="-42" cy="62" r="14" fill="#D4AF37"/>
+    <!-- Right: 3 pips -->
+    <circle cx="38" cy="18" r="13" fill="#F7E396"/>
+    <circle cx="66" cy="40" r="13" fill="#F7E396"/>
+    <circle cx="94" cy="62" r="13" fill="#F7E396"/>
+  </g>
+
+  <!-- Foreground Golden Token / Checkers & Go Disc (Bottom Left) -->
+  <g transform="translate(310, 560)">
+    <ellipse cx="0" cy="18" rx="92" ry="42" fill="#9A721C"/>
+    <ellipse cx="0" cy="0" rx="92" ry="42" fill="url(#goldPrimary)" stroke="#0F172A" stroke-width="8"/>
+    <ellipse cx="0" cy="0" rx="64" ry="28" fill="none" stroke="#0F172A" stroke-width="6" opacity="0.65"/>
+  </g>
+</svg>
