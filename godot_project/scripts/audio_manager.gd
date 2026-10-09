@@ -249,7 +249,8 @@ func _play_stream(stream: AudioStream, event_tag: String = "", boost_db: float =
 
 	player.volume_db = sfx_volume_db + boost_db
 	player.stream = stream
-	player.play()
+	if player.is_inside_tree():
+		player.play()
 
 func _notify_haptics(method_name: String) -> void:
 	if is_inside_tree() and has_node("/root/HapticsManager"):

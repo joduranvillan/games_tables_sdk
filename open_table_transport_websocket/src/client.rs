@@ -1044,12 +1044,50 @@ impl WsRelayClient {
                             self.player_id = player;
                             return Ok(player);
                         }
-                        Ok(Err(err)) => return Err(EngineError::Network(err)),
+                        Ok(Err(err)) => {
+                            if self.current_room.as_deref() == Some(normalized.as_str())
+                                && self.player_id.0 > 0
+                            {
+                                return Ok(self.player_id);
+                            }
+                            return Err(EngineError::Network(err));
+                        }
                         Err(e) => return Err(EngineError::Network(e.to_string())),
                     }
                 }
             }
         }
+
+        // Fallback en hub local en memoria
+        let mut hub = local_relay_hub().lock().unwrap();
+        if let Some(room) = hub.get_mut(&normalized) {
+            let assigned_pid = if self.player_id.0 > 0 {
+                self.player_id
+            } else {
+                let pid = PlayerId(room.next_player_id);
+                room.next_player_id += 1;
+                pid
+            };
+            if !room.members.iter().any(|(cid, _, _)| *cid == self.client_id) {
+                room.members
+                    .push((self.client_id, assigned_pid, Arc::clone(&self.events)));
+            }
+            drop(hub);
+
+            self.current_room = Some(normalized.clone());
+            self.player_id = assigned_pid;
+            self.events
+                .lock()
+                .unwrap()
+                .push_back(RelayClientEvent::RoomJoined {
+                    success: true,
+                    player_id: assigned_pid,
+                    room_code: normalized,
+                });
+            return Ok(assigned_pid);
+        }
+        drop(hub);
+
         Err(EngineError::Network(
             "No conectado a un servidor Relay remoto".to_string(),
         ))

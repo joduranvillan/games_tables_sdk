@@ -15,8 +15,7 @@ const PORT: int = 19877
 func _initialize() -> void:
 	var results: Array = []
 	var events_client: Array = []
-	var saved_player_id: int = 2
-	var saved_token: String = ""
+	var hs := {"player_id": 2, "token": ""}
 
 	# 1. Arrancar host TCP en puerto 19877
 	var host = OpenTableBridge.new()
@@ -25,8 +24,8 @@ func _initialize() -> void:
 	# 2. Conectar cliente
 	var client = OpenTableBridge.new()
 	client.connect("native_handshake_established", func(p_id: int, tok: String):
-		saved_player_id = p_id
-		saved_token = tok
+		hs["player_id"] = p_id
+		hs["token"] = tok
 	)
 	client.connect("piece_moved", func(p, fr, fc, tr, tc, cr, cc, prom):
 		events_client.append({"player": p, "from_row": fr, "from_col": fc, "to_row": tr, "to_col": tc})
@@ -41,7 +40,7 @@ func _initialize() -> void:
 		client.poll_events()
 		OS.delay_msec(10)
 
-	results.append(["Handshake establecido y token recibido", saved_token != ""])
+	results.append(["Handshake establecido y token recibido", String(hs["token"]) != ""])
 
 	# 4. Enviar MovePieceCommand desde el host y verificar piece_moved en cliente
 	# Checkers move: (2, 1) -> (3, 2)
@@ -69,8 +68,8 @@ func _initialize() -> void:
 	# 6. Crear un nuevo OpenTableBridge y llamar reconnect_to_host
 	var client2 = OpenTableBridge.new()
 	var ok_reconn: bool = false
-	if saved_token != "":
-		ok_reconn = client2.reconnect_to_host("127.0.0.1", PORT, saved_player_id, saved_token)
+	if String(hs["token"]) != "":
+		ok_reconn = client2.reconnect_to_host("127.0.0.1", PORT, int(hs["player_id"]), String(hs["token"]))
 	else:
 		ok_reconn = client2.reconnect_to_host("127.0.0.1", PORT, 2, "")
 

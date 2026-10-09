@@ -37,6 +37,7 @@ func _initialize() -> void:
 
 	var cmds_per_sec: float = (iterations * 1000.0) / float(elapsed_ms)
 	print("Performance Smoke Test: %.2f comandos/segundo (1000 iteraciones en %d ms)" % [cmds_per_sec, elapsed_ms])
+	bridge.free()
 
 	if cmds_per_sec < 500.0:
 		print("FAIL: Throughput menor a 500 cmd/s (%.2f cmd/s)" % cmds_per_sec)

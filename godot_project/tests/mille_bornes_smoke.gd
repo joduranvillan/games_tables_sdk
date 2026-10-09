@@ -6,7 +6,7 @@ func _initialize() -> void:
 	var results: Array = []
 	var events_received: Array = []
 	var move_rejected_reasons: Array = []
-	var p1_tracked_distance: int = 0
+	var tracked := {"p1_distance": 0}
 
 	var bridge = OpenTableBridge.new()
 
@@ -18,7 +18,7 @@ func _initialize() -> void:
 				events_received.append(data)
 				var et = data.get("event_type", data.get("command_type", ""))
 				if "DistancePlayedEvent" in et and data.get("player") == 1:
-					p1_tracked_distance = int(data.get("new_distance", p1_tracked_distance))
+					tracked["p1_distance"] = int(data.get("new_distance", tracked["p1_distance"]))
 	)
 
 	bridge.connect("move_rejected", func(reason: String):
@@ -42,7 +42,7 @@ func _initialize() -> void:
 
 	for round_num in range(1, 6):
 		var dist_to_play = distances[round_num - 1]
-		var prev_dist = bridge.get_distance(1) if bridge.has_method("get_distance") else p1_tracked_distance
+		var prev_dist = bridge.get_distance(1) if bridge.has_method("get_distance") else int(tracked["p1_distance"])
 		
 		# P1 juega carta de distancia
 		bridge.send_command_json(1, JSON.stringify({
@@ -52,7 +52,7 @@ func _initialize() -> void:
 		}))
 		total_expected += dist_to_play
 
-		var curr_dist = bridge.get_distance(1) if bridge.has_method("get_distance") else p1_tracked_distance
+		var curr_dist = bridge.get_distance(1) if bridge.has_method("get_distance") else int(tracked["p1_distance"])
 		if curr_dist <= prev_dist or (bridge.has_method("get_distance") and curr_dist != total_expected):
 			distance_increments_ok = false
 

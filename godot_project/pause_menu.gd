@@ -32,7 +32,22 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	hide()
 
-	if continue_button != null:
+	if continue_button == null:
+		continue_button = get_node_or_null("Panel/VBoxContainer/ContinueButton")
+	if undo_move_button == null:
+		undo_move_button = get_node_or_null("Panel/VBoxContainer/UndoMoveButton")
+	if rules_button == null:
+		rules_button = get_node_or_null("Panel/VBoxContainer/RulesButton")
+	if resign_button == null:
+		resign_button = get_node_or_null("Panel/VBoxContainer/ResignButton")
+	if offer_draw_button == null:
+		offer_draw_button = get_node_or_null("Panel/VBoxContainer/OfferDrawButton")
+	if settings_button == null:
+		settings_button = get_node_or_null("Panel/VBoxContainer/SettingsButton")
+	if quit_button == null:
+		quit_button = get_node_or_null("Panel/VBoxContainer/QuitButton")
+
+	if continue_button != null and not continue_button.pressed.is_connected(_on_continue_pressed):
 		continue_button.pressed.connect(_on_continue_pressed)
 
 	if undo_move_button == null and has_node("Panel/VBoxContainer"):
@@ -79,9 +94,9 @@ func _ready() -> void:
 		if not offer_draw_button.pressed.is_connected(_on_offer_draw_pressed):
 			offer_draw_button.pressed.connect(_on_offer_draw_pressed)
 
-	if settings_button != null:
+	if settings_button != null and not settings_button.pressed.is_connected(_on_settings_pressed):
 		settings_button.pressed.connect(_on_settings_pressed)
-	if quit_button != null:
+	if quit_button != null and not quit_button.pressed.is_connected(_on_quit_pressed):
 		quit_button.pressed.connect(_on_quit_pressed)
 
 	_ensure_confirmation_dialog()
@@ -128,7 +143,7 @@ func undo_last_move() -> bool:
 
 func _on_undo_move_pressed() -> void:
 	if undo_last_move():
-		if get_tree() != null:
+		if is_inside_tree() and get_tree() != null:
 			get_tree().paused = false
 		hide()
 
@@ -199,11 +214,13 @@ func _toggle_pause() -> void:
 		if rules_popup != null:
 			rules_popup.visible = false
 		hide()
-		get_tree().paused = false
+		if is_inside_tree() and get_tree() != null:
+			get_tree().paused = false
 	else:
 		_update_undo_button_state()
 		show()
-		get_tree().paused = true
+		if is_inside_tree() and get_tree() != null:
+			get_tree().paused = true
 
 func _detect_active_game_id() -> String:
 	if not active_game_id.is_empty():
@@ -218,7 +235,7 @@ func _detect_active_game_id() -> String:
 				var gid := fname.substr(0, fname.length() - 6)
 				return RulesCatalogRef.normalize_game_id(gid)
 
-	if has_node("/root/GameManager"):
+	if is_inside_tree() and has_node("/root/GameManager"):
 		var gm = get_node("/root/GameManager")
 		if "selected_game" in gm and not String(gm.selected_game).is_empty():
 			return RulesCatalogRef.normalize_game_id(String(gm.selected_game))
@@ -269,7 +286,7 @@ func _ensure_game_over_overlay() -> CanvasLayer:
 
 	var host_node: Node = get_parent() if get_parent() != null else self
 	host_node.add_child(game_over_overlay)
-	if game_over_overlay.has_method("_ready"):
+	if not host_node.is_inside_tree() and game_over_overlay.has_method("_ready"):
 		game_over_overlay._ready()
 	return game_over_overlay
 
@@ -310,7 +327,7 @@ func confirm_resign() -> void:
 	if confirm_dialog != null:
 		confirm_dialog.visible = false
 	pending_action = ""
-	if get_tree() != null:
+	if is_inside_tree() and get_tree() != null:
 		get_tree().paused = false
 	hide()
 
@@ -332,7 +349,7 @@ func confirm_draw() -> void:
 	if confirm_dialog != null:
 		confirm_dialog.visible = false
 	pending_action = ""
-	if get_tree() != null:
+	if is_inside_tree() and get_tree() != null:
 		get_tree().paused = false
 	hide()
 

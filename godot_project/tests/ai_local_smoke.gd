@@ -74,7 +74,8 @@ func _initialize() -> void:
 	bridge_go.send_command_json(1, JSON.stringify({
 		"command_type": "go_game::PlaceStoneCommand",
 		"player": 1,
-		"pos": {"row": 2, "col": 2}
+		"x": 2,
+		"y": 2
 	}))
 	for _i in range(100):          # MCTS es más lento; 100 frames
 		bridge_go._process(0.016)
@@ -82,7 +83,8 @@ func _initialize() -> void:
 			bridge_go.send_command_json(1, JSON.stringify({
 				"command_type": "go_game::PlaceStoneCommand",
 				"player": 1,
-				"pos": {"row": 6, "col": 6}
+				"x": 6,
+				"y": 6
 			}))
 	var ticks_go: int = bridge_go.session_tick_count()
 	assert(ticks_go > 2, "Go vs IA: la IA debe haber hecho al menos 1 movimiento (ticks=%d)" % ticks_go)

@@ -10,12 +10,27 @@ signal menu_requested
 @onready var restart_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBoxContainer/HBoxContainer/RestartButton
 @onready var menu_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBoxContainer/HBoxContainer/MenuButton
 
+func _ensure_nodes() -> void:
+	if color_rect == null:
+		color_rect = get_node_or_null("ColorRect")
+	if panel_container == null:
+		panel_container = get_node_or_null("CenterContainer/PanelContainer")
+	if title_label == null:
+		title_label = get_node_or_null("CenterContainer/PanelContainer/MarginContainer/VBoxContainer/TitleLabel")
+	if winner_label == null:
+		winner_label = get_node_or_null("CenterContainer/PanelContainer/MarginContainer/VBoxContainer/WinnerLabel")
+	if restart_button == null:
+		restart_button = get_node_or_null("CenterContainer/PanelContainer/MarginContainer/VBoxContainer/HBoxContainer/RestartButton")
+	if menu_button == null:
+		menu_button = get_node_or_null("CenterContainer/PanelContainer/MarginContainer/VBoxContainer/HBoxContainer/MenuButton")
+
 func _ready() -> void:
+	_ensure_nodes()
 	_apply_styles()
 	
-	if restart_button:
+	if restart_button and not restart_button.pressed.is_connected(_on_restart_pressed):
 		restart_button.pressed.connect(_on_restart_pressed)
-	if menu_button:
+	if menu_button and not menu_button.pressed.is_connected(_on_go_to_menu_pressed):
 		menu_button.pressed.connect(_on_go_to_menu_pressed)
 		
 	if color_rect:
@@ -58,8 +73,9 @@ func get_viewport_rect() -> Rect2:
 	return Rect2(0, 0, 1024, 600)
 
 func show_result(winner_id: int, is_draw: bool) -> void:
+	_ensure_nodes()
 	# Notificar logros
-	if has_node("/root/AchievementManager"):
+	if is_inside_tree() and has_node("/root/AchievementManager"):
 		var am := get_node("/root/AchievementManager")
 		if not is_draw and am.has_method("on_game_won"):
 			am.on_game_won(winner_id, GameManager.get_active_game())
@@ -74,7 +90,7 @@ func show_result(winner_id: int, is_draw: bool) -> void:
 			winner_label.text = "Partida finalizada sin ganador"
 			winner_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
 	else:
-		var p_color = GameManager.get_player_color(winner_id) if Engine.has_singleton("GameManager") or has_node("/root/GameManager") else Color(1.0, 0.85, 0.2)
+		var p_color = GameManager.get_player_color(winner_id) if Engine.has_singleton("GameManager") or (is_inside_tree() and has_node("/root/GameManager")) else Color(1.0, 0.85, 0.2)
 		if title_label:
 			title_label.text = "¡Victoria!"
 			title_label.add_theme_color_override("font_color", p_color)
@@ -82,7 +98,7 @@ func show_result(winner_id: int, is_draw: bool) -> void:
 			winner_label.text = "¡Jugador %d gana la partida!" % winner_id
 			winner_label.add_theme_color_override("font_color", p_color)
 
-		if not OS.has_feature("headless"):
+		if is_inside_tree() and not OS.has_feature("headless") and DisplayServer.get_name() != "headless":
 			var vp_size = get_viewport_rect().size
 			var max_x = max(100.0, vp_size.x - 50.0)
 			for i in range(3):
@@ -116,14 +132,21 @@ func hide() -> void:
 	super.hide()
 
 func _animate_in() -> void:
+	if not is_inside_tree() or OS.has_feature("headless") or DisplayServer.get_name() == "headless":
+		if color_rect:
+			color_rect.modulate.a = 1.0
+		return
+
 	if color_rect:
 		color_rect.modulate.a = 0.0
 		var fade_tween = create_tween()
 		if fade_tween:
 			fade_tween.tween_property(color_rect, "modulate:a", 1.0, 0.3)
 
-	if title_label and get_tree():
+	if title_label and is_inside_tree() and get_tree():
 		await get_tree().process_frame
+		if not is_inside_tree() or title_label == null:
+			return
 		var target_y = title_label.position.y
 		title_label.position.y = -50.0
 		var title_tween = create_tween()

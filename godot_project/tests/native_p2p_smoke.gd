@@ -37,6 +37,7 @@ func _initialize() -> void:
 		if not r[1]:
 			ok = false
 
+	bridge.free()
 	if ok:
 		print("PASS: P2P API surface OK")
 		quit(0)

@@ -19,7 +19,6 @@ func _initialize() -> void:
 	var timer_hud: TurnTimerHud = TurnTimerHudScript.new()
 	var am := AudioManagerScript.new()
 	root.add_child(am)
-	am._ready()
 	timer_hud.audio_manager_ref = am
 	timer_hud.timer_enabled = true
 	root.add_child(timer_hud)
@@ -35,11 +34,16 @@ func _initialize() -> void:
 	assert(am.last_played_sfx == "timer_tick", "AudioManager debe reproducir pulso sonoro suave (timer_tick) en los últimos 10s")
 
 	# Avanzar los 9 segundos restantes -> 00:00 y adjudicación al rival (Jugador 2)
-	var timeout_winner := -1
-	timer_hud.turn_timeout.connect(func(_expired_p: int, win_p: int): timeout_winner = win_p)
+	var state := {
+		"timeout_winner": -1,
+		"resigned_winner": -1,
+		"draw_ok": false,
+		"signal_received": false,
+	}
+	timer_hud.turn_timeout.connect(func(_expired_p: int, win_p: int): state["timeout_winner"] = win_p)
 	timer_hud.advance_timer(9.0)
 	assert(timer_hud.time_label.text == "00:00", "TurnTimerHud debe llegar a 00:00")
-	assert(timeout_winner == 2, "Al expirar el turno del Jugador 1, debe adjudicar la victoria al Jugador 2")
+	assert(state["timeout_winner"] == 2, "Al expirar el turno del Jugador 1, debe adjudicar la victoria al Jugador 2")
 
 	# 3. Verificar PauseMenu: Reglas, Deshacer Jugada, Rendirse con confirmación, Ofrecer Tablas y GameOverOverlay
 	var pm: CanvasLayer = load("res://pause_menu.tscn").instantiate() if ResourceLoader.exists("res://pause_menu.tscn") else null
@@ -75,26 +79,25 @@ func _initialize() -> void:
 	pm.cancel_confirmation()
 	assert(not pm.confirm_dialog.visible, "Cancelar confirmación debe cerrar el diálogo sin terminar la partida")
 
-	var resigned_winner := -1
-	pm.resign_confirmed.connect(func(_resigning: int, winner: int): resigned_winner = winner)
+	pm.resign_confirmed.connect(func(_resigning: int, winner: int): state["resigned_winner"] = winner)
 	pm._on_resign_pressed()
 	pm.confirm_resign()
-	assert(resigned_winner == 2, "Confirmar rendición del Jugador 1 debe adjudicar victoria al Jugador 2")
+	assert(state["resigned_winner"] == 2, "Confirmar rendición del Jugador 1 debe adjudicar victoria al Jugador 2")
 	assert(pm.game_over_overlay != null and pm.game_over_overlay.visible, "Confirmar rendición debe disparar game_over_overlay.gd")
 
 	# Verificar Ofrecer Tablas con confirmación
-	var draw_ok := false
-	pm.draw_accepted.connect(func(): draw_ok = true)
+	pm.draw_accepted.connect(func(): state["draw_ok"] = true)
 	pm._on_offer_draw_pressed()
 	assert(pm.confirm_dialog.visible, "Ofrecer Tablas debe mostrar diálogo de confirmación")
 	pm.confirm_draw()
-	assert(draw_ok, "Confirmar tablas debe emitir draw_accepted")
+	assert(state["draw_ok"], "Confirmar tablas debe emitir draw_accepted")
 
-	var signal_received := false
-	pm.connect("quit_game_requested", func(): signal_received = true)
+	pm.connect("quit_game_requested", func(): state["signal_received"] = true)
 	pm.emit_signal("quit_game_requested")
-	assert(signal_received, "La señal quit_game_requested debe emitirse y recibirse")
+	assert(state["signal_received"], "La señal quit_game_requested debe emitirse y recibirse")
 
+	if pm.game_over_overlay != null and is_instance_valid(pm.game_over_overlay):
+		pm.game_over_overlay.free()
 	timer_hud.free()
 	am.free()
 	pm.free()

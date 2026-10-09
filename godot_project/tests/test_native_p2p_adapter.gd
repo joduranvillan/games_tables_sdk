@@ -73,6 +73,8 @@ func _initialize() -> void:
 	results.append(["reconexión SE dispara automáticamente tras el backoff de 3s", mock_plugin.discovery_started])
 
 	adapter.stop()
+	adapter.free()
+	bridge.free()
 
 	var ok := true
 	for r in results:

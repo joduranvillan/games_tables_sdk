@@ -59,7 +59,8 @@ func _initialize() -> void:
 
 	var detected_rooms_log: Array = []
 	client_discovery.lan_rooms_updated.connect(func(rooms: Array) -> void:
-		detected_rooms_log = rooms
+		detected_rooms_log.clear()
+		detected_rooms_log.append_array(rooms)
 	)
 
 	var listen_port: int = TEST_LAN_PORT

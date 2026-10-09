@@ -48,7 +48,7 @@ func _initialize() -> void:
 
 	# 2. Emitir PlaceArmiesCommand para P1 buscando un territorio de P1
 	var p1_territory = -1
-	for t in range(30):
+	for t in [2, 0, 1, 3, 4, 5, 6, 7, 8, 9, 10]:
 		if armies_placed_events.size() > 0:
 			break
 		bridge.send_command_json(1, JSON.stringify({

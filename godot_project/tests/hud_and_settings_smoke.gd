@@ -147,29 +147,31 @@ func _initialize() -> void:
 	gp_cursor.handle_input_event(joy_motion)
 	assert(gp_cursor.cursor_cell == Vector2i(1, 1), "InputEventJoypadMotion (Stick izquierdo abajo) debe mover el cursor a (1, 1)")
 
-	var selected_cell := Vector2i(-1, -1)
-	gp_cursor.cell_selected.connect(func(c: Vector2i): selected_cell = c)
+	var gp_state := {
+		"selected_cell": Vector2i(-1, -1),
+		"cancelled": false,
+		"pause_triggered": false,
+	}
+	gp_cursor.cell_selected.connect(func(c: Vector2i): gp_state["selected_cell"] = c)
 	var joy_a := InputEventJoypadButton.new()
 	joy_a.button_index = JOY_BUTTON_A
 	joy_a.pressed = true
 	gp_cursor.handle_input_event(joy_a)
-	assert(selected_cell == Vector2i(1, 1), "Botón A (ui_gamepad_select) debe seleccionar la celda actual")
+	assert(gp_state["selected_cell"] == Vector2i(1, 1), "Botón A (ui_gamepad_select) debe seleccionar la celda actual")
 
-	var cancelled := false
-	gp_cursor.selection_cancelled.connect(func(): cancelled = true)
+	gp_cursor.selection_cancelled.connect(func(): gp_state["cancelled"] = true)
 	var joy_b := InputEventJoypadButton.new()
 	joy_b.button_index = JOY_BUTTON_B
 	joy_b.pressed = true
 	gp_cursor.handle_input_event(joy_b)
-	assert(cancelled == true, "Botón B (ui_gamepad_cancel) debe cancelar la selección")
+	assert(gp_state["cancelled"] == true, "Botón B (ui_gamepad_cancel) debe cancelar la selección")
 
-	var pause_triggered := false
-	gp_cursor.pause_requested.connect(func(): pause_triggered = true)
+	gp_cursor.pause_requested.connect(func(): gp_state["pause_triggered"] = true)
 	var joy_start := InputEventJoypadButton.new()
 	joy_start.button_index = JOY_BUTTON_START
 	joy_start.pressed = true
 	gp_cursor.handle_input_event(joy_start)
-	assert(pause_triggered == true, "Botón Start (ui_gamepad_start) debe solicitar el menú de pausa")
+	assert(gp_state["pause_triggered"] == true, "Botón Start (ui_gamepad_start) debe solicitar el menú de pausa")
 
 	var mouse_ev := InputEventMouseMotion.new()
 	mouse_ev.position = Vector2(200, 200)

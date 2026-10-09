@@ -10,6 +10,7 @@ func _initialize() -> void:
         bridge._process(0.016)
     assert(bridge.session_tick_count() > 2,
         "La IA de Shogi debe haber realizado al menos un movimiento")
+    bridge.free()
 
     # Xiangqi vs IA (depth 1)
     bridge = OpenTableBridge.new()
@@ -18,7 +19,8 @@ func _initialize() -> void:
     for i in range(60):
         bridge._process(0.016)
     assert(bridge.session_tick_count() > 2,
-        "La IA de Xiangqi debe haber realizado al menos un movimiento")
+        "La IA de Xiangqi debe realizado al menos un movimiento")
+    bridge.free()
 
     quit(0)
 

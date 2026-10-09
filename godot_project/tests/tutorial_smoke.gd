@@ -123,5 +123,7 @@ func _initialize() -> void:
 			quit(1)
 			return
 
+	tm.free()
+	dummy_board.free()
 	print("PASS: tutorial_smoke.gd — 7 tutoriales interactivos (Chess, Go, Shogi, Checkers, Backgammon, UNO, Ludo) y TutorialManager verificados")
 	quit(0)

@@ -75,5 +75,6 @@ func _initialize() -> void:
 	assert(bridge_host.has_method("start_hosting"), "Bridge debe tener start_hosting")
 	assert(bridge_host.has_method("connect_to_host"), "Bridge debe tener connect_to_host")
 	bridge_host.free()
+	bridge.free()
 
 	quit(0 if all_ok else 1)

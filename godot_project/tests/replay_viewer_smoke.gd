@@ -25,13 +25,13 @@ func _initialize() -> void:
 	# 4. Crear ReplayViewer y cargar datos
 	var viewer = ReplayViewer.new()
 	root.add_child(viewer)
-	var move_events_count: int = 0
+	var move_events := {"count": 0}
 
 	# Escuchar los eventos de movimiento del bridge de ReplayViewer
 	viewer.load_replay_data(log_bytes, "checkers")
 	if viewer.bridge != null:
 		viewer.bridge.connect("piece_moved", func(_p, _fr, _fc, _tr, _tc, _cr, _cc, _pr):
-			move_events_count += 1
+			move_events["count"] = int(move_events["count"]) + 1
 		)
 
 	results.append(["ReplayViewer calculó total_steps == 3", viewer.total_steps == 3])
@@ -44,7 +44,7 @@ func _initialize() -> void:
 	results.append(["step 1 retornó true", step1_ok])
 	results.append(["step 2 retornó true", step2_ok])
 	results.append(["step 3 retornó true", step3_ok])
-	results.append(["step_replay() emitió exactamente 3 eventos de movimiento", move_events_count == 3])
+	results.append(["step_replay() emitió exactamente 3 eventos de movimiento", int(move_events["count"]) == 3])
 
 	# 6. Verificar que step_replay() retorna false al final del replay
 	var step4_ok: bool = viewer.bridge.step_replay() if viewer.bridge else true
