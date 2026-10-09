@@ -1,6 +1,6 @@
 extends Node2D
 
-const TERRITORY_NAMES: Array[String] = [
+const TERRITORY_NAMES: Array = [
 	"Argentina", "Brasil", "Chile", "Colombia", "Perú",
 	"México", "California", "Nueva York", "Canadá",
 	"Gran Bretaña", "España", "Francia", "Alemania", "Rusia",
@@ -9,7 +9,7 @@ const TERRITORY_NAMES: Array[String] = [
 	"Australia", "Java", "Sumatra", "Borneo"
 ]
 
-const CONTINENTS_DATA: Array[Dictionary] = [
+const CONTINENTS_DATA: Array = [
 	{
 		"id": 0,
 		"name": "América del Sur",
@@ -54,7 +54,7 @@ const CONTINENTS_DATA: Array[Dictionary] = [
 	}
 ]
 
-const TERRITORY_POLYGONS: Array[PackedVector2Array] = [
+var TERRITORY_POLYGONS: Array = [
 	# 0: Argentina
 	PackedVector2Array([Vector2(140, 480), Vector2(220, 480), Vector2(200, 560), Vector2(150, 560)]),
 	# 1: Brasil
@@ -122,7 +122,7 @@ const TERRITORY_POLYGONS: Array[PackedVector2Array] = [
 	PackedVector2Array([Vector2(630, 310), Vector2(700, 310), Vector2(690, 360), Vector2(630, 360)])
 ]
 
-const TERRITORY_CENTERS: Array[Vector2] = [
+const TERRITORY_CENTERS: Array = [
 	Vector2(180, 520), # 0: Argentina
 	Vector2(240, 440), # 1: Brasil
 	Vector2(150, 480), # 2: Chile
@@ -160,7 +160,7 @@ const TERRITORY_CENTERS: Array[Vector2] = [
 	Vector2(660, 340)  # 29: Borneo
 ]
 
-const ADJACENCIES: Array[Array] = [
+const ADJACENCIES: Array = [
 	[0, 1], [0, 2], [0, 4],
 	[1, 2], [1, 3], [1, 4], [1, 14],
 	[2, 4], [2, 26],
@@ -189,7 +189,7 @@ const ADJACENCIES: Array[Array] = [
 	[28, 29]
 ]
 
-const SEA_LANES: Array[Array] = [
+const SEA_LANES: Array = [
 	[1, 14],   # Brasil <-> Sahara
 	[2, 26],   # Chile <-> Australia
 	[3, 5],    # Colombia <-> México
@@ -865,13 +865,13 @@ func _on_map_canvas_draw() -> void:
 		for pt in base_poly:
 			screen_poly.append(_to_screen(pt, trans))
 
-		var owner = territory_owners.get(i, 0)
+		var t_owner = territory_owners.get(i, 0)
 		var continent_id = _get_territory_continent(i)
 		var cont_col = CONTINENTS_DATA[continent_id]["color"]
 
 		var fill_color: Color
-		if owner > 0 and PLAYER_COLORS.has(owner):
-			var p_col = PLAYER_COLORS[owner]
+		if t_owner > 0 and PLAYER_COLORS.has(t_owner):
+			var p_col = PLAYER_COLORS[t_owner]
 			# Blend owner color with subtle continent tone
 			fill_color = Color(p_col.r, p_col.g, p_col.b, 0.72)
 		else:
@@ -920,11 +920,11 @@ func _on_map_canvas_draw() -> void:
 	# 4. Draw Center Badges & Army counts & Territory Names
 	for i in range(30):
 		var center_pos = _to_screen(TERRITORY_CENTERS[i], trans)
-		var owner = territory_owners.get(i, 0)
+		var t_owner = territory_owners.get(i, 0)
 		var armies = territory_armies.get(i, 0)
 		var badge_radius = clamp(13.0 * s, 9.0, 16.0)
 
-		var badge_color = PLAYER_COLORS.get(owner, Color(0.25, 0.25, 0.30))
+		var badge_color = PLAYER_COLORS.get(t_owner, Color(0.25, 0.25, 0.30))
 
 		# Outer shield/circle
 		map_canvas.draw_circle(center_pos, badge_radius + 2.0 * s, Color(0.08, 0.1, 0.14, 0.9))
@@ -997,11 +997,11 @@ func _on_map_canvas_gui_input(event: InputEvent) -> void:
 				break
 
 func _on_territory_clicked(t_id: int) -> void:
-	var owner = territory_owners.get(t_id, 0)
+	var t_owner = territory_owners.get(t_id, 0)
 	var armies = territory_armies.get(t_id, 0)
 
 	if current_phase == "PlaceArmies" or current_phase.begins_with("PlaceArmies") or current_phase == "Placement":
-		if owner == current_player_id:
+		if t_owner == current_player_id:
 			selected_from = t_id
 			selected_to = -1
 			valid_targets.clear()
@@ -1009,11 +1009,11 @@ func _on_territory_clicked(t_id: int) -> void:
 				TERRITORY_NAMES[t_id], armies
 			]
 		else:
-			action_info_label.text = "%s no te pertenece (dueño: Jugador %d)." % [TERRITORY_NAMES[t_id], owner]
+			action_info_label.text = "%s no te pertenece (dueño: Jugador %d)." % [TERRITORY_NAMES[t_id], t_owner]
 
 	elif current_phase == "Attack":
 		if selected_from == -1:
-			if owner == current_player_id:
+			if t_owner == current_player_id:
 				if armies > 1:
 					selected_from = t_id
 					_calculate_valid_attack_targets(t_id)
@@ -1025,7 +1025,7 @@ func _on_territory_clicked(t_id: int) -> void:
 			else:
 				action_info_label.text = "Debes seleccionar uno de tus territorios con al menos 2 ejércitos."
 		else:
-			if owner == current_player_id:
+			if t_owner == current_player_id:
 				# Switch attacking origin
 				if armies > 1:
 					selected_from = t_id
@@ -1047,7 +1047,7 @@ func _on_territory_clicked(t_id: int) -> void:
 
 	elif current_phase == "Fortify":
 		if selected_from == -1:
-			if owner == current_player_id:
+			if t_owner == current_player_id:
 				if armies > 1:
 					selected_from = t_id
 					_calculate_valid_fortify_targets(t_id)
@@ -1066,7 +1066,7 @@ func _on_territory_clicked(t_id: int) -> void:
 				action_info_label.text = "Mover tropas de %s ➡️ %s. Selecciona cantidad y presiona Fortificar." % [
 					TERRITORY_NAMES[selected_from], TERRITORY_NAMES[selected_to]
 				]
-			elif owner == current_player_id:
+			elif t_owner == current_player_id:
 				selected_from = t_id
 				_calculate_valid_fortify_targets(t_id)
 				selected_to = -1

@@ -102,5 +102,5 @@ func _initialize() -> void:
 	quit(0)
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+	if what == Node.NOTIFICATION_WM_CLOSE_REQUEST:
 		quit(1)

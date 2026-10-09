@@ -55,6 +55,8 @@ if [ ! -f "target/debug/libopen_table_godot.so" ]; then
 fi
 
 echo "=== Inicializando cache e importación de Godot/Redot ==="
+mkdir -p godot_project/.godot
+printf "res://open_table.gdextension\n" > godot_project/.godot/extension_list.cfg
 "$REDOT_BIN" --headless --path godot_project --editor --quit &>/dev/null || true
 
 echo ""

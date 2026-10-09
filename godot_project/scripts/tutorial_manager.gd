@@ -40,11 +40,11 @@ func start(steps: Array, board_node: Node) -> void:
 		return
 
 	if ResourceLoader.exists("res://scenes/tutorial_overlay.tscn"):
-		var scene: PackedScene = load("res://scenes/tutorial_overlay.tscn")
+		var scene: PackedScene = load("res://scenes/tutorial_overlay.tscn") as PackedScene
 		if scene != null:
-			active_overlay = scene.instantiate()
+			active_overlay = scene.instantiate() as CanvasLayer
 	if active_overlay == null:
-		var OverlayScript = load("res://scenes/tutorial_overlay.gd")
+		var OverlayScript: Variant = load("res://scenes/tutorial_overlay.gd")
 		if OverlayScript != null:
 			active_overlay = OverlayScript.new()
 
@@ -62,7 +62,7 @@ func _apply_current_step() -> void:
 		complete_tutorial()
 		return
 
-	var step = active_steps[current_step_index]
+	var step: Variant = active_steps[current_step_index]
 	if active_overlay != null and active_overlay.has_method("display_tutorial_step"):
 		active_overlay.call("display_tutorial_step", step, current_step_index, active_steps.size(), current_board)
 	step_changed.emit(current_step_index, step if step is Object else null)
@@ -70,8 +70,8 @@ func _apply_current_step() -> void:
 func _on_overlay_next_requested() -> void:
 	if not is_running:
 		return
-	var step = active_steps[current_step_index]
-	var must_wait := false
+	var step: Variant = active_steps[current_step_index]
+	var must_wait: bool = false
 	if step is TutorialStep:
 		must_wait = step.wait_for_action
 	elif step is Dictionary:
@@ -91,9 +91,9 @@ func advance_step() -> void:
 func is_cell_allowed(cell: Vector2i) -> bool:
 	if not is_running or current_step_index < 0 or current_step_index >= active_steps.size():
 		return true
-	var step = active_steps[current_step_index]
-	var target := Vector2i(-1, -1)
-	var dest := Vector2i(-1, -1)
+	var step: Variant = active_steps[current_step_index]
+	var target: Vector2i = Vector2i(-1, -1)
+	var dest: Vector2i = Vector2i(-1, -1)
 	if step is TutorialStep:
 		target = step.highlight_cell
 		dest = step.arrow_to
@@ -109,8 +109,12 @@ func notify_cell_action(cell: Vector2i) -> bool:
 	if not is_cell_allowed(cell):
 		return false
 	if is_running and current_step_index >= 0 and current_step_index < active_steps.size():
-		var step = active_steps[current_step_index]
-		var wait := step.wait_for_action if step is TutorialStep else bool(step.get("wait_for_action", false))
+		var step: Variant = active_steps[current_step_index]
+		var wait: bool = false
+		if step is TutorialStep:
+			wait = step.wait_for_action
+		elif step is Dictionary:
+			wait = bool(step.get("wait_for_action", false))
 		if wait:
 			advance_step()
 	return true

@@ -189,10 +189,10 @@ func apply_relay_event(event_data: Variant, from_player: int = 0) -> void:
 		"from": from_player,
 		"data": event_data,
 	})
-	var serialized := event_data if typeof(event_data) == TYPE_STRING else JSON.stringify(event_data)
+	var serialized: String = str(event_data) if typeof(event_data) == TYPE_STRING else JSON.stringify(event_data)
 	if bridge != null and bridge.has_method("apply_spectator_event"):
-		bridge.call("apply_spectator_event", str(serialized))
-	_on_spectator_event(str(serialized))
+		bridge.call("apply_spectator_event", serialized)
+	_on_spectator_event(serialized)
 	relay_event_applied.emit(event_data)
 
 func _on_spectator_event(event_json: String) -> void:

@@ -108,6 +108,7 @@ func show_result(winner_id: int, is_draw: bool) -> void:
 func show_winner(winner_id: int) -> void:
 	show_result(winner_id, winner_id <= 0)
 
+@warning_ignore("native_method_override")
 func hide() -> void:
 	for child in get_children():
 		if child is CPUParticles2D:

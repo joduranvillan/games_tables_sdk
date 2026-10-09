@@ -85,7 +85,7 @@ func _initialize() -> void:
 	var ok_ludo := bridge_ludo.start_local_match_ludo_vs_ai(1, 2)
 	assert(ok_ludo, "Ludo vs IA: start debe retornar true")
 	# Ludo necesita un RollDice antes de que la IA actúe
-	bridge_ludo.send_command_json(JSON.stringify({"type": "RollDiceCommand", "player": 1}))
+	bridge_ludo.send_command_json(1, JSON.stringify({"type": "RollDiceCommand", "player": 1}))
 	for _i in range(50):
 		bridge_ludo._process(0.016)
 	var ticks_ludo: int = bridge_ludo.session_tick_count()

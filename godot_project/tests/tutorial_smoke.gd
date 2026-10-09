@@ -63,8 +63,8 @@ func _init() -> void:
 		quit(1)
 		return
 
-	var tm := TutorialManagerScript.new()
-	var dummy_board := Node2D.new()
+	var tm: Node = TutorialManagerScript.new()
+	var dummy_board: Node2D = Node2D.new()
 	root.add_child(dummy_board)
 	root.add_child(tm)
 
@@ -95,7 +95,7 @@ func _init() -> void:
 		tm.advance_step()
 
 	# Verificar ejecución completa en TutorialManager para los otros 6 tutoriales
-	var extra_tutorials := [
+	var extra_tutorials: Array = [
 		{"name": "Go", "steps": go_steps},
 		{"name": "Shogi", "steps": shogi_steps},
 		{"name": "Checkers", "steps": checkers_steps},

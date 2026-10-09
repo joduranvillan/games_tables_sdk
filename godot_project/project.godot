@@ -41,6 +41,15 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=1
 
+[debug]
+
+gdscript/warnings/native_method_override=0
+gdscript/warnings/inferred_declaration=0
+gdscript/warnings/unsafe_property_access=0
+gdscript/warnings/unsafe_method_access=0
+gdscript/warnings/unsafe_cast=0
+gdscript/warnings/unsafe_call_argument=0
+
 [locale]
 
 translations=PackedStringArray("res://assets/translations/translations.csv", "res://assets/translations/translations.en.translation", "res://assets/translations/translations.es.translation", "res://assets/translations/translations.pt.translation", "res://assets/translations/translations.fr.translation")
