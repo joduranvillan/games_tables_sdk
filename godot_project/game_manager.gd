@@ -32,7 +32,7 @@ var last_safe_margins: Dictionary = {"top": 0, "bottom": 0, "left": 0, "right": 
 func set_online_features_enabled(enabled: bool) -> void:
 	online_features_enabled = enabled
 	offline_only_mode = not enabled
-	var auth := get_node_or_null("/root/AuthClient")
+	var auth := (get_node_or_null("/root/AuthClient") if is_inside_tree() else null)
 	if auth != null and auth.has_method("set_online_enabled"):
 		auth.call("set_online_enabled", enabled)
 
@@ -185,7 +185,7 @@ func load_saved_settings() -> void:
 		var cb_mode = cfg.get_value("accessibility", "colorblind_mode", "none")
 		var ui_scale = float(cfg.get_value("accessibility", "ui_font_scale", 1.0))
 		haptics_enabled = bool(cfg.get_value("accessibility", "haptics_enabled", true))
-		var tm = get_node_or_null("/root/ThemeManager")
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null:
 			tm.set_theme(board_theme)
 			tm.set_font_tier(font_size_tier)
@@ -193,7 +193,7 @@ func load_saved_settings() -> void:
 				tm.call("set_ui_font_scale", ui_scale)
 			if tm.has_method("set_colorblind_mode"):
 				tm.call("set_colorblind_mode", cb_mode)
-		var hm = get_node_or_null("/root/HapticsManager")
+		var hm = (get_node_or_null("/root/HapticsManager") if is_inside_tree() else null)
 		if hm != null and hm.has_method("set_haptics_enabled"):
 			hm.call("set_haptics_enabled", haptics_enabled)
 

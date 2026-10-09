@@ -102,6 +102,8 @@ func _ensure_entry(player_name: String, game_type: String) -> Dictionary:
 	return g_scores
 
 func _find_and_bind_bridge() -> void:
+	if not is_inside_tree():
+		return
 	var tree = get_tree()
 	if tree and tree.root:
 		for child in tree.root.get_children():
@@ -294,8 +296,8 @@ func get_game_stats(game_type: String, player_name: String = "Player 1") -> Dict
 		"ai_wins_by_difficulty": (g.get("ai_wins_by_difficulty", get_default_ai_wins_dict()) as Dictionary).duplicate(),
 	}
 
-func get_all_13_games_summary(player_name: String = "Player 1") -> Array[Dictionary]:
-	var result: Array[Dictionary] = []
+func get_all_13_games_summary(player_name: String = "Player 1") -> Array:
+	var result: Array = []
 	for g_meta in ALL_GAMES:
 		var gid: String = g_meta["id"]
 		var item := get_game_stats(gid, player_name)

@@ -83,6 +83,7 @@ func _initialize() -> void:
 		return
 
 	lobby.free()
+	mock_bridge.free()
 	discovery.free()
 
 	print("PASS: lan_discovery_smoke.gd — UDP Beacon OPENTABLE_LAN_V1 (42423), TTL 5s y unión en 1 clic verificados")

@@ -207,7 +207,7 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	music_slider.step = 0.05
 	music_slider.value = 0.7
 	music_slider.value_changed.connect(func(v: float):
-		if has_node("/root/AudioManager"):
+		if (is_inside_tree() and has_node("/root/AudioManager")):
 			var am = get_node("/root/AudioManager")
 			if am.has_method("set_music_volume_linear"):
 				am.call("set_music_volume_linear", v)
@@ -224,7 +224,7 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	sfx_slider.step = 0.05
 	sfx_slider.value = 0.8
 	sfx_slider.value_changed.connect(func(v: float):
-		if has_node("/root/AudioManager"):
+		if (is_inside_tree() and has_node("/root/AudioManager")):
 			var am = get_node("/root/AudioManager")
 			if am.has_method("set_sfx_volume_linear"):
 				am.call("set_sfx_volume_linear", v)
@@ -248,7 +248,7 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 	haptics_checkbox.text = "Vibración háptica (Móvil)"
 	haptics_checkbox.button_pressed = true
 	haptics_checkbox.toggled.connect(func(on: bool):
-		if has_node("/root/HapticsManager"):
+		if (is_inside_tree() and has_node("/root/HapticsManager")):
 			var hm = get_node("/root/HapticsManager")
 			if hm.has_method("set_haptics_enabled"):
 				hm.call("set_haptics_enabled", on)
@@ -321,7 +321,7 @@ func _setup_settings_tab(parent: VBoxContainer) -> void:
 		var target_mode := "deuteranopia" if on else "none"
 		if colorblind_mode_option != null:
 			colorblind_mode_option.selected = 1 if on else 0
-		if has_node("/root/ThemeManager"):
+		if (is_inside_tree() and has_node("/root/ThemeManager")):
 			var tm = get_node("/root/ThemeManager")
 			if tm.has_method("set_colorblind_mode"):
 				tm.call("set_colorblind_mode", target_mode)
@@ -407,9 +407,9 @@ func _on_load_game_pressed() -> void:
 		print("No se encontró el nodo OpenTableBridge activo.")
 
 func _find_active_bridge() -> Object:
-	if has_node("/root/OpenTableBridge"):
+	if (is_inside_tree() and has_node("/root/OpenTableBridge")):
 		return get_node("/root/OpenTableBridge")
-	var root = get_tree().root
+	var root = get_tree().root if is_inside_tree() else null
 	if root != null:
 		for child in root.get_children():
 			if child.get_class() == "OpenTableBridge" or child.has_method("save_game"):
@@ -506,8 +506,8 @@ func _on_font_size_changed(value: float) -> void:
 	font_size_label.text = "Tamaño de fuente: %s" % FONT_TIER_NAMES[tier]
 	if font_scale_option != null and font_scale_option.selected != tier:
 		font_scale_option.selected = tier
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
-		var tm = get_node_or_null("/root/ThemeManager")
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null:
 			tm.set_font_tier(tier)
 
@@ -519,8 +519,8 @@ func _on_font_scale_selected(index: int) -> void:
 		font_size_slider.value = index
 	if font_size_label != null:
 		font_size_label.text = "Tamaño de fuente: %s" % FONT_TIER_NAMES[index]
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
-		var tm = get_node_or_null("/root/ThemeManager")
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null and tm.has_method("set_ui_font_scale"):
 			tm.call("set_ui_font_scale", scale_val)
 
@@ -532,8 +532,8 @@ func _on_colorblind_mode_selected(index: int) -> void:
 		colorblind_checkbox.set_block_signals(true)
 		colorblind_checkbox.button_pressed = (mode_val != "none")
 		colorblind_checkbox.set_block_signals(false)
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
-		var tm = get_node_or_null("/root/ThemeManager")
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null and tm.has_method("set_colorblind_mode"):
 			tm.call("set_colorblind_mode", mode_val)
 
@@ -753,7 +753,7 @@ func _on_save_pressed() -> void:
 		else:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		var am = get_node("/root/AudioManager")
 		if am.has_method("set_music_volume_db"):
 			am.call("set_music_volume_db", linear_to_db(music_vol) if music_vol > 0.0001 else -80.0)
@@ -764,19 +764,19 @@ func _on_save_pressed() -> void:
 	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), not sfx_on)
 	TranslationServer.set_locale(lang_code)
 	
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
-		var tm = get_node_or_null("/root/ThemeManager")
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null:
 			tm.set_theme(theme_key)
 			tm.set_ui_font_scale(ui_scale_val)
 			tm.set_colorblind_mode(cb_mode_val)
 
-	if has_node("/root/HapticsManager"):
+	if (is_inside_tree() and has_node("/root/HapticsManager")):
 		var hm = get_node("/root/HapticsManager")
 		if hm.has_method("set_haptics_enabled"):
 			hm.call("set_haptics_enabled", haptics_on)
 
-	if has_node("/root/GameManager"):
+	if (is_inside_tree() and has_node("/root/GameManager")):
 		var gm = get_node("/root/GameManager")
 		gm.sfx_enabled = sfx_on
 		gm.animations_enabled = anim_on
@@ -785,17 +785,19 @@ func _on_save_pressed() -> void:
 	settings_saved.emit()
 	
 	if close_on_save:
-		if get_parent() is Window or get_parent() is CanvasLayer or get_parent() is Control and get_parent() != get_tree().root:
+		if get_parent() is Window or get_parent() is CanvasLayer or get_parent() is Control and (not is_inside_tree() or get_parent() != get_tree().root):
 			queue_free()
-		elif has_node("/root/SceneManager"):
+		elif (is_inside_tree() and has_node("/root/SceneManager")):
 			get_node("/root/SceneManager").transition_to("res://main_menu.tscn")
 		else:
-			get_tree().change_scene_to_file("res://main_menu.tscn")
+			if is_inside_tree():
+				get_tree().change_scene_to_file("res://main_menu.tscn")
 
 func _on_close_pressed() -> void:
-	if get_parent() is Window or get_parent() is CanvasLayer or get_parent() is Control and get_parent() != get_tree().root:
+	if get_parent() is Window or get_parent() is CanvasLayer or get_parent() is Control and (not is_inside_tree() or get_parent() != get_tree().root):
 		queue_free()
-	elif has_node("/root/SceneManager"):
+	elif (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://main_menu.tscn")
 	else:
-		get_tree().change_scene_to_file("res://main_menu.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://main_menu.tscn")

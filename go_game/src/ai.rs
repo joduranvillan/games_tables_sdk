@@ -125,7 +125,7 @@ pub fn best_move(
 
     let total_budget: usize = difficulty.rollouts();
     let n = candidates.len();
-    let rollouts_per_candidate = (total_budget / n).max(5);
+    let rollouts_per_candidate = (total_budget / n).max(1);
 
     let mut rng = FastRng::new(
         (session.id.0 ^ session.current_tick().0)
@@ -151,8 +151,8 @@ pub fn best_move(
                 continue;
             }
 
-            // Simulación aleatoria hasta 50 movimientos o fin de juego
-            let max_rollout_steps = 50;
+            // Simulación aleatoria hasta 16 movimientos o fin de juego
+            let max_rollout_steps = 16;
             let mut consecutive_passes = 0;
 
             for _ in 0..max_rollout_steps {

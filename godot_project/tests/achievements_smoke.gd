@@ -46,5 +46,5 @@ func _initialize() -> void:
 			ok = false
 
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
-	manager.queue_free()
+	manager.free()
 	quit(0 if ok else 1)

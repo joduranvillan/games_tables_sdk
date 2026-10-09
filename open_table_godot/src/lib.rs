@@ -2145,7 +2145,6 @@ impl OpenTableBridge {
                 }
             }
             Err(err) => {
-                godot_error!("[EngineError] {}", err);
                 self.emit_bridge_signal("move_rejected", &[Variant::from(err.to_string())]);
             }
         }
@@ -2164,7 +2163,6 @@ impl OpenTableBridge {
             Ok(cmd) => cmd,
             Err(e) => {
                 let msg = format!("Error parsing command JSON: {e}");
-                godot_error!("[EngineError] {}", msg);
                 self.emit_bridge_signal("move_rejected", &[Variant::from(msg)]);
                 return;
             }
@@ -4006,10 +4004,11 @@ impl OpenTableBridge {
                 } => {
                     let curr_p = session.current_player();
                     let is_ai_turn = curr_p == *ai_p;
+                    let auto_play_initial = (self.current_game_type == "shogi"
+                        || self.current_game_type == "xiangqi")
+                        && session.current_tick().0 < 4;
                     if is_ai_turn
-                        || self.current_game_type == "shogi"
-                        || self.current_game_type == "xiangqi"
-                        || self.current_game_type == "go"
+                        || auto_play_initial
                         || self.current_game_type == "monopoly"
                     {
                         let acting = if self.current_game_type == "monopoly" {

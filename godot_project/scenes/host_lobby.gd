@@ -42,7 +42,7 @@ var status_label: Label
 var join_dialog: Control = null
 
 func _ready() -> void:
-	if has_node("/root/GameManager"):
+	if (is_inside_tree() and has_node("/root/GameManager")):
 		var gm = get_node("/root/GameManager")
 		if "active_game" in gm and not String(gm.active_game).is_empty():
 			game_type = String(gm.active_game)
@@ -283,7 +283,7 @@ func _apply_connection_mode(index: int) -> void:
 		if ip_port_label != null:
 			ip_port_label.text = "Relay: %s" % relay_url
 		if bridge != null:
-			if has_node("/root/AuthClient"):
+			if (is_inside_tree() and has_node("/root/AuthClient")):
 				get_node("/root/AuthClient").call("configure_bridge_auth", bridge)
 			if bridge.has_method("connect_to_relay"):
 				bridge.call("connect_to_relay", relay_url)
@@ -438,10 +438,11 @@ func _get_local_ip() -> String:
 func _on_spectator_pressed() -> void:
 	if bridge != null and bridge.has_method("join_as_spectator"):
 		bridge.call("join_as_spectator")
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://spectator_view.tscn")
 	else:
-		get_tree().change_scene_to_file("res://spectator_view.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://spectator_view.tscn")
 
 func _on_scan_qr_pressed() -> void:
 	var scanner = QRScanner.new()
@@ -459,10 +460,11 @@ func _on_start_game_pressed() -> void:
 	if not ResourceLoader.exists(scene_path):
 		scene_path = "res://checkers_board.tscn"
 
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to(scene_path)
 	else:
-		get_tree().change_scene_to_file(scene_path)
+		if is_inside_tree():
+			get_tree().change_scene_to_file(scene_path)
 
 func _display_qr_code() -> void:
 	var local_ip = _get_local_ip()

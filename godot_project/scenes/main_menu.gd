@@ -32,7 +32,7 @@ const GAMES = [
 	{ "id": "battleship", "name": "Batalla Naval", "method": "start_local_match_battleship", "ai_method": "start_local_match_battleship_vs_ai", "scene": "res://battleship_board.tscn", "color": Color(0.25, 0.45, 0.85) }
 ]
 
-@onready var grid_container: GridContainer = $GridContainer
+@onready var grid_container: GridContainer = get_node_or_null("GridContainer")
 
 func _ready() -> void:
 	bridge = OpenTableBridge.new()
@@ -275,10 +275,11 @@ func _setup_buttons() -> void:
 		tw.tween_property(tutorial_btn, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	)
 	tutorial_btn.pressed.connect(func():
-		if has_node("/root/SceneManager"):
+		if (is_inside_tree() and has_node("/root/SceneManager")):
 			get_node("/root/SceneManager").transition_to("res://crisis_tutorial.gd")
 		else:
-			get_tree().change_scene_to_file("res://crisis_tutorial.gd")
+			if is_inside_tree():
+				get_tree().change_scene_to_file("res://crisis_tutorial.gd")
 	)
 	grid_container.add_child(tutorial_btn)
 
@@ -336,10 +337,11 @@ func _setup_buttons() -> void:
 	leaderboard_btn.pressed.connect(func():
 		if not is_online_mode_allowed():
 			return
-		if has_node("/root/SceneManager"):
+		if (is_inside_tree() and has_node("/root/SceneManager")):
 			get_node("/root/SceneManager").transition_to("res://scenes/leaderboard.tscn")
 		else:
-			get_tree().change_scene_to_file("res://scenes/leaderboard.tscn")
+			if is_inside_tree():
+				get_tree().change_scene_to_file("res://scenes/leaderboard.tscn")
 	)
 	grid_container.add_child(leaderboard_btn)
 	online_action_buttons.append(leaderboard_btn)
@@ -361,10 +363,11 @@ func _setup_buttons() -> void:
 		tw.tween_property(stats_btn, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	)
 	stats_btn.pressed.connect(func():
-		if has_node("/root/SceneManager"):
+		if (is_inside_tree() and has_node("/root/SceneManager")):
 			get_node("/root/SceneManager").transition_to("res://scenes/stats_screen.tscn")
 		else:
-			get_tree().change_scene_to_file("res://scenes/stats_screen.tscn")
+			if is_inside_tree():
+				get_tree().change_scene_to_file("res://scenes/stats_screen.tscn")
 	)
 	grid_container.add_child(stats_btn)
 
@@ -386,10 +389,11 @@ func _setup_buttons() -> void:
 	tournament_btn.pressed.connect(func():
 		if not is_online_mode_allowed():
 			return
-		if has_node("/root/SceneManager"):
+		if (is_inside_tree() and has_node("/root/SceneManager")):
 			get_node("/root/SceneManager").transition_to("res://scenes/tournament_lobby.tscn")
 		else:
-			get_tree().change_scene_to_file("res://scenes/tournament_lobby.tscn")
+			if is_inside_tree():
+				get_tree().change_scene_to_file("res://scenes/tournament_lobby.tscn")
 	)
 	grid_container.add_child(tournament_btn)
 	online_action_buttons.append(tournament_btn)
@@ -405,10 +409,11 @@ func _play_entry_animation() -> void:
 		tw.tween_property(btn, "modulate:a", 1.0, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _on_settings_pressed() -> void:
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://settings_menu.tscn")
 	else:
-		get_tree().change_scene_to_file("res://settings_menu.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://settings_menu.tscn")
 
 func _on_ver_replay_pressed() -> void:
 	var dialog = FileDialog.new()
@@ -424,10 +429,11 @@ func _on_replay_file_selected(path: String) -> void:
 	if f != null:
 		var bytes = f.get_buffer(f.get_length())
 		GameManager.set_replay_data(bytes, "checkers")
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://replay_viewer.tscn")
 	else:
-		get_tree().change_scene_to_file("res://replay_viewer.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://replay_viewer.tscn")
 
 func _on_game_selected(game: Dictionary) -> void:
 	_show_mode_popup(game)
@@ -704,15 +710,16 @@ func _launch_game(game: Dictionary, mode: String, difficulty_level: int = 1) -> 
 		elif bridge.has_method("start_local_match"):
 			bridge.call("start_local_match", 1, 2)
 
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_game_theme(game["id"])
 	elif Engine.has_singleton("ThemeManager"):
 		ThemeManager.apply_game_theme(game["id"])
 
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to(game["scene"])
 	else:
-		get_tree().change_scene_to_file(game["scene"])
+		if is_inside_tree():
+			get_tree().change_scene_to_file(game["scene"])
 
 func _setup_multiplayer_row() -> void:
 	var hbox := HBoxContainer.new()
@@ -758,10 +765,11 @@ func _setup_multiplayer_row() -> void:
 	about_btn.add_theme_font_size_override("font_size", 15)
 	_apply_button_theme(about_btn, Color(0.45, 0.35, 0.65))
 	about_btn.pressed.connect(func():
-		if has_node("/root/SceneManager"):
+		if (is_inside_tree() and has_node("/root/SceneManager")):
 			get_node("/root/SceneManager").transition_to("res://credits_screen.tscn")
 		else:
-			get_tree().change_scene_to_file("res://credits_screen.tscn")
+			if is_inside_tree():
+				get_tree().change_scene_to_file("res://credits_screen.tscn")
 	)
 	hbox.add_child(about_btn)
 
@@ -787,10 +795,11 @@ func _on_join_code_pressed() -> void:
 			var scene_path := "res://%s_board.tscn" % active_id
 			if not ResourceLoader.exists(scene_path):
 				scene_path = "res://checkers_board.tscn"
-			if has_node("/root/SceneManager"):
+			if (is_inside_tree() and has_node("/root/SceneManager")):
 				get_node("/root/SceneManager").transition_to(scene_path)
 			else:
-				get_tree().change_scene_to_file(scene_path)
+				if is_inside_tree():
+					get_tree().change_scene_to_file(scene_path)
 	)
 	dialog.connect("closed", func():
 		dialog.queue_free()
@@ -804,10 +813,11 @@ func _on_join_pressed() -> void:
 		scanner.close()
 		scanner.queue_free()
 		bridge.call("connect_to_host", ip, port, 2)
-		if has_node("/root/SceneManager"):
+		if (is_inside_tree() and has_node("/root/SceneManager")):
 			get_node("/root/SceneManager").transition_to("res://checkers_board.tscn")
 		else:
-			get_tree().change_scene_to_file("res://checkers_board.tscn")
+			if is_inside_tree():
+				get_tree().change_scene_to_file("res://checkers_board.tscn")
 	)
 	scanner.connect("closed", func():
 		scanner.queue_free()
@@ -855,10 +865,11 @@ func _launch_host_lobby(game_id: String) -> void:
 		return
 	GameManager.set_active_game(game_id)
 	GameManager.set_game_mode("host")
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://host_lobby.tscn")
 	else:
-		get_tree().change_scene_to_file("res://host_lobby.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://host_lobby.tscn")
 
 func _check_and_show_privacy_modal(settings_path: String = "user://settings.cfg") -> bool:
 	var modal_script = load("res://scenes/privacy_consent_modal.gd")
@@ -887,11 +898,11 @@ func is_online_mode_allowed(settings_path: String = "user://settings.cfg") -> bo
 	return true
 
 func _apply_online_mode_state(allow_online: bool) -> void:
-	if has_node("/root/GameManager"):
+	if (is_inside_tree() and has_node("/root/GameManager")):
 		var gm = get_node("/root/GameManager")
 		if gm.has_method("set_online_features_enabled"):
 			gm.call("set_online_features_enabled", allow_online)
-	if has_node("/root/AuthClient"):
+	if (is_inside_tree() and has_node("/root/AuthClient")):
 		var auth = get_node("/root/AuthClient")
 		if auth.has_method("set_online_enabled"):
 			auth.call("set_online_enabled", allow_online)

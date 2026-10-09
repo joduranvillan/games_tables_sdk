@@ -139,10 +139,11 @@ func _on_disconnected() -> void:
 	expelled_to_menu = true
 	reconnect_failed.emit()
 	if return_to_menu_on_exhausted and is_inside_tree():
-		if has_node("/root/SceneManager"):
+		if (is_inside_tree() and has_node("/root/SceneManager")):
 			get_node("/root/SceneManager").transition_to("res://main.tscn")
 		elif get_tree():
-			get_tree().change_scene_to_file("res://main.tscn")
+			if is_inside_tree():
+				get_tree().change_scene_to_file("res://main.tscn")
 
 func _on_reconnecting(attempt: int = 1) -> void:
 	_on_connection_reconnecting(attempt)

@@ -55,11 +55,12 @@ func _initialize() -> void:
 		var board_inst = packed.instantiate()
 		sub_viewport.add_child(board_inst)
 
-		RenderingServer.force_draw()
-		await process_frame
-
-		var tex = sub_viewport.get_texture()
-		var img: Image = tex.get_image() if tex != null else null
+		var img: Image = null
+		if not OS.has_feature("headless") and DisplayServer.get_name() != "headless":
+			RenderingServer.force_draw()
+			await process_frame
+			var tex = sub_viewport.get_texture()
+			img = tex.get_image() if tex != null else null
 		if img == null or img.is_empty():
 			if FileAccess.file_exists(abs_snapshot_path):
 				img = Image.load_from_file(abs_snapshot_path)
@@ -100,8 +101,8 @@ func _initialize() -> void:
 					else:
 						print("PASS: Visual diff %.2f%% dentro de la tolerancia (<= 1%%) para %s" % [diff_ratio * 100.0, board_id])
 
-		board_inst.queue_free()
-		await process_frame
+		sub_viewport.remove_child(board_inst)
+		board_inst.free()
 
 	sub_viewport.free()
 

@@ -46,13 +46,13 @@ var _rules_popup: RulesPopup
 var _pause_menu: CanvasLayer
 
 func _ready() -> void:
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
-		var tm = get_node_or_null("/root/ThemeManager")
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
 
-	var gm = get_node_or_null("/root/GameManager")
+	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
 
@@ -108,20 +108,21 @@ func _ready() -> void:
 		add_child(_pause_menu)
 
 func _on_quit_to_menu() -> void:
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://main.tscn")
 	else:
-		get_tree().change_scene_to_file("res://main.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://main.tscn")
 
 func _on_theme_changed(theme: BoardTheme) -> void:
 	current_theme = theme
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 	_update_grid_ui()
 	queue_redraw()
 
 func _on_layout_changed(_layout: int) -> void:
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 func _init_grids() -> void:
@@ -244,8 +245,8 @@ func _setup_ui() -> void:
 
 func _draw() -> void:
 	var font: Font = null
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
-		var tm = get_node_or_null("/root/ThemeManager")
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null:
 			var th = tm.get_current_theme() if tm.has_method("get_current_theme") else tm.get_theme()
 			if th != null and th.piece_font != null:
@@ -306,14 +307,14 @@ func _handle_placement(start_row: int, start_col: int) -> void:
 		var c = start_col + (i if is_horizontal else 0)
 		if r < 0 or r >= BOARD_SIZE or c < 0 or c >= BOARD_SIZE:
 			status_label.text = "❌ ¡El barco no cabe en el tablero!"
-			if has_node("/root/AudioManager"):
+			if (is_inside_tree() and has_node("/root/AudioManager")):
 				get_node("/root/AudioManager").play_error_buzz()
 			return
 		
 		var pos = Vector2i(r, c)
 		if _is_cell_occupied_in_ships(pos, target_ships):
 			status_label.text = "❌ ¡Casilla ocupada por otro barco!"
-			if has_node("/root/AudioManager"):
+			if (is_inside_tree() and has_node("/root/AudioManager")):
 				get_node("/root/AudioManager").play_error_buzz()
 			return
 		ship_cells.append(pos)
@@ -321,7 +322,7 @@ func _handle_placement(start_row: int, start_col: int) -> void:
 	target_ships.append(ship_cells)
 	current_ship_index += 1
 
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place()
 
 	if current_ship_index >= SHIP_SPECS.size():
@@ -442,10 +443,10 @@ func _on_shot_result(player: int, row: int, col: int, is_hit: bool) -> void:
 	_spawn_shot_animation(player, row, col, is_hit)
 
 	if is_hit:
-		if has_node("/root/AudioManager"):
+		if (is_inside_tree() and has_node("/root/AudioManager")):
 			get_node("/root/AudioManager").play_piece_place(2.0)
 	else:
-		if has_node("/root/AudioManager"):
+		if (is_inside_tree() and has_node("/root/AudioManager")):
 			get_node("/root/AudioManager").play_piece_place()
 
 	_update_grid_ui()
@@ -516,7 +517,7 @@ func _on_game_over(w: int) -> void:
 	_update_status()
 	_update_grid_ui()
 	queue_redraw()
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_victory_fanfare()
 	var overlay = preload("res://game_over_overlay.tscn").instantiate()
 	add_child(overlay)
@@ -524,7 +525,7 @@ func _on_game_over(w: int) -> void:
 
 func _on_move_rejected(reason: String) -> void:
 	status_label.text = "⚠️ Acción inválida: %s" % reason
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()
 
 func _update_status() -> void:
@@ -542,7 +543,7 @@ func _update_status() -> void:
 		else:
 			status_label.text = "⚓ Jugador 1: Flota lista."
 		if turn_indicator != null:
-			var p_col = GameManager.get_player_color(P1) if has_node("/root/GameManager") else Color(0.2, 0.6, 0.9)
+			var p_col = GameManager.get_player_color(P1) if (is_inside_tree() and has_node("/root/GameManager")) else Color(0.2, 0.6, 0.9)
 			turn_indicator.set_turn(P1, "Jugador 1", p_col)
 			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	elif phase == Phase.PLACEMENT_P2:
@@ -554,14 +555,14 @@ func _update_status() -> void:
 		else:
 			status_label.text = "⚓ Jugador 2: Flota lista."
 		if turn_indicator != null:
-			var p_col = GameManager.get_player_color(P2) if has_node("/root/GameManager") else Color(0.9, 0.3, 0.3)
+			var p_col = GameManager.get_player_color(P2) if (is_inside_tree() and has_node("/root/GameManager")) else Color(0.9, 0.3, 0.3)
 			turn_indicator.set_turn(P2, "Jugador 2", p_col)
 			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	elif phase == Phase.FIRE:
 		var p_name = "Jugador 1" if current == P1 else "Jugador 2"
 		status_label.text = "🚀 Fase de Disparo - Turno de %s" % p_name
 		if turn_indicator != null:
-			var p_col = GameManager.get_player_color(current) if has_node("/root/GameManager") else (Color(0.2, 0.6, 0.9) if current == P1 else Color(0.9, 0.3, 0.3))
+			var p_col = GameManager.get_player_color(current) if (is_inside_tree() and has_node("/root/GameManager")) else (Color(0.2, 0.6, 0.9) if current == P1 else Color(0.9, 0.3, 0.3))
 			turn_indicator.set_turn(current, p_name, p_col)
 			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
@@ -625,15 +626,15 @@ func _update_grid_ui() -> void:
 
 # --- Conexión de eventos sonoros procedurales (AudioManager) ---
 func _sfx_piece_slide() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_slide()
 
 func _sfx_piece_place() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place()
 
 func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place(2.0)
 	var particles := CPUParticles2D.new()
 	particles.position = world_pos
@@ -654,21 +655,21 @@ func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
 		)
 
 func _sfx_dice_roll() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_dice_roll()
 
 func _sfx_card_flip() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_card_flip()
 
 func _sfx_check_alert() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_check_alert()
 
 func _sfx_victory_fanfare() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_victory_fanfare()
 
 func _sfx_error_buzz() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()

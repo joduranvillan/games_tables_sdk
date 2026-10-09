@@ -104,11 +104,11 @@ var rules_popup: RulesPopup
 var current_theme: BoardTheme
 var _pause_menu: CanvasLayer
 
-@onready var status: Label = $Status if has_node("Status") else null
+@onready var status: Label = get_node_or_null("Status") if has_node("Status") else null
 
 func _ready() -> void:
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
-		var tm = get_node_or_null("/root/ThemeManager")
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
@@ -118,7 +118,7 @@ func _ready() -> void:
 	_setup_ui()
 	_init_default_game_state()
 
-	var gm = get_node_or_null("/root/GameManager")
+	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
 
@@ -157,10 +157,11 @@ func _ready() -> void:
 		add_child(_pause_menu)
 
 func _on_quit_to_menu() -> void:
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://main.tscn")
 	else:
-		get_tree().change_scene_to_file("res://main.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://main.tscn")
 
 func _create_default_theme() -> void:
 	current_theme = BoardTheme.new()
@@ -688,7 +689,7 @@ func _create_card_visual(card: Dictionary, is_playable: bool = true, is_large: b
 	var mini_sym = _get_card_mini_symbol(c_val)
 	var cb_sym = _get_colorblind_symbol(c_color)
 	var cb_active: bool = true
-	if has_node("/root/ThemeManager") and get_node("/root/ThemeManager").has_method("is_colorblind_mode"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")) and get_node("/root/ThemeManager").has_method("is_colorblind_mode"):
 		cb_active = true # Siempre disponible con realce extra cuando colorblind_mode está activo
 
 	var tl_lbl = Label.new()
@@ -758,7 +759,7 @@ func _get_accessible_card_color(c_color: String) -> Color:
 	var fallback: Color = CARD_COLORS.get(c_color, CARD_COLORS["Wild"])
 	if c_color in ["Wild", "WildColor"]:
 		return fallback
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		var tm = get_node("/root/ThemeManager")
 		if tm.has_method("is_colorblind_mode") and bool(tm.call("is_colorblind_mode")):
 			if tm.has_method("get_accessible_color"):
@@ -974,7 +975,7 @@ func _animate_card_to_discard(card_dict: Dictionary, start_global_pos: Vector2) 
 	tween.chain().tween_callback(func():
 		_update_discard_display()
 		_update_active_color_indicator()
-		if has_node("/root/AudioManager"):
+		if (is_inside_tree() and has_node("/root/AudioManager")):
 			get_node("/root/AudioManager").play_card_flip()
 		flying_card.queue_free()
 	)
@@ -1030,7 +1031,7 @@ func _execute_play_card(idx: int, start_pos: Vector2, chosen_col: String) -> voi
 			val_name
 		]
 
-		if has_node("/root/AudioManager"):
+		if (is_inside_tree() and has_node("/root/AudioManager")):
 			get_node("/root/AudioManager").play_card_flip()
 
 		_animate_card_to_discard(played_card, start_pos)
@@ -1055,7 +1056,7 @@ func _on_draw_pile_pressed() -> void:
 		var drawn_idx = player_hand.size() - 1
 		event_banner_label.text = "Jugador %d robó una carta del mazo" % current
 
-		if has_node("/root/AudioManager"):
+		if (is_inside_tree() and has_node("/root/AudioManager")):
 			get_node("/root/AudioManager").play_card_flip()
 
 		_update_ui(drawn_idx)
@@ -1125,7 +1126,7 @@ func _on_turn_changed(player_id: int) -> void:
 func _on_game_over(w: int) -> void:
 	winner = w
 	_update_status()
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_victory_fanfare()
 	if ResourceLoader.exists("res://game_over_overlay.tscn"):
 		var overlay = preload("res://game_over_overlay.tscn").instantiate()
@@ -1138,11 +1139,11 @@ func _on_move_rejected(reason: String) -> void:
 		status.text = "Movimiento inválido: %s" % reason
 	if event_banner_label != null:
 		event_banner_label.text = "❌ Movimiento no permitido: %s" % reason
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()
 
 func _on_layout_changed(layout: int) -> void:
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 	if layout == 2: # PHONE
@@ -1182,15 +1183,15 @@ func _update_status() -> void:
 
 # --- Conexión de eventos sonoros procedurales (AudioManager) ---
 func _sfx_piece_slide() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_slide()
 
 func _sfx_piece_place() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place()
 
 func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place(2.0)
 	var particles := CPUParticles2D.new()
 	particles.position = world_pos
@@ -1211,21 +1212,21 @@ func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
 		)
 
 func _sfx_dice_roll() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_dice_roll()
 
 func _sfx_card_flip() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_card_flip()
 
 func _sfx_check_alert() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_check_alert()
 
 func _sfx_victory_fanfare() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_victory_fanfare()
 
 func _sfx_error_buzz() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()

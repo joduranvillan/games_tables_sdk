@@ -28,7 +28,7 @@ func _ready() -> void:
 func _ensure_save_manager() -> void:
 	if save_manager != null and is_instance_valid(save_manager):
 		return
-	if has_node("/root/SaveManager"):
+	if (is_inside_tree() and has_node("/root/SaveManager")):
 		save_manager = get_node("/root/SaveManager")
 	else:
 		var script = load("res://scripts/save_manager.gd")

@@ -149,11 +149,11 @@ var rules_popup: RulesPopup
 var current_theme: BoardTheme
 var _pause_menu: CanvasLayer
 
-@onready var status: Label = $Status if has_node("Status") else null
+@onready var status: Label = get_node_or_null("Status") if has_node("Status") else null
 
 func _ready() -> void:
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
-		var tm = get_node_or_null("/root/ThemeManager")
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
@@ -162,7 +162,7 @@ func _ready() -> void:
 
 	_setup_ui()
 
-	var gm = get_node_or_null("/root/GameManager")
+	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
 
@@ -203,10 +203,11 @@ func _ready() -> void:
 		add_child(_pause_menu)
 
 func _on_quit_to_menu() -> void:
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://main.tscn")
 	else:
-		get_tree().change_scene_to_file("res://main.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://main.tscn")
 
 func _create_default_theme() -> void:
 	current_theme = BoardTheme.new()
@@ -866,7 +867,7 @@ func _on_move_rejected(reason: String) -> void:
 		status.text = "Movimiento rechazado: %s" % reason
 
 func _on_layout_changed(layout: int) -> void:
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 	if layout == 2: # PHONE
@@ -958,7 +959,7 @@ func _draw() -> void:
 
 func _get_player_token_color(p_id: int) -> Color:
 	var fallback: Color = PLAYER_COLORS.get(p_id, Color.WHITE)
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		var tm = get_node("/root/ThemeManager")
 		if tm.has_method("is_colorblind_mode") and bool(tm.call("is_colorblind_mode")):
 			if tm.has_method("get_player_color"):
@@ -969,7 +970,7 @@ func _get_group_color(grp: String) -> Color:
 	var fallback: Color = GROUP_COLORS.get(grp, Color.TRANSPARENT)
 	if fallback == Color.TRANSPARENT or grp in ["Especial", "Impuesto", "Ferrocarril"]:
 		return fallback
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		var tm = get_node("/root/ThemeManager")
 		if tm.has_method("is_colorblind_mode") and bool(tm.call("is_colorblind_mode")):
 			if tm.has_method("get_accessible_color"):
@@ -996,15 +997,15 @@ func _update_status() -> void:
 
 # --- Conexión de eventos sonoros procedurales (AudioManager) ---
 func _sfx_piece_slide() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_slide()
 
 func _sfx_piece_place() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place()
 
 func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place(2.0)
 	var particles := CPUParticles2D.new()
 	particles.position = world_pos
@@ -1025,21 +1026,21 @@ func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
 		)
 
 func _sfx_dice_roll() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_dice_roll()
 
 func _sfx_card_flip() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_card_flip()
 
 func _sfx_check_alert() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_check_alert()
 
 func _sfx_victory_fanfare() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_victory_fanfare()
 
 func _sfx_error_buzz() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()

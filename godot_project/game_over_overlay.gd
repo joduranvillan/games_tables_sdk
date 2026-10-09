@@ -3,12 +3,12 @@ extends CanvasLayer
 signal rematch_requested
 signal menu_requested
 
-@onready var color_rect: ColorRect = $ColorRect
-@onready var panel_container: PanelContainer = $CenterContainer/PanelContainer
-@onready var title_label: Label = $CenterContainer/PanelContainer/MarginContainer/VBoxContainer/TitleLabel
-@onready var winner_label: Label = $CenterContainer/PanelContainer/MarginContainer/VBoxContainer/WinnerLabel
-@onready var restart_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBoxContainer/HBoxContainer/RestartButton
-@onready var menu_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBoxContainer/HBoxContainer/MenuButton
+@onready var color_rect: ColorRect = get_node_or_null("ColorRect")
+@onready var panel_container: PanelContainer = get_node_or_null("CenterContainer/PanelContainer")
+@onready var title_label: Label = get_node_or_null("CenterContainer/PanelContainer/MarginContainer/VBoxContainer/TitleLabel")
+@onready var winner_label: Label = get_node_or_null("CenterContainer/PanelContainer/MarginContainer/VBoxContainer/WinnerLabel")
+@onready var restart_button: Button = get_node_or_null("CenterContainer/PanelContainer/MarginContainer/VBoxContainer/HBoxContainer/RestartButton")
+@onready var menu_button: Button = get_node_or_null("CenterContainer/PanelContainer/MarginContainer/VBoxContainer/HBoxContainer/MenuButton")
 
 func _ensure_nodes() -> void:
 	if color_rect == null:
@@ -128,7 +128,8 @@ func show_winner(winner_id: int) -> void:
 func hide() -> void:
 	for child in get_children():
 		if child is CPUParticles2D:
-			child.queue_free()
+			remove_child(child)
+			child.free()
 	super.hide()
 
 func _animate_in() -> void:
@@ -157,16 +158,17 @@ func _animate_in() -> void:
 func _on_restart_pressed() -> void:
 	hide()
 	rematch_requested.emit()
-	if get_tree():
+	if is_inside_tree() and get_tree():
 		get_tree().reload_current_scene()
 
 func _on_go_to_menu_pressed() -> void:
 	hide()
 	menu_requested.emit()
-	if has_node("/root/SceneManager"):
+	if is_inside_tree() and has_node("/root/SceneManager"):
 		get_node("/root/SceneManager").transition_to("res://main.tscn")
-	elif get_tree():
-		get_tree().change_scene_to_file("res://main.tscn")
+	elif is_inside_tree() and get_tree():
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://main.tscn")
 
 # Alias handlers for backward compatibility
 func _on_play_again_pressed() -> void:

@@ -218,8 +218,9 @@ func _finish_tutorial() -> void:
 	var timer = get_tree().create_timer(1.5)
 	timer.timeout.connect(func():
 		GameManager.set_active_game("crisis")
-		if has_node("/root/SceneManager"):
+		if (is_inside_tree() and has_node("/root/SceneManager")):
 			get_node("/root/SceneManager").transition_to("res://crisis_board.tscn")
 		else:
-			get_tree().change_scene_to_file("res://crisis_board.tscn")
+			if is_inside_tree():
+				get_tree().change_scene_to_file("res://crisis_board.tscn")
 	)

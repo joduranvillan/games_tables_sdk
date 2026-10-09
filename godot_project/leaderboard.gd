@@ -188,7 +188,8 @@ func _on_game_selected(idx: int) -> void:
 		fetch_rankings(GAMES[idx]["id"])
 
 func _on_back_pressed() -> void:
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://main.tscn")
 	else:
-		get_tree().change_scene_to_file("res://main.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://main.tscn")

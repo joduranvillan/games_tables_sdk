@@ -52,18 +52,18 @@ var current_opening_key: String = ""
 var opening_step_index: int = 0
 var opening_moves: Array = []
 
-@onready var status: Label = $Status
+@onready var status: Label = get_node_or_null("Status")
 
 func _ready() -> void:
 	highlight_moves_enabled = SettingsMenu.get_saved_settings().get("highlight_moves", true)
 	
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
-		var tm = get_node_or_null("/root/ThemeManager")
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
 
-	var gm = get_node_or_null("/root/GameManager")
+	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
 			
@@ -126,13 +126,14 @@ func _ready() -> void:
 		add_child(_pause_menu)
 
 func _on_quit_to_menu() -> void:
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://main.tscn")
 	else:
-		get_tree().change_scene_to_file("res://main.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://main.tscn")
 
 func _on_layout_changed(layout: int) -> void:
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 	if layout == 2: # PHONE
@@ -267,7 +268,7 @@ func _show_clipboard_notification(msg: String = "Copiado al portapapeles") -> vo
 	if export_toast_label != null:
 		export_toast_label.text = msg
 		export_toast_label.visible = true
-	if has_node("/root/NotificationManager"):
+	if (is_inside_tree() and has_node("/root/NotificationManager")):
 		var nm = get_node("/root/NotificationManager")
 		if nm.has_method("show_toast"):
 			nm.call("show_toast", msg)
@@ -656,7 +657,7 @@ func start_chess_tutorial() -> void:
 		ChessTut.start_on_board(self)
 
 func _handle_cell_click(row: int, col: int) -> void:
-	if has_node("/root/TutorialManager"):
+	if (is_inside_tree() and has_node("/root/TutorialManager")):
 		var tm = get_node("/root/TutorialManager")
 		if tm.get("is_running") == true:
 			if not tm.call("notify_cell_action", Vector2i(col, row)):
@@ -787,10 +788,10 @@ func _on_piece_moved_signal(player: int, from_r: int, from_c: int, to_r: int, to
 
 	var is_capture = (cap_r >= 0 and cap_c >= 0) or (piece_sprites[to_r][to_c] != null)
 	if is_capture:
-		if has_node("/root/AudioManager"):
+		if (is_inside_tree() and has_node("/root/AudioManager")):
 			get_node("/root/AudioManager").play_piece_place(2.0)
 	else:
-		if has_node("/root/AudioManager"):
+		if (is_inside_tree() and has_node("/root/AudioManager")):
 			get_node("/root/AudioManager").play_piece_place()
 
 	_move_piece_sprite(from_r, from_c, to_r, to_c, prom)
@@ -855,7 +856,7 @@ func _on_game_over(w: int) -> void:
 	_hover_moves.clear()
 	_update_status()
 	queue_redraw()
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_victory_fanfare()
 	var overlay = preload("res://game_over_overlay.tscn").instantiate()
 	add_child(overlay)
@@ -863,7 +864,7 @@ func _on_game_over(w: int) -> void:
 
 func _on_move_rejected(reason: String) -> void:
 	status.text = "Movimiento inválido: %s" % reason
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()
 		
 	if selected_pos != null:
@@ -923,8 +924,8 @@ func _draw() -> void:
 
 	# Coordenadas del tablero (a-h en la fila inferior, 1-8 en la columna izquierda)
 	var font: Font = null
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
-		var tm = get_node_or_null("/root/ThemeManager")
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null:
 			var th = tm.get_current_theme() if tm.has_method("get_current_theme") else tm.get_theme()
 			if th != null:
@@ -1043,15 +1044,15 @@ func _update_status() -> void:
 
 # --- Conexión de eventos sonoros procedurales (AudioManager) ---
 func _sfx_piece_slide() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_slide()
 
 func _sfx_piece_place() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place()
 
 func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place(2.0)
 	var particles := CPUParticles2D.new()
 	particles.position = world_pos
@@ -1072,21 +1073,21 @@ func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
 		)
 
 func _sfx_dice_roll() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_dice_roll()
 
 func _sfx_card_flip() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_card_flip()
 
 func _sfx_check_alert() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_check_alert()
 
 func _sfx_victory_fanfare() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_victory_fanfare()
 
 func _sfx_error_buzz() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()

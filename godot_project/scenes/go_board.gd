@@ -37,16 +37,16 @@ var export_toast_label: Label
 var _rules_popup: RulesPopup
 var _pause_menu: CanvasLayer
 
-@onready var status: Label = $Status
+@onready var status: Label = get_node_or_null("Status")
 
 func _ready() -> void:
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
-		var tm = get_node_or_null("/root/ThemeManager")
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
 
-	var gm = get_node_or_null("/root/GameManager")
+	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
 
@@ -101,10 +101,11 @@ func _ready() -> void:
 		add_child(_pause_menu)
 
 func _on_quit_to_menu() -> void:
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://main.tscn")
 	else:
-		get_tree().change_scene_to_file("res://main.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://main.tscn")
 
 func _setup_ui() -> void:
 	stones_container = Node2D.new()
@@ -197,7 +198,7 @@ func _show_clipboard_notification(msg: String = "Copiado al portapapeles") -> vo
 	if export_toast_label != null:
 		export_toast_label.text = msg
 		export_toast_label.visible = true
-	if has_node("/root/NotificationManager"):
+	if (is_inside_tree() and has_node("/root/NotificationManager")):
 		var nm = get_node("/root/NotificationManager")
 		if nm.has_method("show_toast"):
 			nm.call("show_toast", msg)
@@ -218,12 +219,12 @@ func _update_captured_score() -> void:
 
 func _on_theme_changed(theme: BoardTheme) -> void:
 	current_theme = theme
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 	queue_redraw()
 
 func _on_layout_changed(_layout: int) -> void:
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 func cell_to_pixel(cell: Vector2i) -> Vector2:
@@ -235,7 +236,7 @@ func start_go_tutorial() -> void:
 		GoTut.start_on_board(self)
 
 func _on_cell_clicked(cell: Vector2i) -> void:
-	if has_node("/root/TutorialManager"):
+	if (is_inside_tree() and has_node("/root/TutorialManager")):
 		var tm = get_node("/root/TutorialManager")
 		if tm.get("is_running") == true:
 			if not tm.call("notify_cell_action", Vector2i(cell.y, cell.x)):
@@ -351,11 +352,11 @@ func _place_stone(row: int, col: int, player: int) -> void:
 	var tween = create_tween()
 	tween.tween_property(stone, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place()
 
 func _animate_captures(captured_coords: Array) -> void:
-	if captured_coords.size() > 0 and has_node("/root/AudioManager"):
+	if captured_coords.size() > 0 and (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place(2.0)
 		
 	for coord in captured_coords:
@@ -419,7 +420,7 @@ func _on_game_over(w: int) -> void:
 	_update_status()
 	_update_captured_score()
 	queue_redraw()
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_victory_fanfare()
 	var overlay = preload("res://game_over_overlay.tscn").instantiate()
 	add_child(overlay)
@@ -490,7 +491,7 @@ func _calculate_territory() -> void:
 
 func _on_move_rejected(reason: String) -> void:
 	status.text = "Movimiento inválido: %s" % reason
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()
 
 func _draw() -> void:
@@ -562,15 +563,15 @@ func _update_status() -> void:
 
 # --- Conexión de eventos sonoros procedurales (AudioManager) ---
 func _sfx_piece_slide() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_slide()
 
 func _sfx_piece_place() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place()
 
 func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place(2.0)
 	var particles := CPUParticles2D.new()
 	particles.position = world_pos
@@ -591,21 +592,21 @@ func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
 		)
 
 func _sfx_dice_roll() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_dice_roll()
 
 func _sfx_card_flip() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_card_flip()
 
 func _sfx_check_alert() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_check_alert()
 
 func _sfx_victory_fanfare() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_victory_fanfare()
 
 func _sfx_error_buzz() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()

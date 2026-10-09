@@ -270,7 +270,7 @@ func get_theme_for_game(game_id: String) -> Theme:
 
 func apply_game_theme(game_id: String) -> void:
 	var base := get_theme_for_game(game_id)
-	if get_tree() != null:
+	if is_inside_tree() and get_tree() != null:
 		if get_tree().has_method("set_theme"):
 			get_tree().call("set_theme", base)
 		if get_tree().root != null:
@@ -281,7 +281,7 @@ func _init() -> void:
 
 func _ready() -> void:
 	_apply_theme("wood")
-	var gm = get_node_or_null("/root/GameManager")
+	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
 
@@ -306,7 +306,7 @@ func get_ui_font_scale() -> float:
 
 func get_font_scale() -> float:
 	var layout = 0
-	if has_node("/root/GameManager"):
+	if (is_inside_tree() and has_node("/root/GameManager")):
 		layout = get_node("/root/GameManager").get_layout()
 	elif Engine.has_singleton("GameManager"):
 		layout = GameManager.get_layout()

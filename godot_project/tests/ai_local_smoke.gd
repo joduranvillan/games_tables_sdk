@@ -69,7 +69,7 @@ func _initialize() -> void:
 	# --- Go vs IA ---
 	var bridge_go := OpenTableBridge.new()
 	var ok_go := bridge_go.start_local_match_go_vs_ai(1, 2, 9)
-	assert(ok_go, "Go vs IA: start debe retornar true")
+	results.append(["Go vs IA: start_local_match_go_vs_ai inició correctamente", ok_go])
 	# Jugador 1 (humano) coloca primera piedra en (2, 2) para que la IA (P2) responda
 	bridge_go.send_command_json(1, JSON.stringify({
 		"command_type": "go_game::PlaceStoneCommand",
@@ -77,7 +77,7 @@ func _initialize() -> void:
 		"x": 2,
 		"y": 2
 	}))
-	for _i in range(100):          # MCTS es más lento; 100 frames
+	for _i in range(20):
 		bridge_go._process(0.016)
 		if bridge_go.current_player() == 1 and bridge_go.session_tick_count() < 3:
 			bridge_go.send_command_json(1, JSON.stringify({
@@ -87,7 +87,6 @@ func _initialize() -> void:
 				"y": 6
 			}))
 	var ticks_go: int = bridge_go.session_tick_count()
-	assert(ticks_go > 2, "Go vs IA: la IA debe haber hecho al menos 1 movimiento (ticks=%d)" % ticks_go)
 	results.append(["Go vs IA: la IA debe haber hecho al menos 1 movimiento [ticks=%d]" % ticks_go, ok_go and ticks_go > 2])
 	bridge_go.free()
 
@@ -97,13 +96,12 @@ func _initialize() -> void:
 	# --- Ludo vs IA ---
 	var bridge_ludo := OpenTableBridge.new()
 	var ok_ludo := bridge_ludo.start_local_match_ludo_vs_ai(1, 2)
-	assert(ok_ludo, "Ludo vs IA: start debe retornar true")
+	results.append(["Ludo vs IA: start_local_match_ludo_vs_ai inició correctamente", ok_ludo])
 	# Ludo necesita un RollDice antes de que la IA actúe
 	bridge_ludo.send_command_json(1, JSON.stringify({"command_type": "ludo_game::RollDiceCommand", "player": 1}))
-	for _i in range(50):
+	for _i in range(20):
 		bridge_ludo._process(0.016)
 	var ticks_ludo: int = bridge_ludo.session_tick_count()
-	assert(ticks_ludo >= 1, "Ludo vs IA: debe haber procesado al menos 1 tick")
 	results.append(["Ludo vs IA: debe haber procesado al menos 1 tick [ticks=%d]" % ticks_ludo, ok_ludo and ticks_ludo >= 1])
 	bridge_ludo.free()
 

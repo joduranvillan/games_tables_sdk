@@ -244,7 +244,8 @@ func get_rendered_game_row_count() -> int:
 	return (total_children - 7) / 7
 
 func _on_back_pressed() -> void:
-	if has_node("/root/SceneManager"):
+	if is_inside_tree() and has_node("/root/SceneManager"):
 		get_node("/root/SceneManager").transition_to("res://main.tscn")
-	elif get_tree() != null:
-		get_tree().change_scene_to_file("res://main.tscn")
+	elif is_inside_tree() and get_tree() != null:
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://main.tscn")

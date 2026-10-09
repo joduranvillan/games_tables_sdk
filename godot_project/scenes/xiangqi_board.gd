@@ -101,16 +101,16 @@ var current_theme: BoardTheme
 var rules_popup: RulesPopup
 var _pause_menu: CanvasLayer
 
-@onready var status: Label = $Status
+@onready var status: Label = get_node_or_null("Status")
 
 func _ready() -> void:
-	if Engine.has_singleton("ThemeManager") or has_node("/root/ThemeManager"):
-		var tm = get_node_or_null("/root/ThemeManager")
+	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
 
-	var gm = get_node_or_null("/root/GameManager")
+	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
 
@@ -156,10 +156,11 @@ func _ready() -> void:
 		add_child(_pause_menu)
 
 func _on_quit_to_menu() -> void:
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://main.tscn")
 	else:
-		get_tree().change_scene_to_file("res://main.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://main.tscn")
 
 func _on_theme_changed(theme: BoardTheme) -> void:
 	current_theme = theme
@@ -301,7 +302,7 @@ func _apply_theme_to_ui() -> void:
 	mat_style.corner_radius_bottom_right = 12
 	table_mat_panel.add_theme_stylebox_override("panel", mat_style)
 
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 # -------------------------------------------------------------------------
@@ -486,7 +487,7 @@ func _handle_intersection_click(row: int, col: int) -> void:
 		if piece != null and piece.get("player") == current:
 			selected_pos = Vector2i(row, col)
 			valid_moves = _calculate_legal_moves(row, col)
-			if has_node("/root/AudioManager"):
+			if (is_inside_tree() and has_node("/root/AudioManager")):
 				get_node("/root/AudioManager").play_piece_place()
 			queue_redraw()
 	else:
@@ -502,7 +503,7 @@ func _handle_intersection_click(row: int, col: int) -> void:
 		if piece_at_target != null and piece_at_target.get("player") == current:
 			selected_pos = Vector2i(row, col)
 			valid_moves = _calculate_legal_moves(row, col)
-			if has_node("/root/AudioManager"):
+			if (is_inside_tree() and has_node("/root/AudioManager")):
 				get_node("/root/AudioManager").play_piece_place()
 			queue_redraw()
 			return
@@ -539,10 +540,10 @@ func _move_piece_node(from_r: int, from_c: int, to_r: int, to_c: int) -> void:
 			_register_capture(captured_data)
 		_animate_piece_capture(target_node)
 		piece_nodes[to_r][to_c] = null
-		if has_node("/root/AudioManager"):
+		if (is_inside_tree() and has_node("/root/AudioManager")):
 			get_node("/root/AudioManager").play_piece_place(2.0)
 	else:
-		if has_node("/root/AudioManager"):
+		if (is_inside_tree() and has_node("/root/AudioManager")):
 			get_node("/root/AudioManager").play_piece_place()
 
 	board[to_r][to_c] = piece_data
@@ -774,7 +775,7 @@ func _on_game_over(w: int) -> void:
 	winner = w
 	_update_status()
 	queue_redraw()
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_victory_fanfare()
 	if ResourceLoader.exists("res://game_over_overlay.tscn"):
 		var overlay = preload("res://game_over_overlay.tscn").instantiate()
@@ -784,7 +785,7 @@ func _on_game_over(w: int) -> void:
 
 func _on_move_rejected(reason: String) -> void:
 	event_label.text = "❌ Movimiento no permitido: %s" % reason
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()
 
 func _on_mode_selected(index: int) -> void:
@@ -816,7 +817,7 @@ func _on_reset_pressed() -> void:
 	_on_mode_selected(mode_option_button.selected if mode_option_button else 0)
 
 func _on_layout_changed(layout: int) -> void:
-	if has_node("/root/ThemeManager"):
+	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 	if layout == 2: # PHONE
@@ -1013,15 +1014,15 @@ func _draw_intersection_star(row: int, col: int, col_line: Color) -> void:
 
 # --- Conexión de eventos sonoros procedurales (AudioManager) ---
 func _sfx_piece_slide() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_slide()
 
 func _sfx_piece_place() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place()
 
 func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place(2.0)
 	var particles := CPUParticles2D.new()
 	particles.position = world_pos
@@ -1042,21 +1043,21 @@ func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
 		)
 
 func _sfx_dice_roll() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_dice_roll()
 
 func _sfx_card_flip() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_card_flip()
 
 func _sfx_check_alert() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_check_alert()
 
 func _sfx_victory_fanfare() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_victory_fanfare()
 
 func _sfx_error_buzz() -> void:
-	if has_node("/root/AudioManager"):
+	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()

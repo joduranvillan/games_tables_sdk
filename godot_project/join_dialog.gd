@@ -178,7 +178,7 @@ func _on_connect_pressed() -> void:
 
 	if bridge != null:
 		_connect_bridge_signals()
-		if has_node("/root/AuthClient"):
+		if (is_inside_tree() and has_node("/root/AuthClient")):
 			get_node("/root/AuthClient").call("configure_bridge_auth", bridge)
 		if bridge.has_method("connect_to_relay"):
 			bridge.call("connect_to_relay", relay_url)

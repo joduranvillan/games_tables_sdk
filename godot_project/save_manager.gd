@@ -82,7 +82,7 @@ func save_game(
 
 	var resolved_game_id := p_game_id.strip_edges()
 	if resolved_game_id.is_empty():
-		if has_node("/root/GameManager"):
+		if (is_inside_tree() and has_node("/root/GameManager")):
 			var gm = get_node("/root/GameManager")
 			if "active_game" in gm and not String(gm.active_game).is_empty():
 				resolved_game_id = String(gm.active_game)
@@ -111,7 +111,7 @@ func save_game(
 	f.store_string(serialized_json)
 	f.close()
 
-	if has_node("/root/SteamManager"):
+	if (is_inside_tree() and has_node("/root/SteamManager")):
 		var sm = get_node("/root/SteamManager")
 		if sm.has_method("is_steam_available") and sm.call("is_steam_available"):
 			var raw_utf8 := serialized_json.to_utf8_buffer()
@@ -136,7 +136,7 @@ func load_game(save_id: String, p_bridge: Node = null) -> Dictionary:
 				break
 
 	if not FileAccess.file_exists(file_path):
-		if has_node("/root/SteamManager"):
+		if (is_inside_tree() and has_node("/root/SteamManager")):
 			var sm = get_node("/root/SteamManager")
 			if sm.has_method("is_steam_available") and sm.call("is_steam_available"):
 				var cloud_bytes: PackedByteArray = sm.call("load_save", target_id)
@@ -231,7 +231,7 @@ func _extract_replay_moves_array(target_bridge: Node = null) -> Array:
 		elif resolved_bridge.has_method("serialize_state"):
 			raw_bytes = resolved_bridge.call("serialize_state")
 
-	if raw_bytes.is_empty() and has_node("/root/GameManager"):
+	if raw_bytes.is_empty() and (is_inside_tree() and has_node("/root/GameManager")):
 		var gm = get_node("/root/GameManager")
 		if gm.has_method("get_replay_log_bytes"):
 			raw_bytes = gm.call("get_replay_log_bytes")
@@ -266,7 +266,7 @@ func export_replay_file(path: String, share_after_export: bool = false) -> bool:
 		target_path += ".otr"
 
 	var resolved_game_id := active_game_id
-	if resolved_game_id.is_empty() and has_node("/root/GameManager"):
+	if resolved_game_id.is_empty() and (is_inside_tree() and has_node("/root/GameManager")):
 		var gm = get_node("/root/GameManager")
 		if gm.has_method("get_replay_game_type"):
 			resolved_game_id = str(gm.call("get_replay_game_type"))
@@ -354,7 +354,7 @@ func import_replay_file(path: String) -> bool:
 	var moves_json := JSON.stringify(data["moves"])
 	var moves_bytes := moves_json.to_utf8_buffer()
 
-	if has_node("/root/GameManager"):
+	if (is_inside_tree() and has_node("/root/GameManager")):
 		var gm = get_node("/root/GameManager")
 		if gm.has_method("set_replay_data"):
 			gm.call("set_replay_data", moves_bytes, active_game_id)

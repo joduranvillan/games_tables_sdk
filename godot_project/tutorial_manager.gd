@@ -132,5 +132,7 @@ func stop_overlay() -> void:
 	current_step_index = -1
 	active_steps.clear()
 	if active_overlay != null and is_instance_valid(active_overlay):
-		active_overlay.queue_free()
+		if active_overlay.get_parent() != null:
+			active_overlay.get_parent().remove_child(active_overlay)
+		active_overlay.free()
 	active_overlay = null

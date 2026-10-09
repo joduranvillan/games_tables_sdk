@@ -84,5 +84,5 @@ static func start_on_board(board_node: Node) -> void:
 	if board_node == null:
 		return
 	var steps := get_steps()
-	if board_node.has_node("/root/TutorialManager"):
+	if (board_node.is_inside_tree() and board_node.has_node("/root/TutorialManager")):
 		board_node.get_node("/root/TutorialManager").call("start", steps, board_node)

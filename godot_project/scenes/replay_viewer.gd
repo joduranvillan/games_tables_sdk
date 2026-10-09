@@ -479,7 +479,7 @@ func _on_export_replay_pressed() -> void:
 		export_otr_dialog.popup_centered(Vector2i(800, 600))
 
 func _get_save_manager() -> Node:
-	if has_node("/root/SaveManager"):
+	if (is_inside_tree() and has_node("/root/SaveManager")):
 		return get_node("/root/SaveManager")
 	var script_res = load("res://scripts/save_manager.gd")
 	if script_res != null:
@@ -502,7 +502,7 @@ func import_otr_replay(path: String) -> bool:
 			player_names.append(str(n))
 		var moves_bytes: PackedByteArray = save_mgr.call("get_last_imported_replay_bytes")
 		load_replay_data(moves_bytes, imported_game_id)
-	if not has_node("/root/SaveManager"):
+	if not (is_inside_tree() and has_node("/root/SaveManager")):
 		save_mgr.free()
 	return ok
 
@@ -515,7 +515,7 @@ func export_otr_replay(path: String) -> bool:
 		players_meta.append({"id": idx + 1, "name": player_names[idx], "score": 0})
 	save_mgr.call("set_context", bridge, game_type, current_step, players_meta)
 	var ok: bool = bool(save_mgr.call("export_replay_file", path))
-	if not has_node("/root/SaveManager"):
+	if not (is_inside_tree() and has_node("/root/SaveManager")):
 		save_mgr.free()
 	return ok
 
@@ -546,7 +546,8 @@ func _on_game_type_selected(idx: int) -> void:
 			load_replay_data(raw_log_bytes, game_type)
 
 func _on_back_pressed() -> void:
-	if has_node("/root/SceneManager"):
+	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://main_menu.tscn")
 	else:
-		get_tree().change_scene_to_file("res://main_menu.tscn")
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://main_menu.tscn")

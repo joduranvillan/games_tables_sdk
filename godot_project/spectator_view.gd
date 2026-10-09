@@ -96,10 +96,11 @@ func _build_ui() -> void:
 	back.text = "← Salir"
 	back.custom_minimum_size = Vector2(200, 44)
 	back.pressed.connect(func():
-		if has_node("/root/SceneManager"):
+		if (is_inside_tree() and has_node("/root/SceneManager")):
 			get_node("/root/SceneManager").transition_to("res://main.tscn")
 		else:
-			get_tree().change_scene_to_file("res://main.tscn")
+			if is_inside_tree():
+				get_tree().change_scene_to_file("res://main.tscn")
 	)
 	vbox.add_child(back)
 

@@ -15,7 +15,7 @@ func _ready() -> void:
 			steam_available = bool(bridge.call("steam_init"))
 	steam_initialized.emit(steam_available)
 
-	if has_node("/root/AchievementManager"):
+	if (is_inside_tree() and has_node("/root/AchievementManager")):
 		var am = get_node("/root/AchievementManager")
 		if am.has_signal("achievement_unlocked") and not am.achievement_unlocked.is_connected(_on_achievement_unlocked):
 			am.achievement_unlocked.connect(_on_achievement_unlocked)

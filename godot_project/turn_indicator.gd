@@ -243,7 +243,7 @@ func _update_undo_redo_status() -> void:
 
 func _on_theme_pressed() -> void:
 	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
-		var tm = get_node_or_null("/root/ThemeManager")
+		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
 		if tm != null:
 			var new_t = tm.toggle_theme()
 			theme_btn.text = "🎨 " + new_t.theme_name
