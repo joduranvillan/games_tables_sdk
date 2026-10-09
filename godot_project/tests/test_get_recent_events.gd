@@ -13,7 +13,7 @@ func _initialize() -> void:
 	bridge.send_move(1, 2, 1, 3, 2)
 	bridge.send_move(2, 5, 0, 4, 1)
 
-	var recent: Array = bridge.get_recent_events()
+	var recent = bridge.get_recent_events()
 	results.append(["get_recent_events() retorna un Array no vacío", recent.size() >= 2])
 
 	# Verificar orden de los eventos
@@ -27,6 +27,7 @@ func _initialize() -> void:
 			in_order = (ev1["player"] == 1 or (ev1["player"] is Dictionary and ev1["player"].get("0") == 1)) and (ev2["player"] == 2 or (ev2["player"] is Dictionary and ev2["player"].get("0") == 2))
 
 	results.append(["test_get_recent_events_retorna_eventos_en_orden", in_order])
+	bridge.free()
 
 	var ok := true
 	for r in results:

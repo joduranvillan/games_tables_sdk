@@ -16,7 +16,7 @@ class MockLanBridge extends Node:
 		last_player_name = player_name
 		return true
 
-func _init() -> void:
+func _initialize() -> void:
 	var discovery = LanDiscoveryScript.new()
 
 	# 1. Verificar formato del paquete JSON de beacon LAN

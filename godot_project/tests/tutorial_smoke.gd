@@ -19,7 +19,7 @@ const BackgammonTutorialScript = preload("res://scripts/tutorials/backgammon_tut
 const UnoTutorialScript = preload("res://scripts/tutorials/uno_tutorial.gd")
 const LudoTutorialScript = preload("res://scripts/tutorials/ludo_tutorial.gd")
 
-func _init() -> void:
+func _initialize() -> void:
 	print("=== Iniciando Test: tutorial_smoke.gd ===")
 	var steps: Array = ChessTutorialScript.get_steps()
 	if steps.size() != 8:

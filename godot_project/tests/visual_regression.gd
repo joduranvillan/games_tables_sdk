@@ -39,6 +39,7 @@ func _initialize() -> void:
 		var board_id: String = item.id
 		var scene_path: String = item.scene
 		var snapshot_path = SNAPSHOT_DIR + board_id + ".png"
+		var abs_snapshot_path: String = ProjectSettings.globalize_path(snapshot_path)
 
 		if not ResourceLoader.exists(scene_path):
 			print("FAIL: Escena no encontrada %s" % scene_path)
@@ -60,15 +61,15 @@ func _initialize() -> void:
 		var tex = sub_viewport.get_texture()
 		var img: Image = tex.get_image() if tex != null else null
 		if img == null or img.is_empty():
-			if FileAccess.file_exists(snapshot_path):
-				img = Image.load_from_file(ProjectSettings.globalize_path(snapshot_path))
+			if FileAccess.file_exists(abs_snapshot_path):
+				img = Image.load_from_file(abs_snapshot_path)
 			if img == null or img.is_empty():
 				img = Image.create(720, 800, false, Image.FORMAT_RGBA8)
 				img.fill(Color(0.12, 0.16, 0.22, 1.0))
 
 		if update_snapshots:
 			if img != null:
-				var save_err = img.save_png(snapshot_path)
+				var save_err = img.save_png(abs_snapshot_path)
 				if save_err == OK:
 					print("PASS [UPDATE] Snapshot guardado para %s (%s)" % [board_id, snapshot_path])
 				else:
@@ -78,16 +79,16 @@ func _initialize() -> void:
 				print("FAIL: Imagen vacía al capturar %s" % board_id)
 				overall_ok = false
 		else:
-			if not FileAccess.file_exists(snapshot_path):
+			if not FileAccess.file_exists(abs_snapshot_path):
 				# Si no existe y no estamos actualizando, guardar automáticamente el inicial
 				if img != null:
-					img.save_png(snapshot_path)
+					img.save_png(abs_snapshot_path)
 					print("PASS [NEW] Creado snapshot inicial para %s" % board_id)
 				else:
 					print("FAIL: No existe snapshot de referencia para %s" % board_id)
 					overall_ok = false
 			else:
-				var ref_img = Image.load_from_file(snapshot_path)
+				var ref_img = Image.load_from_file(abs_snapshot_path)
 				if ref_img == null:
 					print("FAIL: No se pudo cargar snapshot de referencia para %s" % board_id)
 					overall_ok = false

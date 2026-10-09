@@ -239,7 +239,7 @@ func _play_stream(stream: AudioStream, event_tag: String = "", boost_db: float =
 	if not sfx_enabled:
 		return
 
-	if has_node("/root/GameManager"):
+	if is_inside_tree() and has_node("/root/GameManager"):
 		var gm = get_node("/root/GameManager")
 		if "sfx_enabled" in gm and not gm.sfx_enabled:
 			return

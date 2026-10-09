@@ -1,7 +1,7 @@
 ## Smoke test for NetworkStatusHUD, SettingsMenu, SceneManager, TranslationLoader, and GameOverOverlay.
 extends SceneTree
 
-func _init() -> void:
+func _initialize() -> void:
 	print("--- Smoke Test HUD & Settings starting ---")
 	
 	# 1. TranslationLoader

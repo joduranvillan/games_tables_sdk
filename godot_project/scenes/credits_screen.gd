@@ -153,7 +153,10 @@ func _build_ui() -> void:
 	footer_hbox.add_child(back_button)
 
 func load_oss_licenses_text() -> String:
-	var candidate_paths := ["res://../THIRD_PARTY_LICENSES.md", "THIRD_PARTY_LICENSES.md"]
+	var candidate_paths := [
+		ProjectSettings.globalize_path("res://").path_join("../THIRD_PARTY_LICENSES.md"),
+		"THIRD_PARTY_LICENSES.md",
+	]
 	for p in candidate_paths:
 		if FileAccess.file_exists(p):
 			var f := FileAccess.open(p, FileAccess.READ)

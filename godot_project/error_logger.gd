@@ -106,7 +106,8 @@ func log_info(msg: String) -> void:
 
 func _write_to_file(line: String) -> void:
 	if file_handle == null:
-		file_handle = FileAccess.open(LOG_PATH, FileAccess.READ_WRITE)
+		var mode := FileAccess.READ_WRITE if FileAccess.file_exists(LOG_PATH) else FileAccess.WRITE_READ
+		file_handle = FileAccess.open(LOG_PATH, mode)
 	if file_handle != null:
 		file_handle.seek_end()
 		file_handle.store_line(line)

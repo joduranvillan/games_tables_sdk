@@ -10,7 +10,7 @@ extends SceneTree
 #      aumentó (> 1200) y el del perdedor disminuyó (< 1200).
 # ==============================================================================
 
-func _init() -> void:
+func _initialize() -> void:
 	print("=== Iniciando Test: competitive_smoke.gd ===")
 	var ok := _run_competitive_flow()
 	if ok:
@@ -22,7 +22,7 @@ func _init() -> void:
 
 func _run_competitive_flow() -> bool:
 	# 1. Cola de emparejamiento (2 clientes para "chess")
-	var queue: Array[Dictionary] = []
+	var queue: Array = []
 	var client_1 := {"player_id": "player1", "game_id": "chess", "elo": 1200.0}
 	var client_2 := {"player_id": "player2", "game_id": "chess", "elo": 1200.0}
 	queue.append(client_1)
@@ -47,12 +47,9 @@ func _run_competitive_flow() -> bool:
 	# 3. Jugar 1 movimiento en Chess (vía OpenTableBridge si está cargado, o validación determinista)
 	var move_ok := false
 	if ClassDB.class_exists("OpenTableBridge"):
-		var bridge = ClassDB.instantiate("OpenTableBridge")
+		var bridge = OpenTableBridge.new()
 		if bridge != null:
-			if bridge.has_method("start_local_match_chess"):
-				bridge.call("start_local_match_chess", 1, 2)
-			elif bridge.has_method("init_local"):
-				bridge.call("init_local", "chess")
+			bridge.start_local_match_chess(1, 2)
 			var cmd_json := JSON.stringify({
 				"command_type": "chess_game::MovePieceCommand",
 				"player": 1,
@@ -60,13 +57,9 @@ func _run_competitive_flow() -> bool:
 				"to": {"row": 3, "col": 4},
 				"promote_to": null,
 			})
-			if bridge.has_method("send_command_json"):
-				bridge.call("send_command_json", 1, cmd_json)
-				move_ok = (int(bridge.call("current_player")) == 2)
-			else:
-				move_ok = true
-			if bridge is Node:
-				bridge.free()
+			bridge.send_command_json(1, cmd_json)
+			move_ok = (bridge.current_player() == 2)
+			bridge.free()
 	else:
 		move_ok = true
 
@@ -81,13 +74,13 @@ func _run_competitive_flow() -> bool:
 	var new_loser_elo: float = 0.0
 
 	if ClassDB.class_exists("OpenTableBridge"):
-		var bridge = ClassDB.instantiate("OpenTableBridge")
+		var bridge = OpenTableBridge.new()
 		if bridge != null and bridge.has_method("compute_elo_delta"):
-			var deltas: Array = bridge.call("compute_elo_delta", 1, 2, initial_winner_elo, initial_loser_elo, 32.0)
-			if deltas.size() >= 2:
+			var deltas = bridge.call("compute_elo_delta", 1, 2, initial_winner_elo, initial_loser_elo, 32.0)
+			if deltas != null and deltas.size() >= 2:
 				new_winner_elo = float(deltas[0])
 				new_loser_elo = float(deltas[1])
-		if bridge != null and bridge is Node:
+		if bridge != null:
 			bridge.free()
 
 	if new_winner_elo == 0.0 and new_loser_elo == 0.0:

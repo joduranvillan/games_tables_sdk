@@ -9,7 +9,7 @@ class MockWsPeer extends RefCounted:
 	func send_text(msg: String) -> void:
 		sent_messages.append(msg)
 
-func _init() -> void:
+func _initialize() -> void:
 	var test_cfg_path := "user://test_identity_469.cfg"
 	if FileAccess.file_exists(test_cfg_path):
 		DirAccess.remove_absolute(test_cfg_path)

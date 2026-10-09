@@ -2206,7 +2206,7 @@ impl OpenTableBridge {
     }
 
     #[func]
-    pub fn get_legal_moves(&self, player_id: i64) -> Array<Dictionary<Variant, Variant>> {
+    pub fn get_legal_moves(&self, player_id: i64) -> Array<Variant> {
         let player = PlayerId(player_id as u32);
         let moves_json = match &self.mode {
             BridgeMode::Local { session, .. }
@@ -2227,7 +2227,7 @@ impl OpenTableBridge {
             if let Ok(json_str) = serde_json::to_string(&val) {
                 let parsed_var = godot::classes::Json::parse_string(&GString::from(&json_str));
                 if let Ok(dict) = parsed_var.try_to::<Dictionary<Variant, Variant>>() {
-                    godot_array.push(&dict);
+                    godot_array.push(&Variant::from(dict));
                 }
             }
         }
@@ -2242,15 +2242,15 @@ impl OpenTableBridge {
         winner_current: f64,
         loser_current: f64,
         k: f64,
-    ) -> Array<f64> {
+    ) -> Array<Variant> {
         let (new_winner, new_loser) = open_table_engine::elo::update_elo(
             open_table_engine::elo::EloRating(winner_current),
             open_table_engine::elo::EloRating(loser_current),
             k,
         );
         let mut result = Array::new();
-        result.push(new_winner.0);
-        result.push(new_loser.0);
+        result.push(&Variant::from(new_winner.0));
+        result.push(&Variant::from(new_loser.0));
         result
     }
 
@@ -2738,10 +2738,10 @@ impl OpenTableBridge {
     }
 
     #[func]
-    pub fn get_recent_events(&self) -> Array<Dictionary<Variant, Variant>> {
+    pub fn get_recent_events(&self) -> Array<Variant> {
         let mut arr = Array::new();
         for dict in &self.recent_events {
-            arr.push(dict);
+            arr.push(&Variant::from(dict.clone()));
         }
         arr
     }

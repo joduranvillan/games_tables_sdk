@@ -9,14 +9,15 @@ func _initialize() -> void:
 	var bridge = OpenTableBridge.new()
 	bridge.start_local_match_checkers(1, 2)
 
-	var p1_moves: Array = bridge.get_legal_moves(1)
+	var p1_moves = bridge.get_legal_moves(1)
 	results.append(["get_legal_moves(1) en Checkers retorna un Array", p1_moves is Array])
 	results.append(["get_legal_moves(1) en Checkers tiene 7 jugadas en posicion inicial", p1_moves.size() == 7])
 
 	bridge.start_local_match_chess(1, 2)
-	var chess_p1_moves: Array = bridge.get_legal_moves(1)
+	var chess_p1_moves = bridge.get_legal_moves(1)
 	results.append(["get_legal_moves(1) en Chess retorna un Array", chess_p1_moves is Array])
 	results.append(["get_legal_moves(1) en Chess tiene 20 jugadas en posicion inicial", chess_p1_moves.size() == 20])
+	bridge.free()
 
 	var ok := true
 	for r in results:
