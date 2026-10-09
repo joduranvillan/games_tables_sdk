@@ -878,14 +878,17 @@ mod tests {
             .validate_and_apply(1, &json!({"player": 1, "roll": true}))
             .is_ok());
 
-        // 7. Mille Bornes: jugar índice de carta inexistente (99) -> rechazado; robar en turno -> OK
+        // 7. Mille Bornes: jugar índice de carta inexistente (99) -> rechazado; descartar carta 0 en turno -> OK
         let mut mb_ac = AntiCheatSession::for_game_with_seed(Some("mille_bornes"), 555).unwrap();
         assert_eq!(
             mb_ac.validate_and_apply(1, &json!({"player": 1, "card_index": 99})),
             Err("illegal_move")
         );
         assert!(mb_ac
-            .validate_and_apply(1, &json!({"player": 1, "draw": true}))
+            .validate_and_apply(
+                1,
+                &json!({"player": 1, "action": "discard", "card_index": 0})
+            )
             .is_ok());
 
         // 8. Monopoly: P2 intenta tirar en turno de P1 -> rechazado; P1 tira y avanza -> OK
