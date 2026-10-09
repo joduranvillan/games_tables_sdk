@@ -150,10 +150,9 @@ fn parse_headers_and_content_length(raw: &[u8]) -> Option<(usize, usize)> {
     let text = std::str::from_utf8(raw).ok()?;
     let (headers_part, headers_end) = if let Some(idx) = text.find("\r\n\r\n") {
         (&text[..idx], idx + 4)
-    } else if let Some(idx) = text.find("\n\n") {
-        (&text[..idx], idx + 2)
     } else {
-        return None;
+        let idx = text.find("\n\n")?;
+        (&text[..idx], idx + 2)
     };
 
     for line in headers_part.lines() {
