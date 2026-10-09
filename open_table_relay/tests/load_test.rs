@@ -90,13 +90,7 @@ async fn test_relay_concurrent_50_rooms_100_clients_plus_20_matchmaking() {
                 .await
                 .unwrap();
 
-            let created_raw = ws_host
-                .next()
-                .await
-                .unwrap()
-                .unwrap()
-                .into_text()
-                .unwrap();
+            let created_raw = ws_host.next().await.unwrap().unwrap().into_text().unwrap();
             let created_val: Value = serde_json::from_str(&created_raw).unwrap();
             assert_eq!(created_val["op"], "created");
             let room_code = created_val["room_code"].as_str().unwrap().to_string();
@@ -109,24 +103,12 @@ async fn test_relay_concurrent_50_rooms_100_clients_plus_20_matchmaking() {
             .to_string();
             ws_guest.send(Message::Text(join_msg.into())).await.unwrap();
 
-            let joined_raw = ws_guest
-                .next()
-                .await
-                .unwrap()
-                .unwrap()
-                .into_text()
-                .unwrap();
+            let joined_raw = ws_guest.next().await.unwrap().unwrap().into_text().unwrap();
             let joined_val: Value = serde_json::from_str(&joined_raw).unwrap();
             assert_eq!(joined_val["op"], "joined");
             assert_eq!(joined_val["player_id"], 2);
 
-            let peer_joined_raw = ws_host
-                .next()
-                .await
-                .unwrap()
-                .unwrap()
-                .into_text()
-                .unwrap();
+            let peer_joined_raw = ws_host.next().await.unwrap().unwrap().into_text().unwrap();
             let peer_joined_val: Value = serde_json::from_str(&peer_joined_raw).unwrap();
             assert_eq!(peer_joined_val["op"], "peer_joined");
 
@@ -158,13 +140,7 @@ async fn test_relay_concurrent_50_rooms_100_clients_plus_20_matchmaking() {
                 .send(Message::Text(p1_move.to_string().into()))
                 .await
                 .unwrap();
-            let recv1_raw = ws_guest
-                .next()
-                .await
-                .unwrap()
-                .unwrap()
-                .into_text()
-                .unwrap();
+            let recv1_raw = ws_guest.next().await.unwrap().unwrap().into_text().unwrap();
             let latency_1 = t0.elapsed();
             let recv1_val: Value = serde_json::from_str(&recv1_raw).unwrap();
             assert_eq!(recv1_val["op"], "relay");
@@ -203,13 +179,7 @@ async fn test_relay_concurrent_50_rooms_100_clients_plus_20_matchmaking() {
                 .send(Message::Text(p2_move.to_string().into()))
                 .await
                 .unwrap();
-            let recv2_raw = ws_host
-                .next()
-                .await
-                .unwrap()
-                .unwrap()
-                .into_text()
-                .unwrap();
+            let recv2_raw = ws_host.next().await.unwrap().unwrap().into_text().unwrap();
             let latency_2 = t1.elapsed();
             let recv2_val: Value = serde_json::from_str(&recv2_raw).unwrap();
             assert_eq!(recv2_val["op"], "relay");

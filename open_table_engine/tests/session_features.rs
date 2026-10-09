@@ -312,4 +312,3 @@ fn test_undo_last_command_rechazado_en_modo_online() {
     session.set_mode(open_table_engine::session::SessionMode::Online);
     assert!(session.undo_last_command().is_err());
 }
-

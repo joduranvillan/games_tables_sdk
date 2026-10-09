@@ -2985,9 +2985,11 @@ impl OpenTableBridge {
                 session
                     .world_mut()
                     .insert_resource(open_table_engine::session::GameOverResource(true));
-                session.world_mut().insert_resource(
-                    open_table_engine::session::WinnerResource(Some(PlayerId(winner_id as u32))),
-                );
+                session
+                    .world_mut()
+                    .insert_resource(open_table_engine::session::WinnerResource(Some(PlayerId(
+                        winner_id as u32,
+                    ))));
             }
             BridgeMode::MultiSession { sessions, active } => {
                 if let Some((_, session)) = sessions.get_mut(*active) {
