@@ -662,10 +662,10 @@ Continúa desde `PROMPTS11.md` (prompts 448–468, con el Bloque 4 social omitid
 
 Al completar los 27 prompts de `PROMPTS12.md`:
 
-- [ ] Cualquier jugador puede abrir el juego y jugar online al instante con un JWT de invitado firmado automáticamente (`POST /auth/guest`), o jugar 100% offline.
-- [ ] El servidor Relay valida las reglas de los **13 juegos**, calcula el ELO sin confiar en el cliente, gestiona relojes de turno (anti-AFK) y permite reconectar tras micro-cortes de red (`rejoin_room`).
-- [ ] En red local (Wi-Fi), las salas aparecen automáticamente en pantalla mediante descubrimiento UDP sin teclear direcciones IP.
-- [ ] Los 13 juegos cuentan con reglamento completo consultable en partida, controles de rendición/tablas, deshacer jugada en modo local/IA y estadísticas detalladas.
-- [ ] El proyecto es jugable con mando (Steam Deck), accesible para personas con daltonismo y respeta las áreas seguras y vibración en móviles.
-- [ ] El repositorio incluye `export_presets.cfg`, scripts de SteamPipe (`.vdf`), soporte `.aab` para Google Play, Política de Privacidad y licencias Open Source requeridas por las tiendas.
-- [ ] `tools/verify_p12.sh` pasa limpio de principio a fin.
+- [x] Cualquier jugador puede abrir el juego y jugar online al instante con un JWT de invitado firmado automáticamente (`POST /auth/guest`), o jugar 100% offline.
+- [x] El servidor Relay valida las reglas de los **13 juegos**, calcula el ELO sin confiar en el cliente, gestiona relojes de turno (anti-AFK) y permite reconectar tras micro-cortes de red (`rejoin_room`).
+- [x] En red local (Wi-Fi), las salas aparecen automáticamente en pantalla mediante descubrimiento UDP sin teclear direcciones IP.
+- [x] Los 13 juegos cuentan con reglamento completo consultable en partida, controles de rendición/tablas, deshacer jugada en modo local/IA y estadísticas detalladas.
+- [x] El proyecto es jugable con mando (Steam Deck), accesible para personas con daltonismo y respeta las áreas seguras y vibración en móviles.
+- [x] El repositorio incluye `export_presets.cfg`, scripts de SteamPipe (`.vdf`), soporte `.aab` para Google Play, Política de Privacidad y licencias Open Source requeridas por las tiendas.
+- [x] `tools/verify_p12.sh` pasa limpio de principio a fin.
