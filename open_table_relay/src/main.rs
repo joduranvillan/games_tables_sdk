@@ -14,7 +14,8 @@
 #![allow(
     clippy::needless_range_loop,
     clippy::large_enum_variant,
-    clippy::too_many_arguments
+    clippy::too_many_arguments,
+    clippy::type_complexity
 )]
 
 pub mod anticheat;

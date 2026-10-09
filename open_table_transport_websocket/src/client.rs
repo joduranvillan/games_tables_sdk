@@ -380,6 +380,10 @@ fn is_valid_relay_code(code: &str) -> bool {
 
 type RelayEventQueue = Arc<Mutex<VecDeque<RelayClientEvent>>>;
 type RoomMemberEntry = (u64, PlayerId, RelayEventQueue);
+type CreateReplySender = oneshot::Sender<Result<String, String>>;
+type JoinReplySender = oneshot::Sender<Result<u32, String>>;
+type RejoinReplyPayload = (u32, u64, Vec<Value>);
+type RejoinReplySender = oneshot::Sender<Result<RejoinReplyPayload, String>>;
 
 // Hub local en memoria para permitir que múltiples instancias de `WsRelayClient`
 // dentro del mismo proceso (por ejemplo, tests headless de Godot sin daemon externo)
@@ -402,16 +406,16 @@ enum OutboundRelayCommand {
     },
     Create {
         game_id: String,
-        reply: oneshot::Sender<Result<String, String>>,
+        reply: CreateReplySender,
     },
     Join {
         room_code: String,
-        reply: oneshot::Sender<Result<u32, String>>,
+        reply: JoinReplySender,
     },
     Rejoin {
         room_code: String,
         player_id: Option<String>,
-        reply: oneshot::Sender<Result<(u32, u64, Vec<Value>), String>>,
+        reply: RejoinReplySender,
     },
     Relay {
         data: Value,
@@ -531,11 +535,9 @@ impl WsRelayClient {
                 let mut heartbeat = tokio::time::interval(HEARTBEAT_INTERVAL);
                 heartbeat.tick().await;
 
-                let mut pending_create: Option<oneshot::Sender<Result<String, String>>> = None;
-                let mut pending_join: Option<(String, oneshot::Sender<Result<u32, String>>)> = None;
-                let mut pending_rejoin: Option<
-                    oneshot::Sender<Result<(u32, u64, Vec<Value>), String>>,
-                > = None;
+                let mut pending_create: Option<CreateReplySender> = None;
+                let mut pending_join: Option<(String, JoinReplySender)> = None;
+                let mut pending_rejoin: Option<RejoinReplySender> = None;
 
                 let mut active_room_code: Option<String> = None;
                 let mut active_player_id: u32 = 0;
