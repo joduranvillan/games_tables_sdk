@@ -91,8 +91,8 @@ func _ready() -> void:
 	bridge.connect("event_json", _on_event_json)
 	bridge.connect("piece_moved", _on_piece_moved_signal)
 	
-	if GameManager.get_game_mode() == "vs_ai":
-		var depth = GameManager.get_chess_ai_depth()
+	if gm != null and gm.get_game_mode() == "vs_ai":
+		var depth = gm.get_chess_ai_depth() if gm != null else 2
 		bridge.start_local_match_chess_vs_ai(P1, P2, depth)
 		if mode_option_button != null:
 			mode_option_button.selected = 1
@@ -102,7 +102,7 @@ func _ready() -> void:
 			mode_option_button.selected = 0
 	current = bridge.current_player()
 	
-	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_status()
 	queue_redraw()
 
@@ -483,7 +483,7 @@ func _create_piece_sprite(row: int, col: int, player: int, kind: String) -> Node
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		label.size = Vector2(CELL_SIZE, CELL_SIZE)
 		label.position = -Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-		var text_color = GameManager.get_player_color(player)
+		var text_color = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(player) - 1, 6)])
 		label.add_theme_color_override("font_color", text_color)
 		piece_node.add_child(label)
 
@@ -1025,7 +1025,7 @@ func _update_status() -> void:
 			turn_indicator.set_active(false)
 	else:
 		var p_name = "Jugador %s" % current
-		var p_col = GameManager.get_player_color(current)
+		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)])
 		if in_opening_practice and opening_step_index < opening_moves.size():
 			var expected = opening_moves[opening_step_index]
 			var op_data = ChessOpenings.get_opening(current_opening_key)

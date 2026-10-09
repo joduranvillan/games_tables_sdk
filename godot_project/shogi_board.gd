@@ -91,7 +91,7 @@ func _ready() -> void:
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
 
-	if GameManager.get_game_mode() == "vs_ai":
+	if gm != null and gm.get_game_mode() == "vs_ai":
 		bridge.start_local_match_shogi_vs_ai(P_SENTE, P_GOTE)
 		if mode_option_button != null:
 			mode_option_button.selected = 1
@@ -101,7 +101,7 @@ func _ready() -> void:
 			mode_option_button.selected = 0
 	current = bridge.current_player()
 	
-	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_hand_panels()
 	_update_status()
 	queue_redraw()
@@ -660,7 +660,7 @@ func _update_status() -> void:
 			turn_indicator.set_active(false)
 	else:
 		var name = "Sente (P1)" if current == P_SENTE else "Gote (P2)"
-		var col = GameManager.get_player_color(current)
+		var col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)])
 		var hand_sel_text = " (Mano: %s)" % selected_hand_piece if selected_hand_piece != "" else ""
 		status.text = "Turno: Jugador %s (Shogi)%s" % [name, hand_sel_text]
 		if turn_indicator != null:

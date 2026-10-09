@@ -122,7 +122,7 @@ func _ready() -> void:
 	bridge.send_command_json(P1, JSON.stringify({"command_type": "SetupDeckCommand"}))
 	current = bridge.current_player()
 
-	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_hand_ui()
 	_update_tableaus()
 	_update_status()

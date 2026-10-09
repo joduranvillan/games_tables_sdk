@@ -59,8 +59,9 @@ func _ready() -> void:
 	_setup_ui()
 	_setup_timer()
 
-	var bytes = GameManager.get_replay_log_bytes()
-	var gtype = GameManager.get_replay_game_type()
+	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	var bytes: PackedByteArray = gm.get_replay_log_bytes() if gm != null and gm.has_method("get_replay_log_bytes") else PackedByteArray()
+	var gtype: String = gm.get_replay_game_type() if gm != null and gm.has_method("get_replay_game_type") else "checkers"
 	if bytes.size() > 0:
 		load_replay_data(bytes, gtype)
 	else:
@@ -322,7 +323,8 @@ func _populate_move_list() -> void:
 	if move_list_vbox == null:
 		return
 	for child in move_list_vbox.get_children():
-		child.queue_free()
+		move_list_vbox.remove_child(child)
+		child.free()
 
 	for i in range(parsed_commands.size()):
 		var btn := Button.new()
@@ -335,7 +337,9 @@ func _populate_move_list() -> void:
 
 func _reload_board_scene() -> void:
 	if board_instance != null:
-		board_instance.queue_free()
+		if board_instance.get_parent() != null:
+			board_instance.get_parent().remove_child(board_instance)
+		board_instance.free()
 		board_instance = null
 
 	var scene_path = GAME_SCENES.get(game_type, "res://checkers_board.tscn")

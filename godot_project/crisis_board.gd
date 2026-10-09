@@ -354,7 +354,7 @@ func _ready() -> void:
 	current_player_id = bridge.current_player()
 
 	_sync_all_from_bridge()
-	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_ui_state()
 
 	if not OS.has_feature("headless"):

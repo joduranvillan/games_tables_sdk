@@ -28,7 +28,7 @@ class PieceSprite extends Node2D:
 
 	func _draw() -> void:
 		draw_circle(Vector2(3, 4), cell_size * 0.36, Color(0, 0, 0, 0.35))
-		var pcolor := GameManager.get_player_color(owner_id)
+		var pcolor := ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(owner_id) - 1, 6)])
 		draw_circle(Vector2.ZERO, cell_size * 0.38, pcolor)
 		draw_arc(Vector2.ZERO, cell_size * 0.38, 0.0, TAU, 32, Color(1, 1, 1, 0.6), 2.0)
 		if king:
@@ -89,13 +89,13 @@ func _ready() -> void:
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
 
-	if GameManager.get_game_mode() == "vs_ai":
+	if gm != null and gm.get_game_mode() == "vs_ai":
 		bridge.start_local_match_checkers_vs_ai(42, P_TOP, P_BOTTOM)
 	else:
 		bridge.start_local_match(P_TOP, P_BOTTOM)
 	current = bridge.current_player()
 
-	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_status()
 	queue_redraw()
 
@@ -657,7 +657,7 @@ func _update_status() -> void:
 			turn_indicator.set_active(false)
 	else:
 		var who := "Jugador 1" if current == P_TOP else "Jugador 2"
-		var p_col = GameManager.get_player_color(current)
+		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)])
 		status.text = "Turno: %s" % who
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, who, p_col)

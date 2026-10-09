@@ -309,7 +309,7 @@ func get_font_scale() -> float:
 	if (is_inside_tree() and has_node("/root/GameManager")):
 		layout = get_node("/root/GameManager").get_layout()
 	elif Engine.has_singleton("GameManager"):
-		layout = GameManager.get_layout()
+		layout = Engine.get_singleton("GameManager").get_layout()
 	var base_layout_scale := 1.0
 	match layout:
 		2: base_layout_scale = 0.75  # PHONE

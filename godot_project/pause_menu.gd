@@ -364,10 +364,15 @@ func confirm_draw() -> void:
 	draw_accepted.emit()
 
 func _on_settings_pressed() -> void:
-	var settings = load("res://settings_menu.tscn").instantiate()
-	get_tree().root.add_child(settings)
+	if is_inside_tree() and get_tree() != null:
+		var settings = load("res://settings_menu.tscn").instantiate()
+		get_tree().root.add_child(settings)
 
 func _on_quit_pressed() -> void:
 	emit_signal("quit_game_requested")
-	get_tree().paused = false
-	SceneManager.change_scene("res://main.tscn")
+	if is_inside_tree() and get_tree() != null:
+		get_tree().paused = false
+	if is_inside_tree() and has_node("/root/SceneManager"):
+		get_node("/root/SceneManager").transition_to("res://main.tscn")
+	elif is_inside_tree() and get_tree() != null:
+		get_tree().change_scene_to_file("res://main.tscn")

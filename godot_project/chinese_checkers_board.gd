@@ -63,7 +63,7 @@ func _ready() -> void:
 
 	_setup_ui_layers()
 	start_match(num_players)
-	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
 
 	if not OS.has_feature("headless"):
 		_pause_menu = load("res://pause_menu.tscn").instantiate()
@@ -271,7 +271,7 @@ func _setup_peg_buttons() -> void:
 		peg_buttons[pos] = btn
 
 func _get_peg_color(p_id: int) -> Color:
-	var fallback: Color = PLAYER_COLORS.get(p_id, GameManager.get_player_color(p_id))
+	var fallback: Color = PLAYER_COLORS.get(p_id, ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(p_id) - 1, 6)]))
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		var tm = get_node("/root/ThemeManager")
 		if tm.has_method("is_colorblind_mode") and bool(tm.call("is_colorblind_mode")):

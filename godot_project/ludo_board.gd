@@ -91,7 +91,7 @@ func _ready() -> void:
 	bridge.start_local_match_ludo(1, 2)
 	current_p = bridge.current_player()
 	
-	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_token_positions()
 	_update_status()
 	queue_redraw()
@@ -215,7 +215,7 @@ func _setup_ui() -> void:
 			token_buttons[p].append(btn)
 
 func _get_token_color(player_id: int) -> Color:
-	var fallback := GameManager.get_player_color(player_id)
+	var fallback := ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(player_id) - 1, 6)])
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		var tm = get_node("/root/ThemeManager")
 		if tm.has_method("is_colorblind_mode") and bool(tm.call("is_colorblind_mode")):
@@ -465,10 +465,10 @@ func _draw() -> void:
 	
 	# Base Corner Zones (4 Home bases)
 	var zones = [
-		{"rect": Rect2(20, 20, 210, 210), "col": GameManager.get_player_color(1)},
-		{"rect": Rect2(370, 20, 210, 210), "col": GameManager.get_player_color(2)},
-		{"rect": Rect2(370, 370, 210, 210), "col": GameManager.get_player_color(3)},
-		{"rect": Rect2(20, 370, 210, 210), "col": GameManager.get_player_color(4)}
+		{"rect": Rect2(20, 20, 210, 210), "col": ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(1) - 1, 6)])},
+		{"rect": Rect2(370, 20, 210, 210), "col": ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(2) - 1, 6)])},
+		{"rect": Rect2(370, 370, 210, 210), "col": ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(3) - 1, 6)])},
+		{"rect": Rect2(20, 370, 210, 210), "col": ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(4) - 1, 6)])}
 	]
 	for z in zones:
 		draw_rect(z.rect, z.col)
@@ -488,7 +488,7 @@ func _draw() -> void:
 
 	# Draw home columns
 	for p in range(1, 5):
-		var p_col = GameManager.get_player_color(p)
+		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(p) - 1, 6)])
 		p_col.a = 0.35
 		for g in HOME_GRIDS[p]:
 			var h_rect = Rect2(margin + g.x * track_step - 17.5, margin + g.y * track_step - 17.5, track_step, track_step)
@@ -515,7 +515,7 @@ func _update_status() -> void:
 			turn_indicator.stop_timer()
 	else:
 		var name = "Jugador %s" % current_p
-		var col = GameManager.get_player_color(current_p)
+		var col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current_p) - 1, 6)])
 		status.text = "Turno: Jugador %s (Ludo)" % current_p
 		if turn_indicator != null:
 			turn_indicator.set_turn(current_p, name, col)

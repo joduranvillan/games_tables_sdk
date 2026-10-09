@@ -23,7 +23,7 @@ func _initialize() -> void:
 	results.append(["export_log generó bytes de replay", log_bytes.size() > 0])
 
 	# 4. Crear ReplayViewer y cargar datos
-	var viewer = ReplayViewer.new()
+	var viewer = load("res://replay_viewer.gd").new()
 	root.add_child(viewer)
 	var move_events := {"count": 0}
 

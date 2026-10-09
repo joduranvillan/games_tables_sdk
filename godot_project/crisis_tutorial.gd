@@ -217,7 +217,8 @@ func _finish_tutorial() -> void:
 	# Transicionar a partida contra la IA después de un breve delay
 	var timer = get_tree().create_timer(1.5)
 	timer.timeout.connect(func():
-		GameManager.set_active_game("crisis")
+		if is_inside_tree() and has_node("/root/GameManager"):
+		get_node("/root/GameManager").set_active_game("crisis")
 		if (is_inside_tree() and has_node("/root/SceneManager")):
 			get_node("/root/SceneManager").transition_to("res://crisis_board.tscn")
 		else:

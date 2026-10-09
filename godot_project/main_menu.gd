@@ -428,7 +428,8 @@ func _on_replay_file_selected(path: String) -> void:
 	var f = FileAccess.open(path, FileAccess.READ)
 	if f != null:
 		var bytes = f.get_buffer(f.get_length())
-		GameManager.set_replay_data(bytes, "checkers")
+		if is_inside_tree() and has_node("/root/GameManager"):
+			get_node("/root/GameManager").set_replay_data(bytes, "checkers")
 	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://replay_viewer.tscn")
 	else:
@@ -674,12 +675,15 @@ func _close_mode_popup() -> void:
 
 func _launch_game(game: Dictionary, mode: String, difficulty_level: int = 1) -> void:
 	_close_mode_popup()
-	GameManager.set_active_game(game["id"])
-	GameManager.set_game_mode(mode)
+	if is_inside_tree() and has_node("/root/GameManager"):
+		get_node("/root/GameManager").set_active_game(game["id"])
+	if is_inside_tree() and has_node("/root/GameManager"):
+		get_node("/root/GameManager").set_game_mode(mode)
 
 	if mode == "vs_ai":
 		var board_size: int = 9
-		GameManager.set_chess_ai_depth(difficulty_level + 1)
+		if is_inside_tree() and has_node("/root/GameManager"):
+			get_node("/root/GameManager").set_chess_ai_depth(difficulty_level + 1)
 		if bridge.has_method("set_ai_difficulty"):
 			bridge.call("set_ai_difficulty", difficulty_level)
 		if game["id"] == "chess":
@@ -713,7 +717,8 @@ func _launch_game(game: Dictionary, mode: String, difficulty_level: int = 1) -> 
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_game_theme(game["id"])
 	elif Engine.has_singleton("ThemeManager"):
-		ThemeManager.apply_game_theme(game["id"])
+		if is_inside_tree() and has_node("/root/ThemeManager"):
+			get_node("/root/ThemeManager").apply_game_theme(game["id"])
 
 	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to(game["scene"])
@@ -791,7 +796,8 @@ func _on_join_code_pressed() -> void:
 		if success:
 			dialog.close()
 			dialog.queue_free()
-			var active_id: String = GameManager.active_game if "active_game" in GameManager and not String(GameManager.active_game).is_empty() else "checkers"
+			var gm_ref = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+		var active_id: String = String(gm_ref.active_game) if gm_ref != null and "active_game" in gm_ref and not String(gm_ref.active_game).is_empty() else "checkers"
 			var scene_path := "res://%s_board.tscn" % active_id
 			if not ResourceLoader.exists(scene_path):
 				scene_path = "res://checkers_board.tscn"
@@ -863,8 +869,10 @@ func _show_game_selector_for_network() -> void:
 func _launch_host_lobby(game_id: String) -> void:
 	if not is_online_mode_allowed():
 		return
-	GameManager.set_active_game(game_id)
-	GameManager.set_game_mode("host")
+	if is_inside_tree() and has_node("/root/GameManager"):
+		get_node("/root/GameManager").set_active_game(game_id)
+	if is_inside_tree() and has_node("/root/GameManager"):
+		get_node("/root/GameManager").set_game_mode("host")
 	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://host_lobby.tscn")
 	else:

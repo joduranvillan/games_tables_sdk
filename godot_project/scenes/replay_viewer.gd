@@ -58,8 +58,9 @@ func _ready() -> void:
 	_setup_ui()
 	_setup_timer()
 
-	var bytes = GameManager.get_replay_log_bytes()
-	var gtype = GameManager.get_replay_game_type()
+	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	var bytes: PackedByteArray = gm.get_replay_log_bytes() if gm != null and gm.has_method("get_replay_log_bytes") else PackedByteArray()
+	var gtype: String = gm.get_replay_game_type() if gm != null and gm.has_method("get_replay_game_type") else "checkers"
 	if bytes.size() > 0:
 		load_replay_data(bytes, gtype)
 	else:

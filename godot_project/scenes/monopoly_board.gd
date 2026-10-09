@@ -191,7 +191,7 @@ func _ready() -> void:
 	bridge.start_local_match_monopoly(P1, P2)
 	current = bridge.current_player()
 
-	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_token_positions()
 	_update_hud_display()
 	_update_status()

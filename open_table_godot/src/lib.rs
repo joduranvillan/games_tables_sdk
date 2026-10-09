@@ -2233,6 +2233,26 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn get_legal_moves_json(&self, player_id: i64) -> GString {
+        let player = PlayerId(player_id as u32);
+        let moves_json = match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::Replay { session, .. }
+            | BridgeMode::Tournament { session, .. } => session.get_legal_moves(player),
+            BridgeMode::MultiSession { sessions, active } => sessions
+                .get(*active)
+                .map(|(_, s)| s.get_legal_moves(player))
+                .unwrap_or_default(),
+            _ => vec![],
+        };
+        let json_str = serde_json::to_string(&moves_json).unwrap_or_else(|_| "[]".to_string());
+        GString::from(&json_str)
+    }
+
+    #[func]
     pub fn compute_elo_delta(
         &self,
         _winner_id: i64,

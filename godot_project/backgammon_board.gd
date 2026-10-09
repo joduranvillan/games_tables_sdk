@@ -79,7 +79,7 @@ func _ready() -> void:
 					hud.bind_bridge(bridge)
 				add_child(hud)
 
-	if GameManager.get_game_mode() == "vs_ai":
+	if gm != null and gm.get_game_mode() == "vs_ai":
 		bridge.start_local_match_backgammon_vs_ai(P1, P2)
 		if mode_option_button != null:
 			mode_option_button.selected = 1
@@ -89,7 +89,7 @@ func _ready() -> void:
 			mode_option_button.selected = 0
 	current = bridge.current_player()
 	
-	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_checker_positions()
 	_update_status()
 	queue_redraw()

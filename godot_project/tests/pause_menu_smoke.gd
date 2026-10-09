@@ -48,7 +48,7 @@ func _initialize() -> void:
 	# 3. Verificar PauseMenu: Reglas, Deshacer Jugada, Rendirse con confirmación, Ofrecer Tablas y GameOverOverlay
 	var pm: CanvasLayer = load("res://pause_menu.tscn").instantiate() if ResourceLoader.exists("res://pause_menu.tscn") else null
 	if pm == null:
-		pm = preload("res://pause_menu.gd").new()
+		pm = load("res://pause_menu.gd").new()
 
 	root.add_child(pm)
 	assert(pm != null, "PauseMenu debe instanciarse")

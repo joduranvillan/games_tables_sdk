@@ -21,7 +21,7 @@ func _initialize() -> void:
 	bridge.send_move(1, 2, 3, 3, 4)
 
 	var expected_turn: int = bridge.current_player()
-	var expected_legal_moves: String = bridge.get_legal_moves_json(expected_turn)
+	var expected_legal_moves: String = bridge.get_legal_moves_json(expected_turn) if bridge.has_method("get_legal_moves_json") else JSON.stringify(bridge.get_legal_moves(expected_turn))
 	results.append([
 		"tras 3 jugadas en damas el turno activo es del jugador 2",
 		expected_turn == 2
@@ -82,7 +82,7 @@ func _initialize() -> void:
 	])
 
 	var restored_turn: int = restored_bridge.current_player()
-	var restored_legal_moves: String = restored_bridge.get_legal_moves_json(restored_turn)
+	var restored_legal_moves: String = restored_bridge.get_legal_moves_json(restored_turn) if restored_bridge.has_method("get_legal_moves_json") else JSON.stringify(restored_bridge.get_legal_moves(restored_turn))
 
 	results.append([
 		"el turno restaurado coincide exactamente con el turno previo al guardado (%d)" % restored_turn,
@@ -103,7 +103,7 @@ func _initialize() -> void:
 
 	# 6. Verificar compatibilidad del snapshot con ReplayViewer
 	var raw_log: PackedByteArray = Marshalls.base64_to_raw(str(loaded_data.get("engine_state", "")))
-	var viewer = ReplayViewer.new()
+	var viewer = load("res://replay_viewer.gd").new()
 	root.add_child(viewer)
 	viewer.load_replay_data(raw_log, "checkers")
 	viewer.seek_to_step(3)
@@ -133,7 +133,7 @@ func _initialize() -> void:
 		and (otr_meta.get("moves", []) as Array).size() == 3
 	])
 
-	var otr_viewer = ReplayViewer.new()
+	var otr_viewer = load("res://replay_viewer.gd").new()
 	root.add_child(otr_viewer)
 	var viewer_imported: bool = otr_viewer.import_otr_replay(otr_path)
 	results.append([

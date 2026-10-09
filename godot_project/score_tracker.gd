@@ -145,7 +145,7 @@ func _connect_bridge(b: Node) -> void:
 			b.connect("game_ended", _on_game_ended)
 
 func _on_game_ended(winner: int, loser: int) -> void:
-	var game_type: String = GameManager.get_active_game() if is_inside_tree() and has_node("/root/GameManager") else "unknown"
+	var game_type: String = get_node("/root/GameManager").get_active_game() if is_inside_tree() and has_node("/root/GameManager") else "unknown"
 	update_elo(winner, loser, game_type)
 
 func update_elo(winner: int, loser: int, game_type: String = "") -> void:

@@ -77,10 +77,12 @@ func show_result(winner_id: int, is_draw: bool) -> void:
 	# Notificar logros
 	if is_inside_tree() and has_node("/root/AchievementManager"):
 		var am := get_node("/root/AchievementManager")
+		var gm_node = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+		var active_g: String = gm_node.get_active_game() if gm_node != null and gm_node.has_method("get_active_game") else ""
 		if not is_draw and am.has_method("on_game_won"):
-			am.on_game_won(winner_id, GameManager.get_active_game())
+			am.on_game_won(winner_id, active_g)
 		elif is_draw and am.has_method("on_game_draw"):
-			am.on_game_draw(GameManager.get_active_game())
+			am.on_game_draw(active_g)
 
 	if is_draw:
 		if title_label:
@@ -90,7 +92,7 @@ func show_result(winner_id: int, is_draw: bool) -> void:
 			winner_label.text = "Partida finalizada sin ganador"
 			winner_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
 	else:
-		var p_color = GameManager.get_player_color(winner_id) if Engine.has_singleton("GameManager") or (is_inside_tree() and has_node("/root/GameManager")) else Color(1.0, 0.85, 0.2)
+		var p_color = get_node("/root/GameManager").get_player_color(winner_id) if (is_inside_tree() and has_node("/root/GameManager")) else Color(1.0, 0.85, 0.2)
 		if title_label:
 			title_label.text = "¡Victoria!"
 			title_label.add_theme_color_override("font_color", p_color)

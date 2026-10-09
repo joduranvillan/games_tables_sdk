@@ -83,7 +83,7 @@ func _ready() -> void:
 	bridge.start_local_match_battleship(P1, P2)
 	current = bridge.current_player()
 
-	_on_layout_changed(GameManager.get_layout() if gm != null else 0)
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_status()
 	_update_grid_ui()
 	queue_redraw()
@@ -543,7 +543,7 @@ func _update_status() -> void:
 		else:
 			status_label.text = "⚓ Jugador 1: Flota lista."
 		if turn_indicator != null:
-			var p_col = GameManager.get_player_color(P1) if (is_inside_tree() and has_node("/root/GameManager")) else Color(0.2, 0.6, 0.9)
+			var p_col = get_node("/root/GameManager").get_player_color(P1) if (is_inside_tree() and has_node("/root/GameManager")) else Color(0.2, 0.6, 0.9)
 			turn_indicator.set_turn(P1, "Jugador 1", p_col)
 			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	elif phase == Phase.PLACEMENT_P2:
@@ -555,14 +555,14 @@ func _update_status() -> void:
 		else:
 			status_label.text = "⚓ Jugador 2: Flota lista."
 		if turn_indicator != null:
-			var p_col = GameManager.get_player_color(P2) if (is_inside_tree() and has_node("/root/GameManager")) else Color(0.9, 0.3, 0.3)
+			var p_col = get_node("/root/GameManager").get_player_color(P2) if (is_inside_tree() and has_node("/root/GameManager")) else Color(0.9, 0.3, 0.3)
 			turn_indicator.set_turn(P2, "Jugador 2", p_col)
 			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	elif phase == Phase.FIRE:
 		var p_name = "Jugador 1" if current == P1 else "Jugador 2"
 		status_label.text = "🚀 Fase de Disparo - Turno de %s" % p_name
 		if turn_indicator != null:
-			var p_col = GameManager.get_player_color(current) if (is_inside_tree() and has_node("/root/GameManager")) else (Color(0.2, 0.6, 0.9) if current == P1 else Color(0.9, 0.3, 0.3))
+			var p_col = get_node("/root/GameManager").get_player_color(current) if (is_inside_tree() and has_node("/root/GameManager")) else (Color(0.2, 0.6, 0.9) if current == P1 else Color(0.9, 0.3, 0.3))
 			turn_indicator.set_turn(current, p_name, p_col)
 			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
