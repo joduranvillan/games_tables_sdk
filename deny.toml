@@ -1,9 +1,7 @@
 [advisories]
 yanked = "warn"
 ignore = [
-    "RUSTSEC-2024-0436",  # paste v1.0.15 unmaintained, no fix available via godot dep chain
-    "RUSTSEC-2025-0141",  # bincode 1.x unmaintained, transitive dep via bevy_ecs
-    "RUSTSEC-2024-0384",  # instant unmaintained, transitive dep via bevy_tasks
+    "RUSTSEC-2025-0141",  # bincode unmaintained, direct/transitive dep
 ]
 
 [licenses]
