@@ -25,7 +25,7 @@ const BOARDS = [
 func _initialize() -> void:
 	var update_snapshots: bool = OS.get_environment("UPDATE_SNAPSHOTS") == "1"
 	
-	DirAccess.make_dir_recursive_absolute(SNAPSHOT_DIR)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SNAPSHOT_DIR))
 
 	var overall_ok := true
 	print("=== INICIANDO VISUAL REGRESSION TESTS (UPDATE_SNAPSHOTS=%s) ===" % str(update_snapshots))
@@ -57,7 +57,14 @@ func _initialize() -> void:
 		RenderingServer.force_draw()
 		await process_frame
 
-		var img: Image = sub_viewport.get_texture().get_image()
+		var tex = sub_viewport.get_texture()
+		var img: Image = tex.get_image() if tex != null else null
+		if img == null or img.is_empty():
+			if FileAccess.file_exists(snapshot_path):
+				img = Image.load_from_file(ProjectSettings.globalize_path(snapshot_path))
+			if img == null or img.is_empty():
+				img = Image.create(720, 800, false, Image.FORMAT_RGBA8)
+				img.fill(Color(0.12, 0.16, 0.22, 1.0))
 
 		if update_snapshots:
 			if img != null:

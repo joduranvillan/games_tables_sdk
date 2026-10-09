@@ -49,19 +49,20 @@ func _run_competitive_flow() -> bool:
 	if ClassDB.class_exists("OpenTableBridge"):
 		var bridge = ClassDB.instantiate("OpenTableBridge")
 		if bridge != null:
-			if bridge.has_method("init_local"):
-				bridge.call("init_local", "chess")
-			elif bridge.has_method("start_local_match_chess"):
+			if bridge.has_method("start_local_match_chess"):
 				bridge.call("start_local_match_chess", 1, 2)
+			elif bridge.has_method("init_local"):
+				bridge.call("init_local", "chess")
 			var cmd_json := JSON.stringify({
-				"command_type": "MoveChessPieceCommand",
-				"from_row": 6,
-				"from_col": 4,
-				"to_row": 4,
-				"to_col": 4,
+				"command_type": "chess_game::MovePieceCommand",
+				"player": 1,
+				"from": {"row": 1, "col": 4},
+				"to": {"row": 3, "col": 4},
+				"promote_to": null,
 			})
 			if bridge.has_method("send_command_json"):
-				move_ok = bool(bridge.call("send_command_json", 1, cmd_json))
+				bridge.call("send_command_json", 1, cmd_json)
+				move_ok = (int(bridge.call("current_player")) == 2)
 			else:
 				move_ok = true
 			if bridge is Node:
