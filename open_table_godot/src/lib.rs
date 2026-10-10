@@ -3378,6 +3378,13 @@ impl OpenTableBridge {
                     Session::replay_collecting_events(id, seed, players, rules, &log_bytes)
                 {
                     let current_p = loaded_session.current_player().0 as i64;
+                    if let BridgeMode::Client {
+                        client_current_player,
+                        ..
+                    } = &mut self.mode
+                    {
+                        *client_current_player = current_p;
+                    }
                     self.emit_game_events(&events);
                     self.base_mut()
                         .emit_signal("turn_changed", &[Variant::from(current_p)]);

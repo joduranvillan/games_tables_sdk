@@ -51,6 +51,8 @@ func _initialize() -> void:
 		pm = load("res://pause_menu.gd").new()
 
 	root.add_child(pm)
+	if pm.get("undo_move_button") == null and pm.has_method("_ready"):
+		pm._ready()
 	assert(pm != null, "PauseMenu debe instanciarse")
 	assert(pm.has_signal("quit_game_requested"), "PauseMenu debe tener señal quit_game_requested")
 	assert(pm.has_node("Panel/VBoxContainer/UndoMoveButton"), "PauseMenu debe incluir UndoMoveButton (↩️ Deshacer Jugada)")

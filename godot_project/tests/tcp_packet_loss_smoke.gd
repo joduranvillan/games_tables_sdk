@@ -18,15 +18,20 @@ class MockTcpProxy:
 	var pending_h2c: Array = []
 	var host_port: int
 	var proxy_port: int
+	var mutex: Mutex
+	var rng: RandomNumberGenerator
 
 	func _init(p_host_port: int, p_proxy_port: int) -> void:
 		host_port = p_host_port
 		proxy_port = p_proxy_port
+		mutex = Mutex.new()
+		rng = RandomNumberGenerator.new()
+		rng.seed = 2026
 		server = TCPServer.new()
 		server.listen(proxy_port)
 
 	func poll() -> void:
-		server.poll()
+		mutex.lock()
 		if client_peer == null and server.is_connection_available():
 			client_peer = server.take_connection()
 			host_peer = StreamPeerTCP.new()
@@ -38,7 +43,7 @@ class MockTcpProxy:
 			host_peer.poll()
 
 		# Recibir de cliente -> proxy
-		if client_peer != null and client_peer.get_available_bytes() > 0:
+		if client_peer != null and client_peer.get_status() == StreamPeerTCP.STATUS_CONNECTED and client_peer.get_available_bytes() > 0:
 			var res = client_peer.get_data(client_peer.get_available_bytes())
 			if res[0] == OK:
 				var buf = StreamPeerBuffer.new()
@@ -46,7 +51,7 @@ class MockTcpProxy:
 				pending_c2h.append(buf)
 
 		# Recibir de host -> proxy
-		if host_peer != null and host_peer.get_available_bytes() > 0:
+		if host_peer != null and host_peer.get_status() == StreamPeerTCP.STATUS_CONNECTED and host_peer.get_available_bytes() > 0:
 			var res = host_peer.get_data(host_peer.get_available_bytes())
 			if res[0] == OK:
 				var buf = StreamPeerBuffer.new()
@@ -55,47 +60,51 @@ class MockTcpProxy:
 
 		# Reenviar cliente -> host con 20% de descarte (hasta 5 reintentos por frame)
 		if host_peer != null and host_peer.get_status() == StreamPeerTCP.STATUS_CONNECTED:
-			var i = 0
-			while i < pending_c2h.size():
-				var buf: StreamPeerBuffer = pending_c2h[i]
+			while not pending_c2h.is_empty():
+				var buf: StreamPeerBuffer = pending_c2h[0]
 				var sent = false
 				for _attempt in range(5):
-					if randf_range(0.0, 1.0) >= 0.2:
+					if rng.randf_range(0.0, 1.0) >= 0.2:
 						host_peer.put_data(buf.data_array)
 						sent = true
 						break
 				if sent:
-					pending_c2h.remove_at(i)
+					pending_c2h.remove_at(0)
 				else:
-					i += 1
+					break
 
 		# Reenviar host -> cliente con 20% de descarte (hasta 5 reintentos por frame)
 		if client_peer != null and client_peer.get_status() == StreamPeerTCP.STATUS_CONNECTED:
-			var j = 0
-			while j < pending_h2c.size():
-				var buf: StreamPeerBuffer = pending_h2c[j]
+			while not pending_h2c.is_empty():
+				var buf: StreamPeerBuffer = pending_h2c[0]
 				var sent = false
 				for _attempt in range(5):
-					if randf_range(0.0, 1.0) >= 0.2:
+					if rng.randf_range(0.0, 1.0) >= 0.2:
 						client_peer.put_data(buf.data_array)
 						sent = true
 						break
 				if sent:
-					pending_h2c.remove_at(j)
+					pending_h2c.remove_at(0)
 				else:
-					j += 1
+					break
+		mutex.unlock()
 
 	func is_proxy_connected() -> bool:
-		return client_peer != null and host_peer != null \
+		mutex.lock()
+		var ok: bool = client_peer != null and host_peer != null \
 			and client_peer.get_status() == StreamPeerTCP.STATUS_CONNECTED \
 			and host_peer.get_status() == StreamPeerTCP.STATUS_CONNECTED
+		mutex.unlock()
+		return ok
 
 	func stop() -> void:
+		mutex.lock()
 		if client_peer != null:
 			client_peer.disconnect_from_host()
 		if host_peer != null:
 			host_peer.disconnect_from_host()
 		server.stop()
+		mutex.unlock()
 
 func _initialize() -> void:
 	seed(2026)
@@ -115,7 +124,16 @@ func _initialize() -> void:
 		client_events.append({"player": p, "from_row": fr, "from_col": fc, "to_row": tr, "to_col": tc})
 	)
 
+	var handshake_state := {"done": false}
+	var handshake_thread := Thread.new()
+	handshake_thread.start(func():
+		while not handshake_state["done"]:
+			proxy.poll()
+			OS.delay_msec(5)
+	)
 	var ok_conn = client.connect_to_host("127.0.0.1", PROXY_PORT, "P2")
+	handshake_state["done"] = true
+	handshake_thread.wait_to_finish()
 	results.append(["Client connect_to_host via MockTcpProxy retorno true", ok_conn])
 
 	# 4. Esperar a establecer la conexión completa a través del proxy

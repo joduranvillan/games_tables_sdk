@@ -31,7 +31,10 @@ var pending_action: String = ""
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	hide()
+	_ensure_ui_nodes()
+	_update_undo_button_state()
 
+func _ensure_ui_nodes() -> void:
 	if continue_button == null:
 		continue_button = get_node_or_null("Panel/VBoxContainer/ContinueButton")
 	if undo_move_button == null:
@@ -100,7 +103,6 @@ func _ready() -> void:
 		quit_button.pressed.connect(_on_quit_pressed)
 
 	_ensure_confirmation_dialog()
-	_update_undo_button_state()
 
 func is_network_mode() -> bool:
 	if is_network_match:
@@ -118,6 +120,7 @@ func set_network_mode(net_active: bool) -> void:
 	_update_undo_button_state()
 
 func _update_undo_button_state() -> void:
+	_ensure_ui_nodes()
 	if undo_move_button == null:
 		return
 	var net := is_network_mode()
