@@ -28,7 +28,7 @@ class PieceSprite extends Node2D:
 
 	func _draw() -> void:
 		draw_circle(Vector2(3, 4), cell_size * 0.36, Color(0, 0, 0, 0.35))
-		var pcolor := ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(owner_id) - 1, 6)])
+		var pcolor: Color = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(owner_id) - 1, 6)] as Color)
 		draw_circle(Vector2.ZERO, cell_size * 0.38, pcolor)
 		draw_arc(Vector2.ZERO, cell_size * 0.38, 0.0, TAU, 32, Color(1, 1, 1, 0.6), 2.0)
 		if king:
@@ -657,7 +657,7 @@ func _update_status() -> void:
 			turn_indicator.set_active(false)
 	else:
 		var who := "Jugador 1" if current == P_TOP else "Jugador 2"
-		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)])
+		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)] as Color)
 		status.text = "Turno: %s" % who
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, who, p_col)

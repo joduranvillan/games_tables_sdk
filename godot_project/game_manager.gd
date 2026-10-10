@@ -32,7 +32,7 @@ var last_safe_margins: Dictionary = {"top": 0, "bottom": 0, "left": 0, "right": 
 func set_online_features_enabled(enabled: bool) -> void:
 	online_features_enabled = enabled
 	offline_only_mode = not enabled
-	var auth := (get_node_or_null("/root/AuthClient") if is_inside_tree() else null)
+	var auth = (get_node_or_null("/root/AuthClient") if is_inside_tree() else null)
 	if auth != null and auth.has_method("set_online_enabled"):
 		auth.call("set_online_enabled", enabled)
 

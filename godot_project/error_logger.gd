@@ -142,7 +142,7 @@ func build_diagnostics_payload() -> Dictionary:
 	var online_enabled := true
 
 	if is_inside_tree():
-		var gm := (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
+		var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 		if gm != null:
 			if gm.has_method("get_active_game"):
 				active_game = str(gm.call("get_active_game"))

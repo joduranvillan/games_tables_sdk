@@ -271,7 +271,7 @@ func _setup_peg_buttons() -> void:
 		peg_buttons[pos] = btn
 
 func _get_peg_color(p_id: int) -> Color:
-	var fallback: Color = PLAYER_COLORS.get(p_id, ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(p_id) - 1, 6)]))
+	var fallback: Color = PLAYER_COLORS.get(p_id, ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(p_id) - 1, 6)] as Color))
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		var tm = get_node("/root/ThemeManager")
 		if tm.has_method("is_colorblind_mode") and bool(tm.call("is_colorblind_mode")):

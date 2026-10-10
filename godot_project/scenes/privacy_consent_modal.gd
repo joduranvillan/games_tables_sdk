@@ -244,9 +244,9 @@ func _save_decision(target_path: String, accepted: bool, allow_online: bool) -> 
 
 func _apply_runtime_mode(allow_online: bool) -> void:
 	if is_inside_tree():
-		var gm := (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
+		var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 		if gm != null and gm.has_method("set_online_features_enabled"):
 			gm.call("set_online_features_enabled", allow_online)
-		var auth := (get_node_or_null("/root/AuthClient") if is_inside_tree() else null)
+		var auth = (get_node_or_null("/root/AuthClient") if is_inside_tree() else null)
 		if auth != null and auth.has_method("set_online_enabled"):
 			auth.call("set_online_enabled", allow_online)

@@ -1121,7 +1121,7 @@ func _on_turn_changed(player_id: int) -> void:
 	_update_ui()
 	_update_status()
 	if turn_indicator != null:
-		turn_indicator.set_turn(player_id, "Jugador %d" % player_id, ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(player_id) - 1, 6)]))
+		turn_indicator.set_turn(player_id, "Jugador %d" % player_id, ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(player_id) - 1, 6)] as Color))
 
 func _on_game_over(w: int) -> void:
 	winner = w
@@ -1176,7 +1176,7 @@ func _update_status() -> void:
 			turn_indicator.stop_timer()
 	else:
 		var p_name = "Jugador %s" % current
-		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)])
+		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)] as Color)
 		status.text = "Turno: Jugador %s (UNO)" % current
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, p_name, p_col)

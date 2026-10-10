@@ -92,8 +92,8 @@ func _initialize() -> void:
 
 	results.append(["espectador tardío recibió señales spectator_event_received históricas", late_spectator_jsons.size() >= 2])
 
-	# Realizar un 3er movimiento en vivo: (2, 3) -> (3, 4)
-	host_late.send_move(1, 2, 3, 3, 4)
+	# Realizar un 3er movimiento en vivo: captura obligatoria (3, 2) -> (5, 0)
+	host_late.send_move(1, 3, 2, 5, 0)
 	for _i in range(15):
 		host_late.poll_events()
 		late_spectator_bridge.poll_events()
@@ -101,10 +101,10 @@ func _initialize() -> void:
 
 	results.append(["espectador tardío recibió el tercer movimiento en vivo tras el resync", late_moved_events.size() == 3])
 	if late_moved_events.size() == 3:
-		var m3_ok: bool = late_moved_events[2].player == 1 and late_moved_events[2].to_row == 3 and late_moved_events[2].to_col == 4
-		results.append(["tercer movimiento en vivo correcto (3,4)", m3_ok])
+		var m3_ok: bool = late_moved_events[2].player == 1 and late_moved_events[2].to_row == 5 and late_moved_events[2].to_col == 0
+		results.append(["tercer movimiento en vivo correcto (5,0)", m3_ok])
 	else:
-		results.append(["tercer movimiento en vivo correcto (3,4)", false])
+		results.append(["tercer movimiento en vivo correcto (5,0)", false])
 
 	var ok := true
 	for r in results:

@@ -135,16 +135,16 @@ func _initialize() -> void:
 		client.poll_events()
 		OS.delay_msec(10)
 
-	# 5. Jugar 8 movimientos alternativos de damas (4 por jugador) vía host
+	# 5. Jugar 8 movimientos alternativos legales de damas (4 por jugador) vía host
 	var moves = [
-		[1, 2, 1, 3, 2], # P1
-		[2, 5, 0, 4, 1], # P2
-		[1, 2, 3, 3, 4], # P1
+		[1, 2, 1, 3, 0], # P1
 		[2, 5, 6, 4, 7], # P2
-		[1, 2, 5, 3, 6], # P1
-		[2, 5, 4, 4, 5], # P2
 		[1, 1, 0, 2, 1], # P1
-		[2, 6, 7, 5, 6]  # P2
+		[2, 6, 7, 5, 6], # P2
+		[1, 0, 1, 1, 0], # P1
+		[2, 7, 6, 6, 7], # P2
+		[1, 2, 3, 3, 2], # P1
+		[2, 5, 4, 4, 5]  # P2
 	]
 
 	for m in moves:

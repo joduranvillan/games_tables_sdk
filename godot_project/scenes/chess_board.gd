@@ -483,7 +483,7 @@ func _create_piece_sprite(row: int, col: int, player: int, kind: String) -> Node
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		label.size = Vector2(CELL_SIZE, CELL_SIZE)
 		label.position = -Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-		var text_color = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(player) - 1, 6)])
+		var text_color = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(player) - 1, 6)] as Color)
 		label.add_theme_color_override("font_color", text_color)
 		piece_node.add_child(label)
 
@@ -1025,7 +1025,7 @@ func _update_status() -> void:
 			turn_indicator.set_active(false)
 	else:
 		var p_name = "Jugador %s" % current
-		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)])
+		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)] as Color)
 		if in_opening_practice and opening_step_index < opening_moves.size():
 			var expected = opening_moves[opening_step_index]
 			var op_data = ChessOpenings.get_opening(current_opening_key)

@@ -17,8 +17,8 @@ func _initialize() -> void:
 	bridge.send_move(1, 2, 1, 3, 2)
 	# Jugada 2 (Jugador 2): (5,0) -> (4,1)
 	bridge.send_move(2, 5, 0, 4, 1)
-	# Jugada 3 (Jugador 1): (2,3) -> (3,4)
-	bridge.send_move(1, 2, 3, 3, 4)
+	# Jugada 3 (Jugador 1): captura obligatoria (3,2) -> (5,0)
+	bridge.send_move(1, 3, 2, 5, 0)
 
 	var expected_turn: int = bridge.current_player()
 	var expected_legal_moves: String = bridge.get_legal_moves_json(expected_turn) if bridge.has_method("get_legal_moves_json") else JSON.stringify(bridge.get_legal_moves(expected_turn))
@@ -93,7 +93,7 @@ func _initialize() -> void:
 		restored_moves.size() == 3
 		and restored_moves[0]["from"] == Vector2i(2, 1) and restored_moves[0]["to"] == Vector2i(3, 2)
 		and restored_moves[1]["from"] == Vector2i(5, 0) and restored_moves[1]["to"] == Vector2i(4, 1)
-		and restored_moves[2]["from"] == Vector2i(2, 3) and restored_moves[2]["to"] == Vector2i(3, 4)
+		and restored_moves[2]["from"] == Vector2i(3, 2) and restored_moves[2]["to"] == Vector2i(5, 0)
 		and restored_legal_moves == expected_legal_moves
 	)
 	results.append([

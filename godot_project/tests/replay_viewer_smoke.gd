@@ -15,8 +15,8 @@ func _initialize() -> void:
 	bridge.send_move(1, 2, 1, 3, 2)
 	# Movimiento 2 (P2): (5,0) -> (4,1)
 	bridge.send_move(2, 5, 0, 4, 1)
-	# Movimiento 3 (P1): (2,3) -> (3,4)
-	bridge.send_move(1, 2, 3, 3, 4)
+	# Movimiento 3 (P1): captura obligatoria (3,2) -> (5,0)
+	bridge.send_move(1, 3, 2, 5, 0)
 
 	# 3. Exportar log
 	var log_bytes: PackedByteArray = bridge.export_log()
