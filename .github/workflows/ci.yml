@@ -132,7 +132,7 @@ jobs:
         run: cd platform_plugins && gradle :android:assembleRelease --no-daemon
         working-directory: .
       - name: Upload OpenTableNearby-release.aar artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: OpenTableNearby-release.aar
           path: platform_plugins/android/build/outputs/aar/OpenTableNearby-release.aar
@@ -199,7 +199,7 @@ jobs:
           echo "iOS Swift plugin compiled and packaged into OpenTableMultipeer.xcframework!"
 
       - name: Upload OpenTableMultipeer.xcframework artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: OpenTableMultipeer.xcframework
           path: OpenTableMultipeer.xcframework
