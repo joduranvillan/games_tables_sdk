@@ -18,7 +18,7 @@ open_table_macros = { version = "1.0.0", path = "../open_table_macros" }
 
 serde = { version = "1", features = ["derive"] }
 typetag = "0.2"
-bevy_ecs = "0.19"
+bevy_ecs = "0.20"
 
 [dev-dependencies]
 serde_json = "1"
