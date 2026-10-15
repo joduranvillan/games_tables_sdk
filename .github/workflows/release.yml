@@ -162,7 +162,7 @@ jobs:
           fi
 
       - name: Upload Release Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.platform }}
           path: dist/opentable-${{ matrix.platform }}.${{ matrix.archive_ext }}
@@ -267,7 +267,7 @@ jobs:
           fi
 
       - name: Upload Android APK & AAB Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-android
           path: |
@@ -320,7 +320,7 @@ jobs:
           tar -czf dist/opentable-web.tar.gz -C dist web
 
       - name: Upload Web Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-web
           path: dist/opentable-web.tar.gz
