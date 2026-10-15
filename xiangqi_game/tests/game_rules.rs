@@ -698,7 +698,7 @@ fn test_triple_repeticion_xiangqi_declara_tablas() {
             Box::new(MovePieceCommand {
                 player: BLACK,
                 from: (4, 0),
-                to: (3, 0),
+                to: (5, 0),
             }),
         )
         .unwrap();
@@ -717,7 +717,7 @@ fn test_triple_repeticion_xiangqi_declara_tablas() {
             BLACK,
             Box::new(MovePieceCommand {
                 player: BLACK,
-                from: (3, 0),
+                from: (5, 0),
                 to: (4, 0),
             }),
         )
@@ -746,7 +746,7 @@ fn test_triple_repeticion_xiangqi_declara_tablas() {
             Box::new(MovePieceCommand {
                 player: BLACK,
                 from: (4, 0),
-                to: (3, 0),
+                to: (5, 0),
             }),
         )
         .unwrap();
@@ -765,7 +765,7 @@ fn test_triple_repeticion_xiangqi_declara_tablas() {
             BLACK,
             Box::new(MovePieceCommand {
                 player: BLACK,
-                from: (3, 0),
+                from: (5, 0),
                 to: (4, 0),
             }),
         )
