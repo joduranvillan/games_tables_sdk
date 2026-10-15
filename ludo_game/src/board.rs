@@ -186,20 +186,10 @@ impl ConsecutiveSixesResource {
     }
 }
 
-#[derive(GameResource, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(GameResource, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct LudoRulesConfigResource {
     pub star_safe_squares: bool,
     pub bonus_roll_on_capture_and_goal: bool,
     pub three_sixes_penalty: bool,
-}
-
-impl Default for LudoRulesConfigResource {
-    fn default() -> Self {
-        Self {
-            star_safe_squares: false,
-            bonus_roll_on_capture_and_goal: false,
-            three_sixes_penalty: false,
-        }
-    }
 }
 
