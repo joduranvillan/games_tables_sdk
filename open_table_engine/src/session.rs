@@ -174,7 +174,10 @@ pub trait LegalMoveGenerator: Send + Sync + 'static {
     fn generate_candidates(&self, world: &BevyWorld, player: PlayerId) -> Vec<Box<dyn Command>> {
         self.generate(world, player)
     }
-    fn generate(&self, _world: &BevyWorld, _player: PlayerId) -> Vec<Box<dyn Command>> {
+    fn generate(&self, world: &BevyWorld, player: PlayerId) -> Vec<Box<dyn Command>> {
+        self.legal_moves(world, player)
+    }
+    fn legal_moves(&self, _world: &BevyWorld, _player: PlayerId) -> Vec<Box<dyn Command>> {
         vec![]
     }
 }
@@ -543,7 +546,7 @@ impl Session {
     /// let moves = session.get_legal_moves(PlayerId(1));
     /// assert!(moves.is_empty());
     /// ```
-    pub fn get_legal_moves(&self, player: PlayerId) -> Vec<serde_json::Value> {
+    pub fn legal_moves(&self, player: PlayerId) -> Vec<Box<dyn Command>> {
         let generator = if let Some(g) = self.world.get_resource::<LegalMoveGeneratorResource>() {
             Some(g.0.clone())
         } else {
@@ -554,7 +557,11 @@ impl Session {
             return vec![];
         };
 
-        let candidates = generator.generate_candidates(&self.world, player);
+        generator.generate_candidates(&self.world, player)
+    }
+
+    pub fn get_legal_moves(&self, player: PlayerId) -> Vec<serde_json::Value> {
+        let candidates = self.legal_moves(player);
         let mut legal_moves = Vec::new();
 
         for cmd in candidates {

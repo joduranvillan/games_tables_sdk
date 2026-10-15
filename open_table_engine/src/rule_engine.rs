@@ -42,6 +42,13 @@ impl RuleEngine {
         self.legal_move_generator.as_ref()
     }
 
+    pub fn legal_moves(&self, world: &BevyWorld, player: PlayerId) -> Vec<Box<dyn Command>> {
+        self.legal_move_generator
+            .as_ref()
+            .map(|g| g.generate_candidates(world, player))
+            .unwrap_or_default()
+    }
+
     /// Registra la regla para un tipo de comando concreto. `C` es
     /// `RollDiceCommand`, `PlayCardCommand`, etc. — un tipo que vive en el
     /// crate del juego, nunca en el motor.

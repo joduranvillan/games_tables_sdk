@@ -15,7 +15,17 @@ fn invalid(reason: impl Into<String>) -> EngineError {
 pub struct ChineseCheckersLegalMoveGenerator;
 
 impl LegalMoveGenerator for ChineseCheckersLegalMoveGenerator {
+    fn generate(&self, world: &World, player: PlayerId) -> Vec<Box<dyn Command>> {
+        self.legal_moves(world, player)
+    }
+
     fn legal_moves(&self, world: &World, player: PlayerId) -> Vec<Box<dyn Command>> {
+        self.legal_moves(world, player)
+    }
+}
+
+impl ChineseCheckersLegalMoveGenerator {
+    pub fn legal_moves(&self, world: &World, player: PlayerId) -> Vec<Box<dyn Command>> {
         if world
             .get_resource::<GameOverResource>()
             .is_some_and(|g| g.0)
