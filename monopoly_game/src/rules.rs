@@ -848,7 +848,6 @@ pub fn build_monopoly_rules() -> RuleEngine {
 
         players.position.insert(cmd.player, new_pos);
         players.money.insert(cmd.player, money);
-        drop(players);
 
         if jailed {
             let mut jail = world.resource_mut::<JailResource>();
@@ -1055,7 +1054,6 @@ pub fn build_monopoly_rules() -> RuleEngine {
         let mut buildings = world.resource_mut::<BuildingsResource>();
         let new_level = current_level + 1;
         buildings.buildings.insert(cmd.space, new_level);
-        drop(buildings);
 
         let events: Vec<Box<dyn Event>> = vec![Box::new(HouseBuiltEvent {
             player: cmd.player,
@@ -1141,7 +1139,6 @@ pub fn build_monopoly_rules() -> RuleEngine {
         } else {
             buildings.buildings.insert(cmd.space, new_level);
         }
-        drop(buildings);
 
         let events: Vec<Box<dyn Event>> = vec![Box::new(HouseSoldEvent {
             player: cmd.player,
