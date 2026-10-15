@@ -20,8 +20,12 @@ pub struct PassedEvent {
     pub player: PlayerId,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, GameEvent)]
 pub struct GameOverEvent {
     pub winner: Option<PlayerId>,
     pub reason: String,
+    #[serde(default)]
+    pub black_score: f32,
+    #[serde(default)]
+    pub white_score: f32,
 }

@@ -412,3 +412,218 @@ fn test_go_ai_devuelve_movimiento_o_none_en_posicion_inicial() {
         elapsed
     );
 }
+
+#[test]
+fn test_prisioneros_se_acumulan_en_captura_y_piedras_muertas() {
+    let mut session = new_go_session(SessionId(301), 0, P1, P2);
+
+    // P1 (Black) juega en (1, 0), P2 (White) en (0, 0), P1 en (0, 1) capturando la piedra blanca en (0, 0)
+    session
+        .process_command(
+            P1,
+            Box::new(PlaceStoneCommand {
+                player: P1,
+                x: 1,
+                y: 0,
+            }),
+        )
+        .unwrap();
+    session
+        .process_command(
+            P2,
+            Box::new(PlaceStoneCommand {
+                player: P2,
+                x: 0,
+                y: 0,
+            }),
+        )
+        .unwrap();
+    session
+        .process_command(
+            P1,
+            Box::new(PlaceStoneCommand {
+                player: P1,
+                x: 0,
+                y: 1,
+            }),
+        )
+        .unwrap();
+
+    assert_eq!(
+        session.world().resource::<BoardResource>().black_prisoners,
+        1,
+        "Negro debe acumular 1 prisionero tras capturar en (0, 0)"
+    );
+
+    // Colocar muros simétricos: columna 3 de Negro, columna 5 de Blanco, y una piedra blanca muerta en (1, 2)
+    {
+        let mut board = session.world_mut().resource_mut::<BoardResource>();
+        for y in 0..9 {
+            board.set_stone(3, y, Some(Stone::Black));
+            board.set_stone(5, y, Some(Stone::White));
+        }
+        board.set_stone(1, 2, Some(Stone::White));
+    }
+
+    // Doble pase (turno actual es P2)
+    session
+        .process_command(P2, Box::new(PassCommand { player: P2 }))
+        .unwrap();
+    session
+        .process_command(P1, Box::new(PassCommand { player: P1 }))
+        .unwrap();
+
+    // Marcar la piedra blanca en (1, 2) como muerta
+    session
+        .process_command(
+            P1,
+            Box::new(MarkDeadCommand {
+                player: P1,
+                positions: vec![(1, 2)],
+            }),
+        )
+        .unwrap();
+
+    session
+        .process_command(P1, Box::new(ConfirmDeadCommand { player: P1 }))
+        .unwrap();
+    let events = session
+        .process_command(P2, Box::new(ConfirmDeadCommand { player: P2 }))
+        .unwrap();
+
+    let board = session.world().resource::<BoardResource>();
+    assert_eq!(
+        board.black_prisoners, 2,
+        "Negro debe tener 2 prisioneros (1 capturado en juego + 1 piedra muerta removida)"
+    );
+
+    let game_over = events
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<GameOverEvent>())
+        .expect("Debe emitirse GameOverEvent");
+
+    // Territorio Negro: 3x9 = 27 menos 2 piedras propias en (1,0) y (0,1) = 25 + 2 prisioneros = 27.0
+    // Territorio Blanco: 3x9 = 27 + 0 prisioneros + 6.5 komi = 33.5
+    assert!((game_over.black_score - 27.0).abs() < 1e-4);
+    assert!((game_over.white_score - 33.5).abs() < 1e-4);
+    assert_eq!(game_over.winner, Some(P2));
+}
+
+#[test]
+fn test_komi_6_5_desempata_a_favor_de_blancas_y_configurable_con_set_komi() {
+    let mut session = new_go_session(SessionId(302), 0, P1, P2);
+
+    // Posición simétrica: Negro encierra columnas 0..2 (piedras en col 3), Blanco encierra columnas 6..8 (piedras en col 5)
+    // Ambos tienen exactamente 27 puntos de territorio y 0 prisioneros.
+    {
+        let mut board = session.world_mut().resource_mut::<BoardResource>();
+        for y in 0..9 {
+            board.set_stone(3, y, Some(Stone::Black));
+            board.set_stone(5, y, Some(Stone::White));
+        }
+    }
+
+    session
+        .process_command(P1, Box::new(PassCommand { player: P1 }))
+        .unwrap();
+    session
+        .process_command(P2, Box::new(PassCommand { player: P2 }))
+        .unwrap();
+    session
+        .process_command(P1, Box::new(ConfirmDeadCommand { player: P1 }))
+        .unwrap();
+    let events = session
+        .process_command(P2, Box::new(ConfirmDeadCommand { player: P2 }))
+        .unwrap();
+
+    let game_over = events
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<GameOverEvent>())
+        .expect("Debe emitirse GameOverEvent");
+
+    assert_eq!(
+        game_over.winner,
+        Some(P2),
+        "Con territorio igual (27 vs 27), Blancas debe ganar gracias al Komi de 6.5"
+    );
+    assert!((game_over.black_score - 27.0).abs() < 1e-4);
+    assert!((game_over.white_score - 33.5).abs() < 1e-4);
+
+    // Ahora probar SetKomiCommand con komi = 0 y 1 prisionero para Negro
+    let mut session_no_komi = go_game::new_go_session_with_komi(SessionId(303), 0, P1, P2, 13);
+    session_no_komi
+        .process_command(
+            P1,
+            Box::new(go_game::SetKomiCommand {
+                player: P1,
+                komi_half_points: 0,
+            }),
+        )
+        .unwrap();
+    {
+        let mut board = session_no_komi.world_mut().resource_mut::<BoardResource>();
+        for y in 0..9 {
+            board.set_stone(3, y, Some(Stone::Black));
+            board.set_stone(5, y, Some(Stone::White));
+        }
+        board.black_prisoners = 1;
+    }
+    session_no_komi
+        .process_command(P1, Box::new(PassCommand { player: P1 }))
+        .unwrap();
+    session_no_komi
+        .process_command(P2, Box::new(PassCommand { player: P2 }))
+        .unwrap();
+    session_no_komi
+        .process_command(P1, Box::new(ConfirmDeadCommand { player: P1 }))
+        .unwrap();
+    let events2 = session_no_komi
+        .process_command(P2, Box::new(ConfirmDeadCommand { player: P2 }))
+        .unwrap();
+    let game_over2 = events2
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<GameOverEvent>())
+        .unwrap();
+    assert_eq!(game_over2.winner, Some(P1));
+    assert!((game_over2.black_score - 28.0).abs() < 1e-4);
+    assert!((game_over2.white_score - 27.0).abs() < 1e-4);
+}
+
+#[test]
+fn test_go_legal_move_generator_excluye_suicidio_y_ko_e_incluye_pass() {
+    let mut session = new_go_session(SessionId(304), 0, P1, P2);
+
+    // En tablero 9x9 vacío deben existir 81 jugadas PlaceStoneCommand + 1 PassCommand = 82
+    let initial_moves = session.get_legal_moves(P1);
+    assert_eq!(
+        initial_moves.len(),
+        82,
+        "En tablero 9x9 vacío deben existir 81 intersecciones + PassCommand"
+    );
+
+    // Rodear (0, 0) con piedras blancas para que (0, 0) sea suicidio para Negro
+    {
+        let mut board = session.world_mut().resource_mut::<BoardResource>();
+        board.set_stone(1, 0, Some(Stone::White));
+        board.set_stone(0, 1, Some(Stone::White));
+        board.ko_point = Some((4, 4));
+    }
+
+    let moves = session.get_legal_moves(P1);
+    // 81 total - 2 ocupadas ((1,0) y (0,1)) - 1 suicidio ((0,0)) - 1 ko ((4,4)) + 1 PassCommand = 78
+    assert_eq!(moves.len(), 78);
+    let has_suicide_0_0 = moves
+        .iter()
+        .any(|m| m.get("x").and_then(|v| v.as_u64()) == Some(0) && m.get("y").and_then(|v| v.as_u64()) == Some(0));
+    assert!(
+        !has_suicide_0_0,
+        "GoLegalMoveGenerator no debe incluir la intersección suicida (0, 0)"
+    );
+    let has_ko_4_4 = moves
+        .iter()
+        .any(|m| m.get("x").and_then(|v| v.as_u64()) == Some(4) && m.get("y").and_then(|v| v.as_u64()) == Some(4));
+    assert!(
+        !has_ko_4_4,
+        "GoLegalMoveGenerator no debe incluir el punto de Ko (4, 4)"
+    );
+}

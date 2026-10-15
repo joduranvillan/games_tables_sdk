@@ -1,6 +1,9 @@
+use bevy_ecs::world::World;
 use open_table_engine::prelude::*;
 
-use crate::board::{BoardResource, Sides, CHECKERS_PER_PLAYER, POINTS};
+use crate::board::{
+    must_use_larger_die_check, BoardResource, Sides, CHECKERS_PER_PLAYER, POINTS,
+};
 use crate::commands::{
     AcceptDoubleCommand, MoveCheckerCommand, OfferDoubleCommand, RejectDoubleCommand,
     ResignCommand, RollDiceCommand,
@@ -18,8 +21,109 @@ fn invalid(reason: impl Into<String>) -> EngineError {
     }
 }
 
+pub struct BackgammonLegalMoveGenerator;
+
+impl LegalMoveGenerator for BackgammonLegalMoveGenerator {
+    fn generate(&self, world: &World, player: PlayerId) -> Vec<Box<dyn Command>> {
+        if let Some(go) = world.get_resource::<GameOverResource>() {
+            if go.0 {
+                return Vec::new();
+            }
+        }
+
+        if let Some(cube) = world.get_resource::<DoublingCubeResource>() {
+            if let Some(offerer) = cube.offered_by {
+                if let Some(sides) = world.get_resource::<Sides>() {
+                    if player == sides.opponent_of(offerer) {
+                        return vec![
+                            Box::new(AcceptDoubleCommand { player }),
+                            Box::new(RejectDoubleCommand { player }),
+                        ];
+                    }
+                }
+                return Vec::new();
+            }
+        }
+
+        if let Some(turn) = world.get_resource::<TurnResource>() {
+            if !turn.0.is_current(player) {
+                return Vec::new();
+            }
+        }
+
+        let Some(board) = world.get_resource::<BoardResource>() else {
+            return Vec::new();
+        };
+        let Some(sides) = world.get_resource::<Sides>() else {
+            return Vec::new();
+        };
+
+        let pending_dice = world
+            .get_resource::<PendingDiceResource>()
+            .and_then(|p| p.pending.get(&player))
+            .cloned()
+            .unwrap_or_default();
+
+        if pending_dice.is_empty() {
+            return vec![Box::new(RollDiceCommand { player })];
+        }
+
+        let mut unique_dice = pending_dice.clone();
+        unique_dice.sort_unstable();
+        unique_dice.dedup();
+
+        let owner_sign = sides.owner_sign(player);
+        let on_bar = *board.bar.get(&player).unwrap_or(&0);
+        let mut moves: Vec<Box<dyn Command>> = Vec::new();
+
+        if on_bar > 0 {
+            for &die in &unique_dice {
+                if sides.simulate_step(board, player, None, die).is_some()
+                    && must_use_larger_die_check(sides, board, player, &pending_dice, None, die)
+                        .is_ok()
+                {
+                    moves.push(Box::new(MoveCheckerCommand {
+                        player,
+                        from: None,
+                        die,
+                    }));
+                }
+            }
+        } else {
+            for from in 0..POINTS {
+                if board.points[from] * owner_sign > 0 {
+                    for &die in &unique_dice {
+                        if sides
+                            .simulate_step(board, player, Some(from), die)
+                            .is_some()
+                            && must_use_larger_die_check(
+                                sides,
+                                board,
+                                player,
+                                &pending_dice,
+                                Some(from),
+                                die,
+                            )
+                            .is_ok()
+                        {
+                            moves.push(Box::new(MoveCheckerCommand {
+                                player,
+                                from: Some(from),
+                                die,
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+
+        moves
+    }
+}
+
 pub fn build_backgammon_rules() -> RuleEngine {
     let mut rules = RuleEngine::new();
+    rules.set_legal_move_generator(Box::new(BackgammonLegalMoveGenerator));
 
     rules.register::<OfferDoubleCommand, _>(|cmd, world| {
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
@@ -252,6 +356,24 @@ pub fn build_backgammon_rules() -> RuleEngine {
                 }
             }
         };
+
+        if let Some(dest) = destination {
+            let board = world.resource::<BoardResource>();
+            let opponent_sign = -owner_sign;
+            if board.points[dest] * opponent_sign > 1 {
+                return Err(invalid("ese punto está bloqueado por el rival"));
+            }
+        }
+
+        {
+            let board = world.resource::<BoardResource>();
+            let pending_dice = &world.resource::<PendingDiceResource>().pending[&cmd.player];
+            if let Err(reason) =
+                must_use_larger_die_check(&sides, board, cmd.player, pending_dice, cmd.from, cmd.die)
+            {
+                return Err(invalid(reason));
+            }
+        }
 
         let mut board = world.resource_mut::<BoardResource>();
         let mut captured_opponent = false;

@@ -118,3 +118,15 @@ impl RematchResource {
         }
     }
 }
+
+#[derive(GameResource, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct BattleshipConfigResource {
+    pub extra_turn_on_hit: bool,
+}
+
+impl BattleshipConfigResource {
+    pub fn new(extra_turn_on_hit: bool) -> Self {
+        Self { extra_turn_on_hit }
+    }
+}
+

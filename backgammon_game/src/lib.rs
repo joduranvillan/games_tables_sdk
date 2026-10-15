@@ -12,7 +12,7 @@ pub mod resources;
 pub mod rules;
 
 pub use ai::backgammon_ai_pick_move;
-pub use board::{BoardResource, Sides, CHECKERS_PER_PLAYER, POINTS};
+pub use board::{must_use_larger_die_check, BoardResource, Sides, CHECKERS_PER_PLAYER, POINTS};
 pub use commands::{
     AcceptDoubleCommand, MoveCheckerCommand, OfferDoubleCommand, RejectDoubleCommand,
     ResignCommand, RollDiceCommand,
@@ -23,7 +23,7 @@ pub use events::{
     DoubleRejectedEvent, GameOverEvent, NoValidMovesEvent,
 };
 pub use resources::{DoublingCubeResource, MatchStateResource};
-pub use rules::build_backgammon_rules;
+pub use rules::{build_backgammon_rules, BackgammonLegalMoveGenerator};
 
 use open_table_engine::prelude::*;
 

@@ -8,11 +8,11 @@ pub mod rules;
 use open_table_engine::prelude::*;
 
 pub use ai::{cannon_has_screen, piece_value, xiangqi_ai_pick_move};
-pub use board::{BoardResource, Piece, PieceKind};
+pub use board::{BoardResource, Piece, PieceKind, XiangqiHistoryResource};
 pub use commands::{MovePieceCommand, ResignCommand};
 pub use events::{GameOverEvent, PieceMovedEvent};
 pub use movement::{check_flying_general, is_in_check, is_legal_move};
-pub use rules::{all_legal_moves_for, build_xiangqi_rules};
+pub use rules::{all_legal_moves_for, build_xiangqi_rules, XiangqiLegalMoveGenerator};
 
 pub fn new_xiangqi_session(
     session_id: SessionId,
@@ -31,4 +31,13 @@ pub fn new_xiangqi_session(
         .world_mut()
         .insert_resource(BoardResource::standard_setup(red, black));
     session
+        .world_mut()
+        .insert_resource(XiangqiHistoryResource::default());
+    session
+        .world_mut()
+        .insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(
+            XiangqiLegalMoveGenerator,
+        )));
+    session
 }
+

@@ -102,6 +102,12 @@ pub fn clone_xiangqi_session(session: &Session) -> Session {
     if let Some(winner) = session.world().get_resource::<WinnerResource>() {
         new_session.world_mut().insert_resource(*winner);
     }
+    if let Some(history) = session
+        .world()
+        .get_resource::<crate::board::XiangqiHistoryResource>()
+    {
+        new_session.world_mut().insert_resource(history.clone());
+    }
 
     new_session
 }

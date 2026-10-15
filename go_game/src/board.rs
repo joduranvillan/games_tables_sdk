@@ -18,6 +18,9 @@ pub struct BoardResource {
     pub white_player: PlayerId,
     pub passes: usize,
     pub ko_point: Option<(usize, usize)>,
+    pub black_prisoners: usize,
+    pub white_prisoners: usize,
+    pub komi_half_points: u32,
 }
 
 #[derive(GameResource, Default, Clone, Debug)]
@@ -55,7 +58,23 @@ impl BoardResource {
             white_player,
             passes: 0,
             ko_point: None,
+            black_prisoners: 0,
+            white_prisoners: 0,
+            komi_half_points: 13,
         }
+    }
+
+    pub fn with_komi(mut self, komi_half_points: u32) -> Self {
+        self.komi_half_points = komi_half_points;
+        self
+    }
+
+    pub fn calculate_final_scores(&self) -> (f32, f32) {
+        let (black_territory, white_territory) = self.calculate_territory();
+        let black_total = (black_territory + self.black_prisoners) as f32;
+        let white_total =
+            (white_territory + self.white_prisoners) as f32 + (self.komi_half_points as f32 / 2.0);
+        (black_total, white_total)
     }
 
     pub fn compute_hash(&self) -> u64 {

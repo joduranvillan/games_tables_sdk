@@ -1,6 +1,6 @@
 use open_table_engine::prelude::*;
 
-use crate::board::{BoardResource, MultiCaptureResource, Sides};
+use crate::board::{BoardResource, DrawClockResource, MultiCaptureResource, Sides};
 use crate::commands::{MovePieceCommand, ResignCommand};
 use crate::events::{GameOverEvent, PieceMovedEvent};
 use crate::legal_moves::CheckersLegalMoveGenerator;
@@ -33,6 +33,9 @@ pub fn build_checkers_rules() -> RuleEngine {
         }
         if !world.contains_resource::<MultiCaptureResource>() {
             world.insert_resource(MultiCaptureResource::default());
+        }
+        if !world.contains_resource::<DrawClockResource>() {
+            world.insert_resource(DrawClockResource::default());
         }
         if !world.contains_resource::<LegalMoveGeneratorResource>() {
             world.insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(
@@ -144,6 +147,11 @@ pub fn build_checkers_rules() -> RuleEngine {
                 .is_empty();
 
         let counts = board.count_pieces();
+        let opponent_blocked = if !has_further_capture {
+            board.get_all_legal_moves(&sides_snapshot, opponent).is_empty()
+        } else {
+            false
+        };
         let _ = board; // soltar el borrow antes de tocar otros resources
 
         if let Some(mut multi) = world.get_resource_mut::<MultiCaptureResource>() {
@@ -158,6 +166,16 @@ pub fn build_checkers_rules() -> RuleEngine {
             });
         }
 
+        let half_moves = {
+            let mut clock = world.resource_mut::<DrawClockResource>();
+            if captured_pos.is_some() || promoted {
+                clock.half_moves_without_capture_or_promotion = 0;
+            } else {
+                clock.half_moves_without_capture_or_promotion += 1;
+            }
+            clock.half_moves_without_capture_or_promotion
+        };
+
         let mut events: Vec<Box<dyn Event>> = vec![Box::new(PieceMovedEvent {
             player: cmd.player,
             from: cmd.from,
@@ -166,14 +184,26 @@ pub fn build_checkers_rules() -> RuleEngine {
             promoted,
         })];
 
-        // Condición de victoria: si el rival se quedó sin fichas.
+        // Condición de victoria: si el rival se quedó sin fichas o bloqueado sin movimientos legales.
         let opponent_pieces_left = counts
             .iter()
             .find(|(id, _)| *id == opponent)
             .map(|(_, count)| *count)
             .unwrap_or(0);
-        if opponent_pieces_left == 0 {
-            events.push(Box::new(GameOverEvent { winner: cmd.player }));
+        if opponent_pieces_left == 0 || (!has_further_capture && opponent_blocked) {
+            world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(Some(cmd.player)));
+            events.push(Box::new(GameOverEvent {
+                winner: cmd.player,
+                is_draw: false,
+            }));
+        } else if !has_further_capture && half_moves >= 80 {
+            world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(None));
+            events.push(Box::new(GameOverEvent {
+                winner: PlayerId(0),
+                is_draw: true,
+            }));
         }
 
         if !has_further_capture {
@@ -194,7 +224,10 @@ pub fn build_checkers_rules() -> RuleEngine {
             .unwrap_or(cmd.player);
         world.insert_resource(GameOverResource(true));
         world.insert_resource(WinnerResource(Some(opponent)));
-        Ok(vec![Box::new(GameOverEvent { winner: opponent })])
+        Ok(vec![Box::new(GameOverEvent {
+            winner: opponent,
+            is_draw: false,
+        })])
     });
 
     rules

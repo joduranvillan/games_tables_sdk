@@ -1,6 +1,7 @@
 use battleship_game::{
-    new_battleship_session, FireShotCommand, FleetResource, GameOverEvent, PlaceFleetCommand,
-    Position, RematchCommand, Ship, ShotResult, ShotResultEvent, SunkenShipEvent,
+    new_battleship_session, BattleshipConfigResource, FireShotCommand, FleetResource,
+    GameOverEvent, PlaceFleetCommand, Position, RematchCommand, ResignCommand,
+    SetBattleshipRulesCommand, Ship, ShotResult, ShotResultEvent, SunkenShipEvent,
 };
 use open_table_engine::prelude::*;
 
@@ -609,3 +610,112 @@ fn test_tablero_es_10x10() {
         "el disparo en (10, 0) debe ser rechazado como fuera de límites"
     );
 }
+
+#[test]
+fn test_regla_por_defecto_alterna_turnos_incluso_al_acertar() {
+    let mut session = new_battleship_session(SessionId(200), 1, P1, P2);
+    place_fleet(&mut session, P1, standard_fleet(0));
+    place_fleet(&mut session, P2, standard_fleet(0));
+
+    // Por defecto extra_turn_on_hit es false
+    assert!(!session.world().resource::<BattleshipConfigResource>().extra_turn_on_hit);
+
+    // P1 dispara y acierta en (0, 0)
+    let events = session
+        .process_command(
+            P1,
+            Box::new(FireShotCommand {
+                player: P1,
+                target: pos(0, 0),
+            }),
+        )
+        .expect("P1 debe poder disparar");
+    let shot = events[0].as_any().downcast_ref::<ShotResultEvent>().unwrap();
+    assert_eq!(shot.result, ShotResult::Hit);
+
+    // Turno debe haber avanzado a P2
+    assert_eq!(session.current_player(), P2);
+}
+
+#[test]
+fn test_regla_racha_turno_extra_al_acertar() {
+    let mut session = new_battleship_session(SessionId(201), 1, P1, P2);
+    place_fleet(&mut session, P1, standard_fleet(0));
+    place_fleet(&mut session, P2, standard_fleet(0));
+
+    // Activar regla de turno extra al impactar mediante comando
+    session
+        .process_command(
+            P1,
+            Box::new(SetBattleshipRulesCommand {
+                extra_turn_on_hit: true,
+            }),
+        )
+        .expect("Configuración de reglas debe ser aceptada");
+
+    assert!(session.world().resource::<BattleshipConfigResource>().extra_turn_on_hit);
+
+    // P1 dispara a (0, 0) y acierta
+    let events1 = session
+        .process_command(
+            P1,
+            Box::new(FireShotCommand {
+                player: P1,
+                target: pos(0, 0),
+            }),
+        )
+        .expect("P1 debe disparar");
+    let shot1 = events1[0].as_any().downcast_ref::<ShotResultEvent>().unwrap();
+    assert_eq!(shot1.result, ShotResult::Hit);
+
+    // Con racha, el turno NO avanza: sigue siendo de P1
+    assert_eq!(session.current_player(), P1);
+
+    // P1 dispara de nuevo y acierta en (0, 1)
+    let events2 = session
+        .process_command(
+            P1,
+            Box::new(FireShotCommand {
+                player: P1,
+                target: pos(0, 1),
+            }),
+        )
+        .expect("P1 debe tener turno consecutivo tras impactar");
+    let shot2 = events2[0].as_any().downcast_ref::<ShotResultEvent>().unwrap();
+    assert_eq!(shot2.result, ShotResult::Hit);
+    assert_eq!(session.current_player(), P1);
+
+    // P1 falla en (1, 0) (agua)
+    let events3 = session
+        .process_command(
+            P1,
+            Box::new(FireShotCommand {
+                player: P1,
+                target: pos(1, 0),
+            }),
+        )
+        .expect("P1 dispara a agua");
+    let shot3 = events3[0].as_any().downcast_ref::<ShotResultEvent>().unwrap();
+    assert_eq!(shot3.result, ShotResult::Miss);
+
+    // Al fallar, el turno avanza a P2
+    assert_eq!(session.current_player(), P2);
+}
+
+#[test]
+fn test_resign_command_concede_victoria_al_rival() {
+    let mut session = new_battleship_session(SessionId(202), 1, P1, P2);
+    place_fleet(&mut session, P1, standard_fleet(0));
+    place_fleet(&mut session, P2, standard_fleet(0));
+
+    // P1 se rinde
+    let events = session
+        .process_command(P1, Box::new(ResignCommand { player: P1 }))
+        .expect("Resign debe ser procesado");
+
+    assert_eq!(events.len(), 1);
+    let go = events[0].as_any().downcast_ref::<GameOverEvent>().unwrap();
+    assert_eq!(go.winner, Some(P2));
+    assert!(session.is_game_over());
+}
+

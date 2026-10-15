@@ -212,6 +212,34 @@ pub fn must_promote(
     false
 }
 
+/// Regla oficial FESA de promoción obligatoria por fila de destino:
+/// - `Pawn` y `Lance`: obligados a promocionar únicamente en la última fila (`0` para Sente, `8` para Gote).
+/// - `Knight`: obligado a promocionar en las dos últimas filas (`0..=1` para Sente, `7..=8` para Gote).
+/// - `Silver`, `Rook`, `Bishop` (y el resto): promoción siempre opcional dentro de la zona de promoción.
+pub fn must_promote_fesa(
+    board: &BoardResource,
+    piece_kind: PieceKind,
+    to: (usize, usize),
+    player: PlayerId,
+) -> bool {
+    let is_sente = player == board.sente;
+    let rank = to.1;
+
+    if is_sente {
+        match piece_kind {
+            PieceKind::Pawn | PieceKind::Lance => rank == 0,
+            PieceKind::Knight => rank <= 1,
+            _ => false,
+        }
+    } else {
+        match piece_kind {
+            PieceKind::Pawn | PieceKind::Lance => rank == 8,
+            PieceKind::Knight => rank >= 7,
+            _ => false,
+        }
+    }
+}
+
 pub fn find_king(board: &BoardResource, player: PlayerId) -> Option<(usize, usize)> {
     board.squares.iter().find_map(|(&pos, piece)| {
         if piece.kind == PieceKind::King && piece.owner == player {

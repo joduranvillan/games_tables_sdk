@@ -28,3 +28,37 @@ pub struct AuctionBidCommand {
     pub player: PlayerId,
     pub amount: u32,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct BuildHouseCommand {
+    #[issuer]
+    pub player: PlayerId,
+    pub space: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct SellHouseCommand {
+    #[issuer]
+    pub player: PlayerId,
+    pub space: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct MortgagePropertyCommand {
+    #[issuer]
+    pub player: PlayerId,
+    pub space: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct UnmortgagePropertyCommand {
+    #[issuer]
+    pub player: PlayerId,
+    pub space: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct UseJailCardCommand {
+    #[issuer]
+    pub player: PlayerId,
+}

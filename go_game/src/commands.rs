@@ -41,3 +41,10 @@ pub struct ResignCommand {
     #[issuer]
     pub player: PlayerId,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct SetKomiCommand {
+    #[issuer]
+    pub player: PlayerId,
+    pub komi_half_points: u32,
+}

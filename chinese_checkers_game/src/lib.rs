@@ -10,10 +10,10 @@ pub use ai::{
     ChineseCheckersState,
 };
 pub use board::BoardResource;
-pub use commands::MovePegCommand;
+pub use commands::{MovePegCommand, ResignCommand};
 pub use events::{GameOverEvent, PegMovedEvent};
 pub use position::{corner_cells, home_cells_a, home_cells_b, Position, BOARD_RADIUS};
-pub use rules::build_chinese_checkers_rules;
+pub use rules::{build_chinese_checkers_rules, ChineseCheckersLegalMoveGenerator};
 
 use open_table_engine::prelude::*;
 

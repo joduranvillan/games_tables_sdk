@@ -444,3 +444,128 @@ fn test_aceptar_doble_duplica_el_cubo() {
     assert_eq!(cube.owner, Some(P2));
     assert!(!cube.offered);
 }
+
+#[test]
+fn test_obligacion_usar_dado_mayor_cuando_solo_uno_es_jugable() {
+    let mut session = new_backgammon_session(SessionId(104), 1, P1, P2);
+    {
+        let mut board = session
+            .world_mut()
+            .resource_mut::<backgammon_game::BoardResource>();
+        board.points = [0; backgammon_game::POINTS];
+        // P1 tiene una única ficha en el punto 0
+        board.points[0] = 1;
+        // P2 bloquea el punto 5 (0 + 2 + 3 = 5), por lo que P1 puede jugar 2 (a 2) o 3 (a 3), pero no ambos
+        board.points[5] = -2;
+    }
+    force_roll(&mut session, P1, vec![2, 3]);
+
+    let sides = *session.world().resource::<backgammon_game::Sides>();
+    let board = session.world().resource::<backgammon_game::BoardResource>();
+    assert!(
+        !sides.can_play_both_dice(board, P1, 2, 3),
+        "no debe ser posible jugar ambos dados"
+    );
+
+    // Intentar jugar el dado menor (2) debe fallar
+    let err = session.process_command(
+        P1,
+        Box::new(MoveCheckerCommand {
+            player: P1,
+            from: Some(0),
+            die: 2,
+        }),
+    );
+    assert!(
+        err.is_err(),
+        "debe rechazarse el dado menor cuando ambos son jugables por separado pero no juntos"
+    );
+
+    // El generador de jugadas legales solo debe ofrecer el dado mayor (3)
+    let legal = session.legal_moves(P1);
+    assert_eq!(legal.len(), 1);
+    let legal_mv = legal[0]
+        .as_any()
+        .downcast_ref::<MoveCheckerCommand>()
+        .expect("debe ser MoveCheckerCommand");
+    assert_eq!(legal_mv.die, 3);
+
+    // Jugar el dado mayor (3) debe ser válido y pasar el turno al quedar bloqueado el 2
+    session
+        .process_command(
+            P1,
+            Box::new(MoveCheckerCommand {
+                player: P1,
+                from: Some(0),
+                die: 3,
+            }),
+        )
+        .expect("jugar el dado mayor (3) debe ser válido");
+    assert_eq!(session.current_player(), P2);
+}
+
+#[test]
+fn test_obligacion_usar_ambos_dados_rechaza_primer_movimiento_que_bloquea_el_segundo() {
+    let mut session = new_backgammon_session(SessionId(105), 1, P1, P2);
+    {
+        let mut board = session
+            .world_mut()
+            .resource_mut::<backgammon_game::BoardResource>();
+        board.points = [0; backgammon_game::POINTS];
+        // P1 tiene fichas en los puntos 0 y 10
+        board.points[0] = 1;
+        board.points[10] = 1;
+        // P2 bloquea 3 (0+3), 13 (10+3) y 15 (10+2+3).
+        // Si P1 mueve con dado 2 desde 10 -> 12, luego no puede usar el 3 (ni desde 0->3 ni desde 12->15).
+        // Si P1 mueve con dado 2 desde 0 -> 2, luego SÍ puede usar el 3 desde 2 -> 5.
+        board.points[3] = -2;
+        board.points[13] = -2;
+        board.points[15] = -2;
+    }
+    force_roll(&mut session, P1, vec![2, 3]);
+
+    let sides = *session.world().resource::<backgammon_game::Sides>();
+    let board = session.world().resource::<backgammon_game::BoardResource>();
+    assert!(
+        sides.can_play_both_dice(board, P1, 2, 3),
+        "existe una línea que permite jugar ambos dados (0->2 y luego 2->5)"
+    );
+
+    // Intentar mover 10 -> 12 con dado 2 deja sin jugada para el dado 3 -> debe rechazarse
+    let err = session.process_command(
+        P1,
+        Box::new(MoveCheckerCommand {
+            player: P1,
+            from: Some(10),
+            die: 2,
+        }),
+    );
+    assert!(
+        err.is_err(),
+        "debe rechazarse la jugada que impide usar el segundo dado habiendo alternativa"
+    );
+
+    // Mover 0 -> 2 con dado 2 y luego 2 -> 5 con dado 3 debe funcionar
+    session
+        .process_command(
+            P1,
+            Box::new(MoveCheckerCommand {
+                player: P1,
+                from: Some(0),
+                die: 2,
+            }),
+        )
+        .expect("mover 0->2 permite usar el segundo dado");
+    session
+        .process_command(
+            P1,
+            Box::new(MoveCheckerCommand {
+                player: P1,
+                from: Some(2),
+                die: 3,
+            }),
+        )
+        .expect("mover 2->5 completa el uso de ambos dados");
+    assert_eq!(session.current_player(), P2);
+}
+

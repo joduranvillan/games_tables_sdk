@@ -127,9 +127,36 @@ fn validate_and_play_hazard(
         .active
         .contains(&target);
 
+    // Compatibilidad: RightOfWayResource bloquea todos los hazards excepto OutOfGas
     if target_row && hazard != Hazard::OutOfGas {
         return Err(invalid(
             "el objetivo tiene derecho de vía activo y es inmune a este peligro",
+        ));
+    }
+
+    // Inmunidad específica por cartas de seguridad jugadas
+    let has_specific_safety = {
+        let deck = world.resource::<DeckResource>();
+        let safeties = deck.safeties_played.get(&target);
+        match hazard {
+            Hazard::SpeedLimit => {
+                safeties.map(|s| s.contains(&Safety::RightOfWay)).unwrap_or(false)
+            }
+            Hazard::OutOfGas => {
+                safeties.map(|s| s.contains(&Safety::ExtraTank)).unwrap_or(false)
+            }
+            Hazard::FlatTire => {
+                safeties.map(|s| s.contains(&Safety::PunctureProof)).unwrap_or(false)
+            }
+            Hazard::Accident => {
+                safeties.map(|s| s.contains(&Safety::DrivingAce)).unwrap_or(false)
+            }
+        }
+    };
+
+    if has_specific_safety {
+        return Err(invalid(
+            "el objetivo tiene una carta de seguridad que lo protege de este peligro",
         ));
     }
 
@@ -208,18 +235,44 @@ fn validate_and_play_safety(
 ) -> Result<Vec<Box<dyn Event>>, EngineError> {
     ensure_resources(world);
 
-    world
-        .resource_mut::<RightOfWayResource>()
-        .active
-        .insert(player);
-    world
-        .resource_mut::<SpeedLimitResource>()
-        .limited
-        .remove(&player);
+    match safety {
+        Safety::RightOfWay => {
+            world
+                .resource_mut::<RightOfWayResource>()
+                .active
+                .insert(player);
+            world
+                .resource_mut::<SpeedLimitResource>()
+                .limited
+                .remove(&player);
 
-    let mut deck = world.resource_mut::<DeckResource>();
-    if deck.hazard.get(&player).copied().flatten() != Some(Hazard::OutOfGas) {
-        deck.hazard.insert(player, None);
+            let mut deck = world.resource_mut::<DeckResource>();
+            deck.safeties_played.entry(player).or_default().insert(Safety::RightOfWay);
+            if deck.hazard.get(&player).copied().flatten() != Some(Hazard::OutOfGas) {
+                deck.hazard.insert(player, None);
+            }
+        }
+        Safety::ExtraTank => {
+            let mut deck = world.resource_mut::<DeckResource>();
+            deck.safeties_played.entry(player).or_default().insert(Safety::ExtraTank);
+            if deck.hazard.get(&player).copied().flatten() == Some(Hazard::OutOfGas) {
+                deck.hazard.insert(player, None);
+            }
+        }
+        Safety::PunctureProof => {
+            let mut deck = world.resource_mut::<DeckResource>();
+            deck.safeties_played.entry(player).or_default().insert(Safety::PunctureProof);
+            if deck.hazard.get(&player).copied().flatten() == Some(Hazard::FlatTire) {
+                deck.hazard.insert(player, None);
+            }
+        }
+        Safety::DrivingAce => {
+            let mut deck = world.resource_mut::<DeckResource>();
+            deck.safeties_played.entry(player).or_default().insert(Safety::DrivingAce);
+            if deck.hazard.get(&player).copied().flatten() == Some(Hazard::Accident) {
+                deck.hazard.insert(player, None);
+            }
+        }
     }
 
     Ok(vec![Box::new(SafetyPlayedEvent { player, safety })])
@@ -321,6 +374,7 @@ pub fn build_mille_bornes_rules() -> RuleEngine {
             hand[cmd.card_index]
         };
 
+        let is_safety = matches!(card, Card::Safety(_) | Card::RightOfWay);
         let events = match card {
             Card::Distance(value) => validate_and_play_distance(cmd.player, value, world)?,
             Card::Hazard(hazard) => validate_and_play_hazard(cmd.player, opponent, hazard, world)?,
@@ -336,7 +390,10 @@ pub fn build_mille_bornes_rules() -> RuleEngine {
             .unwrap()
             .remove(cmd.card_index);
 
-        world.resource_mut::<TurnResource>().0.advance();
+        // Jugar una carta de seguridad otorga turno extra (no avanza el turno)
+        if !is_safety {
+            world.resource_mut::<TurnResource>().0.advance();
+        }
 
         Ok(events)
     });
@@ -364,7 +421,17 @@ pub fn build_mille_bornes_rules() -> RuleEngine {
             return Err(invalid("no es tu turno"));
         }
         let events = validate_and_play_safety(cmd.player, cmd.safety, world)?;
-        world.resource_mut::<TurnResource>().0.advance();
+        let mut deck = world.resource_mut::<DeckResource>();
+        if let Some(hand) = deck.hands.get_mut(&cmd.player) {
+            if let Some(pos) = hand.iter().position(|&c| match c {
+                Card::Safety(s) if s == cmd.safety => true,
+                Card::RightOfWay if cmd.safety == Safety::RightOfWay => true,
+                _ => false,
+            }) {
+                hand.remove(pos);
+            }
+        }
+        // Turno extra por jugar carta de seguridad
         Ok(events)
     });
 
@@ -415,31 +482,101 @@ pub fn build_mille_bornes_rules() -> RuleEngine {
             .flatten()
             .ok_or_else(|| invalid("no tenés ningún peligro para responder con coup fourré"))?;
 
+        let matching_safety = match hazard {
+            Hazard::SpeedLimit => Safety::RightOfWay,
+            Hazard::OutOfGas => Safety::ExtraTank,
+            Hazard::FlatTire => Safety::PunctureProof,
+            Hazard::Accident => Safety::DrivingAce,
+        };
+
         let hand = deck
             .hands
             .get_mut(&cmd.player)
             .ok_or_else(|| invalid("no tenés mano en esta partida"))?;
 
-        let remedy_pos = hand
-            .iter()
-            .position(|&c| c == Card::Remedy(hazard))
-            .ok_or_else(|| invalid("no tenés el remedio correspondiente en la mano"))?;
+        let safety_pos = hand.iter().position(|&c| match c {
+            Card::Safety(s) if s == matching_safety => true,
+            Card::RightOfWay if matching_safety == Safety::RightOfWay => true,
+            _ => false,
+        });
 
-        hand.remove(remedy_pos);
-        deck.hazard.insert(cmd.player, None);
-        deck.hazard.insert(opponent, Some(hazard));
+        let mut events: Vec<Box<dyn Event>> = Vec::new();
 
-        Ok(vec![
-            Box::new(RemedyPlayedEvent {
+        if let Some(pos) = safety_pos {
+            let card = hand.remove(pos);
+            let s = match card {
+                Card::Safety(sf) => sf,
+                _ => Safety::RightOfWay,
+            };
+            deck.safeties_played.entry(cmd.player).or_default().insert(s);
+            deck.hazard.insert(cmd.player, None);
+            deck.hazard.insert(opponent, Some(hazard));
+
+            // Bono de +100 km por Coup Fourré
+            let current_dist = *deck.distance.get(&cmd.player).unwrap_or(&0);
+            let new_dist = (current_dist + 100).min(deck.target_distance);
+            deck.distance.insert(cmd.player, new_dist);
+
+            events.push(Box::new(SafetyPlayedEvent {
                 player: cmd.player,
-                hazard,
-            }),
-            Box::new(HazardPlayedEvent {
+                safety: s,
+            }));
+            events.push(Box::new(DistancePlayedEvent {
+                player: cmd.player,
+                value: 100,
+                new_distance: new_dist,
+            }));
+            events.push(Box::new(HazardPlayedEvent {
                 player: cmd.player,
                 target: opponent,
                 hazard,
-            }),
-        ])
+            }));
+
+            if new_dist == deck.target_distance {
+                events.push(Box::new(GameOverEvent { winner: cmd.player }));
+            }
+
+            let _ = deck;
+            if s == Safety::RightOfWay {
+                world
+                    .resource_mut::<RightOfWayResource>()
+                    .active
+                    .insert(cmd.player);
+            }
+            if hazard == Hazard::SpeedLimit {
+                let mut speed_res = world.resource_mut::<SpeedLimitResource>();
+                speed_res.limited.remove(&cmd.player);
+                speed_res.limited.insert(opponent);
+            }
+        } else {
+            let remedy_pos = hand
+                .iter()
+                .position(|&c| c == Card::Remedy(hazard))
+                .ok_or_else(|| invalid("no tenés la carta de seguridad o el remedio correspondiente en la mano"))?;
+
+            hand.remove(remedy_pos);
+            deck.hazard.insert(cmd.player, None);
+            deck.hazard.insert(opponent, Some(hazard));
+
+            events.push(Box::new(RemedyPlayedEvent {
+                player: cmd.player,
+                hazard,
+            }));
+            events.push(Box::new(HazardPlayedEvent {
+                player: cmd.player,
+                target: opponent,
+                hazard,
+            }));
+
+            let _ = deck;
+            if hazard == Hazard::SpeedLimit {
+                let mut speed_res = world.resource_mut::<SpeedLimitResource>();
+                speed_res.limited.remove(&cmd.player);
+                speed_res.limited.insert(opponent);
+            }
+        }
+
+        Ok(events)
     });
 
     rules

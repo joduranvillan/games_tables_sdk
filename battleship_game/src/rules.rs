@@ -1,10 +1,15 @@
 use open_table_engine::prelude::*;
 
-use crate::commands::{FireShotCommand, PlaceFleetCommand, RematchCommand};
+use crate::commands::{
+    FireShotCommand, PlaceFleetCommand, RematchCommand, ResignCommand, SetBattleshipRulesCommand,
+};
 use crate::events::{
     FleetPlacedEvent, GameOverEvent, ShotResult, ShotResultEvent, SunkenShipEvent,
 };
-use crate::fleet::{FleetResource, RematchResource, Ship, ShotsResource, EXPECTED_SHIP_SIZES};
+use crate::fleet::{
+    BattleshipConfigResource, FleetResource, RematchResource, Ship, ShotsResource,
+    EXPECTED_SHIP_SIZES,
+};
 use crate::position::Position;
 
 fn invalid(reason: impl Into<String>) -> EngineError {
@@ -45,7 +50,20 @@ fn validate_ship_shape(ship: &Ship) -> Result<(), EngineError> {
 pub fn build_battleship_rules() -> RuleEngine {
     let mut rules = RuleEngine::new();
 
+    rules.register::<SetBattleshipRulesCommand, _>(|cmd, world| {
+        if !world.contains_resource::<BattleshipConfigResource>() {
+            world.insert_resource(BattleshipConfigResource::default());
+        }
+        world.insert_resource(BattleshipConfigResource {
+            extra_turn_on_hit: cmd.extra_turn_on_hit,
+        });
+        Ok(vec![])
+    });
+
     rules.register::<PlaceFleetCommand, _>(|cmd, world| {
+        if !world.contains_resource::<BattleshipConfigResource>() {
+            world.insert_resource(BattleshipConfigResource::default());
+        }
         let mut fleet = world.resource_mut::<FleetResource>();
 
         if fleet.has_placed_fleet(cmd.player) {
@@ -88,6 +106,9 @@ pub fn build_battleship_rules() -> RuleEngine {
     });
 
     rules.register::<FireShotCommand, _>(|cmd, world| {
+        if !world.contains_resource::<BattleshipConfigResource>() {
+            world.insert_resource(BattleshipConfigResource::default());
+        }
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
             return Err(invalid("no es tu turno"));
         }
@@ -139,18 +160,54 @@ pub fn build_battleship_rules() -> RuleEngine {
             }
         }
 
-        if fleet.all_ships_sunk(opponent) {
+        let game_over = fleet.all_ships_sunk(opponent);
+        if game_over {
             events.push(Box::new(GameOverEvent {
                 winner: Some(cmd.player),
             }));
         }
+        let _ = fleet;
 
-        world.resource_mut::<TurnResource>().0.advance();
+        if game_over {
+            world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(Some(cmd.player)));
+        }
+
+        let extra_turn_on_hit = world
+            .get_resource::<BattleshipConfigResource>()
+            .map(|c| c.extra_turn_on_hit)
+            .unwrap_or(false);
+
+        if !(extra_turn_on_hit && result != ShotResult::Miss && !game_over) {
+            world.resource_mut::<TurnResource>().0.advance();
+        }
 
         Ok(events)
     });
 
+    rules.register::<ResignCommand, _>(|cmd, world| {
+        if !world.contains_resource::<BattleshipConfigResource>() {
+            world.insert_resource(BattleshipConfigResource::default());
+        }
+        let players = world.resource::<TurnResource>().0.players().to_vec();
+        if !players.contains(&cmd.player) {
+            return Err(invalid("no sos un jugador de esta partida"));
+        }
+        let opponent = players
+            .into_iter()
+            .find(|&p| p != cmd.player)
+            .unwrap_or(cmd.player);
+        world.insert_resource(GameOverResource(true));
+        world.insert_resource(WinnerResource(Some(opponent)));
+        Ok(vec![Box::new(GameOverEvent {
+            winner: Some(opponent),
+        })])
+    });
+
     rules.register::<RematchCommand, _>(|cmd, world| {
+        if !world.contains_resource::<BattleshipConfigResource>() {
+            world.insert_resource(BattleshipConfigResource::default());
+        }
         let players_count = world.resource::<TurnResource>().0.players().len();
 
         let should_reset = {
@@ -169,6 +226,9 @@ pub fn build_battleship_rules() -> RuleEngine {
             let mut shots = world.resource_mut::<ShotsResource>();
             shots.shots.clear();
 
+            world.insert_resource(GameOverResource(false));
+            world.insert_resource(WinnerResource(None));
+
             let mut turn = world.resource_mut::<TurnResource>();
             let players = turn.0.players().to_vec();
             turn.0 = TurnOrder::new(players);
@@ -184,3 +244,4 @@ pub fn build_battleship_rules() -> RuleEngine {
 
     rules
 }
+

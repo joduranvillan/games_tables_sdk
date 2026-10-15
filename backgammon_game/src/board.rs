@@ -195,4 +195,203 @@ impl Sides {
 
         false
     }
+
+    /// Verifica si el jugador aún tiene fichas en el tablero o en la barra.
+    pub fn has_remaining_checkers(&self, board: &BoardResource, player: PlayerId) -> bool {
+        if *board.bar.get(&player).unwrap_or(&0) > 0 {
+            return true;
+        }
+        let sign = self.owner_sign(player);
+        board.points.iter().any(|&c| c * sign > 0)
+    }
+
+    /// Simula un único movimiento (`from`, `die`) y devuelve el tablero resultante si el paso es legal.
+    pub fn simulate_step(
+        &self,
+        board: &BoardResource,
+        player: PlayerId,
+        from: Option<usize>,
+        die: u32,
+    ) -> Option<BoardResource> {
+        let owner_sign = self.owner_sign(player);
+        let opponent = self.opponent_of(player);
+        let opponent_sign = -owner_sign;
+        let direction = self.forward_direction(player);
+        let on_bar = *board.bar.get(&player).unwrap_or(&0);
+
+        if on_bar > 0 && from.is_some() {
+            return None;
+        }
+        if on_bar == 0 && from.is_none() {
+            return None;
+        }
+
+        let destination: Option<usize> = match from {
+            None => Some(self.entry_point(player, die)),
+            Some(f) => {
+                if f >= POINTS {
+                    return None;
+                }
+                if board.points[f] * owner_sign <= 0 {
+                    return None;
+                }
+                let raw = f as i32 + direction * die as i32;
+                if raw < 0 || raw >= POINTS as i32 {
+                    if !self.all_checkers_home(board, player) {
+                        return None;
+                    }
+                    let distance = if player == self.increasing {
+                        24 - f as i32
+                    } else {
+                        f as i32 + 1
+                    };
+                    if die as i32 > distance
+                        && self.has_checkers_behind_die_exit(board, player, f, die)
+                    {
+                        return None;
+                    }
+                    None
+                } else {
+                    Some(raw as usize)
+                }
+            }
+        };
+
+        let mut next = board.clone();
+        match destination {
+            None => {
+                *next.borne_off.entry(player).or_insert(0) += 1;
+                if let Some(f) = from {
+                    next.points[f] -= owner_sign;
+                }
+            }
+            Some(dest) => {
+                let dest_count = next.points[dest];
+                if dest_count * opponent_sign > 1 {
+                    return None;
+                }
+                if dest_count * opponent_sign == 1 {
+                    *next.bar.entry(opponent).or_insert(0) += 1;
+                    next.points[dest] = 0;
+                }
+                next.points[dest] += owner_sign;
+                match from {
+                    Some(f) => next.points[f] -= owner_sign,
+                    None => {
+                        *next.bar.get_mut(&player).unwrap() -= 1;
+                    }
+                }
+            }
+        }
+
+        Some(next)
+    }
+
+    fn valid_next_boards_for_die(
+        &self,
+        board: &BoardResource,
+        player: PlayerId,
+        die: u32,
+    ) -> Vec<(Option<usize>, BoardResource)> {
+        let on_bar = *board.bar.get(&player).unwrap_or(&0);
+        let owner_sign = self.owner_sign(player);
+        let mut results = Vec::new();
+
+        if on_bar > 0 {
+            if let Some(next) = self.simulate_step(board, player, None, die) {
+                results.push((None, next));
+            }
+        } else {
+            for from in 0..POINTS {
+                if board.points[from] * owner_sign > 0 {
+                    if let Some(next) = self.simulate_step(board, player, Some(from), die) {
+                        results.push((Some(from), next));
+                    }
+                }
+            }
+        }
+
+        results
+    }
+
+    /// Simula un paso con `d1` seguido de `d2`, o `d2` seguido de `d1`, para determinar si ambos dados pueden jugarse.
+    pub fn can_play_both_dice(
+        &self,
+        board: &BoardResource,
+        player: PlayerId,
+        d1: u32,
+        d2: u32,
+    ) -> bool {
+        for (_, next_board) in self.valid_next_boards_for_die(board, player, d1) {
+            if self.has_any_valid_move(&next_board, player, &[d2]) {
+                return true;
+            }
+        }
+        if d1 != d2 {
+            for (_, next_board) in self.valid_next_boards_for_die(board, player, d2) {
+                if self.has_any_valid_move(&next_board, player, &[d1]) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Valida que si existen jugadas que usan ambos dados no se elija una que bloquee el segundo,
+    /// y si solo se puede jugar un dado pero ambos tienen jugadas individuales, se juegue el mayor.
+    pub fn must_use_larger_die_check(
+        &self,
+        board: &BoardResource,
+        player: PlayerId,
+        pending_dice: &[u32],
+        from: Option<usize>,
+        chosen_die: u32,
+    ) -> Result<(), &'static str> {
+        if pending_dice.len() != 2 || pending_dice[0] == pending_dice[1] {
+            return Ok(());
+        }
+        let d1 = pending_dice[0];
+        let d2 = pending_dice[1];
+        let other_die = if chosen_die == d1 { d2 } else { d1 };
+
+        let Some(after_step) = self.simulate_step(board, player, from, chosen_die) else {
+            return Ok(());
+        };
+
+        // Si con este movimiento el jugador saca su última ficha, gana inmediatamente.
+        if !self.has_remaining_checkers(&after_step, player)
+            || *after_step.borne_off.get(&player).unwrap_or(&0) >= CHECKERS_PER_PLAYER
+        {
+            return Ok(());
+        }
+
+        if self.can_play_both_dice(board, player, d1, d2) {
+            if !self.has_any_valid_move(&after_step, player, &[other_die]) {
+                return Err(
+                    "debés elegir un movimiento que permita usar ambos dados disponibles",
+                );
+            }
+        } else {
+            let can_d1 = self.has_any_valid_move(board, player, &[d1]);
+            let can_d2 = self.has_any_valid_move(board, player, &[d2]);
+            if can_d1 && can_d2 && chosen_die != d1.max(d2) {
+                return Err(
+                    "cuando solo se puede jugar uno de los dos dados, es obligatorio usar el dado de mayor valor",
+                );
+            }
+        }
+
+        Ok(())
+    }
+}
+
+pub fn must_use_larger_die_check(
+    sides: &Sides,
+    board: &BoardResource,
+    player: PlayerId,
+    pending_dice: &[u32],
+    from: Option<usize>,
+    chosen_die: u32,
+) -> Result<(), &'static str> {
+    sides.must_use_larger_die_check(board, player, pending_dice, from, chosen_die)
 }

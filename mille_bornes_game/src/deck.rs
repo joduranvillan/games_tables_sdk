@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use open_table_core::ids::PlayerId;
 use open_table_macros::GameResource;
@@ -21,6 +21,7 @@ pub struct DeckResource {
     pub distance: HashMap<PlayerId, u32>,
     pub hazard: HashMap<PlayerId, Option<Hazard>>,
     pub cards_200_played: HashMap<PlayerId, u8>,
+    pub safeties_played: HashMap<PlayerId, HashSet<Safety>>,
     pub target_distance: u32,
 }
 
@@ -33,6 +34,7 @@ impl Default for DeckResource {
             distance: HashMap::new(),
             hazard: HashMap::new(),
             cards_200_played: HashMap::new(),
+            safeties_played: HashMap::new(),
             target_distance: TARGET_DISTANCE,
         }
     }
@@ -72,6 +74,9 @@ pub fn build_deck() -> Vec<Card> {
         }
     }
     deck.push(Card::Safety(Safety::RightOfWay));
+    deck.push(Card::Safety(Safety::ExtraTank));
+    deck.push(Card::Safety(Safety::PunctureProof));
+    deck.push(Card::Safety(Safety::DrivingAce));
     deck.push(Card::RightOfWay);
     deck
 }

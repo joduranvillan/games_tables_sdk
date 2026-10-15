@@ -1,3 +1,4 @@
+pub use crate::board::XiangqiHistoryResource;
 use crate::board::BoardResource;
 use crate::commands::{MovePieceCommand, ResignCommand};
 use crate::events::{GameOverEvent, PieceMovedEvent};
@@ -6,7 +7,9 @@ use bevy_ecs::world::World;
 use open_table_engine::prelude::*;
 
 pub fn all_legal_moves_for(world: &World, player: PlayerId) -> Vec<MovePieceCommand> {
-    let board = world.resource::<BoardResource>();
+    let Some(board) = world.get_resource::<BoardResource>() else {
+        return Vec::new();
+    };
     let mut legal_moves = Vec::new();
 
     for (&from, piece) in &board.squares {
@@ -30,8 +33,30 @@ pub fn all_legal_moves_for(world: &World, player: PlayerId) -> Vec<MovePieceComm
     legal_moves
 }
 
+pub struct XiangqiLegalMoveGenerator;
+
+impl LegalMoveGenerator for XiangqiLegalMoveGenerator {
+    fn generate(&self, world: &World, player: PlayerId) -> Vec<Box<dyn Command>> {
+        if let Some(go) = world.get_resource::<GameOverResource>() {
+            if go.0 {
+                return Vec::new();
+            }
+        }
+        if let Some(turn) = world.get_resource::<TurnResource>() {
+            if !turn.0.is_current(player) {
+                return Vec::new();
+            }
+        }
+        all_legal_moves_for(world, player)
+            .into_iter()
+            .map(|c| Box::new(c) as Box<dyn Command>)
+            .collect()
+    }
+}
+
 pub fn build_xiangqi_rules() -> RuleEngine {
     let mut rules = RuleEngine::new();
+    rules.set_legal_move_generator(Box::new(XiangqiLegalMoveGenerator));
 
     rules.register::<MovePieceCommand, _>(|cmd, world| {
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
@@ -39,6 +64,10 @@ pub fn build_xiangqi_rules() -> RuleEngine {
                 reason: "Not your turn".into(),
             });
         }
+
+        let pre_move_hash = world
+            .resource::<BoardResource>()
+            .compute_state_hash(cmd.player);
 
         let (captured_kind, invalid_move) = {
             let mut board = world.resource_mut::<BoardResource>();
@@ -167,19 +196,29 @@ pub fn build_xiangqi_rules() -> RuleEngine {
 
         world.resource_mut::<TurnResource>().0.advance();
 
-        let opponent = {
+        let (opponent, post_move_hash) = {
             let board = world.resource::<BoardResource>();
-            if cmd.player == board.red {
+            let opp = if cmd.player == board.red {
                 board.black
             } else {
                 board.red
-            }
+            };
+            (opp, board.compute_state_hash(opp))
         };
 
-        let is_mate = {
-            let board = world.resource::<BoardResource>();
-            is_in_check(board, opponent) && all_legal_moves_for(world, opponent).is_empty()
+        if world.get_resource::<XiangqiHistoryResource>().is_none() {
+            world.insert_resource(XiangqiHistoryResource::default());
+        }
+        let repetition_count = {
+            let mut history = world.resource_mut::<XiangqiHistoryResource>();
+            if history.counts.is_empty() {
+                history.record_hash(pre_move_hash);
+            }
+            history.record_hash(post_move_hash)
         };
+
+        // En Xiangqi tanto el jaque mate (Jiangsi) como el ahogado (Kunbi) son victoria para cmd.player
+        let is_mate_or_kunbi = all_legal_moves_for(world, opponent).is_empty();
 
         let mut events: Vec<Box<dyn Event>> = vec![Box::new(PieceMovedEvent {
             player: cmd.player,
@@ -188,10 +227,16 @@ pub fn build_xiangqi_rules() -> RuleEngine {
             captured: captured_kind,
         })];
 
-        if is_mate {
+        if is_mate_or_kunbi {
+            world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(Some(cmd.player)));
             events.push(Box::new(GameOverEvent {
                 winner: Some(cmd.player),
             }));
+        } else if repetition_count >= 3 {
+            world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(None));
+            events.push(Box::new(GameOverEvent { winner: None }));
         }
 
         Ok(events)
@@ -217,3 +262,4 @@ pub fn build_xiangqi_rules() -> RuleEngine {
 
     rules
 }
+

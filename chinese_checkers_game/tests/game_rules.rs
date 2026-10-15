@@ -1,6 +1,7 @@
 use chinese_checkers_game::{
-    home_cells_a, home_cells_b, new_chinese_checkers_session, BoardResource, GameOverEvent,
-    MovePegCommand, PegMovedEvent, Position,
+    home_cells_a, home_cells_b, new_chinese_checkers_session, BoardResource,
+    ChineseCheckersLegalMoveGenerator, GameOverEvent, MovePegCommand, PegMovedEvent, Position,
+    ResignCommand,
 };
 use open_table_engine::prelude::*;
 
@@ -271,4 +272,94 @@ fn test_las_6_puntas_no_se_superponen_con_el_hexagono_central() {
             );
         }
     }
+}
+
+#[test]
+fn test_regla_anti_bloqueo_home_camp_spoiling_otorga_victoria() {
+    let mut session = new_chinese_checkers_session(SessionId(13), 1, vec![P1, P2]);
+    let target = home_cells_b();
+    let last_target = target[9];
+
+    let from = chinese_checkers_game::position::DIRECTIONS
+        .iter()
+        .map(|&d| last_target.add(d))
+        .find(|p| p.is_on_board() && !target.contains(p))
+        .expect("debe haber una posición adyacente fuera de target");
+
+    {
+        let mut board = session.world_mut().resource_mut::<BoardResource>();
+        board.pegs.clear();
+        // P2 deja una ficha rezagada bloqueando la punta de su propia casa (target[0] de P1)
+        board.pegs.insert(target[0], P2);
+        // P1 ya tiene 8 fichas dentro del triángulo objetivo
+        for pos in &target[1..9] {
+            board.pegs.insert(*pos, P1);
+        }
+        // Y la novena ficha de P1 está lista para entrar en la última casilla vacía (target[9])
+        board.pegs.insert(from, P1);
+    }
+
+    let events = session
+        .process_command(
+            P1,
+            Box::new(MovePegCommand {
+                player: P1,
+                from,
+                to: last_target,
+                path: vec![],
+            }),
+        )
+        .expect("P1 debe poder ocupar la última casilla libre de su triángulo objetivo");
+
+    assert!(
+        events.iter().any(|e| {
+            e.as_any()
+                .downcast_ref::<GameOverEvent>()
+                .is_some_and(|go| go.winner == Some(P1))
+        }),
+        "La regla anti-bloqueo (Home-Camp Spoiling) debe otorgar la victoria a P1 aunque P2 bloquee una casilla de la meta"
+    );
+    assert!(session.world().resource::<GameOverResource>().0);
+    assert_eq!(session.world().resource::<WinnerResource>().0, Some(P1));
+}
+
+#[test]
+fn test_resign_command_termina_la_partida_y_asigna_ganador() {
+    let mut session = new_chinese_checkers_session(SessionId(14), 1, vec![P1, P2]);
+
+    let events = session
+        .process_command(P1, Box::new(ResignCommand { player: P1 }))
+        .expect("ResignCommand debe ser válido para un jugador de la partida");
+
+    assert!(
+        events.iter().any(|e| {
+            e.as_any()
+                .downcast_ref::<GameOverEvent>()
+                .is_some_and(|go| go.winner == Some(P2))
+        }),
+        "Al rendirse P1 debe ganar P2"
+    );
+    assert!(session.world().resource::<GameOverResource>().0);
+    assert_eq!(session.world().resource::<WinnerResource>().0, Some(P2));
+}
+
+#[test]
+fn test_chinese_checkers_legal_move_generator_lista_movimientos_del_turno_actual() {
+    let session = new_chinese_checkers_session(SessionId(15), 1, vec![P1, P2]);
+    let generator = ChineseCheckersLegalMoveGenerator;
+
+    let moves_p1 = generator.legal_moves(session.world(), P1);
+    assert!(
+        !moves_p1.is_empty(),
+        "El jugador en turno (P1) debe tener movimientos legales iniciales"
+    );
+
+    let moves_p2 = generator.legal_moves(session.world(), P2);
+    assert!(
+        moves_p2.is_empty(),
+        "El jugador fuera de turno (P2) no debe tener movimientos legales"
+    );
+
+    let via_engine = session.rules().legal_moves(session.world(), P1);
+    assert_eq!(via_engine.len(), moves_p1.len());
 }

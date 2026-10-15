@@ -39,7 +39,10 @@ fn test_serialization_contract_checkers() {
         promoted: false,
     });
 
-    assert_roundtrip(GameOverEvent { winner: P1 });
+    assert_roundtrip(GameOverEvent {
+        winner: P1,
+        is_draw: false,
+    });
 }
 
 #[test]
@@ -272,6 +275,8 @@ fn test_serialization_contract_go() {
     assert_roundtrip(GameOverEvent {
         winner: Some(P1),
         reason: "Normal".to_string(),
+        black_score: 45.0,
+        white_score: 15.5,
     });
 }
 

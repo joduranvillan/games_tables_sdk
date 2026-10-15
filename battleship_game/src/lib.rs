@@ -15,9 +15,14 @@ pub use ai::{
     BattleshipCommand, BattleshipState,
 };
 pub use board::BOARD_SIZE;
-pub use commands::{FireShotCommand, PlaceFleetCommand, RematchCommand};
+pub use commands::{
+    FireShotCommand, PlaceFleetCommand, RematchCommand, ResignCommand, SetBattleshipRulesCommand,
+};
 pub use events::{FleetPlacedEvent, GameOverEvent, ShotResult, ShotResultEvent, SunkenShipEvent};
-pub use fleet::{FleetResource, RematchResource, Ship, ShotsResource, EXPECTED_SHIP_SIZES};
+pub use fleet::{
+    BattleshipConfigResource, FleetResource, RematchResource, Ship, ShotsResource,
+    EXPECTED_SHIP_SIZES,
+};
 pub use position::Position;
 pub use rules::build_battleship_rules;
 
@@ -40,4 +45,8 @@ pub fn new_battleship_session(
     session.world_mut().insert_resource(ShotsResource::new());
     session.world_mut().insert_resource(RematchResource::new());
     session
+        .world_mut()
+        .insert_resource(BattleshipConfigResource::default());
+    session
 }
+

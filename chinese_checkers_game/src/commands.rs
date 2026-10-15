@@ -14,3 +14,9 @@ pub struct MovePegCommand {
     #[serde(default)]
     pub path: Vec<Position>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct ResignCommand {
+    #[issuer]
+    pub player: PlayerId,
+}

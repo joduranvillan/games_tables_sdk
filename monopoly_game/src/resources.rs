@@ -31,6 +31,8 @@ pub struct PlayersResource {
     /// Índice de casilla -> dueño.
     pub properties: HashMap<usize, PlayerId>,
     pub bankrupt: HashSet<PlayerId>,
+    pub mortgaged: HashSet<usize>,
+    pub jail_free_cards: HashMap<PlayerId, u8>,
 }
 
 impl PlayersResource {
@@ -46,6 +48,8 @@ impl PlayersResource {
             money,
             properties: HashMap::new(),
             bankrupt: HashSet::new(),
+            mortgaged: HashSet::new(),
+            jail_free_cards: HashMap::new(),
         }
     }
 
@@ -112,9 +116,10 @@ pub struct PendingPurchaseResource {
     pub pending: HashMap<PlayerId, PendingDecision>,
 }
 
-#[derive(GameResource, Default)]
+#[derive(GameResource, Default, Clone, Debug)]
 pub struct JailResource {
     pub jailed: HashMap<PlayerId, u8>,
+    pub consecutive_doubles: HashMap<PlayerId, u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -128,4 +133,9 @@ pub struct AuctionState {
 #[derive(GameResource, Default)]
 pub struct AuctionResource {
     pub state: Option<AuctionState>,
+}
+
+#[derive(GameResource, Default, Clone, Debug)]
+pub struct BuildingsResource {
+    pub buildings: HashMap<usize, u8>,
 }

@@ -96,3 +96,38 @@ pub struct CommunityChestCardDrawnEvent {
     pub card: CommunityChestCard,
     pub description: String,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct HouseBuiltEvent {
+    pub player: PlayerId,
+    pub space: usize,
+    pub level: u8,
+    pub cost: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct HouseSoldEvent {
+    pub player: PlayerId,
+    pub space: usize,
+    pub level: u8,
+    pub refund: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct PropertyMortgagedEvent {
+    pub player: PlayerId,
+    pub space: usize,
+    pub amount: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct PropertyUnmortgagedEvent {
+    pub player: PlayerId,
+    pub space: usize,
+    pub cost: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct JailCardUsedEvent {
+    pub player: PlayerId,
+}

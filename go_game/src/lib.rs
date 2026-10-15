@@ -11,10 +11,10 @@ pub use ai::go_ai_pick_move;
 pub use board::{BoardHistoryResource, BoardResource, DeadMarkingResource, Stone};
 pub use commands::{
     ConfirmDeadCommand, MarkDeadCommand, PassCommand, PlaceHandicapCommand, PlaceStoneCommand,
-    ResignCommand,
+    ResignCommand, SetKomiCommand,
 };
 pub use events::{GameOverEvent, PassedEvent, StonePlacedEvent, StonesCapturedEvent};
-pub use rules::build_go_rules;
+pub use rules::{build_go_rules, GoLegalMoveGenerator};
 pub use sgf::{export_session_sgf, export_to_sgf, GoSgfExport};
 
 pub fn new_go_session(
@@ -23,9 +23,19 @@ pub fn new_go_session(
     black: PlayerId,
     white: PlayerId,
 ) -> Session {
+    new_go_session_with_komi(session_id, seed, black, white, 13)
+}
+
+pub fn new_go_session_with_komi(
+    session_id: SessionId,
+    seed: u64,
+    black: PlayerId,
+    white: PlayerId,
+    komi_half_points: u32,
+) -> Session {
     let mut session =
         Session::new_with_metadata(session_id, "Go", seed, vec![black, white], build_go_rules());
-    let board = BoardResource::new(9, black, white);
+    let board = BoardResource::new(9, black, white).with_komi(komi_half_points);
     let mut history = BoardHistoryResource::new();
     history.history.insert(board.compute_hash());
     session.world_mut().insert_resource(board);

@@ -1,9 +1,12 @@
 use monopoly_game::{
     board_layout, new_monopoly_session, AuctionBidCommand, AuctionStartedEvent, AuctionWonEvent,
-    BankruptcyEvent, BuyPropertyCommand, ChanceCard, CommunityChestCard, GameOverEvent,
-    JailedEvent, PayJailFeeCommand, PlayerMovedEvent, PropertyPurchasedEvent,
-    RailroadRentPaidEvent, RentPaidEvent, RollAndMoveCommand, SpaceKind, TaxPaidEvent,
-    UtilityRentPaidEvent, BOARD_SIZE, GO_TO_JAIL_SPACE, JAIL_SPACE, STARTING_MONEY,
+    BankruptcyEvent, BuildHouseCommand, BuildingsResource, BuyPropertyCommand, ChanceCard,
+    CommunityChestCard, GameOverEvent, HouseBuiltEvent, HouseSoldEvent, JailCardUsedEvent,
+    JailResource, JailedEvent, MortgagePropertyCommand, PayJailFeeCommand, PlayerMovedEvent,
+    PropertyMortgagedEvent, PropertyPurchasedEvent, PropertyUnmortgagedEvent,
+    RailroadRentPaidEvent, RentPaidEvent, RollAndMoveCommand, SellHouseCommand, SpaceKind,
+    TaxPaidEvent, UnmortgagePropertyCommand, UseJailCardCommand, UtilityRentPaidEvent, BOARD_SIZE,
+    GO_TO_JAIL_SPACE, JAIL_SPACE, STARTING_MONEY,
 };
 use open_table_engine::prelude::*;
 
@@ -774,3 +777,471 @@ fn monopoly_primer_jugador_en_quebrar() {
         "Debe encontrarse una seed válida para el test de quiebra"
     );
 }
+
+#[test]
+fn test_construccion_uniforme_y_coste_por_lado_del_tablero() {
+    let mut session = new_monopoly_session(SessionId(101), 1, P1, P2);
+
+    // Dar a P1 las casillas del grupo Marrón (1 y 3)
+    session
+        .world_mut()
+        .resource_mut::<monopoly_game::PlayersResource>()
+        .properties
+        .insert(1, P1);
+
+    // Sin el grupo completo, no puede construir
+    let err = session
+        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .unwrap_err();
+    assert!(err.to_string().contains("grupo"));
+
+    // Otorgar casilla 3 a P1 (completa grupo Marrón)
+    session
+        .world_mut()
+        .resource_mut::<monopoly_game::PlayersResource>()
+        .properties
+        .insert(3, P1);
+
+    // Coste de casilla 1 (< 10) es $50
+    let money_before = session
+        .world()
+        .resource::<monopoly_game::PlayersResource>()
+        .money[&P1];
+
+    let events = session
+        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .expect("debe construir primera casa en casilla 1");
+
+    let built = events[0]
+        .as_any()
+        .downcast_ref::<HouseBuiltEvent>()
+        .expect("debe emitir HouseBuiltEvent");
+    assert_eq!(built.level, 1);
+    assert_eq!(built.cost, 50);
+
+    let money_after = session
+        .world()
+        .resource::<monopoly_game::PlayersResource>()
+        .money[&P1];
+    assert_eq!(money_before - money_after, 50);
+
+    // Intento de construir segunda casa en casilla 1 cuando casilla 3 tiene 0 casas (viola construcción uniforme)
+    let err_uniform = session
+        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .unwrap_err();
+    assert!(err_uniform.to_string().contains("uniforme"));
+
+    // Construir en casilla 3 para igualar a nivel 1
+    session
+        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 3 }))
+        .expect("debe permitir construir en casilla 3");
+
+    // Ahora sí se puede construir en casilla 1 para llevarla a nivel 2
+    let events2 = session
+        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .expect("debe permitir construir segunda casa en casilla 1");
+    let built2 = events2[0]
+        .as_any()
+        .downcast_ref::<HouseBuiltEvent>()
+        .unwrap();
+    assert_eq!(built2.level, 2);
+}
+
+#[test]
+fn test_construccion_hasta_hotel_y_limite_nivel_5() {
+    let mut session = new_monopoly_session(SessionId(102), 1, P1, P2);
+
+    session
+        .world_mut()
+        .resource_mut::<monopoly_game::PlayersResource>()
+        .properties
+        .insert(1, P1);
+    session
+        .world_mut()
+        .resource_mut::<monopoly_game::PlayersResource>()
+        .properties
+        .insert(3, P1);
+
+    // Llevar ambas casillas hasta nivel 5 (Hotel)
+    for level in 1..=5 {
+        session
+            .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+            .unwrap_or_else(|e| panic!("error en espacio 1 nivel {}: {}", level, e));
+        session
+            .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 3 }))
+            .unwrap_or_else(|e| panic!("error en espacio 3 nivel {}: {}", level, e));
+    }
+
+    let buildings = session.world().resource::<BuildingsResource>();
+    assert_eq!(buildings.buildings.get(&1), Some(&5));
+    assert_eq!(buildings.buildings.get(&3), Some(&5));
+
+    // Intentar construir más allá del nivel 5 (Hotel)
+    let err_max = session
+        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .unwrap_err();
+    assert!(err_max.to_string().contains("máximo") || err_max.to_string().contains("hotel"));
+}
+
+#[test]
+fn test_desmonte_uniforme_y_reembolso_50_porciento() {
+    let mut session = new_monopoly_session(SessionId(103), 1, P1, P2);
+
+    session
+        .world_mut()
+        .resource_mut::<monopoly_game::PlayersResource>()
+        .properties
+        .insert(1, P1);
+    session
+        .world_mut()
+        .resource_mut::<monopoly_game::PlayersResource>()
+        .properties
+        .insert(3, P1);
+
+    // Construir 2 casas en casilla 1 y 1 en casilla 3
+    session
+        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .unwrap();
+    session
+        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 3 }))
+        .unwrap();
+    session
+        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .unwrap();
+
+    // Casilla 1 tiene nivel 2, casilla 3 tiene nivel 1.
+    // Intentar vender de casilla 3 (que tiene 1, menor que casilla 1 con 2) viola desmonte uniforme
+    let err_desmonte = session
+        .process_command(P1, Box::new(SellHouseCommand { player: P1, space: 3 }))
+        .unwrap_err();
+    assert!(err_desmonte.to_string().contains("desmonte") || err_desmonte.to_string().contains("uniforme"));
+
+    // Vender de casilla 1 (coste $50 -> reembolso $25)
+    let money_before = session
+        .world()
+        .resource::<monopoly_game::PlayersResource>()
+        .money[&P1];
+
+    let events = session
+        .process_command(P1, Box::new(SellHouseCommand { player: P1, space: 1 }))
+        .expect("debe vender de casilla 1");
+
+    let sold = events[0]
+        .as_any()
+        .downcast_ref::<HouseSoldEvent>()
+        .expect("debe emitir HouseSoldEvent");
+    assert_eq!(sold.level, 1);
+    assert_eq!(sold.refund, 25);
+
+    let money_after = session
+        .world()
+        .resource::<monopoly_game::PlayersResource>()
+        .money[&P1];
+    assert_eq!(money_after - money_before, 25);
+}
+
+#[test]
+fn test_renta_escalonada_segun_edificios() {
+    // Casilla 1: Av. Mediterráneo, base rent = 2
+    // 0 casas grupo completo: 2 * 2 = 4
+    // 1 casa: 2 * 5 = 10
+    // 2 casas: 2 * 15 = 30
+    // 3 casas: 2 * 45 = 90
+    // 4 casas: 2 * 80 = 160
+    // 5 casas (hotel): 2 * 125 = 250
+
+    for (lvl, expected_rent) in [(0, 4), (1, 10), (2, 30), (3, 90), (4, 160), (5, 250)] {
+        let mut session = new_monopoly_session(SessionId(200 + lvl as u64), 1, P1, P2);
+        session
+            .world_mut()
+            .resource_mut::<monopoly_game::PlayersResource>()
+            .properties
+            .insert(1, P1);
+        session
+            .world_mut()
+            .resource_mut::<monopoly_game::PlayersResource>()
+            .properties
+            .insert(3, P1);
+
+        if lvl > 0 {
+            session
+                .world_mut()
+                .resource_mut::<BuildingsResource>()
+                .buildings
+                .insert(1, lvl as u8);
+        }
+
+        // P2 cae en la casilla 1
+        let space = session.world().resource::<monopoly_game::BoardResource>().spaces[1].clone();
+        let mut events = Vec::new();
+        let decision = monopoly_game::apply_land_effect(
+            &space,
+            1,
+            P2,
+            7,
+            false,
+            session.world_mut(),
+            &mut events,
+        );
+        assert!(!decision);
+
+        let rent_event = events
+            .iter()
+            .find_map(|e| e.as_any().downcast_ref::<RentPaidEvent>())
+            .expect("debe emitirse RentPaidEvent");
+        assert_eq!(
+            rent_event.amount, expected_rent,
+            "Renta para nivel {} debe ser {}",
+            lvl, expected_rent
+        );
+    }
+}
+
+#[test]
+fn test_hipoteca_y_deshipoteca_propiedad() {
+    let mut session = new_monopoly_session(SessionId(301), 1, P1, P2);
+
+    // Otorgar propiedad 1 (Mediterráneo, precio $60) a P1
+    session
+        .world_mut()
+        .resource_mut::<monopoly_game::PlayersResource>()
+        .properties
+        .insert(1, P1);
+
+    let money_before = session
+        .world()
+        .resource::<monopoly_game::PlayersResource>()
+        .money[&P1];
+
+    // P1 hipoteca la propiedad (precio $60 -> recibe $30)
+    let events = session
+        .process_command(P1, Box::new(MortgagePropertyCommand { player: P1, space: 1 }))
+        .expect("debe permitir hipotecar propiedad");
+
+    let mort_event = events[0]
+        .as_any()
+        .downcast_ref::<PropertyMortgagedEvent>()
+        .expect("debe emitir PropertyMortgagedEvent");
+    assert_eq!(mort_event.amount, 30);
+    assert_eq!(mort_event.space, 1);
+
+    let money_after = session
+        .world()
+        .resource::<monopoly_game::PlayersResource>()
+        .money[&P1];
+    assert_eq!(money_after - money_before, 30);
+
+    assert!(
+        session
+            .world()
+            .resource::<monopoly_game::PlayersResource>()
+            .mortgaged
+            .contains(&1),
+        "casilla 1 debe estar marcada como hipotecada"
+    );
+
+    // Intentar hipotecar de nuevo debe fallar
+    let err_double = session
+        .process_command(P1, Box::new(MortgagePropertyCommand { player: P1, space: 1 }))
+        .unwrap_err();
+    assert!(err_double.to_string().contains("hipotecada"));
+
+    // Mientras esté hipotecada, caer en ella NO cobra renta
+    let space = session.world().resource::<monopoly_game::BoardResource>().spaces[1].clone();
+    let mut land_events = Vec::new();
+    let decision = monopoly_game::apply_land_effect(
+        &space,
+        1,
+        P2,
+        7,
+        false,
+        session.world_mut(),
+        &mut land_events,
+    );
+    assert!(!decision);
+    assert!(
+        land_events.is_empty(),
+        "propiedad hipotecada no debe emitir eventos de renta"
+    );
+
+    // Deshipotecar: costo = (60 / 2) * 110 / 100 = 33
+    let events_unmort = session
+        .process_command(P1, Box::new(UnmortgagePropertyCommand { player: P1, space: 1 }))
+        .expect("debe permitir deshipotecar");
+
+    let unmort_event = events_unmort[0]
+        .as_any()
+        .downcast_ref::<PropertyUnmortgagedEvent>()
+        .expect("debe emitir PropertyUnmortgagedEvent");
+    assert_eq!(unmort_event.cost, 33);
+    assert_eq!(unmort_event.space, 1);
+
+    assert!(
+        !session
+            .world()
+            .resource::<monopoly_game::PlayersResource>()
+            .mortgaged
+            .contains(&1),
+        "casilla 1 ya no debe estar hipotecada"
+    );
+
+    // Ahora caer en ella sí cobra renta
+    let mut land_events_2 = Vec::new();
+    monopoly_game::apply_land_effect(
+        &space,
+        1,
+        P2,
+        7,
+        false,
+        session.world_mut(),
+        &mut land_events_2,
+    );
+    assert_eq!(land_events_2.len(), 1);
+    assert!(land_events_2[0].as_any().is::<RentPaidEvent>());
+}
+
+#[test]
+fn test_no_se_puede_hipotecar_con_edificios_en_grupo() {
+    let mut session = new_monopoly_session(SessionId(302), 1, P1, P2);
+
+    session
+        .world_mut()
+        .resource_mut::<monopoly_game::PlayersResource>()
+        .properties
+        .insert(1, P1);
+    session
+        .world_mut()
+        .resource_mut::<monopoly_game::PlayersResource>()
+        .properties
+        .insert(3, P1);
+
+    // Construir casa en casilla 1
+    session
+        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .unwrap();
+
+    // Intentar hipotecar casilla 1 o casilla 3 debe fallar por haber edificios en el grupo
+    let err_mort = session
+        .process_command(P1, Box::new(MortgagePropertyCommand { player: P1, space: 1 }))
+        .unwrap_err();
+    assert!(err_mort.to_string().contains("edificios"));
+
+    let err_mort_other = session
+        .process_command(P1, Box::new(MortgagePropertyCommand { player: P1, space: 3 }))
+        .unwrap_err();
+    assert!(err_mort_other.to_string().contains("edificios"));
+
+    // Vender la casa
+    session
+        .process_command(P1, Box::new(SellHouseCommand { player: P1, space: 1 }))
+        .unwrap();
+
+    // Ahora sí se puede hipotecar
+    session
+        .process_command(P1, Box::new(MortgagePropertyCommand { player: P1, space: 1 }))
+        .expect("debe permitir hipotecar tras demoler edificios");
+}
+
+#[test]
+fn test_tres_dobles_consecutivos_a_la_carcel() {
+    // Buscar una semilla donde la tirada de dados sea dobles
+    let mut found_seed = None;
+    for s in 1..1000 {
+        let mut session = new_monopoly_session(SessionId(s), s, P1, P2);
+        let mut rng = session.world_mut().resource_mut::<open_table_engine::prelude::RandomResource>();
+        let (d1, d2) = (rng.0.roll_die(6), rng.0.roll_die(6));
+        if d1 == d2 {
+            found_seed = Some(s);
+            break;
+        }
+    }
+
+    let seed = found_seed.expect("debe existir una semilla que genere dobles");
+    let mut session = new_monopoly_session(SessionId(seed), seed, P1, P2);
+
+    // Simular que P1 ya sacó 2 dobles consecutivos en este turno
+    session
+        .world_mut()
+        .resource_mut::<JailResource>()
+        .consecutive_doubles
+        .insert(P1, 2);
+
+    // Ejecutar RollAndMoveCommand (tercer doble consecutivo)
+    let events = session
+        .process_command(P1, Box::new(RollAndMoveCommand { player: P1 }))
+        .expect("debe procesar RollAndMoveCommand");
+
+    // Debe emitirse JailedEvent
+    let _jailed_event = events
+        .iter()
+        .find(|e| e.as_any().is::<JailedEvent>())
+        .expect("debe emitirse JailedEvent tras 3 dobles");
+
+    // El jugador debe estar en la cárcel y con 3 turnos de condena
+    let jail_res = session.world().resource::<JailResource>();
+    assert_eq!(jail_res.jailed.get(&P1), Some(&3));
+    assert_eq!(jail_res.consecutive_doubles.get(&P1).copied().unwrap_or(0), 0);
+
+    let pos = session
+        .world()
+        .resource::<monopoly_game::PlayersResource>()
+        .position[&P1];
+    assert_eq!(pos, JAIL_SPACE);
+
+    // El turno debe haber avanzado a P2 (sin turno extra a pesar del doble)
+    assert_eq!(session.current_player(), P2);
+}
+
+#[test]
+fn test_tarjeta_salir_libre_de_la_carcel() {
+    let mut session = new_monopoly_session(SessionId(303), 1, P1, P2);
+
+    // Otorgar 1 tarjeta a P1
+    session
+        .world_mut()
+        .resource_mut::<monopoly_game::PlayersResource>()
+        .jail_free_cards
+        .insert(P1, 1);
+
+    // Enviar a P1 a la cárcel
+    session
+        .world_mut()
+        .resource_mut::<JailResource>()
+        .jailed
+        .insert(P1, 3);
+
+    // Usar la tarjeta para salir de la cárcel
+    let events = session
+        .process_command(P1, Box::new(UseJailCardCommand { player: P1 }))
+        .expect("debe permitir usar la tarjeta de cárcel");
+
+    assert!(events[0].as_any().is::<JailCardUsedEvent>());
+
+    // P1 ya no está en la cárcel
+    assert!(
+        !session
+            .world()
+            .resource::<JailResource>()
+            .jailed
+            .contains_key(&P1)
+    );
+
+    // La cantidad de tarjetas se decrementó a 0
+    assert_eq!(
+        session
+            .world()
+            .resource::<monopoly_game::PlayersResource>()
+            .jail_free_cards
+            .get(&P1)
+            .copied()
+            .unwrap_or(0),
+        0
+    );
+
+    // Intentar usarla otra vez debe fallar
+    let err_empty = session
+        .process_command(P1, Box::new(UseJailCardCommand { player: P1 }))
+        .unwrap_err();
+    assert!(err_empty.to_string().contains("cárcel"));
+}
+

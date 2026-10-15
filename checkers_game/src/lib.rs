@@ -19,7 +19,7 @@ pub mod position;
 pub mod rules;
 
 pub use ai::checkers_ai_pick_move;
-pub use board::{initial_board, BoardResource, MultiCaptureResource, Sides};
+pub use board::{initial_board, BoardResource, DrawClockResource, MultiCaptureResource, Sides};
 pub use commands::{MovePieceCommand, ResignCommand};
 pub use events::{GameOverEvent, PieceMovedEvent};
 pub use legal_moves::CheckersLegalMoveGenerator;
@@ -50,6 +50,7 @@ pub fn new_checkers_session(
         world.insert_resource(board);
         world.insert_resource(sides);
         world.insert_resource(MultiCaptureResource::default());
+        world.insert_resource(DrawClockResource::default());
         world.insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(
             CheckersLegalMoveGenerator,
         )));

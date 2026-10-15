@@ -413,6 +413,9 @@ fn parse_go_command(val: &Value, default_player: PlayerId) -> Option<Box<dyn Com
     if let Ok(cmd) = serde_json::from_value::<go_game::MarkDeadCommand>(val.clone()) {
         return Some(Box::new(cmd));
     }
+    if let Ok(cmd) = serde_json::from_value::<go_game::SetKomiCommand>(val.clone()) {
+        return Some(Box::new(cmd));
+    }
     None
 }
 

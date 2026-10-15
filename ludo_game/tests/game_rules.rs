@@ -1,6 +1,8 @@
 use ludo_game::{
-    ludo_ai_pick_move, new_ludo_session, GameOverEvent, MoveTokenCommand, NoValidMovesEvent,
-    PendingRollResource, RollDiceCommand, TokenMovedEvent, TokensResource, MAX_STEPS,
+    ludo_ai_pick_move, new_ludo_session, ConsecutiveSixesResource, GameOverEvent,
+    LudoRulesConfigResource, MoveTokenCommand, NoValidMovesEvent, PendingRollResource,
+    ResignCommand, RollDiceCommand, SetLudoRulesCommand, TokenMovedEvent, TokensResource,
+    MAX_STEPS,
 };
 use open_table_engine::prelude::*;
 
@@ -579,3 +581,160 @@ fn test_ludo_ai_captura_cuando_puede() {
         "La IA debe priorizar la captura (token 0) sobre avanzar la ficha atrasada (token 1)"
     );
 }
+
+#[test]
+fn test_tres_seises_consecutivos_pierde_turno() {
+    let mut session = new_ludo_session(SessionId(300), 1, vec![P1, P2]);
+    session
+        .process_command(
+            P1,
+            Box::new(SetLudoRulesCommand {
+                star_safe_squares: false,
+                bonus_roll_on_capture_and_goal: false,
+                three_sixes_penalty: true,
+            }),
+        )
+        .unwrap();
+
+    // Simular que P1 ya sacó dos 6 consecutivos
+    {
+        let mut sixes = session
+            .world_mut()
+            .resource_mut::<ConsecutiveSixesResource>();
+        sixes.count.insert(P1, 2);
+    }
+
+    // Buscar una semilla o forzar con rng la tirada de 6
+    // Configuramos el RNG para que la siguiente tirada sea 6
+    let mut six_seed = None;
+    for seed in 0..100u64 {
+        let mut rng = RandomService::from_seed(seed);
+        if rng.roll_die(6) == 6 {
+            six_seed = Some(seed);
+            break;
+        }
+    }
+    let seed = six_seed.expect("debe existir una seed que dé 6");
+    {
+        let mut r = session.world_mut().resource_mut::<RandomResource>();
+        r.0 = RandomService::from_seed(seed);
+    }
+
+    let events = session
+        .process_command(P1, Box::new(RollDiceCommand { player: P1 }))
+        .unwrap();
+
+    // Con el tercer 6 consecutivo, se emite DiceRolledEvent y NoValidMovesEvent
+    assert_eq!(events.len(), 2);
+    let dice = events[0].as_any().downcast_ref::<ludo_game::DiceRolledEvent>().unwrap();
+    assert_eq!(dice.value, 6);
+    let no_moves = events[1].as_any().downcast_ref::<NoValidMovesEvent>().unwrap();
+    assert_eq!(no_moves.value, 6);
+
+    // Se reinicia el contador y el turno avanza a P2
+    assert_eq!(
+        session.world().resource::<ConsecutiveSixesResource>().count[&P1],
+        0
+    );
+    assert_eq!(session.current_player(), P2);
+}
+
+#[test]
+fn test_turno_extra_por_captura_y_meta() {
+    let mut session = new_ludo_session(SessionId(301), 1, vec![P1, P2]);
+    session
+        .process_command(
+            P1,
+            Box::new(SetLudoRulesCommand {
+                star_safe_squares: false,
+                bonus_roll_on_capture_and_goal: true,
+                three_sixes_penalty: false,
+            }),
+        )
+        .unwrap();
+
+    // 1. Probar que capturar con un dado que NO sea 6 (ej. 1) otorga turno extra
+    {
+        let mut tokens = session.world_mut().resource_mut::<TokensResource>();
+        tokens.tokens.get_mut(&P1).unwrap()[0] = 25;
+        tokens.tokens.get_mut(&P2).unwrap()[0] = 52;
+    }
+    {
+        let mut pending = session.world_mut().resource_mut::<PendingRollResource>();
+        pending.pending.insert(P1, 1);
+    }
+    let events = move_token(&mut session, P1, 0).expect("mueve y captura");
+    let moved = events[0].as_any().downcast_ref::<TokenMovedEvent>().unwrap();
+    assert_eq!(moved.captured, Some((P2, 0)));
+    // Turno no avanzó a P2: P1 gana tirada extra
+    assert_eq!(session.current_player(), P1);
+
+    // 2. Probar que llegar a la meta exacta (finished == true) con dado distinto de 6 otorga turno extra
+    {
+        let mut tokens = session.world_mut().resource_mut::<TokensResource>();
+        tokens.tokens.get_mut(&P1).unwrap()[1] = MAX_STEPS - 2;
+    }
+    {
+        let mut pending = session.world_mut().resource_mut::<PendingRollResource>();
+        pending.pending.insert(P1, 2);
+    }
+    let events_goal = move_token(&mut session, P1, 1).expect("mueve a meta");
+    let moved_goal = events_goal[0].as_any().downcast_ref::<TokenMovedEvent>().unwrap();
+    assert!(moved_goal.finished);
+    // Como quedan fichas de P1, la partida no terminó y P1 mantiene el turno
+    assert_eq!(session.current_player(), P1);
+}
+
+#[test]
+fn test_casillas_estrella_son_seguras() {
+    let mut session = new_ludo_session(SessionId(302), 1, vec![P1, P2]);
+    session
+        .process_command(
+            P1,
+            Box::new(SetLudoRulesCommand {
+                star_safe_squares: true,
+                bonus_roll_on_capture_and_goal: false,
+                three_sixes_penalty: false,
+            }),
+        )
+        .unwrap();
+
+    let tokens = session.world().resource::<TokensResource>();
+    // Casillas de estrella están en (offset + 8) % 52
+    let p1_star = (tokens.start_offset[&P1] + 8) % ludo_game::TRACK_LEN;
+    assert!(tokens.is_safe_square_with_config(p1_star, true));
+    assert!(!tokens.is_safe_square_with_config(p1_star, false));
+
+    // Colocar P2 en la casilla estrella de P1
+    // start_offset[P1] = 0 -> p1_star = 8
+    // Para P2 (start_offset = 26): (26 + steps - 1) % 52 = 8 -> steps = 35 ((26 + 35 - 1) % 52 = 8)
+    {
+        let mut t = session.world_mut().resource_mut::<TokensResource>();
+        t.tokens.get_mut(&P2).unwrap()[0] = 35; // en casilla 8 (estrella)
+        t.tokens.get_mut(&P1).unwrap()[0] = 8;  // P1 en casilla 7 (a 1 paso)
+    }
+    {
+        let mut pending = session.world_mut().resource_mut::<PendingRollResource>();
+        pending.pending.insert(P1, 1);
+    }
+
+    let events = move_token(&mut session, P1, 0).expect("mueve a estrella");
+    let moved = events[0].as_any().downcast_ref::<TokenMovedEvent>().unwrap();
+    assert_eq!(
+        moved.captured, None,
+        "en casilla estrella con regla activa no hay captura"
+    );
+    assert_eq!(session.world().resource::<TokensResource>().tokens[&P2][0], 35);
+}
+
+#[test]
+fn test_resign_command() {
+    let mut session = new_ludo_session(SessionId(303), 1, vec![P1, P2]);
+    let events = session
+        .process_command(P1, Box::new(ResignCommand { player: P1 }))
+        .expect("resign procesado");
+    assert_eq!(events.len(), 1);
+    let go = events[0].as_any().downcast_ref::<GameOverEvent>().unwrap();
+    assert_eq!(go.winner, P2);
+}
+

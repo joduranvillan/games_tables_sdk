@@ -1,13 +1,177 @@
-use crate::board::{BoardResource, Piece, PieceKind};
-use crate::commands::{DropPieceCommand, MovePieceCommand, ResignCommand};
+use crate::board::{
+    BoardResource, Piece, PieceKind, ShogiHistoryResource, ShogiRulesConfigResource,
+};
+use crate::commands::{DropPieceCommand, MovePieceCommand, ResignCommand, SetShogiRulesCommand};
 use crate::events::{GameOverEvent, PieceDroppedEvent, PieceMovedEvent};
 use crate::movement::{
     can_promote, is_checkmate, is_in_check, is_legal_drop, is_legal_move, must_promote,
+    must_promote_fesa,
 };
 use open_table_engine::prelude::*;
 
+pub struct ShogiLegalMoveGenerator;
+
+impl ShogiLegalMoveGenerator {
+    pub fn generate_for_board(
+        board: &BoardResource,
+        player: PlayerId,
+        strict_fesa: bool,
+    ) -> Vec<Box<dyn Command>> {
+        if player != board.sente && player != board.gote {
+            return vec![];
+        }
+
+        let opponent = if player == board.sente {
+            board.gote
+        } else {
+            board.sente
+        };
+
+        let mut moves: Vec<Box<dyn Command>> = Vec::new();
+
+        for fx in 0..9 {
+            for fy in 0..9 {
+                let from = (fx, fy);
+                let Some(piece) = board.squares.get(&from).copied() else {
+                    continue;
+                };
+                if piece.owner != player {
+                    continue;
+                }
+
+                for tx in 0..9 {
+                    for ty in 0..9 {
+                        let to = (tx, ty);
+                        if !is_legal_move(board, from, to, player) {
+                            continue;
+                        }
+
+                        let mut test_board = board.clone();
+                        test_board.squares.remove(&from);
+                        test_board.squares.insert(to, piece);
+                        if is_in_check(&test_board, player) {
+                            continue;
+                        }
+
+                        let can_pro = can_promote(board, piece.kind, from, to, player);
+                        let must_pro = if strict_fesa {
+                            must_promote_fesa(board, piece.kind, to, player)
+                        } else {
+                            must_promote(board, piece.kind, to, player)
+                        };
+
+                        if can_pro {
+                            moves.push(Box::new(MovePieceCommand {
+                                player,
+                                from,
+                                to,
+                                promote: true,
+                            }));
+                        }
+                        if !must_pro {
+                            moves.push(Box::new(MovePieceCommand {
+                                player,
+                                from,
+                                to,
+                                promote: false,
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(hand) = board.hands.get(&player) {
+            let mut unique_kinds = hand.clone();
+            unique_kinds.sort_by_key(|k| *k as u8);
+            unique_kinds.dedup();
+
+            for &piece_kind in &unique_kinds {
+                for tx in 0..9 {
+                    for ty in 0..9 {
+                        let to = (tx, ty);
+                        if !is_legal_drop(board, piece_kind, to, player) {
+                            continue;
+                        }
+
+                        let mut test_board = board.clone();
+                        test_board.squares.insert(
+                            to,
+                            Piece {
+                                kind: piece_kind,
+                                owner: player,
+                            },
+                        );
+                        if is_in_check(&test_board, player) {
+                            continue;
+                        }
+                        if piece_kind == PieceKind::Pawn && is_checkmate(&test_board, opponent) {
+                            continue;
+                        }
+
+                        moves.push(Box::new(DropPieceCommand {
+                            player,
+                            piece: piece_kind,
+                            to,
+                        }));
+                    }
+                }
+            }
+        }
+
+        moves
+    }
+}
+
+impl LegalMoveGenerator for ShogiLegalMoveGenerator {
+    fn generate(&self, world: &BevyWorld, player: PlayerId) -> Vec<Box<dyn Command>> {
+        if world
+            .get_resource::<GameOverResource>()
+            .is_some_and(|g| g.0)
+        {
+            return vec![];
+        }
+        let Some(board) = world.get_resource::<BoardResource>() else {
+            return vec![];
+        };
+        let strict_fesa = world
+            .get_resource::<ShogiRulesConfigResource>()
+            .map(|c| c.strict_fesa_promotion)
+            .unwrap_or(false);
+
+        Self::generate_for_board(board, player, strict_fesa)
+    }
+}
+
+fn record_state_and_check_sennichite(
+    world: &mut BevyWorld,
+    pre_hash: u64,
+    next_player: PlayerId,
+) -> bool {
+    let post_hash = world
+        .resource::<BoardResource>()
+        .compute_state_hash(next_player);
+
+    if !world.contains_resource::<ShogiHistoryResource>() {
+        world.insert_resource(ShogiHistoryResource::default());
+    }
+
+    let mut history = world.resource_mut::<ShogiHistoryResource>();
+    if history.counts.is_empty()
+        || (history.counts.len() == 1 && !history.counts.contains_key(&pre_hash))
+    {
+        history.counts.clear();
+        history.counts.insert(pre_hash, 1);
+    }
+
+    let count = history.counts.entry(post_hash).or_insert(0);
+    *count += 1;
+    *count >= 4
+}
+
 pub fn build_shogi_rules() -> RuleEngine {
     let mut rules = RuleEngine::new();
+    rules.set_legal_move_generator(Box::new(ShogiLegalMoveGenerator));
 
     rules.register::<MovePieceCommand, _>(|cmd, world| {
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
@@ -16,7 +180,13 @@ pub fn build_shogi_rules() -> RuleEngine {
             });
         }
 
+        let strict_fesa = world
+            .get_resource::<ShogiRulesConfigResource>()
+            .map(|cfg| cfg.strict_fesa_promotion)
+            .unwrap_or(false);
+
         let board_backup = world.resource::<BoardResource>().clone();
+        let pre_hash = board_backup.compute_state_hash(cmd.player);
 
         let (promoted, captured_kind) = {
             let mut board = world.resource_mut::<BoardResource>();
@@ -46,7 +216,11 @@ pub fn build_shogi_rules() -> RuleEngine {
             }
 
             let can_pro = can_promote(&board, piece.kind, cmd.from, cmd.to, cmd.player);
-            let must_pro = must_promote(&board, piece.kind, cmd.to, cmd.player);
+            let must_pro = if strict_fesa {
+                must_promote_fesa(&board, piece.kind, cmd.to, cmd.player)
+            } else {
+                must_promote(&board, piece.kind, cmd.to, cmd.player)
+            };
 
             if must_pro && !cmd.promote {
                 return Err(EngineError::InvalidCommand {
@@ -103,10 +277,18 @@ pub fn build_shogi_rules() -> RuleEngine {
             }
         };
 
+        let is_sennichite = record_state_and_check_sennichite(world, pre_hash, opponent);
+
         if is_checkmate(world.resource::<BoardResource>(), opponent) {
+            world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(Some(cmd.player)));
             events.push(Box::new(GameOverEvent {
                 winner: Some(cmd.player),
             }));
+        } else if is_sennichite {
+            world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(None));
+            events.push(Box::new(GameOverEvent { winner: None }));
         }
 
         Ok(events)
@@ -120,6 +302,7 @@ pub fn build_shogi_rules() -> RuleEngine {
         }
 
         let board_backup = world.resource::<BoardResource>().clone();
+        let pre_hash = board_backup.compute_state_hash(cmd.player);
 
         let piece_placed = {
             let mut board = world.resource_mut::<BoardResource>();
@@ -197,10 +380,18 @@ pub fn build_shogi_rules() -> RuleEngine {
             }
         };
 
+        let is_sennichite = record_state_and_check_sennichite(world, pre_hash, opponent);
+
         if is_checkmate(world.resource::<BoardResource>(), opponent) {
+            world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(Some(cmd.player)));
             events.push(Box::new(GameOverEvent {
                 winner: Some(cmd.player),
             }));
+        } else if is_sennichite {
+            world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(None));
+            events.push(Box::new(GameOverEvent { winner: None }));
         }
 
         Ok(events)
@@ -222,6 +413,13 @@ pub fn build_shogi_rules() -> RuleEngine {
         Ok(vec![Box::new(GameOverEvent {
             winner: Some(opponent),
         })])
+    });
+
+    rules.register::<SetShogiRulesCommand, _>(|cmd, world| {
+        world.insert_resource(ShogiRulesConfigResource {
+            strict_fesa_promotion: cmd.strict_fesa_promotion,
+        });
+        Ok(vec![])
     });
 
     rules

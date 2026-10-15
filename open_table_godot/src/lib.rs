@@ -3034,6 +3034,7 @@ impl OpenTableBridge {
 
         let events: Vec<Box<dyn Event>> = vec![Box::new(GameOverEvent {
             winner: PlayerId(winner_id as u32),
+            is_draw: false,
         })];
         let serialized = serde_json::to_vec(&events).unwrap_or_default();
         match &mut self.mode {
@@ -3092,6 +3093,8 @@ impl OpenTableBridge {
         let events: Vec<Box<dyn Event>> = vec![Box::new(go_game::GameOverEvent {
             winner: None,
             reason: "draw".to_string(),
+            black_score: 0.0,
+            white_score: 0.0,
         })];
         let serialized = serde_json::to_vec(&events).unwrap_or_default();
         match &mut self.mode {
@@ -3802,7 +3805,11 @@ impl OpenTableBridge {
             }
 
             if let Some(game_over) = event.as_any().downcast_ref::<GameOverEvent>() {
-                let winner_id = game_over.winner.0 as i64;
+                let winner_id = if game_over.is_draw {
+                    0
+                } else {
+                    game_over.winner.0 as i64
+                };
                 self.emit_bridge_signal("game_over", &[Variant::from(winner_id)]);
                 self.check_advance_tournament(winner_id);
             }

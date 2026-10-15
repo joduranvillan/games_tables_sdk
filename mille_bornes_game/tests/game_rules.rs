@@ -1,7 +1,7 @@
 use mille_bornes_game::{
     new_mille_bornes_session, Card, CardDiscardedEvent, CoupFourreCommand, DiscardCardCommand,
-    DrawCardCommand, GameOverEvent, Hazard, HazardPlayedEvent, PlayCardCommand, MAX_HAND_SIZE,
-    TARGET_DISTANCE, WIN_DISTANCE,
+    DrawCardCommand, GameOverEvent, Hazard, HazardPlayedEvent, PlayCardCommand, PlayHazardCommand,
+    PlaySafetyCommand, Safety, SafetyPlayedEvent, MAX_HAND_SIZE, TARGET_DISTANCE, WIN_DISTANCE,
 };
 use open_table_engine::prelude::*;
 
@@ -558,3 +558,199 @@ fn test_gana_con_1000km() {
     assert_eq!(deck.distance[&P1], 1000);
     assert_eq!(WIN_DISTANCE, 1000);
 }
+
+#[test]
+fn test_las_4_cartas_de_seguridad_bloquean_sus_hazards_especificos() {
+    let safeties_and_hazards = [
+        (Safety::RightOfWay, Hazard::SpeedLimit),
+        (Safety::ExtraTank, Hazard::OutOfGas),
+        (Safety::PunctureProof, Hazard::FlatTire),
+        (Safety::DrivingAce, Hazard::Accident),
+    ];
+
+    for (i, (safety, hazard)) in safeties_and_hazards.iter().enumerate() {
+        let mut session = new_mille_bornes_session(SessionId(200 + i as u64), 1, P1, P2);
+        // P1 juega su carta de seguridad
+        {
+            let mut deck = session
+                .world_mut()
+                .resource_mut::<mille_bornes_game::DeckResource>();
+            deck.hands.get_mut(&P1).unwrap()[0] = Card::Safety(*safety);
+        }
+        session
+            .process_command(
+                P1,
+                Box::new(PlayCardCommand {
+                    player: P1,
+                    card_index: 0,
+                }),
+            )
+            .expect("jugar carta de seguridad debe ser válido");
+
+        // Turno extra: P1 sigue teniendo el turno
+        assert_eq!(session.current_player(), P1);
+
+        // P1 descarta para ceder turno a P2
+        session
+            .process_command(
+                P1,
+                Box::new(DiscardCardCommand {
+                    player: P1,
+                    card_index: 0,
+                }),
+            )
+            .expect("P1 descarta");
+        assert_eq!(session.current_player(), P2);
+
+        // P2 intenta jugar el peligro bloqueado por esa seguridad
+        let result = session.process_command(
+            P2,
+            Box::new(PlayHazardCommand {
+                player: P2,
+                target: P1,
+                hazard: *hazard,
+            }),
+        );
+        assert!(
+            matches!(result, Err(EngineError::InvalidCommand { .. })),
+            "Safety {:?} debe bloquear Hazard {:?}",
+            safety,
+            hazard
+        );
+    }
+}
+
+#[test]
+fn test_extra_tank_cura_inmediatamente_out_of_gas() {
+    let mut session = new_mille_bornes_session(SessionId(300), 1, P1, P2);
+    {
+        let mut deck = session
+            .world_mut()
+            .resource_mut::<mille_bornes_game::DeckResource>();
+        deck.hazard.insert(P1, Some(Hazard::OutOfGas));
+        deck.hands.get_mut(&P1).unwrap()[0] = Card::Safety(Safety::ExtraTank);
+    }
+
+    session
+        .process_command(
+            P1,
+            Box::new(PlayCardCommand {
+                player: P1,
+                card_index: 0,
+            }),
+        )
+        .expect("jugar ExtraTank debe ser válido");
+
+    let deck = session
+        .world()
+        .resource::<mille_bornes_game::DeckResource>();
+    assert_eq!(deck.hazard[&P1], None, "ExtraTank debe curar inmediatamente OutOfGas");
+    assert!(deck.safeties_played[&P1].contains(&Safety::ExtraTank));
+}
+
+#[test]
+fn test_turno_extra_al_jugar_carta_de_seguridad() {
+    let mut session = new_mille_bornes_session(SessionId(301), 1, P1, P2);
+    {
+        let mut deck = session
+            .world_mut()
+            .resource_mut::<mille_bornes_game::DeckResource>();
+        deck.hands.get_mut(&P1).unwrap()[0] = Card::Safety(Safety::DrivingAce);
+    }
+
+    assert_eq!(session.current_player(), P1);
+    session
+        .process_command(
+            P1,
+            Box::new(PlayCardCommand {
+                player: P1,
+                card_index: 0,
+            }),
+        )
+        .expect("P1 juega DrivingAce");
+
+    // Debe conservar el turno
+    assert_eq!(
+        session.current_player(),
+        P1,
+        "jugar carta de seguridad debe otorgar turno extra (no avanzar turno)"
+    );
+}
+
+#[test]
+fn test_coup_fourre_con_safety_otorga_bono_100_inmunidad_y_anula_peligro() {
+    let mut session = new_mille_bornes_session(SessionId(302), 1, P1, P2);
+    // P1 descarta para pasar turno a P2
+    session
+        .process_command(
+            P1,
+            Box::new(DiscardCardCommand {
+                player: P1,
+                card_index: 0,
+            }),
+        )
+        .unwrap();
+    assert_eq!(session.current_player(), P2);
+
+    {
+        let mut deck = session
+            .world_mut()
+            .resource_mut::<mille_bornes_game::DeckResource>();
+        deck.hands.get_mut(&P2).unwrap()[0] = Card::Hazard(Hazard::Accident);
+        deck.hands.get_mut(&P1).unwrap()[0] = Card::Safety(Safety::DrivingAce);
+        deck.distance.insert(P1, 100);
+    }
+
+    // P2 ataca a P1 con Accident
+    session
+        .process_command(
+            P2,
+            Box::new(PlayCardCommand {
+                player: P2,
+                card_index: 0,
+            }),
+        )
+        .expect("P2 juega peligro Accident");
+
+    {
+        let deck = session
+            .world()
+            .resource::<mille_bornes_game::DeckResource>();
+        assert_eq!(deck.hazard[&P1], Some(Hazard::Accident));
+    }
+
+    // P1 responde con Coup Fourré
+    let events = session
+        .process_command(P1, Box::new(CoupFourreCommand { player: P1 }))
+        .expect("P1 realiza Coup Fourré");
+
+    // Verificar eventos: SafetyPlayedEvent, DistancePlayedEvent (+100), HazardPlayedEvent
+    assert!(events.iter().any(|e| e.as_any().is::<SafetyPlayedEvent>()));
+    let dist_ev = events
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<mille_bornes_game::DistancePlayedEvent>())
+        .expect("debe emitir DistancePlayedEvent por bono de 100 km");
+    assert_eq!(dist_ev.value, 100);
+    assert_eq!(dist_ev.new_distance, 200);
+
+    let deck = session
+        .world()
+        .resource::<mille_bornes_game::DeckResource>();
+    assert_eq!(deck.hazard[&P1], None, "el peligro de P1 debe ser anulado");
+    assert_eq!(deck.hazard[&P2], Some(Hazard::Accident), "P2 sufre el peligro reflejado");
+    assert_eq!(deck.distance[&P1], 200, "P1 recibe bono de 100 km");
+    assert!(
+        deck.safeties_played[&P1].contains(&Safety::DrivingAce),
+        "P1 obtiene inmunidad permanente de DrivingAce"
+    );
+}
+
+#[test]
+fn test_build_deck_contiene_las_4_safeties() {
+    let deck = mille_bornes_game::deck::build_deck();
+    assert!(deck.contains(&Card::Safety(Safety::RightOfWay)));
+    assert!(deck.contains(&Card::Safety(Safety::ExtraTank)));
+    assert!(deck.contains(&Card::Safety(Safety::PunctureProof)));
+    assert!(deck.contains(&Card::Safety(Safety::DrivingAce)));
+}
+

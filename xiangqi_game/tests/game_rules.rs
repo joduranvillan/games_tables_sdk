@@ -592,3 +592,215 @@ fn test_jaque_mate_termina_la_partida_en_xiangqi() {
         "El evento GameOverEvent debe ser emitido con Red como ganador"
     );
 }
+
+#[test]
+fn test_kunbi_ahogado_sin_jaque_otorga_victoria_en_xiangqi() {
+    let mut session = new_xiangqi_session(SessionId(11), 0, RED, BLACK);
+
+    {
+        let mut board = session
+            .world_mut()
+            .resource_mut::<xiangqi_game::BoardResource>();
+        board.squares.clear();
+
+        // Black General en (3, 0); no tiene más piezas
+        board.squares.insert(
+            (3, 0),
+            xiangqi_game::Piece {
+                kind: xiangqi_game::PieceKind::General,
+                owner: BLACK,
+            },
+        );
+        // Red General en (4, 9) controla la columna 4 por regla de General Volador
+        board.squares.insert(
+            (4, 9),
+            xiangqi_game::Piece {
+                kind: xiangqi_game::PieceKind::General,
+                owner: RED,
+            },
+        );
+        // Red Chariot en (0, 5), listo para bajar a (0, 1) y cortar la fila 1 sin dar jaque
+        board.squares.insert(
+            (0, 5),
+            xiangqi_game::Piece {
+                kind: xiangqi_game::PieceKind::Chariot,
+                owner: RED,
+            },
+        );
+    }
+
+    // Red mueve Chariot de (0, 5) a (0, 1): Black General en (3, 0) NO está en jaque,
+    // pero no puede ir a (4, 0) (Flying General) ni a (3, 1) (controlado por Chariot en (0, 1)).
+    let events = session
+        .process_command(
+            RED,
+            Box::new(MovePieceCommand {
+                player: RED,
+                from: (0, 5),
+                to: (0, 1),
+            }),
+        )
+        .expect("El movimiento de bloqueo Kunbi debe ser válido");
+
+    {
+        let board = session.world().resource::<xiangqi_game::BoardResource>();
+        assert!(
+            !xiangqi_game::is_in_check(board, BLACK),
+            "El General negro no está en jaque (es ahogado / Kunbi)"
+        );
+    }
+    assert!(
+        xiangqi_game::all_legal_moves_for(session.world(), BLACK).is_empty(),
+        "Black no debe tener movimientos legales disponibles"
+    );
+
+    let is_red_winner = events.iter().any(|e| {
+        if let Some(game_over) = e.as_any().downcast_ref::<xiangqi_game::GameOverEvent>() {
+            game_over.winner == Some(RED)
+        } else {
+            false
+        }
+    });
+    assert!(
+        is_red_winner,
+        "En Xiangqi el ahogado (Kunbi) debe otorgar la victoria inmediata a RED"
+    );
+    assert_eq!(
+        session.world().resource::<GameOverResource>().0,
+        true,
+        "GameOverResource debe ser true tras Kunbi"
+    );
+    assert_eq!(
+        session.world().resource::<WinnerResource>().0,
+        Some(RED),
+        "WinnerResource debe ser Some(RED) tras Kunbi"
+    );
+}
+
+#[test]
+fn test_triple_repeticion_xiangqi_declara_tablas() {
+    let mut session = new_xiangqi_session(SessionId(12), 0, RED, BLACK);
+
+    // Ciclo 1 -> 2da aparición de la posición inicial
+    session
+        .process_command(
+            RED,
+            Box::new(MovePieceCommand {
+                player: RED,
+                from: (4, 9),
+                to: (3, 9),
+            }),
+        )
+        .unwrap();
+    session
+        .process_command(
+            BLACK,
+            Box::new(MovePieceCommand {
+                player: BLACK,
+                from: (4, 0),
+                to: (3, 0),
+            }),
+        )
+        .unwrap();
+    session
+        .process_command(
+            RED,
+            Box::new(MovePieceCommand {
+                player: RED,
+                from: (3, 9),
+                to: (4, 9),
+            }),
+        )
+        .unwrap();
+    let events_second = session
+        .process_command(
+            BLACK,
+            Box::new(MovePieceCommand {
+                player: BLACK,
+                from: (3, 0),
+                to: (4, 0),
+            }),
+        )
+        .unwrap();
+    assert!(
+        !events_second
+            .iter()
+            .any(|e| e.as_any().is::<xiangqi_game::GameOverEvent>()),
+        "Con 2 repeticiones aún no debe declararse tablas"
+    );
+
+    // Ciclo 2 -> 3ra aparición de la posición inicial
+    session
+        .process_command(
+            RED,
+            Box::new(MovePieceCommand {
+                player: RED,
+                from: (4, 9),
+                to: (3, 9),
+            }),
+        )
+        .unwrap();
+    session
+        .process_command(
+            BLACK,
+            Box::new(MovePieceCommand {
+                player: BLACK,
+                from: (4, 0),
+                to: (3, 0),
+            }),
+        )
+        .unwrap();
+    session
+        .process_command(
+            RED,
+            Box::new(MovePieceCommand {
+                player: RED,
+                from: (3, 9),
+                to: (4, 9),
+            }),
+        )
+        .unwrap();
+    let events_third = session
+        .process_command(
+            BLACK,
+            Box::new(MovePieceCommand {
+                player: BLACK,
+                from: (3, 0),
+                to: (4, 0),
+            }),
+        )
+        .unwrap();
+
+    let is_draw = events_third.iter().any(|e| {
+        if let Some(go) = e.as_any().downcast_ref::<xiangqi_game::GameOverEvent>() {
+            go.winner.is_none()
+        } else {
+            false
+        }
+    });
+    assert!(
+        is_draw,
+        "Al repetirse 3 veces la misma posición debe emitirse GameOverEvent con winner: None"
+    );
+    assert!(session.world().resource::<GameOverResource>().0);
+    assert_eq!(session.world().resource::<WinnerResource>().0, None);
+}
+
+#[test]
+fn test_xiangqi_legal_move_generator_registrado() {
+    let session = new_xiangqi_session(SessionId(13), 0, RED, BLACK);
+    let rules = xiangqi_game::build_xiangqi_rules();
+
+    let red_moves = rules.legal_moves(session.world(), RED);
+    assert!(
+        !red_moves.is_empty(),
+        "XiangqiLegalMoveGenerator debe generar movimientos legales para RED en su turno"
+    );
+
+    let black_moves = rules.legal_moves(session.world(), BLACK);
+    assert!(
+        black_moves.is_empty(),
+        "XiangqiLegalMoveGenerator no debe generar movimientos para BLACK fuera de su turno"
+    );
+}
+

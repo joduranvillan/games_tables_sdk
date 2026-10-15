@@ -77,10 +77,22 @@ impl TokensResource {
     }
 
     /// Las casillas de salida de cada jugador actúan como casillas seguras donde no se puede capturar.
+    /// Si `star_safe_squares` está activo, también son seguras las casillas estrella en (offset + 8) % TRACK_LEN.
+    pub fn is_safe_square_with_config(&self, board_pos: u32, star_safe_squares: bool) -> bool {
+        self.start_offset.values().any(|&offset| {
+            if offset == board_pos {
+                true
+            } else if star_safe_squares {
+                (offset + 8) % TRACK_LEN == board_pos
+            } else {
+                false
+            }
+        })
+    }
+
+    /// Mantiene compatibilidad directa con el comportamiento por defecto de casillas de salida.
     pub fn is_safe_square(&self, board_pos: u32) -> bool {
-        self.start_offset
-            .values()
-            .any(|&offset| offset == board_pos)
+        self.is_safe_square_with_config(board_pos, false)
     }
 
     /// Comprueba si algún rival del jugador tiene 2 o más fichas en `board_pos` (formando un bloqueo).
@@ -160,3 +172,34 @@ impl TokensResource {
 pub struct PendingRollResource {
     pub pending: HashMap<PlayerId, u32>,
 }
+
+#[derive(GameResource, Default, Debug, Clone, PartialEq, Eq)]
+pub struct ConsecutiveSixesResource {
+    pub count: HashMap<PlayerId, u8>,
+}
+
+impl ConsecutiveSixesResource {
+    pub fn new() -> Self {
+        Self {
+            count: HashMap::new(),
+        }
+    }
+}
+
+#[derive(GameResource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LudoRulesConfigResource {
+    pub star_safe_squares: bool,
+    pub bonus_roll_on_capture_and_goal: bool,
+    pub three_sixes_penalty: bool,
+}
+
+impl Default for LudoRulesConfigResource {
+    fn default() -> Self {
+        Self {
+            star_safe_squares: false,
+            bonus_roll_on_capture_and_goal: false,
+            three_sixes_penalty: false,
+        }
+    }
+}
+

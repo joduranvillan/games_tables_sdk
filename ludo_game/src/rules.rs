@@ -1,7 +1,10 @@
 use open_table_engine::prelude::*;
 
-use crate::board::{PendingRollResource, TokensResource, MAX_STEPS};
-use crate::commands::{MoveTokenCommand, RollDiceCommand};
+use crate::board::{
+    ConsecutiveSixesResource, LudoRulesConfigResource, PendingRollResource, TokensResource,
+    MAX_STEPS,
+};
+use crate::commands::{MoveTokenCommand, ResignCommand, RollDiceCommand, SetLudoRulesCommand};
 use crate::events::{DiceRolledEvent, GameOverEvent, NoValidMovesEvent, TokenMovedEvent};
 
 fn invalid(reason: impl Into<String>) -> EngineError {
@@ -13,7 +16,26 @@ fn invalid(reason: impl Into<String>) -> EngineError {
 pub fn build_ludo_rules() -> RuleEngine {
     let mut rules = RuleEngine::new();
 
+    rules.register::<SetLudoRulesCommand, _>(|cmd, world| {
+        if !world.contains_resource::<LudoRulesConfigResource>() {
+            world.insert_resource(LudoRulesConfigResource::default());
+        }
+        world.insert_resource(LudoRulesConfigResource {
+            star_safe_squares: cmd.star_safe_squares,
+            bonus_roll_on_capture_and_goal: cmd.bonus_roll_on_capture_and_goal,
+            three_sixes_penalty: cmd.three_sixes_penalty,
+        });
+        Ok(vec![])
+    });
+
     rules.register::<RollDiceCommand, _>(|cmd, world| {
+        if !world.contains_resource::<ConsecutiveSixesResource>() {
+            world.insert_resource(ConsecutiveSixesResource::default());
+        }
+        if !world.contains_resource::<LudoRulesConfigResource>() {
+            world.insert_resource(LudoRulesConfigResource::default());
+        }
+
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
             return Err(invalid("no es tu turno"));
         }
@@ -31,6 +53,46 @@ pub fn build_ludo_rules() -> RuleEngine {
             let mut rng = world.resource_mut::<RandomResource>();
             rng.0.roll_die(6)
         };
+
+        let (three_sixes_triggered, current_six_count) = {
+            let config = world
+                .get_resource::<LudoRulesConfigResource>()
+                .copied()
+                .unwrap_or_default();
+            let mut sixes = world.resource_mut::<ConsecutiveSixesResource>();
+            if value == 6 {
+                let entry = sixes.count.entry(cmd.player).or_insert(0);
+                *entry += 1;
+                if *entry == 3 && config.three_sixes_penalty {
+                    *entry = 0;
+                    (true, 3)
+                } else {
+                    (false, *entry)
+                }
+            } else {
+                sixes.count.insert(cmd.player, 0);
+                (false, 0)
+            }
+        };
+
+        if three_sixes_triggered {
+            world
+                .resource_mut::<PendingRollResource>()
+                .pending
+                .remove(&cmd.player);
+            world.resource_mut::<TurnResource>().0.advance();
+            let events: Vec<Box<dyn Event>> = vec![
+                Box::new(DiceRolledEvent {
+                    player: cmd.player,
+                    value,
+                }),
+                Box::new(NoValidMovesEvent {
+                    player: cmd.player,
+                    value: 6,
+                }),
+            ];
+            return Ok(events);
+        }
 
         let has_moves = world
             .resource::<TokensResource>()
@@ -56,10 +118,18 @@ pub fn build_ludo_rules() -> RuleEngine {
             }
         }
 
+        let _ = current_six_count;
         Ok(events)
     });
 
     rules.register::<MoveTokenCommand, _>(|cmd, world| {
+        if !world.contains_resource::<ConsecutiveSixesResource>() {
+            world.insert_resource(ConsecutiveSixesResource::default());
+        }
+        if !world.contains_resource::<LudoRulesConfigResource>() {
+            world.insert_resource(LudoRulesConfigResource::default());
+        }
+
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
             return Err(invalid("no es tu turno"));
         }
@@ -87,6 +157,11 @@ pub fn build_ludo_rules() -> RuleEngine {
             .pending
             .remove(&cmd.player);
 
+        let config = world
+            .get_resource::<LudoRulesConfigResource>()
+            .copied()
+            .unwrap_or_default();
+
         let mut tokens = world.resource_mut::<TokensResource>();
         let current_steps = tokens.tokens[&cmd.player][cmd.token_index];
 
@@ -98,10 +173,11 @@ pub fn build_ludo_rules() -> RuleEngine {
 
         // Captura: si la nueva posición coincide con una ficha rival en
         // el tramo compartido, esa ficha vuelve a la base. Nunca aplica
-        // en la base, tramo final o en casillas seguras (salidas).
+        // en la base, tramo final o en casillas seguras (salidas y estrellas si configurado).
         let mut captured = None;
         if let Some(landing) = tokens.board_position(cmd.player, new_steps) {
-            if !tokens.is_safe_square(landing) {
+            let is_safe = tokens.is_safe_square_with_config(landing, config.star_safe_squares);
+            if !is_safe {
                 let other_players: Vec<PlayerId> = tokens.tokens.keys().copied().collect();
                 for other in other_players {
                     if other == cmd.player {
@@ -135,13 +211,34 @@ pub fn build_ludo_rules() -> RuleEngine {
             events.push(Box::new(GameOverEvent { winner: cmd.player }));
         }
 
-        // Un 6 da turno extra: no se avanza el turno en ese caso.
-        if roll != 6 {
+        // Determinar si gana turno extra:
+        // - Sacar 6 siempre da turno extra
+        // - Si bonus_roll_on_capture_and_goal está activo, capturar o terminar una ficha da turno extra
+        let gains_bonus_turn = roll == 6
+            || (config.bonus_roll_on_capture_and_goal && (captured.is_some() || finished));
+
+        if !all_finished && !gains_bonus_turn {
             world.resource_mut::<TurnResource>().0.advance();
         }
 
         Ok(events)
     });
 
+    rules.register::<ResignCommand, _>(|cmd, world| {
+        let players = world.resource::<TurnResource>().0.players().to_vec();
+        if !players.contains(&cmd.player) {
+            return Err(invalid("no sos un jugador de esta partida"));
+        }
+        let opponent = players
+            .into_iter()
+            .find(|&p| p != cmd.player)
+            .unwrap_or(cmd.player);
+
+        Ok(vec![Box::new(GameOverEvent {
+            winner: opponent,
+        })])
+    });
+
     rules
 }
+

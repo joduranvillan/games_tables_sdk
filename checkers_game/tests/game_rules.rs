@@ -726,3 +726,206 @@ fn test_checkers_ai_captura_multiple_cuando_puede() {
     assert_eq!(chosen.from, pos(0, 1));
     assert_eq!(chosen.to, pos(2, 3));
 }
+
+#[test]
+fn test_victoria_por_bloqueo_total_sin_movimientos_legales() {
+    let mut session = new_checkers_session(SessionId(200), 1, P1, P2);
+
+    // P2 tiene una ficha en (2, 7) (borde derecho, avanza hacia filas menores: solo podría ir a (1, 6)).
+    // Si (0, 5) también está ocupada por P1, P2 tampoco puede saltar sobre (1, 6).
+    // P1 mueve de (0, 7) a (1, 6), dejando a P2 con 1 ficha en el tablero pero 0 movimientos legales.
+    {
+        let mut board = session
+            .world_mut()
+            .resource_mut::<checkers_game::BoardResource>();
+        for r in 0..8u8 {
+            for c in 0..8u8 {
+                board.set(pos(r, c), None);
+            }
+        }
+        board.set(
+            pos(0, 5),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(0, 7),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(2, 7),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
+    }
+
+    let events = session
+        .process_command(P1, move_cmd(P1, pos(0, 7), pos(1, 6)))
+        .expect("el movimiento de bloqueo debe ser válido");
+
+    let game_over = events
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<checkers_game::GameOverEvent>())
+        .expect("debe emitirse GameOverEvent cuando el rival queda sin movimientos legales");
+
+    assert_eq!(game_over.winner, P1);
+    assert!(!game_over.is_draw);
+    assert_eq!(
+        session.world().resource::<GameOverResource>(),
+        &GameOverResource(true)
+    );
+    assert_eq!(
+        session.world().resource::<WinnerResource>(),
+        &WinnerResource(Some(P1))
+    );
+}
+
+#[test]
+fn test_tablas_por_40_movimientos_sin_captura_ni_coronacion() {
+    let mut session = new_checkers_session(SessionId(201), 1, P1, P2);
+
+    // Dos damas lejos entre sí moviéndose sin capturas durante 80 medios turnos (40 movimientos por lado).
+    {
+        let mut board = session
+            .world_mut()
+            .resource_mut::<checkers_game::BoardResource>();
+        for r in 0..8u8 {
+            for c in 0..8u8 {
+                board.set(pos(r, c), None);
+            }
+        }
+        board.set(
+            pos(0, 1),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: true,
+            }),
+        );
+        board.set(
+            pos(7, 6),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: true,
+            }),
+        );
+    }
+
+    for i in 0..40 {
+        let (p1_from, p1_to) = if i % 2 == 0 {
+            (pos(0, 1), pos(1, 0))
+        } else {
+            (pos(1, 0), pos(0, 1))
+        };
+        let ev1 = session
+            .process_command(P1, move_cmd(P1, p1_from, p1_to))
+            .expect("movimiento de dama P1 válido");
+        assert!(
+            ev1.iter()
+                .all(|e| e.as_any().downcast_ref::<checkers_game::GameOverEvent>().is_none()),
+            "no debe terminar antes del medio turno 80"
+        );
+
+        let (p2_from, p2_to) = if i % 2 == 0 {
+            (pos(7, 6), pos(6, 7))
+        } else {
+            (pos(6, 7), pos(7, 6))
+        };
+        let ev2 = session
+            .process_command(P2, move_cmd(P2, p2_from, p2_to))
+            .expect("movimiento de dama P2 válido");
+
+        if i < 39 {
+            assert!(
+                ev2.iter()
+                    .all(|e| e.as_any().downcast_ref::<checkers_game::GameOverEvent>().is_none()),
+                "no debe terminar antes del medio turno 80"
+            );
+        } else {
+            let go = ev2
+                .iter()
+                .find_map(|e| e.as_any().downcast_ref::<checkers_game::GameOverEvent>())
+                .expect("al llegar a 80 medios turnos debe emitirse GameOverEvent de tablas");
+            assert!(go.is_draw);
+        }
+    }
+
+    assert_eq!(
+        session
+            .world()
+            .resource::<checkers_game::DrawClockResource>()
+            .half_moves_without_capture_or_promotion,
+        80
+    );
+    assert_eq!(
+        session.world().resource::<GameOverResource>(),
+        &GameOverResource(true)
+    );
+    assert_eq!(
+        session.world().resource::<WinnerResource>(),
+        &WinnerResource(None)
+    );
+}
+
+#[test]
+fn test_draw_clock_se_reinicia_en_captura_o_coronacion() {
+    let mut session = new_checkers_session(SessionId(202), 1, P1, P2);
+
+    // Pre-cargar DrawClockResource en 50 medios turnos y ejecutar una captura
+    session
+        .world_mut()
+        .insert_resource(checkers_game::DrawClockResource {
+            half_moves_without_capture_or_promotion: 50,
+        });
+
+    {
+        let mut board = session
+            .world_mut()
+            .resource_mut::<checkers_game::BoardResource>();
+        for r in 0..8u8 {
+            for c in 0..8u8 {
+                board.set(pos(r, c), None);
+            }
+        }
+        board.set(
+            pos(3, 4),
+            Some(checkers_game::Piece {
+                owner: P1,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(4, 3),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(7, 6),
+            Some(checkers_game::Piece {
+                owner: P2,
+                is_king: true,
+            }),
+        );
+    }
+
+    session
+        .process_command(P1, move_cmd(P1, pos(3, 4), pos(5, 2)))
+        .expect("captura válida");
+
+    assert_eq!(
+        session
+            .world()
+            .resource::<checkers_game::DrawClockResource>()
+            .half_moves_without_capture_or_promotion,
+        0,
+        "el reloj de tablas debe reiniciarse a 0 tras una captura"
+    );
+}

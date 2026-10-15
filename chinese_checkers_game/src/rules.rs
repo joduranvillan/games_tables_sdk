@@ -1,7 +1,8 @@
+use bevy_ecs::world::World;
 use open_table_engine::prelude::*;
 
 use crate::board::BoardResource;
-use crate::commands::MovePegCommand;
+use crate::commands::{MovePegCommand, ResignCommand};
 use crate::events::{GameOverEvent, PegMovedEvent};
 use crate::position::DIRECTIONS;
 
@@ -11,10 +12,42 @@ fn invalid(reason: impl Into<String>) -> EngineError {
     }
 }
 
+pub struct ChineseCheckersLegalMoveGenerator;
+
+impl LegalMoveGenerator for ChineseCheckersLegalMoveGenerator {
+    fn legal_moves(&self, world: &World, player: PlayerId) -> Vec<Box<dyn Command>> {
+        if world
+            .get_resource::<GameOverResource>()
+            .is_some_and(|g| g.0)
+        {
+            return Vec::new();
+        }
+        if let Some(turn) = world.get_resource::<TurnResource>() {
+            if !turn.0.is_current(player) {
+                return Vec::new();
+            }
+        }
+        let Some(board) = world.get_resource::<BoardResource>() else {
+            return Vec::new();
+        };
+        crate::ai::generate_legal_moves(board, player)
+            .into_iter()
+            .map(|m| Box::new(m) as Box<dyn Command>)
+            .collect()
+    }
+}
+
 pub fn build_chinese_checkers_rules() -> RuleEngine {
     let mut rules = RuleEngine::new();
+    rules.set_legal_move_generator(Box::new(ChineseCheckersLegalMoveGenerator));
 
     rules.register::<MovePegCommand, _>(|cmd, world| {
+        if world
+            .get_resource::<GameOverResource>()
+            .is_some_and(|g| g.0)
+        {
+            return Err(invalid("la partida ya ha terminado"));
+        }
         if !world.resource::<TurnResource>().0.is_current(cmd.player) {
             return Err(invalid("no es tu turno"));
         }
@@ -109,6 +142,8 @@ pub fn build_chinese_checkers_rules() -> RuleEngine {
         })];
 
         if won {
+            world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(Some(cmd.player)));
             events.push(Box::new(GameOverEvent {
                 winner: Some(cmd.player),
             }));
@@ -117,6 +152,23 @@ pub fn build_chinese_checkers_rules() -> RuleEngine {
         world.resource_mut::<TurnResource>().0.advance();
 
         Ok(events)
+    });
+
+    rules.register::<ResignCommand, _>(|cmd, world| {
+        if world
+            .get_resource::<GameOverResource>()
+            .is_some_and(|g| g.0)
+        {
+            return Err(invalid("la partida ya ha terminado"));
+        }
+        let players = world.resource::<TurnResource>().0.players().to_vec();
+        if !players.contains(&cmd.player) {
+            return Err(invalid("el jugador no pertenece a la partida"));
+        }
+        let winner = players.into_iter().find(|&p| p != cmd.player);
+        world.insert_resource(GameOverResource(true));
+        world.insert_resource(WinnerResource(winner));
+        Ok(vec![Box::new(GameOverEvent { winner })])
     });
 
     rules

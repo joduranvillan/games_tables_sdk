@@ -11,10 +11,11 @@ pub mod rules;
 
 pub use ai::ludo_ai_pick_move;
 pub use board::{
-    next_step_for, PendingRollResource, TokensResource, BOARD_STEPS, HOME_STRETCH_LEN, MAX_STEPS,
-    TOKENS_PER_PLAYER, TRACK_LEN, WIN_STEPS,
+    next_step_for, ConsecutiveSixesResource, LudoRulesConfigResource, PendingRollResource,
+    TokensResource, BOARD_STEPS, HOME_STRETCH_LEN, MAX_STEPS, TOKENS_PER_PLAYER, TRACK_LEN,
+    WIN_STEPS,
 };
-pub use commands::{MoveTokenCommand, RollDiceCommand};
+pub use commands::{MoveTokenCommand, ResignCommand, RollDiceCommand, SetLudoRulesCommand};
 pub use events::{DiceRolledEvent, GameOverEvent, NoValidMovesEvent, TokenMovedEvent};
 pub use rules::build_ludo_rules;
 
@@ -38,5 +39,11 @@ pub fn new_ludo_session(session_id: SessionId, seed: u64, players: Vec<PlayerId>
     session
         .world_mut()
         .insert_resource(PendingRollResource::default());
+    session
+        .world_mut()
+        .insert_resource(ConsecutiveSixesResource::default());
+    session
+        .world_mut()
+        .insert_resource(LudoRulesConfigResource::default());
     session
 }

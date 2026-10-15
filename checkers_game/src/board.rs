@@ -9,6 +9,11 @@ pub struct MultiCaptureResource {
     pub active_piece: Option<Position>,
 }
 
+#[derive(GameResource, Default, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DrawClockResource {
+    pub half_moves_without_capture_or_promotion: u32,
+}
+
 /// El tablero completo. 8x8 aunque solo se usen las 32 casillas oscuras
 /// (las claras quedan siempre en `None`) — simplifica el código de
 /// indexado a costa de un poco de memoria desperdiciada, precio
@@ -94,6 +99,50 @@ impl BoardResource {
             }
         }
         all_captures
+    }
+
+    /// Devuelve todos los movimientos legales `(from, to)` para `player`
+    /// respetando la regla de captura obligatoria.
+    pub fn get_all_legal_moves(
+        &self,
+        sides: &Sides,
+        player: PlayerId,
+    ) -> Vec<(Position, Position)> {
+        let captures = self.get_all_available_captures(sides, player);
+        if !captures.is_empty() {
+            return captures;
+        }
+
+        let forward = sides.forward_direction(player);
+        let mut moves = Vec::new();
+        for row in 0..8u8 {
+            for col in 0..8u8 {
+                let from = Position::new(row, col);
+                if let Some(piece) = self.get(from) {
+                    if piece.owner != player {
+                        continue;
+                    }
+                    let directions: &[(i8, i8)] = if piece.is_king {
+                        &[(-1, -1), (-1, 1), (1, -1), (1, 1)]
+                    } else if forward == 1 {
+                        &[(1, -1), (1, 1)]
+                    } else {
+                        &[(-1, -1), (-1, 1)]
+                    };
+                    for &(dr, dc) in directions {
+                        let nr = row as i8 + dr;
+                        let nc = col as i8 + dc;
+                        if (0..8).contains(&nr) && (0..8).contains(&nc) {
+                            let to = Position::new(nr as u8, nc as u8);
+                            if to.is_dark_square() && self.get(to).is_none() {
+                                moves.push((from, to));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        moves
     }
 
     /// Cuenta cuántas fichas le quedan a cada jugador. Con exactamente

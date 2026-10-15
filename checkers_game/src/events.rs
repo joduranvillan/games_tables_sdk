@@ -19,4 +19,6 @@ pub struct PieceMovedEvent {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
 pub struct GameOverEvent {
     pub winner: PlayerId,
+    #[serde(default)]
+    pub is_draw: bool,
 }

@@ -15,3 +15,23 @@ pub struct MoveTokenCommand {
     pub player: PlayerId,
     pub token_index: usize,
 }
+
+/// Permite configurar dinámicamente las reglas opcionales de Ludo
+/// (tres 6 seguidos, turno extra por captura/meta, casillas estrella).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct SetLudoRulesCommand {
+    #[serde(default)]
+    pub star_safe_squares: bool,
+    #[serde(default)]
+    pub bonus_roll_on_capture_and_goal: bool,
+    #[serde(default)]
+    pub three_sixes_penalty: bool,
+}
+
+/// Permite a un jugador rendirse y conceder la partida.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct ResignCommand {
+    #[issuer]
+    pub player: PlayerId,
+}
+

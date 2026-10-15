@@ -6,17 +6,20 @@ use crate::board::{
     ChanceCard, CommunityChestCard, SpaceKind, BOARD_SIZE, GO_BONUS, GO_TO_JAIL_SPACE, JAIL_SPACE,
 };
 use crate::commands::{
-    AuctionBidCommand, BuyPropertyCommand, PayJailFeeCommand, RollAndMoveCommand,
+    AuctionBidCommand, BuildHouseCommand, BuyPropertyCommand, MortgagePropertyCommand,
+    PayJailFeeCommand, RollAndMoveCommand, SellHouseCommand, UnmortgagePropertyCommand,
+    UseJailCardCommand,
 };
 use crate::events::{
     AuctionStartedEvent, AuctionWonEvent, BankruptcyEvent, ChanceCardDrawnEvent,
-    CommunityChestCardDrawnEvent, GameOverEvent, JailedEvent, PlayerMovedEvent,
-    PropertyPurchasedEvent, RailroadRentPaidEvent, RentPaidEvent, TaxPaidEvent,
-    UtilityRentPaidEvent,
+    CommunityChestCardDrawnEvent, GameOverEvent, HouseBuiltEvent, HouseSoldEvent,
+    JailCardUsedEvent, JailedEvent, PlayerMovedEvent, PropertyMortgagedEvent,
+    PropertyPurchasedEvent, PropertyUnmortgagedEvent, RailroadRentPaidEvent, RentPaidEvent,
+    TaxPaidEvent, UtilityRentPaidEvent,
 };
 use crate::resources::{
-    AuctionResource, AuctionState, BoardResource, JailResource, PendingDecision,
-    PendingPurchaseResource, PlayersResource,
+    AuctionResource, AuctionState, BoardResource, BuildingsResource, JailResource,
+    PendingDecision, PendingPurchaseResource, PlayersResource,
 };
 
 fn invalid(reason: impl Into<String>) -> EngineError {
@@ -76,6 +79,18 @@ fn handle_bankruptcy(
     }
 }
 
+pub fn house_cost_for_space(space: usize) -> u32 {
+    if space < 10 {
+        50
+    } else if space < 20 {
+        100
+    } else if space < 30 {
+        150
+    } else {
+        200
+    }
+}
+
 /// Aplica el efecto de caer en una casilla determinada.
 /// Devuelve `true` si el jugador debe tomar una decisión (e.g. comprar propiedad)
 /// antes de que el turno pueda avanzar.
@@ -115,10 +130,44 @@ pub fn apply_land_effect(
                 }
                 Some(owner) if owner == player => false,
                 Some(owner) => {
-                    let mut players = world.resource_mut::<PlayersResource>();
-                    let is_full_group = players.owns_full_group(&board_spaces, owner, group);
-                    let actual_rent = if is_full_group { rent * 2 } else { *rent };
+                    if world
+                        .resource::<PlayersResource>()
+                        .mortgaged
+                        .contains(&space_idx)
+                    {
+                        return false;
+                    }
 
+                    let is_full_group = world
+                        .resource::<PlayersResource>()
+                        .owns_full_group(&board_spaces, owner, group);
+
+                    if !world.contains_resource::<BuildingsResource>() {
+                        world.insert_resource(BuildingsResource::default());
+                    }
+                    let buildings_lvl = world
+                        .resource::<BuildingsResource>()
+                        .buildings
+                        .get(&space_idx)
+                        .copied()
+                        .unwrap_or(0);
+
+                    let actual_rent = match buildings_lvl {
+                        0 => {
+                            if is_full_group {
+                                rent * 2
+                            } else {
+                                *rent
+                            }
+                        }
+                        1 => rent * 5,
+                        2 => rent * 15,
+                        3 => rent * 45,
+                        4 => rent * 80,
+                        _ => rent * 125,
+                    };
+
+                    let mut players = world.resource_mut::<PlayersResource>();
                     let payer_money =
                         players.money.get(&player).copied().unwrap_or(0) - actual_rent as i64;
                     players.money.insert(player, payer_money);
@@ -161,6 +210,14 @@ pub fn apply_land_effect(
                 }
                 Some(owner) if owner == player => false,
                 Some(owner) => {
+                    if world
+                        .resource::<PlayersResource>()
+                        .mortgaged
+                        .contains(&space_idx)
+                    {
+                        return false;
+                    }
+
                     let count = world
                         .resource::<PlayersResource>()
                         .count_utilities(&board_spaces, owner);
@@ -211,6 +268,14 @@ pub fn apply_land_effect(
                 }
                 Some(owner) if owner == player => false,
                 Some(owner) => {
+                    if world
+                        .resource::<PlayersResource>()
+                        .mortgaged
+                        .contains(&space_idx)
+                    {
+                        return false;
+                    }
+
                     let count = world
                         .resource::<PlayersResource>()
                         .count_railroads(&board_spaces, owner);
@@ -385,10 +450,17 @@ pub fn apply_land_effect(
                         &rr_space, target_rr, player, roll, is_doubles, world, events,
                     )
                 }
-                ChanceCard::BankDividend50 | ChanceCard::GetOutOfJailFree => {
+                ChanceCard::BankDividend50 => {
                     let mut players = world.resource_mut::<PlayersResource>();
                     let money = players.money.get(&player).copied().unwrap_or(0) + 50;
                     players.money.insert(player, money);
+                    false
+                }
+                ChanceCard::GetOutOfJailFree => {
+                    let mut players = world.resource_mut::<PlayersResource>();
+                    let money = players.money.get(&player).copied().unwrap_or(0) + 50;
+                    players.money.insert(player, money);
+                    *players.jail_free_cards.entry(player).or_insert(0) += 1;
                     false
                 }
                 ChanceCard::GoBack3Spaces => {
@@ -464,10 +536,17 @@ pub fn apply_land_effect(
                     }
                     false
                 }
-                CommunityChestCard::FromSaleOfStock50 | CommunityChestCard::GetOutOfJailFree => {
+                CommunityChestCard::FromSaleOfStock50 => {
                     let mut players = world.resource_mut::<PlayersResource>();
                     let money = players.money.get(&player).copied().unwrap_or(0) + 50;
                     players.money.insert(player, money);
+                    false
+                }
+                CommunityChestCard::GetOutOfJailFree => {
+                    let mut players = world.resource_mut::<PlayersResource>();
+                    let money = players.money.get(&player).copied().unwrap_or(0) + 50;
+                    players.money.insert(player, money);
+                    *players.jail_free_cards.entry(player).or_insert(0) += 1;
                     false
                 }
                 CommunityChestCard::GoToJail => {
@@ -657,6 +736,11 @@ pub fn build_monopoly_rules() -> RuleEngine {
         let mut events: Vec<Box<dyn Event>> = Vec::new();
 
         if is_jailed {
+            world
+                .resource_mut::<JailResource>()
+                .consecutive_doubles
+                .insert(cmd.player, 0);
+
             if is_doubles {
                 world
                     .resource_mut::<JailResource>()
@@ -701,6 +785,44 @@ pub fn build_monopoly_rules() -> RuleEngine {
                     return Ok(events);
                 }
             }
+        } else if is_doubles {
+            let count = {
+                let mut jail_res = world.resource_mut::<JailResource>();
+                let entry = jail_res.consecutive_doubles.entry(cmd.player).or_insert(0);
+                *entry += 1;
+                *entry
+            };
+            if count >= 3 {
+                world
+                    .resource_mut::<JailResource>()
+                    .consecutive_doubles
+                    .insert(cmd.player, 0);
+                world
+                    .resource_mut::<PlayersResource>()
+                    .position
+                    .insert(cmd.player, JAIL_SPACE);
+                world
+                    .resource_mut::<JailResource>()
+                    .jailed
+                    .insert(cmd.player, 3);
+                events.push(Box::new(PlayerMovedEvent {
+                    player: cmd.player,
+                    roll,
+                    d1,
+                    d2,
+                    is_doubles: true,
+                    new_position: JAIL_SPACE,
+                    passed_go: false,
+                }));
+                events.push(Box::new(JailedEvent { player: cmd.player }));
+                advance_turn_skip_bankrupt(world);
+                return Ok(events);
+            }
+        } else {
+            world
+                .resource_mut::<JailResource>()
+                .consecutive_doubles
+                .insert(cmd.player, 0);
         }
 
         let board_spaces = world.resource::<BoardResource>().spaces.clone();
@@ -726,13 +848,12 @@ pub fn build_monopoly_rules() -> RuleEngine {
 
         players.position.insert(cmd.player, new_pos);
         players.money.insert(cmd.player, money);
-        let _ = players;
+        drop(players);
 
         if jailed {
-            world
-                .resource_mut::<JailResource>()
-                .jailed
-                .insert(cmd.player, 3);
+            let mut jail = world.resource_mut::<JailResource>();
+            jail.consecutive_doubles.insert(cmd.player, 0);
+            jail.jailed.insert(cmd.player, 3);
         }
 
         events.push(Box::new(PlayerMovedEvent {
@@ -769,6 +890,10 @@ pub fn build_monopoly_rules() -> RuleEngine {
             .bankrupt
             .contains(&cmd.player);
         if !awaiting_decision && (!is_doubles || is_bankrupt) {
+            world
+                .resource_mut::<JailResource>()
+                .consecutive_doubles
+                .insert(cmd.player, 0);
             advance_turn_skip_bankrupt(world);
         }
 
@@ -839,6 +964,338 @@ pub fn build_monopoly_rules() -> RuleEngine {
 
             events.push(Box::new(AuctionStartedEvent { space }));
         }
+
+        Ok(events)
+    });
+
+    rules.register::<BuildHouseCommand, _>(|cmd, world| {
+        if !world.contains_resource::<BuildingsResource>() {
+            world.insert_resource(BuildingsResource::default());
+        }
+
+        if !world.resource::<TurnResource>().0.is_current(cmd.player) {
+            return Err(invalid("no es tu turno"));
+        }
+
+        let board = world.resource::<BoardResource>().spaces.clone();
+        if cmd.space >= board.len() {
+            return Err(invalid("casilla fuera de rango"));
+        }
+
+        let group = match &board[cmd.space] {
+            SpaceKind::Property { group, .. } => group.clone(),
+            _ => return Err(invalid("solo se puede construir en calles")),
+        };
+
+        let players = world.resource::<PlayersResource>();
+        if players.properties.get(&cmd.space) != Some(&cmd.player) {
+            return Err(invalid("no eres el dueño de esta propiedad"));
+        }
+
+        if !players.owns_full_group(&board, cmd.player, &group) {
+            return Err(invalid("debes poseer todo el grupo de color para construir"));
+        }
+
+        for (idx, space) in board.iter().enumerate() {
+            if let SpaceKind::Property { group: g, .. } = space {
+                if g == &group && players.mortgaged.contains(&idx) {
+                    return Err(invalid(
+                        "no se puede construir si alguna propiedad del grupo está hipotecada",
+                    ));
+                }
+            }
+        }
+
+        let buildings = world.resource::<BuildingsResource>();
+        let current_level = buildings.buildings.get(&cmd.space).copied().unwrap_or(0);
+        if current_level >= 5 {
+            return Err(invalid("la propiedad ya tiene el nivel máximo (hotel)"));
+        }
+
+        let group_spaces: Vec<usize> = board
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, s)| match s {
+                SpaceKind::Property { group: g, .. } if g == &group => Some(idx),
+                _ => None,
+            })
+            .collect();
+
+        let other_spaces: Vec<usize> = group_spaces
+            .into_iter()
+            .filter(|&idx| idx != cmd.space)
+            .collect();
+        if !other_spaces.is_empty() {
+            let min_other = other_spaces
+                .iter()
+                .map(|&idx| buildings.buildings.get(&idx).copied().unwrap_or(0))
+                .min()
+                .unwrap_or(0);
+            if current_level > min_other {
+                return Err(invalid(
+                    "regla de construcción uniforme: debes construir primero en las propiedades con menos edificios",
+                ));
+            }
+        }
+
+        let cost = house_cost_for_space(cmd.space);
+        let player_money = players.money.get(&cmd.player).copied().unwrap_or(0);
+        if player_money < cost as i64 {
+            return Err(invalid("no tienes suficiente dinero para construir"));
+        }
+
+        let _ = players;
+        let _ = buildings;
+
+        let mut players = world.resource_mut::<PlayersResource>();
+        let current_money = players.money.get(&cmd.player).copied().unwrap_or(0);
+        players.money.insert(cmd.player, current_money - cost as i64);
+        let _ = players;
+
+        let mut buildings = world.resource_mut::<BuildingsResource>();
+        let new_level = current_level + 1;
+        buildings.buildings.insert(cmd.space, new_level);
+        drop(buildings);
+
+        let events: Vec<Box<dyn Event>> = vec![Box::new(HouseBuiltEvent {
+            player: cmd.player,
+            space: cmd.space,
+            level: new_level,
+            cost,
+        })];
+
+        Ok(events)
+    });
+
+    rules.register::<SellHouseCommand, _>(|cmd, world| {
+        if !world.contains_resource::<BuildingsResource>() {
+            world.insert_resource(BuildingsResource::default());
+        }
+
+        if !world.resource::<TurnResource>().0.is_current(cmd.player) {
+            return Err(invalid("no es tu turno"));
+        }
+
+        let board = world.resource::<BoardResource>().spaces.clone();
+        if cmd.space >= board.len() {
+            return Err(invalid("casilla fuera de rango"));
+        }
+
+        let group = match &board[cmd.space] {
+            SpaceKind::Property { group, .. } => group.clone(),
+            _ => return Err(invalid("solo se puede vender edificios en calles")),
+        };
+
+        let players = world.resource::<PlayersResource>();
+        if players.properties.get(&cmd.space) != Some(&cmd.player) {
+            return Err(invalid("no eres el dueño de esta propiedad"));
+        }
+
+        let buildings = world.resource::<BuildingsResource>();
+        let current_level = buildings.buildings.get(&cmd.space).copied().unwrap_or(0);
+        if current_level == 0 {
+            return Err(invalid("no hay edificios construidos en esta propiedad"));
+        }
+
+        let group_spaces: Vec<usize> = board
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, s)| match s {
+                SpaceKind::Property { group: g, .. } if g == &group => Some(idx),
+                _ => None,
+            })
+            .collect();
+
+        let other_spaces: Vec<usize> = group_spaces
+            .into_iter()
+            .filter(|&idx| idx != cmd.space)
+            .collect();
+        if !other_spaces.is_empty() {
+            let max_other = other_spaces
+                .iter()
+                .map(|&idx| buildings.buildings.get(&idx).copied().unwrap_or(0))
+                .max()
+                .unwrap_or(0);
+            if current_level < max_other {
+                return Err(invalid(
+                    "regla de desmonte uniforme: debes vender primero en las propiedades con más edificios",
+                ));
+            }
+        }
+
+        let cost = house_cost_for_space(cmd.space);
+        let refund = cost / 2;
+
+        let _ = players;
+        let _ = buildings;
+
+        let mut players = world.resource_mut::<PlayersResource>();
+        let current_money = players.money.get(&cmd.player).copied().unwrap_or(0);
+        players.money.insert(cmd.player, current_money + refund as i64);
+        let _ = players;
+
+        let mut buildings = world.resource_mut::<BuildingsResource>();
+        let new_level = current_level - 1;
+        if new_level == 0 {
+            buildings.buildings.remove(&cmd.space);
+        } else {
+            buildings.buildings.insert(cmd.space, new_level);
+        }
+        drop(buildings);
+
+        let events: Vec<Box<dyn Event>> = vec![Box::new(HouseSoldEvent {
+            player: cmd.player,
+            space: cmd.space,
+            level: new_level,
+            refund,
+        })];
+
+        Ok(events)
+    });
+
+    rules.register::<UseJailCardCommand, _>(|cmd, world| {
+        if !world.resource::<TurnResource>().0.is_current(cmd.player) {
+            return Err(invalid("no es tu turno"));
+        }
+
+        let is_jailed = world
+            .resource::<JailResource>()
+            .jailed
+            .contains_key(&cmd.player);
+        if !is_jailed {
+            return Err(invalid("no estás en la cárcel"));
+        }
+
+        let mut players = world.resource_mut::<PlayersResource>();
+        let cards = players
+            .jail_free_cards
+            .get(&cmd.player)
+            .copied()
+            .unwrap_or(0);
+        if cards == 0 {
+            return Err(invalid("no tienes ninguna tarjeta para salir de la cárcel"));
+        }
+        players.jail_free_cards.insert(cmd.player, cards - 1);
+        let _ = players;
+
+        world
+            .resource_mut::<JailResource>()
+            .jailed
+            .remove(&cmd.player);
+
+        let events: Vec<Box<dyn Event>> = vec![Box::new(JailCardUsedEvent {
+            player: cmd.player,
+        })];
+
+        Ok(events)
+    });
+
+    rules.register::<MortgagePropertyCommand, _>(|cmd, world| {
+        if !world.resource::<TurnResource>().0.is_current(cmd.player) {
+            return Err(invalid("no es tu turno"));
+        }
+
+        let board = world.resource::<BoardResource>().spaces.clone();
+        if cmd.space >= board.len() {
+            return Err(invalid("casilla fuera de rango"));
+        }
+
+        let players = world.resource::<PlayersResource>();
+        if players.properties.get(&cmd.space) != Some(&cmd.player) {
+            return Err(invalid("no eres el dueño de esta propiedad"));
+        }
+
+        if players.mortgaged.contains(&cmd.space) {
+            return Err(invalid("la propiedad ya está hipotecada"));
+        }
+
+        let (price, group_opt) = match &board[cmd.space] {
+            SpaceKind::Property { price, group, .. } => (*price, Some(group.clone())),
+            SpaceKind::Railroad { price, .. } => (*price, None),
+            SpaceKind::Utility { price, .. } => (*price, None),
+            _ => return Err(invalid("esta casilla no se puede hipotecar")),
+        };
+
+        if let Some(ref group) = group_opt {
+            if world.contains_resource::<BuildingsResource>() {
+                let buildings = world.resource::<BuildingsResource>();
+                for (idx, space) in board.iter().enumerate() {
+                    if let SpaceKind::Property { group: g, .. } = space {
+                        if g == group && buildings.buildings.get(&idx).copied().unwrap_or(0) > 0 {
+                            return Err(invalid(
+                                "no se puede hipotecar una propiedad de un grupo con edificios",
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        let _ = players;
+
+        let mortgage_value = price / 2;
+        let mut players = world.resource_mut::<PlayersResource>();
+        let current_money = players.money.get(&cmd.player).copied().unwrap_or(0);
+        players.money.insert(cmd.player, current_money + mortgage_value as i64);
+        players.mortgaged.insert(cmd.space);
+        let _ = players;
+
+        let events: Vec<Box<dyn Event>> = vec![Box::new(PropertyMortgagedEvent {
+            player: cmd.player,
+            space: cmd.space,
+            amount: mortgage_value,
+        })];
+
+        Ok(events)
+    });
+
+    rules.register::<UnmortgagePropertyCommand, _>(|cmd, world| {
+        if !world.resource::<TurnResource>().0.is_current(cmd.player) {
+            return Err(invalid("no es tu turno"));
+        }
+
+        let board = world.resource::<BoardResource>().spaces.clone();
+        if cmd.space >= board.len() {
+            return Err(invalid("casilla fuera de rango"));
+        }
+
+        let players = world.resource::<PlayersResource>();
+        if players.properties.get(&cmd.space) != Some(&cmd.player) {
+            return Err(invalid("no eres el dueño de esta propiedad"));
+        }
+
+        if !players.mortgaged.contains(&cmd.space) {
+            return Err(invalid("la propiedad no está hipotecada"));
+        }
+
+        let price = match &board[cmd.space] {
+            SpaceKind::Property { price, .. } => *price,
+            SpaceKind::Railroad { price, .. } => *price,
+            SpaceKind::Utility { price, .. } => *price,
+            _ => return Err(invalid("esta casilla no es una propiedad")),
+        };
+
+        let cost = (price / 2) * 110 / 100;
+        let current_money = players.money.get(&cmd.player).copied().unwrap_or(0);
+        if current_money < cost as i64 {
+            return Err(invalid(
+                "no tienes suficiente dinero para deshipotecar la propiedad",
+            ));
+        }
+
+        let _ = players;
+
+        let mut players = world.resource_mut::<PlayersResource>();
+        let current_money = players.money.get(&cmd.player).copied().unwrap_or(0);
+        players.money.insert(cmd.player, current_money - cost as i64);
+        players.mortgaged.remove(&cmd.space);
+        let _ = players;
+
+        let events: Vec<Box<dyn Event>> = vec![Box::new(PropertyUnmortgagedEvent {
+            player: cmd.player,
+            space: cmd.space,
+            cost,
+        })];
 
         Ok(events)
     });

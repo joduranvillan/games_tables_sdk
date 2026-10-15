@@ -14,36 +14,28 @@ un resumen de estado + cómo correr cada parte.
 ## Nivel de confianza distinto según la parte
 
 ### Juegos de referencia y reglas
-Cada uno con su propio `Command`/`Event`/`Resource`, reglas reales registradas en el `RuleEngine`, y referencia de reglas documentada:
+Cada uno con su propio `Command`/`Event`/`Resource`, reglas reales registradas en el `RuleEngine`, y referencia de reglas documentada (ver **[`PROMPTS13.md`](./PROMPTS13.md)** para el cierre del 100% de reglas canónicas de torneo y su cableado en UI):
 
-| Juego | Reglas Básicas | Reglas Completas | Tests Rust | Test Godot | UI Godot | Documentación |
-|---|:---:|:---:|:---:|:---:|:---:|---|
-| **Ajedrez** (`chess_game`) | ✅ | ⚠️ (sin enroque/al paso) | ✅ | ✅ | ✅ | [`chess.md`](./docs/games/chess.md) |
-| **Damas** (`checkers_game`) | ✅ | ⚠️ (sin captura obligatoria) | ✅ | ✅ | ✅ | [`checkers.md`](./docs/games/checkers.md) |
-| **Go** (`go_game`) | ✅ | ⚠️ (sin regla de Ko) | ✅ | ✅ | ✅ | [`go.md`](./docs/games/go.md) |
-| **Shogi** (`shogi_game`) | ✅ | ⚠️ (falta Nifu/Uchifuzume) | ✅ | ✅ | ✅ | [`shogi.md`](./docs/games/shogi.md) |
-| **Xiangqi** (`xiangqi_game`) | ✅ | ⚠️ (falta General Volador) | ✅ | ✅ | ✅ | [`xiangqi.md`](./docs/games/xiangqi.md) |
-| **Damas Chinas** (`chinese_checkers_game`) | ✅ | ⚠️ (tablero estrella) | ✅ | ✅ | ✅ | [`chinese_checkers.md`](./docs/games/chinese_checkers.md) |
-| **Backgammon** (`backgammon_game`) | ✅ | ⚠️ (sin doubling cube) | ✅ | ✅ | ✅ | [`backgammon.md`](./docs/games/backgammon.md) |
-| **Batalla naval** (`battleship_game`) | ✅ | ⚠️ (tablero 8x8) | ✅ | ✅ | ✅ | [`battleship.md`](./docs/games/battleship.md) |
-| **Ludo** (`ludo_game`) | ✅ | ⚠️ (24 casillas) | ✅ | ✅ | ✅ | [`ludo.md`](./docs/games/ludo.md) |
-| **Mil Millas** (`mille_bornes_game`) | ✅ | ⚠️ (meta 200) | ✅ | ✅ | ✅ | [`mille_bornes.md`](./docs/games/mille_bornes.md) |
-| **Monopoly** (`monopoly_game`) | ✅ | ⚠️ (16 casillas) | ✅ | ✅ | ✅ | [`monopoly.md`](./docs/games/monopoly.md) |
-| **Uno** (`uno_game`) | ✅ | ⚠️ (sin intercepción) | ✅ | ✅ | ✅ | [`uno.md`](./docs/games/uno.md) |
-| **Crisis / TEG** (`crisis_game`) | ✅ | ✅ (30 terr, 6 cont, obj. sec) | ✅ | ✅ | ✅ | [`teg.md`](./docs/games/teg.md) |
+| Juego | Reglas Básicas | Reglas en Motor Rust | Pendiente Canónico / UI (`PROMPTS13.md`) | Tests Rust | Test Godot | UI Godot | Documentación |
+|---|:---:|:---:|---|:---:|:---:|:---:|---|
+| **Ajedrez** (`chess_game`) | ✅ | ✅ (enroque, al paso, promoción, 50 mov, triple rep, mat. insuf., tablas) | ⚠️ UI: selector visual de pieza al coronar y botones de oferta/aceptación de tablas en tablero | ✅ | ✅ | ✅ | [`chess.md`](./docs/games/chess.md) |
+| **Damas** (`checkers_game`) | ✅ | ✅ (captura obligatoria, saltos múltiples encadenados, dama 4 diag.) | ⚠️ Motor: victoria por bloqueo total sin jugadas legales del rival y tablas por 40 turnos sin captura | ✅ | ✅ | ✅ | [`checkers.md`](./docs/games/checkers.md) |
+| **Go** (`go_game`) | ✅ | ✅ (Ko, Superko posicional, suicidio prohibido, Handicap, marcado de muertas) | ⚠️ Motor/UI: Komi (6.5) + prisioneros en score final; botones `Pass`, `MarkDead` y `ConfirmDead` en `go_board.gd` | ✅ | ✅ | ✅ | [`go.md`](./docs/games/go.md) |
+| **Shogi** (`shogi_game`) | ✅ | ✅ (drops con despromoción, Nifu, Uchifuzume, Fuzumi/Todome) | ⚠️ Motor/UI: promoción opcional vs obligatoria por fila exacta, Sennichite (repetición ×4) y modal de promoción en UI | ✅ | ✅ | ✅ | [`shogi.md`](./docs/games/shogi.md) |
+| **Xiangqi** (`xiangqi_game`) | ✅ | ✅ (General Volador, ojo de elefante, pata de caballo, río, palacio, cañón) | ⚠️ Motor: derrota por ahogado (*Kunbi*), `LegalMoveGenerator` en `RuleEngine` y regla de repetición | ✅ | ✅ | ✅ | [`xiangqi.md`](./docs/games/xiangqi.md) |
+| **Damas Chinas** (`chinese_checkers_game`) | ✅ | ✅ (estrella oficial de 121 casillas, 2/3/4/6 jugadores, saltos encadenados `path`) | ⚠️ Motor: regla oficial anti-bloqueo en punta de meta (*home-camp spoiling*), `ResignCommand` y `LegalMoveGenerator` | ✅ | ✅ | ✅ | [`chinese_checkers.md`](./docs/games/chinese_checkers.md) |
+| **Backgammon** (`backgammon_game`) | ✅ | ✅ (dobles = 4 movs, Doubling Cube, regla Crawford, bear-off exacto, Gammon/Backgammon) | ⚠️ Motor/UI: obligación de usar ambos dados (o el mayor) y botones de `Offer/Accept/RejectDouble` en `backgammon_board.gd` | ✅ | ✅ | ✅ | [`backgammon.md`](./docs/games/backgammon.md) |
+| **Batalla naval** (`battleship_game`) | ✅ | ✅ (tablero 10×10, 5 barcos `[5,4,3,3,2]`, separación 8 dir., `RematchCommand`) | ⚠️ Motor/UI: variante configurable de turno extra al acertar (`extra_turn_on_hit`), `ResignCommand` y botón Revancha en UI | ✅ | ✅ | ✅ | [`battleship.md`](./docs/games/battleship.md) |
+| **Ludo** (`ludo_game`) | ✅ | ✅ (track de 52 casillas + 5 meta, salida/turno extra con 6, casillas seguras, barreras) | ⚠️ Motor: anulación de turno por 3 seises seguidos, tiro extra por captura/meta y 4 casillas seguras de estrella (`+8`) | ✅ | ✅ | ✅ | [`ludo.md`](./docs/games/ludo.md) |
+| **Mil Millas** (`mille_bornes_game`) | ✅ | ✅ (meta 1000 km con extensión, límite 2×200 km, rebarajado, `RightOfWay`, `CoupFourre`) | ⚠️ Motor/UI: las 3 cartas de seguridad restantes (`ExtraTank`, `PunctureProof`, `DrivingAce`), turno extra por Safety y botón Coup Fourré en UI | ✅ | ✅ | ✅ | [`mille_bornes.md`](./docs/games/mille_bornes.md) |
+| **Monopoly** (`monopoly_game`) | ✅ | ✅ (tablero 40 casillas, 10 Suerte + 10 Arca, Cárcel, Subastas, renta doble grupo, quiebra) | ⚠️ Motor/UI: construcción de Casas/Hoteles, Hipotecas, 3 dobles seguidos a la cárcel, retención de carta salir de cárcel e Intercambios | ✅ | ✅ | ✅ | [`monopoly.md`](./docs/games/monopoly.md) |
+| **Uno** (`uno_game`) | ✅ | ✅ (mazo 108 cartas, stacking `+2`/`+4`, validación `+4` legal, robo/juego inmediato, `InterceptCommand`) | ⚠️ Motor/UI: grito/penalización de `"¡UNO!"` (+2 cartas), desafío formal de `+4` (`ChallengeWildDrawFour`) y botón Jump-In en `uno_board.gd` | ✅ | ✅ | ✅ | [`uno.md`](./docs/games/uno.md) |
+| **Crisis / TEG** (`crisis_game`) | ✅ | ✅ (30 territorios, 6 continentes, objetivos secretos, combate 3v3, canje de tarjetas y fortificación) | ⚠️ Motor: robo automático de 1 `TerritoryCard` al conquistar al menos un país en el turno y bono de +2 ejércitos por tarjeta de país propio | ✅ | ✅ | ✅ | [`teg.md`](./docs/games/teg.md) |
 
 **`open_table_godot/` (bridge de Godot/Redot): compila, carga y está
 verificado en runtime.** Corre en Redot 26.2 (= Godot 4.5.2 por dentro).
-Un único nodo `CheckersBridge` soporta tres modos (local, host, cliente
-por TCP) — ver `open_table_godot/BRIDGE_USAGE.md`. Hay una escena
-jugable de damas en `godot_project/` (modo local) y dos tests headless
-que confirman la cadena motor→bridge→señales: uno de humo (modo local)
-y uno de host/cliente sobre TCP real. Detalles del binding contra Redot
-(feature `api-custom` + shim) en `open_table_godot/GODOT_SETUP.md`;
-cómo correr el demo, en `godot_project/README.md`.
-
-**Todavía NO verificado** (`platform_plugins/android`, `platform_plugins/ios`):
-falta compilarlos con Android Studio / Xcode.
+Un único nodo `OpenTableBridge` soporta modos local, vs IA, host/cliente TCP,
+Relay WebSocket y P2P móvil — ver `open_table_godot/BRIDGE_USAGE.md`.
 
 ## Quick Start / Guía de Integración
 
@@ -93,8 +85,8 @@ Cálculo oficial de puntuación ELO ($E_a = \frac{1}{1 + 10^{(R_b - R_a)/400}}$,
 ### 3. Oponente de IA Local Offline (`ai_player: Option<PlayerId>`)
 El motor cuenta con algoritmos de IA locales y deterministas (heurísticas posicionales, Minimax/evaluación con profundidad configurable y agentes de toma de decisiones) para jugar contra la máquina sin conexión ni dependencias externas.
 
-- **Modos vs IA soportados**: Ajedrez (`chess`), Damas (`checkers`), Go (`go`), Shogi (`shogi`), Xiangqi (`xiangqi`), Backgammon (`backgammon`) y Ludo (`ludo`).
-- **Ciclo Autónomo en `_process()`**: Cuando el turno actual coincide con `ai_player`, el bridge procesa y ejecuta automáticamente la jugada en el ECS emitiendo las señales correspondientes (`move_piece`, `board_updated`, `game_over`), validado en `ai_local_smoke.gd` y `ai_shogi_xiangqi_smoke.gd`.
+- **Modos vs IA soportados**: Los **13 juegos** del catálogo (`chess`, `checkers`, `go`, `shogi`, `xiangqi`, `backgammon`, `ludo`, `mille_bornes`, `uno`, `crisis`, `chinese_checkers`, `monopoly`, `battleship`).
+- **Ciclo Autónomo en `_process()`**: Cuando el turno actual coincide con `ai_player`, el bridge procesa y ejecuta automáticamente la jugada en el ECS emitiendo las señales correspondientes (`piece_moved`, `event_json`, `game_over`), validado en `ai_local_smoke.gd`, `ai_shogi_xiangqi_smoke.gd` y `ai_all_games_smoke.gd`.
 - **Inicialización desde GDScript**:
   ```gdscript
   var bridge = OpenTableBridge.new()
@@ -123,37 +115,29 @@ El motor cuenta con algoritmos de IA locales y deterministas (heurísticas posic
 cd checkers_game && cargo test          # o battleship_game, ludo_game, etc.
 ```
 
-`checkers_game` sigue siendo el único con un ejemplo jugable por
-consola (`cargo run --example local_match`) — el patrón es idéntico
-para replicarlo en cualquiera de los otros siete.
+## Auditoría de Reglas Completas y Plan de Cierre (`PROMPTS13.md`)
 
-## Simplificaciones deliberadas, por juego
+Las simplificaciones iniciales de los prototipos (enroque/al paso en Ajedrez, captura obligatoria y saltos múltiples en Damas, Ko/Superko en Go, Nifu/Uchifuzume en Shogi, General Volador en Xiangqi, estrella de 121 casillas en Damas Chinas, Doubling Cube en Backgammon, tablero 10×10 con 5 barcos en Batalla Naval, pista de 52 casillas en Ludo, meta de 1000 km y Coup Fourré en Mil Millas, tablero de 40 casillas con Suerte/Arca/Cárcel/Subastas en Monopoly e Intercepción Jump-In en UNO) **ya están implementadas en los crates de Rust**.
 
-Cada crate documenta las suyas en su propio `lib.rs`, resumidas acá:
+Los detalles finos de reglamento oficial de torneo y el cableado de comandos avanzados en la UI de Godot están especificados paso a paso, garantizando **compatibilidad regresiva total sin romper el motor ni los tests existentes**, en **[`PROMPTS13.md`](./PROMPTS13.md)** (Prompts **496 al 520**):
 
-- **Damas**: sin captura obligatoria, sin saltos múltiples encadenados.
-- **Batalla naval**: tablero 8x8 (no 10x10), 3 barcos (no 5), sin regla
-  de separación entre barcos, sin turno extra al acertar.
-- **Ludo**: track compartido de 24 casillas (no 52), sin turno extra
-  además del de sacar 6 (los dobles no dan 4 movimientos).
-- **Mil Millas**: meta de 200 (no 1000), sin cartas de seguridad, sin
-  pila de descarte/rebarajado, sin "coup fourré".
-- **Backgammon**: dobles no dan 4 movimientos, sin doubling cube, bear-off
-  sin la regla exacta de "solo con overshoot si no hay fichas más atrás".
-- **Damas chinas**: tablero hexagonal simple (37 casillas), NO la
-  estrella de 6 puntas oficial; sin saltos múltiples encadenados.
-- **Monopoly**: tablero de 16 casillas (no 40), sin casas/hoteles, sin
-  cartas de Suerte/Caja de Comunidad, sin cárcel, sin subastas ni
-  intercambios.
-- **Ajedrez**: sin enroque, sin captura al paso, corona siempre a dama
-  (sin elección), sin regla de 50 movimientos ni triple repetición.
+- **Ajedrez**: Selector visual de coronación (`Queen`/`Rook`/`Bishop`/`Knight`) y controles de tablas (`OfferDraw`/`AcceptDraw`) en `chess_board.gd`.
+- **Damas**: Victoria automática cuando el rival queda bloqueado sin movimientos legales y tablas por 40 turnos sin captura ni coronación.
+- **Go**: Puntuación con Komi (`6.5`) y prisioneros capturados; botones de `PassCommand`, `MarkDeadCommand` y `ConfirmDeadCommand` en `go_board.gd`.
+- **Shogi**: Separación entre promoción opcional (`can_promote`) y obligatoria (`must_promote` solo en filas sin jugada futura), regla de **Sennichite** (cuádruple repetición) y diálogo de promoción en `shogi_board.gd`.
+- **Xiangqi**: Derrota por ahogado (*Kunbi* — quedarse sin jugadas legales aunque no haya jaque) y registro de `XiangqiLegalMoveGenerator`.
+- **Damas Chinas**: Regla oficial anti-bloqueo en triángulo destino (*home-camp spoiling*), `ResignCommand` y `ChineseCheckersLegalMoveGenerator`.
+- **Backgammon**: Obligación de usar ambos dados (o el dado mayor si solo uno es jugable) y controles del Doubling Cube en `backgammon_board.gd`.
+- **Batalla Naval**: Regla opcional `extra_turn_on_hit` en `BattleshipConfigResource` (desactivada por defecto para preservar tests clásicos), `ResignCommand` y botón de revancha en `battleship_board.gd`.
+- **Ludo**: Penalización por tres `6` consecutivos, tirada extra al capturar o coronar ficha en meta y las 4 casillas seguras de estrella intermedias (`+8`).
+- **Mil Millas**: Las 4 cartas de seguridad completas (`RightOfWay`, `ExtraTank`, `PunctureProof`, `DrivingAce`), turno extra al bajar Safety, bono de `+100 km` en `CoupFourreCommand` y botón de reacción en `mille_bornes_board.gd`.
+- **Monopoly**: Construcción uniforme de Casas y Hoteles (`BuildHouseCommand`/`SellHouseCommand`), Hipotecas (`MortgagePropertyCommand`), 3 dobles seguidos a la cárcel, uso de carta `GetOutOfJailFree` e intercambios entre jugadores (`ProposeTradeCommand`).
+- **UNO**: Grito y penalización de `"¡UNO!"` (`CallUnoCommand`/`CatchUnoFailureCommand`), desafío de `+4` (`ChallengeWildDrawFourCommand`) y botón de intercepción (`InterceptCommand`) en `uno_board.gd`.
+- **Crisis / TEG**: Robo efectivo de 1 `TerritoryCard` al finalizar el turno tras conquistar al menos un territorio y bono de `+2` ejércitos al canjear tarjeta de territorio propio.
 
 ## 👉 Para continuar el proyecto en tu máquina local
 
-Ver **[`NEXT_STEPS.md`](./NEXT_STEPS.md)**: pasos exactos de setup
-(Rust moderno, Godot, Android Studio/Xcode), mapa completo de cómo se
-integra todo, y la lista de funcionalidad faltante ordenada por
-prioridad. Es el punto de partida recomendado después de clonar.
+Ver **[`NEXT_STEPS.md`](./NEXT_STEPS.md)** y **[`PROMPTS13.md`](./PROMPTS13.md)**.
 
 ## Workspace y reproducibilidad
 

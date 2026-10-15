@@ -674,3 +674,235 @@ fn test_capturar_pieza_promovida_la_agrega_despromovida_al_hand() {
         "La pieza capturada debe ser un Silver (despromovida), no PromotedSilver"
     );
 }
+
+#[test]
+fn test_sennichite_cuadruple_repeticion_declara_tablas() {
+    let mut session = new_shogi_session(SessionId(20), 0, SENTE, GOTE);
+
+    // El estado inicial cuenta como la aparición #1 de (squares_inicial, hands_inicial, SENTE).
+    // Cada ciclo de 4 medios turnos (Sente Rey (4,8)->(3,8), Gote Rey (4,0)->(3,0),
+    // Sente Rey (3,8)->(4,8), Gote Rey (3,0)->(4,0)) regresa exactamente al estado inicial.
+    for cycle in 1..=3 {
+        session
+            .process_command(
+                SENTE,
+                Box::new(MovePieceCommand {
+                    player: SENTE,
+                    from: (4, 8),
+                    to: (3, 8),
+                    promote: false,
+                }),
+            )
+            .unwrap();
+
+        session
+            .process_command(
+                GOTE,
+                Box::new(MovePieceCommand {
+                    player: GOTE,
+                    from: (4, 0),
+                    to: (3, 0),
+                    promote: false,
+                }),
+            )
+            .unwrap();
+
+        session
+            .process_command(
+                SENTE,
+                Box::new(MovePieceCommand {
+                    player: SENTE,
+                    from: (3, 8),
+                    to: (4, 8),
+                    promote: false,
+                }),
+            )
+            .unwrap();
+
+        let events = session
+            .process_command(
+                GOTE,
+                Box::new(MovePieceCommand {
+                    player: GOTE,
+                    from: (3, 0),
+                    to: (4, 0),
+                    promote: false,
+                }),
+            )
+            .unwrap();
+
+        let draw_event = events.iter().any(|e| {
+            e.as_any()
+                .downcast_ref::<shogi_game::GameOverEvent>()
+                .is_some_and(|go| go.winner.is_none())
+        });
+
+        if cycle < 3 {
+            assert!(
+                !draw_event,
+                "No debe declararse Sennichite antes de la 4ª repetición (ciclo {})",
+                cycle
+            );
+        } else {
+            assert!(
+                draw_event,
+                "En la 4ª aparición del mismo estado debe emitirse GameOverEvent {{ winner: None }} por Sennichite"
+            );
+        }
+    }
+
+    assert!(
+        session.world().resource::<GameOverResource>().0,
+        "GameOverResource debe ser true tras Sennichite"
+    );
+    assert_eq!(
+        session.world().resource::<WinnerResource>().0,
+        None,
+        "WinnerResource debe ser None en tablas por Sennichite"
+    );
+}
+
+#[test]
+fn test_fesa_promocion_opcional_y_obligatoria_por_fila() {
+    let mut session = shogi_game::new_shogi_session_fesa(SessionId(21), 0, SENTE, GOTE);
+    force_turn!(session, SENTE);
+
+    {
+        let mut board = session
+            .world_mut()
+            .resource_mut::<shogi_game::BoardResource>();
+        board.squares.clear();
+        board.squares.insert(
+            (4, 8),
+            shogi_game::Piece {
+                kind: PieceKind::King,
+                owner: SENTE,
+            },
+        );
+        board.squares.insert(
+            (4, 0),
+            shogi_game::Piece {
+                kind: PieceKind::King,
+                owner: GOTE,
+            },
+        );
+        // Silver en (2, 3) entrando a fila 2; Rook en (7, 3); Bishop en (6, 3)
+        board.squares.insert(
+            (2, 3),
+            shogi_game::Piece {
+                kind: PieceKind::Silver,
+                owner: SENTE,
+            },
+        );
+        // Peón en (1, 1) a punto de entrar en fila 0 (obligatoria)
+        board.squares.insert(
+            (1, 1),
+            shogi_game::Piece {
+                kind: PieceKind::Pawn,
+                owner: SENTE,
+            },
+        );
+        // Caballo en (8, 3) a punto de saltar a fila 1 (obligatoria)
+        board.squares.insert(
+            (8, 3),
+            shogi_game::Piece {
+                kind: PieceKind::Knight,
+                owner: SENTE,
+            },
+        );
+    }
+
+    // 1. Con strict_fesa_promotion = true, Silver puede entrar a la zona rival (fila 2) SIN promocionar
+    let res_silver_unpromo = session.process_command(
+        SENTE,
+        Box::new(MovePieceCommand {
+            player: SENTE,
+            from: (2, 3),
+            to: (2, 2),
+            promote: false,
+        }),
+    );
+    assert!(
+        res_silver_unpromo.is_ok(),
+        "Con reglas FESA, Silver puede entrar en fila 2 con promote: false"
+    );
+    assert_eq!(
+        session
+            .world()
+            .resource::<shogi_game::BoardResource>()
+            .squares
+            .get(&(2, 2))
+            .map(|p| p.kind),
+        Some(PieceKind::Silver)
+    );
+
+    // 2. Peón Sente avanzando a fila 0 SIN promocionar debe ser rechazado
+    force_turn!(session, SENTE);
+    let res_pawn_no_promo = session.process_command(
+        SENTE,
+        Box::new(MovePieceCommand {
+            player: SENTE,
+            from: (1, 1),
+            to: (1, 0),
+            promote: false,
+        }),
+    );
+    assert!(
+        matches!(res_pawn_no_promo, Err(EngineError::InvalidCommand { .. })),
+        "Peón en fila 0 está obligado a promocionar en FESA"
+    );
+
+    // Peón Sente avanzando a fila 0 CON promote: true debe tener éxito
+    let res_pawn_promo = session.process_command(
+        SENTE,
+        Box::new(MovePieceCommand {
+            player: SENTE,
+            from: (1, 1),
+            to: (1, 0),
+            promote: true,
+        }),
+    );
+    assert!(res_pawn_promo.is_ok());
+
+    // 3. Caballo Sente saltando a fila 1 SIN promocionar debe ser rechazado
+    force_turn!(session, SENTE);
+    let res_knight_no_promo = session.process_command(
+        SENTE,
+        Box::new(MovePieceCommand {
+            player: SENTE,
+            from: (8, 3),
+            to: (7, 1),
+            promote: false,
+        }),
+    );
+    assert!(
+        matches!(res_knight_no_promo, Err(EngineError::InvalidCommand { .. })),
+        "Caballo en fila 1 está obligado a promocionar en FESA"
+    );
+
+    // Caballo Sente saltando a fila 1 CON promote: true debe tener éxito
+    let res_knight_promo = session.process_command(
+        SENTE,
+        Box::new(MovePieceCommand {
+            player: SENTE,
+            from: (8, 3),
+            to: (7, 1),
+            promote: true,
+        }),
+    );
+    assert!(res_knight_promo.is_ok());
+}
+
+#[test]
+fn test_shogi_legal_move_generator_registrado() {
+    let session = new_shogi_session(SessionId(22), 0, SENTE, GOTE);
+    let generator = session
+        .world()
+        .get_resource::<LegalMoveGeneratorResource>()
+        .expect("LegalMoveGeneratorResource debe estar registrado en new_shogi_session");
+    let moves = generator.0.generate(session.world(), SENTE);
+    assert!(
+        !moves.is_empty(),
+        "ShogiLegalMoveGenerator debe generar jugadas legales para Sente en el estado inicial"
+    );
+}

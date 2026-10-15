@@ -25,3 +25,9 @@ pub struct ResignCommand {
     #[issuer]
     pub player: PlayerId,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct SetShogiRulesCommand {
+    #[serde(default)]
+    pub strict_fesa_promotion: bool,
+}

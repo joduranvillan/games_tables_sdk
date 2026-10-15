@@ -180,6 +180,18 @@ pub fn clone_shogi_session(session: &Session) -> Session {
     if let Some(winner) = session.world().get_resource::<WinnerResource>() {
         new_session.world_mut().insert_resource(*winner);
     }
+    if let Some(history) = session
+        .world()
+        .get_resource::<crate::board::ShogiHistoryResource>()
+    {
+        new_session.world_mut().insert_resource(history.clone());
+    }
+    if let Some(cfg) = session
+        .world()
+        .get_resource::<crate::board::ShogiRulesConfigResource>()
+    {
+        new_session.world_mut().insert_resource(*cfg);
+    }
 
     new_session
 }
