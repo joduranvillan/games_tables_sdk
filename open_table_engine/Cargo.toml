@@ -14,7 +14,7 @@ categories = ["game-engines", "game-development"]
 open_table_core = { version = "1.0.0", path = "../open_table_core" }
 open_table_macros = { version = "1.0.0", path = "../open_table_macros" }
 
-bevy_ecs = "0.19"
+bevy_ecs = "0.20"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 typetag = "0.2"
