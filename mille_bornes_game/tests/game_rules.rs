@@ -1,7 +1,7 @@
 use mille_bornes_game::{
     new_mille_bornes_session, Card, CardDiscardedEvent, CoupFourreCommand, DiscardCardCommand,
     DrawCardCommand, GameOverEvent, Hazard, HazardPlayedEvent, PlayCardCommand, PlayHazardCommand,
-    PlaySafetyCommand, Safety, SafetyPlayedEvent, MAX_HAND_SIZE, TARGET_DISTANCE, WIN_DISTANCE,
+    Safety, SafetyPlayedEvent, MAX_HAND_SIZE, TARGET_DISTANCE, WIN_DISTANCE,
 };
 use open_table_engine::prelude::*;
 

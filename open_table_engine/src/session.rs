@@ -795,6 +795,17 @@ impl Session {
         &mut self.world
     }
 
+    pub fn rules(&self) -> &RuleEngine {
+        &self.rules
+    }
+
+    pub fn is_game_over(&self) -> bool {
+        self.world
+            .get_resource::<GameOverResource>()
+            .map(|g| g.0)
+            .unwrap_or(false)
+    }
+
     /// Exporta el log completo de comandos como JSON. Esto es todo lo que
     /// hace falta guardar para poder reproducir la partida entera más
     /// adelante: seed + orden de jugadores + este log alcanzan, porque

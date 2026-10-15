@@ -1,6 +1,6 @@
 use ludo_game::{
     ludo_ai_pick_move, new_ludo_session, ConsecutiveSixesResource, GameOverEvent,
-    LudoRulesConfigResource, MoveTokenCommand, NoValidMovesEvent, PendingRollResource,
+    MoveTokenCommand, NoValidMovesEvent, PendingRollResource,
     ResignCommand, RollDiceCommand, SetLudoRulesCommand, TokenMovedEvent, TokensResource,
     MAX_STEPS,
 };
