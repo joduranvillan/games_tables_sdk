@@ -46,4 +46,3 @@ pub struct ResignCommand {
     #[issuer]
     pub player: PlayerId,
 }
-

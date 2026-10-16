@@ -10,7 +10,8 @@ use crate::events::{DiceRolledEvent, GameOverEvent, NoValidMovesEvent, TokenMove
 fn invalid(reason: impl Into<String>) -> EngineError {
     EngineError::InvalidCommand {
         reason: reason.into(),
-    }}
+    }
+}
 
 pub fn build_ludo_rules() -> RuleEngine {
     let mut rules = RuleEngine::new();
@@ -238,4 +239,3 @@ pub fn build_ludo_rules() -> RuleEngine {
 
     rules
 }
-
