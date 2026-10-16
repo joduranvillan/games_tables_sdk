@@ -98,8 +98,11 @@ impl BoardResource {
     pub fn compute_state_hash(&self, current_player: PlayerId) -> u64 {
         let mut hasher = DefaultHasher::new();
 
-        let mut sq_list: Vec<((usize, usize), Piece)> =
-            self.squares.iter().map(|(&pos, &piece)| (pos, piece)).collect();
+        let mut sq_list: Vec<((usize, usize), Piece)> = self
+            .squares
+            .iter()
+            .map(|(&pos, &piece)| (pos, piece))
+            .collect();
         sq_list.sort_by_key(|&(pos, _)| pos);
         sq_list.hash(&mut hasher);
 

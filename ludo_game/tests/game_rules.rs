@@ -1,8 +1,7 @@
 use ludo_game::{
-    ludo_ai_pick_move, new_ludo_session, ConsecutiveSixesResource, GameOverEvent,
-    MoveTokenCommand, NoValidMovesEvent, PendingRollResource,
-    ResignCommand, RollDiceCommand, SetLudoRulesCommand, TokenMovedEvent, TokensResource,
-    MAX_STEPS,
+    ludo_ai_pick_move, new_ludo_session, ConsecutiveSixesResource, GameOverEvent, MoveTokenCommand,
+    NoValidMovesEvent, PendingRollResource, ResignCommand, RollDiceCommand, SetLudoRulesCommand,
+    TokenMovedEvent, TokensResource, MAX_STEPS,
 };
 use open_table_engine::prelude::*;
 
@@ -626,9 +625,15 @@ fn test_tres_seises_consecutivos_pierde_turno() {
 
     // Con el tercer 6 consecutivo, se emite DiceRolledEvent y NoValidMovesEvent
     assert_eq!(events.len(), 2);
-    let dice = events[0].as_any().downcast_ref::<ludo_game::DiceRolledEvent>().unwrap();
+    let dice = events[0]
+        .as_any()
+        .downcast_ref::<ludo_game::DiceRolledEvent>()
+        .unwrap();
     assert_eq!(dice.value, 6);
-    let no_moves = events[1].as_any().downcast_ref::<NoValidMovesEvent>().unwrap();
+    let no_moves = events[1]
+        .as_any()
+        .downcast_ref::<NoValidMovesEvent>()
+        .unwrap();
     assert_eq!(no_moves.value, 6);
 
     // Se reinicia el contador y el turno avanza a P2
@@ -664,7 +669,10 @@ fn test_turno_extra_por_captura_y_meta() {
         pending.pending.insert(P1, 1);
     }
     let events = move_token(&mut session, P1, 0).expect("mueve y captura");
-    let moved = events[0].as_any().downcast_ref::<TokenMovedEvent>().unwrap();
+    let moved = events[0]
+        .as_any()
+        .downcast_ref::<TokenMovedEvent>()
+        .unwrap();
     assert_eq!(moved.captured, Some((P2, 0)));
     // Turno no avanzó a P2: P1 gana tirada extra
     assert_eq!(session.current_player(), P1);
@@ -679,7 +687,10 @@ fn test_turno_extra_por_captura_y_meta() {
         pending.pending.insert(P1, 2);
     }
     let events_goal = move_token(&mut session, P1, 1).expect("mueve a meta");
-    let moved_goal = events_goal[0].as_any().downcast_ref::<TokenMovedEvent>().unwrap();
+    let moved_goal = events_goal[0]
+        .as_any()
+        .downcast_ref::<TokenMovedEvent>()
+        .unwrap();
     assert!(moved_goal.finished);
     // Como quedan fichas de P1, la partida no terminó y P1 mantiene el turno
     assert_eq!(session.current_player(), P1);
@@ -711,7 +722,7 @@ fn test_casillas_estrella_son_seguras() {
     {
         let mut t = session.world_mut().resource_mut::<TokensResource>();
         t.tokens.get_mut(&P2).unwrap()[0] = 35; // en casilla 8 (estrella)
-        t.tokens.get_mut(&P1).unwrap()[0] = 8;  // P1 en casilla 7 (a 1 paso)
+        t.tokens.get_mut(&P1).unwrap()[0] = 8; // P1 en casilla 7 (a 1 paso)
     }
     {
         let mut pending = session.world_mut().resource_mut::<PendingRollResource>();
@@ -719,12 +730,18 @@ fn test_casillas_estrella_son_seguras() {
     }
 
     let events = move_token(&mut session, P1, 0).expect("mueve a estrella");
-    let moved = events[0].as_any().downcast_ref::<TokenMovedEvent>().unwrap();
+    let moved = events[0]
+        .as_any()
+        .downcast_ref::<TokenMovedEvent>()
+        .unwrap();
     assert_eq!(
         moved.captured, None,
         "en casilla estrella con regla activa no hay captura"
     );
-    assert_eq!(session.world().resource::<TokensResource>().tokens[&P2][0], 35);
+    assert_eq!(
+        session.world().resource::<TokensResource>().tokens[&P2][0],
+        35
+    );
 }
 
 #[test]
@@ -737,4 +754,3 @@ fn test_resign_command() {
     let go = events[0].as_any().downcast_ref::<GameOverEvent>().unwrap();
     assert_eq!(go.winner, P2);
 }
-

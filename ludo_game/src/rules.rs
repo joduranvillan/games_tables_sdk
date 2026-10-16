@@ -10,8 +10,7 @@ use crate::events::{DiceRolledEvent, GameOverEvent, NoValidMovesEvent, TokenMove
 fn invalid(reason: impl Into<String>) -> EngineError {
     EngineError::InvalidCommand {
         reason: reason.into(),
-    }
-}
+    }}
 
 pub fn build_ludo_rules() -> RuleEngine {
     let mut rules = RuleEngine::new();
@@ -234,9 +233,7 @@ pub fn build_ludo_rules() -> RuleEngine {
             .find(|&p| p != cmd.player)
             .unwrap_or(cmd.player);
 
-        Ok(vec![Box::new(GameOverEvent {
-            winner: opponent,
-        })])
+        Ok(vec![Box::new(GameOverEvent { winner: opponent })])
     });
 
     rules

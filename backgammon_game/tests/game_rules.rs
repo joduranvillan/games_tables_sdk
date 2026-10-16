@@ -568,4 +568,3 @@ fn test_obligacion_usar_ambos_dados_rechaza_primer_movimiento_que_bloquea_el_seg
         .expect("mover 2->5 completa el uso de ambos dados");
     assert_eq!(session.current_player(), P2);
 }
-

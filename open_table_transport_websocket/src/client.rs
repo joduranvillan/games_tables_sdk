@@ -1068,7 +1068,11 @@ impl WsRelayClient {
                 room.next_player_id += 1;
                 pid
             };
-            if !room.members.iter().any(|(cid, _, _)| *cid == self.client_id) {
+            if !room
+                .members
+                .iter()
+                .any(|(cid, _, _)| *cid == self.client_id)
+            {
                 room.members
                     .push((self.client_id, assigned_pid, Arc::clone(&self.events)));
             }

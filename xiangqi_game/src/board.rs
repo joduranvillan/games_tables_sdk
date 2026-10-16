@@ -108,4 +108,3 @@ impl XiangqiHistoryResource {
         self.record_hash(hash)
     }
 }
-

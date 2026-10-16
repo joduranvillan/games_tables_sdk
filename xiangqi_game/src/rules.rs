@@ -1,5 +1,5 @@
-pub use crate::board::XiangqiHistoryResource;
 use crate::board::BoardResource;
+pub use crate::board::XiangqiHistoryResource;
 use crate::commands::{MovePieceCommand, ResignCommand};
 use crate::events::{GameOverEvent, PieceMovedEvent};
 use crate::movement::{check_flying_general, is_in_check, is_legal_move};
@@ -262,4 +262,3 @@ pub fn build_xiangqi_rules() -> RuleEngine {
 
     rules
 }
-

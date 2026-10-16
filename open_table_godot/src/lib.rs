@@ -4041,10 +4041,7 @@ impl OpenTableBridge {
                     let auto_play_initial = (self.current_game_type == "shogi"
                         || self.current_game_type == "xiangqi")
                         && session.current_tick().0 < 4;
-                    if is_ai_turn
-                        || auto_play_initial
-                        || self.current_game_type == "monopoly"
-                    {
+                    if is_ai_turn || auto_play_initial || self.current_game_type == "monopoly" {
                         let acting = if self.current_game_type == "monopoly" {
                             *ai_p
                         } else {

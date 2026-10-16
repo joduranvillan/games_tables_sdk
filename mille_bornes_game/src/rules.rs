@@ -139,18 +139,18 @@ fn validate_and_play_hazard(
         let deck = world.resource::<DeckResource>();
         let safeties = deck.safeties_played.get(&target);
         match hazard {
-            Hazard::SpeedLimit => {
-                safeties.map(|s| s.contains(&Safety::RightOfWay)).unwrap_or(false)
-            }
-            Hazard::OutOfGas => {
-                safeties.map(|s| s.contains(&Safety::ExtraTank)).unwrap_or(false)
-            }
-            Hazard::FlatTire => {
-                safeties.map(|s| s.contains(&Safety::PunctureProof)).unwrap_or(false)
-            }
-            Hazard::Accident => {
-                safeties.map(|s| s.contains(&Safety::DrivingAce)).unwrap_or(false)
-            }
+            Hazard::SpeedLimit => safeties
+                .map(|s| s.contains(&Safety::RightOfWay))
+                .unwrap_or(false),
+            Hazard::OutOfGas => safeties
+                .map(|s| s.contains(&Safety::ExtraTank))
+                .unwrap_or(false),
+            Hazard::FlatTire => safeties
+                .map(|s| s.contains(&Safety::PunctureProof))
+                .unwrap_or(false),
+            Hazard::Accident => safeties
+                .map(|s| s.contains(&Safety::DrivingAce))
+                .unwrap_or(false),
         }
     };
 
@@ -247,28 +247,40 @@ fn validate_and_play_safety(
                 .remove(&player);
 
             let mut deck = world.resource_mut::<DeckResource>();
-            deck.safeties_played.entry(player).or_default().insert(Safety::RightOfWay);
+            deck.safeties_played
+                .entry(player)
+                .or_default()
+                .insert(Safety::RightOfWay);
             if deck.hazard.get(&player).copied().flatten() != Some(Hazard::OutOfGas) {
                 deck.hazard.insert(player, None);
             }
         }
         Safety::ExtraTank => {
             let mut deck = world.resource_mut::<DeckResource>();
-            deck.safeties_played.entry(player).or_default().insert(Safety::ExtraTank);
+            deck.safeties_played
+                .entry(player)
+                .or_default()
+                .insert(Safety::ExtraTank);
             if deck.hazard.get(&player).copied().flatten() == Some(Hazard::OutOfGas) {
                 deck.hazard.insert(player, None);
             }
         }
         Safety::PunctureProof => {
             let mut deck = world.resource_mut::<DeckResource>();
-            deck.safeties_played.entry(player).or_default().insert(Safety::PunctureProof);
+            deck.safeties_played
+                .entry(player)
+                .or_default()
+                .insert(Safety::PunctureProof);
             if deck.hazard.get(&player).copied().flatten() == Some(Hazard::FlatTire) {
                 deck.hazard.insert(player, None);
             }
         }
         Safety::DrivingAce => {
             let mut deck = world.resource_mut::<DeckResource>();
-            deck.safeties_played.entry(player).or_default().insert(Safety::DrivingAce);
+            deck.safeties_played
+                .entry(player)
+                .or_default()
+                .insert(Safety::DrivingAce);
             if deck.hazard.get(&player).copied().flatten() == Some(Hazard::Accident) {
                 deck.hazard.insert(player, None);
             }
@@ -508,7 +520,10 @@ pub fn build_mille_bornes_rules() -> RuleEngine {
                 Card::Safety(sf) => sf,
                 _ => Safety::RightOfWay,
             };
-            deck.safeties_played.entry(cmd.player).or_default().insert(s);
+            deck.safeties_played
+                .entry(cmd.player)
+                .or_default()
+                .insert(s);
             deck.hazard.insert(cmd.player, None);
             deck.hazard.insert(opponent, Some(hazard));
 
@@ -552,7 +567,11 @@ pub fn build_mille_bornes_rules() -> RuleEngine {
             let remedy_pos = hand
                 .iter()
                 .position(|&c| c == Card::Remedy(hazard))
-                .ok_or_else(|| invalid("no tenés la carta de seguridad o el remedio correspondiente en la mano"))?;
+                .ok_or_else(|| {
+                    invalid(
+                        "no tenés la carta de seguridad o el remedio correspondiente en la mano",
+                    )
+                })?;
 
             hand.remove(remedy_pos);
             deck.hazard.insert(cmd.player, None);

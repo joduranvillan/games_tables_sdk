@@ -8,7 +8,6 @@ pub struct RollDiceCommand {
     #[issuer]
     pub player: PlayerId,
 }
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct MoveTokenCommand {
     #[issuer]

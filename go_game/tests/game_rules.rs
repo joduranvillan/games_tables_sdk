@@ -612,16 +612,18 @@ fn test_go_legal_move_generator_excluye_suicidio_y_ko_e_incluye_pass() {
     let moves = session.get_legal_moves(P1);
     // 81 total - 2 ocupadas ((1,0) y (0,1)) - 1 suicidio ((0,0)) - 1 ko ((4,4)) + 1 PassCommand = 78
     assert_eq!(moves.len(), 78);
-    let has_suicide_0_0 = moves
-        .iter()
-        .any(|m| m.get("x").and_then(|v| v.as_u64()) == Some(0) && m.get("y").and_then(|v| v.as_u64()) == Some(0));
+    let has_suicide_0_0 = moves.iter().any(|m| {
+        m.get("x").and_then(|v| v.as_u64()) == Some(0)
+            && m.get("y").and_then(|v| v.as_u64()) == Some(0)
+    });
     assert!(
         !has_suicide_0_0,
         "GoLegalMoveGenerator no debe incluir la intersección suicida (0, 0)"
     );
-    let has_ko_4_4 = moves
-        .iter()
-        .any(|m| m.get("x").and_then(|v| v.as_u64()) == Some(4) && m.get("y").and_then(|v| v.as_u64()) == Some(4));
+    let has_ko_4_4 = moves.iter().any(|m| {
+        m.get("x").and_then(|v| v.as_u64()) == Some(4)
+            && m.get("y").and_then(|v| v.as_u64()) == Some(4)
+    });
     assert!(
         !has_ko_4_4,
         "GoLegalMoveGenerator no debe incluir el punto de Ko (4, 4)"

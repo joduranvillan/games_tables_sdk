@@ -1,9 +1,7 @@
 use bevy_ecs::world::World;
 use open_table_engine::prelude::*;
 
-use crate::board::{
-    must_use_larger_die_check, BoardResource, Sides, CHECKERS_PER_PLAYER, POINTS,
-};
+use crate::board::{must_use_larger_die_check, BoardResource, Sides, CHECKERS_PER_PLAYER, POINTS};
 use crate::commands::{
     AcceptDoubleCommand, MoveCheckerCommand, OfferDoubleCommand, RejectDoubleCommand,
     ResignCommand, RollDiceCommand,

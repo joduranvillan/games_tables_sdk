@@ -367,9 +367,7 @@ impl Sides {
 
         if self.can_play_both_dice(board, player, d1, d2) {
             if !self.has_any_valid_move(&after_step, player, &[other_die]) {
-                return Err(
-                    "debés elegir un movimiento que permita usar ambos dados disponibles",
-                );
+                return Err("debés elegir un movimiento que permita usar ambos dados disponibles");
             }
         } else {
             let can_d1 = self.has_any_valid_move(board, player, &[d1]);

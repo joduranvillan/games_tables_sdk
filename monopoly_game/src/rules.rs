@@ -18,8 +18,8 @@ use crate::events::{
     TaxPaidEvent, UtilityRentPaidEvent,
 };
 use crate::resources::{
-    AuctionResource, AuctionState, BoardResource, BuildingsResource, JailResource,
-    PendingDecision, PendingPurchaseResource, PlayersResource,
+    AuctionResource, AuctionState, BoardResource, BuildingsResource, JailResource, PendingDecision,
+    PendingPurchaseResource, PlayersResource,
 };
 
 fn invalid(reason: impl Into<String>) -> EngineError {
@@ -138,9 +138,11 @@ pub fn apply_land_effect(
                         return false;
                     }
 
-                    let is_full_group = world
-                        .resource::<PlayersResource>()
-                        .owns_full_group(&board_spaces, owner, group);
+                    let is_full_group = world.resource::<PlayersResource>().owns_full_group(
+                        &board_spaces,
+                        owner,
+                        group,
+                    );
 
                     if !world.contains_resource::<BuildingsResource>() {
                         world.insert_resource(BuildingsResource::default());
@@ -1180,9 +1182,7 @@ pub fn build_monopoly_rules() -> RuleEngine {
             .jailed
             .remove(&cmd.player);
 
-        let events: Vec<Box<dyn Event>> = vec![Box::new(JailCardUsedEvent {
-            player: cmd.player,
-        })];
+        let events: Vec<Box<dyn Event>> = vec![Box::new(JailCardUsedEvent { player: cmd.player })];
 
         Ok(events)
     });
@@ -1233,7 +1233,9 @@ pub fn build_monopoly_rules() -> RuleEngine {
         let mortgage_value = price / 2;
         let mut players = world.resource_mut::<PlayersResource>();
         let current_money = players.money.get(&cmd.player).copied().unwrap_or(0);
-        players.money.insert(cmd.player, current_money + mortgage_value as i64);
+        players
+            .money
+            .insert(cmd.player, current_money + mortgage_value as i64);
         players.mortgaged.insert(cmd.space);
         let _ = players;
 
@@ -1284,7 +1286,9 @@ pub fn build_monopoly_rules() -> RuleEngine {
 
         let mut players = world.resource_mut::<PlayersResource>();
         let current_money = players.money.get(&cmd.player).copied().unwrap_or(0);
-        players.money.insert(cmd.player, current_money - cost as i64);
+        players
+            .money
+            .insert(cmd.player, current_money - cost as i64);
         players.mortgaged.remove(&cmd.space);
         let _ = players;
 

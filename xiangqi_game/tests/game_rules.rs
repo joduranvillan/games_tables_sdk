@@ -803,4 +803,3 @@ fn test_xiangqi_legal_move_generator_registrado() {
         "XiangqiLegalMoveGenerator no debe generar movimientos para BLACK fuera de su turno"
     );
 }
-

@@ -148,7 +148,9 @@ pub fn build_checkers_rules() -> RuleEngine {
 
         let counts = board.count_pieces();
         let opponent_blocked = if !has_further_capture {
-            board.get_all_legal_moves(&sides_snapshot, opponent).is_empty()
+            board
+                .get_all_legal_moves(&sides_snapshot, opponent)
+                .is_empty()
         } else {
             false
         };

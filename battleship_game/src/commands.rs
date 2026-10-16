@@ -33,7 +33,6 @@ pub struct RematchCommand {
     #[issuer]
     pub player: PlayerId,
 }
-
 /// Configura las reglas opcionales de Batalla Naval (ej. turno extra al acertar).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
 pub struct SetBattleshipRulesCommand {

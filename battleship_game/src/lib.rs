@@ -49,4 +49,3 @@ pub fn new_battleship_session(
         .insert_resource(BattleshipConfigResource::default());
     session
 }
-

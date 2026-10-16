@@ -8,9 +8,7 @@ pub mod rules;
 use open_table_engine::prelude::*;
 
 pub use ai::{generate_shogi_candidates, piece_value, shogi_ai_pick_move, ShogiAction};
-pub use board::{
-    BoardResource, Piece, PieceKind, ShogiHistoryResource, ShogiRulesConfigResource,
-};
+pub use board::{BoardResource, Piece, PieceKind, ShogiHistoryResource, ShogiRulesConfigResource};
 pub use commands::{DropPieceCommand, MovePieceCommand, ResignCommand, SetShogiRulesCommand};
 pub use events::{GameOverEvent, PieceDroppedEvent, PieceMovedEvent};
 pub use movement::{

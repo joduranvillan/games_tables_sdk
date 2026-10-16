@@ -129,4 +129,3 @@ impl BattleshipConfigResource {
         Self { extra_turn_on_hit }
     }
 }
-

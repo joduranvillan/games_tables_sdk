@@ -40,4 +40,3 @@ pub fn new_xiangqi_session(
         )));
     session
 }
-

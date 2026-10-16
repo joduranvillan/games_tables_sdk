@@ -618,7 +618,12 @@ fn test_regla_por_defecto_alterna_turnos_incluso_al_acertar() {
     place_fleet(&mut session, P2, standard_fleet(0));
 
     // Por defecto extra_turn_on_hit es false
-    assert!(!session.world().resource::<BattleshipConfigResource>().extra_turn_on_hit);
+    assert!(
+        !session
+            .world()
+            .resource::<BattleshipConfigResource>()
+            .extra_turn_on_hit
+    );
 
     // P1 dispara y acierta en (0, 0)
     let events = session
@@ -630,7 +635,10 @@ fn test_regla_por_defecto_alterna_turnos_incluso_al_acertar() {
             }),
         )
         .expect("P1 debe poder disparar");
-    let shot = events[0].as_any().downcast_ref::<ShotResultEvent>().unwrap();
+    let shot = events[0]
+        .as_any()
+        .downcast_ref::<ShotResultEvent>()
+        .unwrap();
     assert_eq!(shot.result, ShotResult::Hit);
 
     // Turno debe haber avanzado a P2
@@ -653,7 +661,12 @@ fn test_regla_racha_turno_extra_al_acertar() {
         )
         .expect("Configuración de reglas debe ser aceptada");
 
-    assert!(session.world().resource::<BattleshipConfigResource>().extra_turn_on_hit);
+    assert!(
+        session
+            .world()
+            .resource::<BattleshipConfigResource>()
+            .extra_turn_on_hit
+    );
 
     // P1 dispara a (0, 0) y acierta
     let events1 = session
@@ -665,7 +678,10 @@ fn test_regla_racha_turno_extra_al_acertar() {
             }),
         )
         .expect("P1 debe disparar");
-    let shot1 = events1[0].as_any().downcast_ref::<ShotResultEvent>().unwrap();
+    let shot1 = events1[0]
+        .as_any()
+        .downcast_ref::<ShotResultEvent>()
+        .unwrap();
     assert_eq!(shot1.result, ShotResult::Hit);
 
     // Con racha, el turno NO avanza: sigue siendo de P1
@@ -681,7 +697,10 @@ fn test_regla_racha_turno_extra_al_acertar() {
             }),
         )
         .expect("P1 debe tener turno consecutivo tras impactar");
-    let shot2 = events2[0].as_any().downcast_ref::<ShotResultEvent>().unwrap();
+    let shot2 = events2[0]
+        .as_any()
+        .downcast_ref::<ShotResultEvent>()
+        .unwrap();
     assert_eq!(shot2.result, ShotResult::Hit);
     assert_eq!(session.current_player(), P1);
 
@@ -695,7 +714,10 @@ fn test_regla_racha_turno_extra_al_acertar() {
             }),
         )
         .expect("P1 dispara a agua");
-    let shot3 = events3[0].as_any().downcast_ref::<ShotResultEvent>().unwrap();
+    let shot3 = events3[0]
+        .as_any()
+        .downcast_ref::<ShotResultEvent>()
+        .unwrap();
     assert_eq!(shot3.result, ShotResult::Miss);
 
     // Al fallar, el turno avanza a P2
@@ -718,4 +740,3 @@ fn test_resign_command_concede_victoria_al_rival() {
     assert_eq!(go.winner, Some(P2));
     assert!(session.is_game_over());
 }
-

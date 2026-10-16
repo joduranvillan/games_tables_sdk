@@ -644,7 +644,10 @@ fn test_extra_tank_cura_inmediatamente_out_of_gas() {
     let deck = session
         .world()
         .resource::<mille_bornes_game::DeckResource>();
-    assert_eq!(deck.hazard[&P1], None, "ExtraTank debe curar inmediatamente OutOfGas");
+    assert_eq!(
+        deck.hazard[&P1], None,
+        "ExtraTank debe curar inmediatamente OutOfGas"
+    );
     assert!(deck.safeties_played[&P1].contains(&Safety::ExtraTank));
 }
 
@@ -728,7 +731,10 @@ fn test_coup_fourre_con_safety_otorga_bono_100_inmunidad_y_anula_peligro() {
     assert!(events.iter().any(|e| e.as_any().is::<SafetyPlayedEvent>()));
     let dist_ev = events
         .iter()
-        .find_map(|e| e.as_any().downcast_ref::<mille_bornes_game::DistancePlayedEvent>())
+        .find_map(|e| {
+            e.as_any()
+                .downcast_ref::<mille_bornes_game::DistancePlayedEvent>()
+        })
         .expect("debe emitir DistancePlayedEvent por bono de 100 km");
     assert_eq!(dist_ev.value, 100);
     assert_eq!(dist_ev.new_distance, 200);
@@ -737,7 +743,11 @@ fn test_coup_fourre_con_safety_otorga_bono_100_inmunidad_y_anula_peligro() {
         .world()
         .resource::<mille_bornes_game::DeckResource>();
     assert_eq!(deck.hazard[&P1], None, "el peligro de P1 debe ser anulado");
-    assert_eq!(deck.hazard[&P2], Some(Hazard::Accident), "P2 sufre el peligro reflejado");
+    assert_eq!(
+        deck.hazard[&P2],
+        Some(Hazard::Accident),
+        "P2 sufre el peligro reflejado"
+    );
     assert_eq!(deck.distance[&P1], 200, "P1 recibe bono de 100 km");
     assert!(
         deck.safeties_played[&P1].contains(&Safety::DrivingAce),
@@ -753,4 +763,3 @@ fn test_build_deck_contiene_las_4_safeties() {
     assert!(deck.contains(&Card::Safety(Safety::PunctureProof)));
     assert!(deck.contains(&Card::Safety(Safety::DrivingAce)));
 }
-

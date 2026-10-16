@@ -192,4 +192,3 @@ pub struct LudoRulesConfigResource {
     pub bonus_roll_on_capture_and_goal: bool,
     pub three_sixes_penalty: bool,
 }
-

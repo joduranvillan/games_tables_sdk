@@ -791,7 +791,13 @@ fn test_construccion_uniforme_y_coste_por_lado_del_tablero() {
 
     // Sin el grupo completo, no puede construir
     let err = session
-        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(BuildHouseCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .unwrap_err();
     assert!(err.to_string().contains("grupo"));
 
@@ -809,7 +815,13 @@ fn test_construccion_uniforme_y_coste_por_lado_del_tablero() {
         .money[&P1];
 
     let events = session
-        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(BuildHouseCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .expect("debe construir primera casa en casilla 1");
 
     let built = events[0]
@@ -827,18 +839,36 @@ fn test_construccion_uniforme_y_coste_por_lado_del_tablero() {
 
     // Intento de construir segunda casa en casilla 1 cuando casilla 3 tiene 0 casas (viola construcción uniforme)
     let err_uniform = session
-        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(BuildHouseCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .unwrap_err();
     assert!(err_uniform.to_string().contains("uniforme"));
 
     // Construir en casilla 3 para igualar a nivel 1
     session
-        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 3 }))
+        .process_command(
+            P1,
+            Box::new(BuildHouseCommand {
+                player: P1,
+                space: 3,
+            }),
+        )
         .expect("debe permitir construir en casilla 3");
 
     // Ahora sí se puede construir en casilla 1 para llevarla a nivel 2
     let events2 = session
-        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(BuildHouseCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .expect("debe permitir construir segunda casa en casilla 1");
     let built2 = events2[0]
         .as_any()
@@ -865,10 +895,22 @@ fn test_construccion_hasta_hotel_y_limite_nivel_5() {
     // Llevar ambas casillas hasta nivel 5 (Hotel)
     for level in 1..=5 {
         session
-            .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+            .process_command(
+                P1,
+                Box::new(BuildHouseCommand {
+                    player: P1,
+                    space: 1,
+                }),
+            )
             .unwrap_or_else(|e| panic!("error en espacio 1 nivel {}: {}", level, e));
         session
-            .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 3 }))
+            .process_command(
+                P1,
+                Box::new(BuildHouseCommand {
+                    player: P1,
+                    space: 3,
+                }),
+            )
             .unwrap_or_else(|e| panic!("error en espacio 3 nivel {}: {}", level, e));
     }
 
@@ -878,7 +920,13 @@ fn test_construccion_hasta_hotel_y_limite_nivel_5() {
 
     // Intentar construir más allá del nivel 5 (Hotel)
     let err_max = session
-        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(BuildHouseCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .unwrap_err();
     assert!(err_max.to_string().contains("máximo") || err_max.to_string().contains("hotel"));
 }
@@ -900,21 +948,48 @@ fn test_desmonte_uniforme_y_reembolso_50_porciento() {
 
     // Construir 2 casas en casilla 1 y 1 en casilla 3
     session
-        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(BuildHouseCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .unwrap();
     session
-        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 3 }))
+        .process_command(
+            P1,
+            Box::new(BuildHouseCommand {
+                player: P1,
+                space: 3,
+            }),
+        )
         .unwrap();
     session
-        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(BuildHouseCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .unwrap();
 
     // Casilla 1 tiene nivel 2, casilla 3 tiene nivel 1.
     // Intentar vender de casilla 3 (que tiene 1, menor que casilla 1 con 2) viola desmonte uniforme
     let err_desmonte = session
-        .process_command(P1, Box::new(SellHouseCommand { player: P1, space: 3 }))
+        .process_command(
+            P1,
+            Box::new(SellHouseCommand {
+                player: P1,
+                space: 3,
+            }),
+        )
         .unwrap_err();
-    assert!(err_desmonte.to_string().contains("desmonte") || err_desmonte.to_string().contains("uniforme"));
+    assert!(
+        err_desmonte.to_string().contains("desmonte")
+            || err_desmonte.to_string().contains("uniforme")
+    );
 
     // Vender de casilla 1 (coste $50 -> reembolso $25)
     let money_before = session
@@ -923,7 +998,13 @@ fn test_desmonte_uniforme_y_reembolso_50_porciento() {
         .money[&P1];
 
     let events = session
-        .process_command(P1, Box::new(SellHouseCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(SellHouseCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .expect("debe vender de casilla 1");
 
     let sold = events[0]
@@ -972,7 +1053,11 @@ fn test_renta_escalonada_segun_edificios() {
         }
 
         // P2 cae en la casilla 1
-        let space = session.world().resource::<monopoly_game::BoardResource>().spaces[1].clone();
+        let space = session
+            .world()
+            .resource::<monopoly_game::BoardResource>()
+            .spaces[1]
+            .clone();
         let mut events = Vec::new();
         let decision = monopoly_game::apply_land_effect(
             &space,
@@ -1015,7 +1100,13 @@ fn test_hipoteca_y_deshipoteca_propiedad() {
 
     // P1 hipoteca la propiedad (precio $60 -> recibe $30)
     let events = session
-        .process_command(P1, Box::new(MortgagePropertyCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(MortgagePropertyCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .expect("debe permitir hipotecar propiedad");
 
     let mort_event = events[0]
@@ -1042,12 +1133,22 @@ fn test_hipoteca_y_deshipoteca_propiedad() {
 
     // Intentar hipotecar de nuevo debe fallar
     let err_double = session
-        .process_command(P1, Box::new(MortgagePropertyCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(MortgagePropertyCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .unwrap_err();
     assert!(err_double.to_string().contains("hipotecada"));
 
     // Mientras esté hipotecada, caer en ella NO cobra renta
-    let space = session.world().resource::<monopoly_game::BoardResource>().spaces[1].clone();
+    let space = session
+        .world()
+        .resource::<monopoly_game::BoardResource>()
+        .spaces[1]
+        .clone();
     let mut land_events = Vec::new();
     let decision = monopoly_game::apply_land_effect(
         &space,
@@ -1066,7 +1167,13 @@ fn test_hipoteca_y_deshipoteca_propiedad() {
 
     // Deshipotecar: costo = (60 / 2) * 110 / 100 = 33
     let events_unmort = session
-        .process_command(P1, Box::new(UnmortgagePropertyCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(UnmortgagePropertyCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .expect("debe permitir deshipotecar");
 
     let unmort_event = events_unmort[0]
@@ -1117,28 +1224,58 @@ fn test_no_se_puede_hipotecar_con_edificios_en_grupo() {
 
     // Construir casa en casilla 1
     session
-        .process_command(P1, Box::new(BuildHouseCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(BuildHouseCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .unwrap();
 
     // Intentar hipotecar casilla 1 o casilla 3 debe fallar por haber edificios en el grupo
     let err_mort = session
-        .process_command(P1, Box::new(MortgagePropertyCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(MortgagePropertyCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .unwrap_err();
     assert!(err_mort.to_string().contains("edificios"));
 
     let err_mort_other = session
-        .process_command(P1, Box::new(MortgagePropertyCommand { player: P1, space: 3 }))
+        .process_command(
+            P1,
+            Box::new(MortgagePropertyCommand {
+                player: P1,
+                space: 3,
+            }),
+        )
         .unwrap_err();
     assert!(err_mort_other.to_string().contains("edificios"));
 
     // Vender la casa
     session
-        .process_command(P1, Box::new(SellHouseCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(SellHouseCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .unwrap();
 
     // Ahora sí se puede hipotecar
     session
-        .process_command(P1, Box::new(MortgagePropertyCommand { player: P1, space: 1 }))
+        .process_command(
+            P1,
+            Box::new(MortgagePropertyCommand {
+                player: P1,
+                space: 1,
+            }),
+        )
         .expect("debe permitir hipotecar tras demoler edificios");
 }
 
@@ -1148,7 +1285,9 @@ fn test_tres_dobles_consecutivos_a_la_carcel() {
     let mut found_seed = None;
     for s in 1..1000 {
         let mut session = new_monopoly_session(SessionId(s), s, P1, P2);
-        let mut rng = session.world_mut().resource_mut::<open_table_engine::prelude::RandomResource>();
+        let mut rng = session
+            .world_mut()
+            .resource_mut::<open_table_engine::prelude::RandomResource>();
         let (d1, d2) = (rng.0.roll_die(6), rng.0.roll_die(6));
         if d1 == d2 {
             found_seed = Some(s);
@@ -1180,7 +1319,10 @@ fn test_tres_dobles_consecutivos_a_la_carcel() {
     // El jugador debe estar en la cárcel y con 3 turnos de condena
     let jail_res = session.world().resource::<JailResource>();
     assert_eq!(jail_res.jailed.get(&P1), Some(&3));
-    assert_eq!(jail_res.consecutive_doubles.get(&P1).copied().unwrap_or(0), 0);
+    assert_eq!(
+        jail_res.consecutive_doubles.get(&P1).copied().unwrap_or(0),
+        0
+    );
 
     let pos = session
         .world()
@@ -1218,13 +1360,11 @@ fn test_tarjeta_salir_libre_de_la_carcel() {
     assert!(events[0].as_any().is::<JailCardUsedEvent>());
 
     // P1 ya no está en la cárcel
-    assert!(
-        !session
-            .world()
-            .resource::<JailResource>()
-            .jailed
-            .contains_key(&P1)
-    );
+    assert!(!session
+        .world()
+        .resource::<JailResource>()
+        .jailed
+        .contains_key(&P1));
 
     // La cantidad de tarjetas se decrementó a 0
     assert_eq!(
@@ -1244,4 +1384,3 @@ fn test_tarjeta_salir_libre_de_la_carcel() {
         .unwrap_err();
     assert!(err_empty.to_string().contains("cárcel"));
 }
-

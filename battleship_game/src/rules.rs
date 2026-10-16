@@ -244,4 +244,3 @@ pub fn build_battleship_rules() -> RuleEngine {
 
     rules
 }
-

@@ -827,8 +827,10 @@ fn test_tablas_por_40_movimientos_sin_captura_ni_coronacion() {
             .process_command(P1, move_cmd(P1, p1_from, p1_to))
             .expect("movimiento de dama P1 válido");
         assert!(
-            ev1.iter()
-                .all(|e| e.as_any().downcast_ref::<checkers_game::GameOverEvent>().is_none()),
+            ev1.iter().all(|e| e
+                .as_any()
+                .downcast_ref::<checkers_game::GameOverEvent>()
+                .is_none()),
             "no debe terminar antes del medio turno 80"
         );
 
@@ -843,8 +845,10 @@ fn test_tablas_por_40_movimientos_sin_captura_ni_coronacion() {
 
         if i < 39 {
             assert!(
-                ev2.iter()
-                    .all(|e| e.as_any().downcast_ref::<checkers_game::GameOverEvent>().is_none()),
+                ev2.iter().all(|e| e
+                    .as_any()
+                    .downcast_ref::<checkers_game::GameOverEvent>()
+                    .is_none()),
                 "no debe terminar antes del medio turno 80"
             );
         } else {
