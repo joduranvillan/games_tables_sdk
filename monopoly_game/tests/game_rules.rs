@@ -1,12 +1,14 @@
 use monopoly_game::{
-    board_layout, new_monopoly_session, AuctionBidCommand, AuctionStartedEvent, AuctionWonEvent,
-    BankruptcyEvent, BuildHouseCommand, BuildingsResource, BuyPropertyCommand, ChanceCard,
-    CommunityChestCard, GameOverEvent, HouseBuiltEvent, HouseSoldEvent, JailCardUsedEvent,
-    JailResource, JailedEvent, MortgagePropertyCommand, PayJailFeeCommand, PlayerMovedEvent,
-    PropertyMortgagedEvent, PropertyPurchasedEvent, PropertyUnmortgagedEvent,
-    RailroadRentPaidEvent, RentPaidEvent, RollAndMoveCommand, SellHouseCommand, SpaceKind,
-    TaxPaidEvent, UnmortgagePropertyCommand, UseJailCardCommand, UtilityRentPaidEvent, BOARD_SIZE,
-    GO_TO_JAIL_SPACE, JAIL_SPACE, STARTING_MONEY,
+    board_layout, new_monopoly_session, AcceptTradeCommand, AuctionBidCommand, AuctionStartedEvent,
+    AuctionWonEvent, BankruptcyEvent, BuildHouseCommand, BuildingsResource, BuyPropertyCommand,
+    ChanceCard, CommunityChestCard, GameOverEvent, HouseBuiltEvent, HouseSoldEvent,
+    JailCardUsedEvent, JailResource, JailedEvent, MortgagePropertyCommand, PayJailFeeCommand,
+    PlayerMovedEvent, PropertyMortgagedEvent, PropertyPurchasedEvent, PropertyUnmortgagedEvent,
+    ProposeTradeCommand, RailroadRentPaidEvent, RejectTradeCommand, RentPaidEvent,
+    RollAndMoveCommand, SellHouseCommand, SpaceKind, TaxPaidEvent, TradeAcceptedEvent,
+    TradeOfferResource, TradeProposedEvent, TradeRejectedEvent, UnmortgagePropertyCommand,
+    UseJailCardCommand, UtilityRentPaidEvent, BOARD_SIZE, GO_TO_JAIL_SPACE, JAIL_SPACE,
+    STARTING_MONEY,
 };
 use open_table_engine::prelude::*;
 
@@ -1383,4 +1385,273 @@ fn test_tarjeta_salir_libre_de_la_carcel() {
         .process_command(P1, Box::new(UseJailCardCommand { player: P1 }))
         .unwrap_err();
     assert!(err_empty.to_string().contains("cárcel"));
+}
+
+#[test]
+fn test_propose_trade_valida_propiedades_y_efectivo() {
+    let mut session = new_monopoly_session(SessionId(511), 1, P1, P2);
+
+    // Asignar propiedades
+    {
+        let mut players = session
+            .world_mut()
+            .resource_mut::<monopoly_game::PlayersResource>();
+        players.properties.insert(1, P1);
+        players.properties.insert(3, P2);
+    }
+
+    // P1 propone a P2 cambiar casilla 1 + $50 por casilla 3 + $20
+    let events = session
+        .process_command(
+            P1,
+            Box::new(ProposeTradeCommand {
+                player: P1,
+                target: P2,
+                offered_spaces: vec![1],
+                requested_spaces: vec![3],
+                offered_cash: 50,
+                requested_cash: 20,
+            }),
+        )
+        .expect("la propuesta de intercambio debe ser válida");
+
+    assert_eq!(events.len(), 1);
+    let prop = events[0]
+        .as_any()
+        .downcast_ref::<TradeProposedEvent>()
+        .unwrap();
+    assert_eq!(prop.player, P1);
+    assert_eq!(prop.target, P2);
+    assert_eq!(prop.offered_spaces, vec![1]);
+    assert_eq!(prop.requested_spaces, vec![3]);
+    assert_eq!(prop.offered_cash, 50);
+    assert_eq!(prop.requested_cash, 20);
+
+    // TradeOfferResource debe registrar la oferta
+    let trade_res = session.world().resource::<TradeOfferResource>();
+    let offer = trade_res.offer.as_ref().expect("debe haber una oferta registrada");
+    assert_eq!(offer.from, P1);
+    assert_eq!(offer.to, P2);
+}
+
+#[test]
+fn test_propose_trade_rechaza_casos_invalidos() {
+    let mut session = new_monopoly_session(SessionId(512), 1, P1, P2);
+
+    {
+        let mut players = session
+            .world_mut()
+            .resource_mut::<monopoly_game::PlayersResource>();
+        players.properties.insert(1, P1);
+        players.properties.insert(3, P2);
+        players.money.insert(P1, 100);
+        players.money.insert(P2, 50);
+    }
+
+    // 1. Comerciar consigo mismo
+    let err_self = session
+        .process_command(
+            P1,
+            Box::new(ProposeTradeCommand {
+                player: P1,
+                target: P1,
+                offered_spaces: vec![1],
+                requested_spaces: vec![],
+                offered_cash: 0,
+                requested_cash: 0,
+            }),
+        )
+        .unwrap_err();
+    assert!(err_self.to_string().contains("mismo"));
+
+    // 2. Ofrecer propiedad que no posee
+    let err_not_owner = session
+        .process_command(
+            P1,
+            Box::new(ProposeTradeCommand {
+                player: P1,
+                target: P2,
+                offered_spaces: vec![6], // No pertenece a P1
+                requested_spaces: vec![3],
+                offered_cash: 0,
+                requested_cash: 0,
+            }),
+        )
+        .unwrap_err();
+    assert!(err_not_owner.to_string().contains("dueño"));
+
+    // 3. Solicitar propiedad que el target no posee
+    let err_target_not_owner = session
+        .process_command(
+            P1,
+            Box::new(ProposeTradeCommand {
+                player: P1,
+                target: P2,
+                offered_spaces: vec![1],
+                requested_spaces: vec![8], // No pertenece a P2
+                offered_cash: 0,
+                requested_cash: 0,
+            }),
+        )
+        .unwrap_err();
+    assert!(err_target_not_owner.to_string().contains("dueño") || err_target_not_owner.to_string().contains("objetivo"));
+
+    // 4. Ofrecer más efectivo del que tiene
+    let err_cash = session
+        .process_command(
+            P1,
+            Box::new(ProposeTradeCommand {
+                player: P1,
+                target: P2,
+                offered_spaces: vec![1],
+                requested_spaces: vec![3],
+                offered_cash: 200, // P1 solo tiene 100
+                requested_cash: 0,
+            }),
+        )
+        .unwrap_err();
+    assert!(err_cash.to_string().contains("efectivo"));
+
+    // 5. Solicitar más efectivo del que target tiene
+    let err_target_cash = session
+        .process_command(
+            P1,
+            Box::new(ProposeTradeCommand {
+                player: P1,
+                target: P2,
+                offered_spaces: vec![1],
+                requested_spaces: vec![3],
+                offered_cash: 0,
+                requested_cash: 100, // P2 solo tiene 50
+            }),
+        )
+        .unwrap_err();
+    assert!(err_target_cash.to_string().contains("efectivo"));
+
+    // 6. Propiedad con edificios no puede comerciarse
+    {
+        let mut buildings = session
+            .world_mut()
+            .resource_mut::<monopoly_game::BuildingsResource>();
+        buildings.buildings.insert(1, 1);
+    }
+    let err_bldg = session
+        .process_command(
+            P1,
+            Box::new(ProposeTradeCommand {
+                player: P1,
+                target: P2,
+                offered_spaces: vec![1],
+                requested_spaces: vec![3],
+                offered_cash: 0,
+                requested_cash: 0,
+            }),
+        )
+        .unwrap_err();
+    assert!(err_bldg.to_string().contains("edificios"));
+}
+
+#[test]
+fn test_accept_trade_transfiere_atomicamente_propiedades_y_dinero() {
+    let mut session = new_monopoly_session(SessionId(513), 1, P1, P2);
+
+    {
+        let mut players = session
+            .world_mut()
+            .resource_mut::<monopoly_game::PlayersResource>();
+        players.properties.insert(1, P1);
+        players.properties.insert(3, P2);
+        players.money.insert(P1, 1500);
+        players.money.insert(P2, 1500);
+    }
+
+    // P1 propone: Casilla 1 + $200 por Casilla 3 + $50
+    session
+        .process_command(
+            P1,
+            Box::new(ProposeTradeCommand {
+                player: P1,
+                target: P2,
+                offered_spaces: vec![1],
+                requested_spaces: vec![3],
+                offered_cash: 200,
+                requested_cash: 50,
+            }),
+        )
+        .expect("propuesta válida");
+
+    // P1 no puede aceptar su propia propuesta
+    let err_proposer_accept = session
+        .process_command(P1, Box::new(AcceptTradeCommand { player: P1 }))
+        .unwrap_err();
+    assert!(err_proposer_accept.to_string().contains("destinatario"));
+
+    // P2 acepta la propuesta
+    let events = session
+        .process_command(P2, Box::new(AcceptTradeCommand { player: P2 }))
+        .expect("P2 debe poder aceptar la oferta");
+
+    assert_eq!(events.len(), 1);
+    let acc = events[0]
+        .as_any()
+        .downcast_ref::<TradeAcceptedEvent>()
+        .unwrap();
+    assert_eq!(acc.player, P2);
+    assert_eq!(acc.target, P1);
+
+    // Verificar transferencia de propiedades
+    let players = session
+        .world()
+        .resource::<monopoly_game::PlayersResource>();
+    assert_eq!(players.properties.get(&1), Some(&P2), "Casilla 1 ahora debe pertenecer a P2");
+    assert_eq!(players.properties.get(&3), Some(&P1), "Casilla 3 ahora debe pertenecer a P1");
+
+    // P1 pagó 200 y recibió 50 -> neto -150: 1500 - 150 = 1350
+    assert_eq!(players.money[&P1], 1350);
+    // P2 recibió 200 y pagó 50 -> neto +150: 1500 + 150 = 1650
+    assert_eq!(players.money[&P2], 1650);
+
+    // Oferta debe estar limpia
+    let trade_res = session.world().resource::<TradeOfferResource>();
+    assert!(trade_res.offer.is_none());
+}
+
+#[test]
+fn test_reject_trade_limpia_la_oferta() {
+    let mut session = new_monopoly_session(SessionId(514), 1, P1, P2);
+
+    {
+        let mut players = session
+            .world_mut()
+            .resource_mut::<monopoly_game::PlayersResource>();
+        players.properties.insert(1, P1);
+        players.properties.insert(3, P2);
+    }
+
+    session
+        .process_command(
+            P1,
+            Box::new(ProposeTradeCommand {
+                player: P1,
+                target: P2,
+                offered_spaces: vec![1],
+                requested_spaces: vec![3],
+                offered_cash: 0,
+                requested_cash: 0,
+            }),
+        )
+        .expect("propuesta válida");
+
+    assert!(session.world().resource::<TradeOfferResource>().offer.is_some());
+
+    // P2 rechaza la oferta
+    let events = session
+        .process_command(P2, Box::new(RejectTradeCommand { player: P2 }))
+        .expect("P2 debe poder rechazar");
+
+    assert_eq!(events.len(), 1);
+    assert!(events[0].as_any().is::<TradeRejectedEvent>());
+
+    // Oferta limpia
+    assert!(session.world().resource::<TradeOfferResource>().offer.is_none());
 }

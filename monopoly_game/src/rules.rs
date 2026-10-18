@@ -6,20 +6,20 @@ use crate::board::{
     ChanceCard, CommunityChestCard, SpaceKind, BOARD_SIZE, GO_BONUS, GO_TO_JAIL_SPACE, JAIL_SPACE,
 };
 use crate::commands::{
-    AuctionBidCommand, BuildHouseCommand, BuyPropertyCommand, MortgagePropertyCommand,
-    PayJailFeeCommand, RollAndMoveCommand, SellHouseCommand, UnmortgagePropertyCommand,
-    UseJailCardCommand,
+    AcceptTradeCommand, AuctionBidCommand, BuildHouseCommand, BuyPropertyCommand,
+    MortgagePropertyCommand, PayJailFeeCommand, ProposeTradeCommand, RejectTradeCommand,
+    RollAndMoveCommand, SellHouseCommand, UnmortgagePropertyCommand, UseJailCardCommand,
 };
 use crate::events::{
     AuctionStartedEvent, AuctionWonEvent, BankruptcyEvent, ChanceCardDrawnEvent,
     CommunityChestCardDrawnEvent, GameOverEvent, HouseBuiltEvent, HouseSoldEvent,
     JailCardUsedEvent, JailedEvent, PlayerMovedEvent, PropertyMortgagedEvent,
     PropertyPurchasedEvent, PropertyUnmortgagedEvent, RailroadRentPaidEvent, RentPaidEvent,
-    TaxPaidEvent, UtilityRentPaidEvent,
+    TaxPaidEvent, TradeAcceptedEvent, TradeProposedEvent, TradeRejectedEvent, UtilityRentPaidEvent,
 };
 use crate::resources::{
     AuctionResource, AuctionState, BoardResource, BuildingsResource, JailResource, PendingDecision,
-    PendingPurchaseResource, PlayersResource,
+    PendingPurchaseResource, PlayersResource, TradeOffer, TradeOfferResource,
 };
 
 fn invalid(reason: impl Into<String>) -> EngineError {
@@ -1296,6 +1296,257 @@ pub fn build_monopoly_rules() -> RuleEngine {
             player: cmd.player,
             space: cmd.space,
             cost,
+        })];
+
+        Ok(events)
+    });
+
+    rules.register::<ProposeTradeCommand, _>(|cmd, world| {
+        if cmd.player == cmd.target {
+            return Err(invalid("no puedes comerciar contigo mismo"));
+        }
+
+        let board = world.resource::<BoardResource>().spaces.clone();
+        let players = world.resource::<PlayersResource>();
+
+        if players.bankrupt.contains(&cmd.player) || players.bankrupt.contains(&cmd.target) {
+            return Err(invalid("un jugador en bancarrota no puede comerciar"));
+        }
+
+        let player_money = players.money.get(&cmd.player).copied().unwrap_or(0);
+        if player_money < cmd.offered_cash as i64 {
+            return Err(invalid("no tienes suficiente efectivo para ofrecer"));
+        }
+
+        let target_money = players.money.get(&cmd.target).copied().unwrap_or(0);
+        if target_money < cmd.requested_cash as i64 {
+            return Err(invalid("el jugador objetivo no tiene suficiente efectivo"));
+        }
+
+        // Validar propiedades ofrecidas
+        for &space_idx in &cmd.offered_spaces {
+            if space_idx >= board.len() {
+                return Err(invalid("casilla fuera de rango"));
+            }
+            if players.properties.get(&space_idx) != Some(&cmd.player) {
+                return Err(invalid("no eres el dueño de una de las propiedades ofrecidas"));
+            }
+            if world.contains_resource::<BuildingsResource>() {
+                let buildings = world.resource::<BuildingsResource>();
+                if buildings.buildings.get(&space_idx).copied().unwrap_or(0) > 0 {
+                    return Err(invalid("no se puede comerciar una propiedad con edificios"));
+                }
+                if let SpaceKind::Property { group, .. } = &board[space_idx] {
+                    for (idx, space) in board.iter().enumerate() {
+                        if let SpaceKind::Property { group: g, .. } = space {
+                            if g == group && buildings.buildings.get(&idx).copied().unwrap_or(0) > 0 {
+                                return Err(invalid(
+                                    "no se puede comerciar una propiedad de un grupo con edificios",
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Validar propiedades solicitadas
+        for &space_idx in &cmd.requested_spaces {
+            if space_idx >= board.len() {
+                return Err(invalid("casilla fuera de rango"));
+            }
+            if players.properties.get(&space_idx) != Some(&cmd.target) {
+                return Err(invalid(
+                    "el objetivo no es el dueño de una de las propiedades solicitadas",
+                ));
+            }
+            if world.contains_resource::<BuildingsResource>() {
+                let buildings = world.resource::<BuildingsResource>();
+                if buildings.buildings.get(&space_idx).copied().unwrap_or(0) > 0 {
+                    return Err(invalid("no se puede comerciar una propiedad con edificios"));
+                }
+                if let SpaceKind::Property { group, .. } = &board[space_idx] {
+                    for (idx, space) in board.iter().enumerate() {
+                        if let SpaceKind::Property { group: g, .. } = space {
+                            if g == group && buildings.buildings.get(&idx).copied().unwrap_or(0) > 0 {
+                                return Err(invalid(
+                                    "no se puede comerciar una propiedad de un grupo con edificios",
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let offer = TradeOffer {
+            from: cmd.player,
+            to: cmd.target,
+            offered_spaces: cmd.offered_spaces.clone(),
+            requested_spaces: cmd.requested_spaces.clone(),
+            offered_cash: cmd.offered_cash,
+            requested_cash: cmd.requested_cash,
+        };
+
+        if !world.contains_resource::<TradeOfferResource>() {
+            world.insert_resource(TradeOfferResource::default());
+        }
+        let mut trade_res = world.resource_mut::<TradeOfferResource>();
+        trade_res.set_offer(offer);
+
+        let events: Vec<Box<dyn Event>> = vec![Box::new(TradeProposedEvent {
+            player: cmd.player,
+            target: cmd.target,
+            offered_spaces: cmd.offered_spaces.clone(),
+            requested_spaces: cmd.requested_spaces.clone(),
+            offered_cash: cmd.offered_cash,
+            requested_cash: cmd.requested_cash,
+        })];
+
+        Ok(events)
+    });
+
+    rules.register::<AcceptTradeCommand, _>(|cmd, world| {
+        if !world.contains_resource::<TradeOfferResource>() {
+            return Err(invalid("no hay ninguna oferta de intercambio activa"));
+        }
+
+        let offer = {
+            let trade_res = world.resource::<TradeOfferResource>();
+            trade_res
+                .offer
+                .as_ref()
+                .ok_or_else(|| invalid("no hay ninguna oferta de intercambio activa"))?
+                .clone()
+        };
+
+        if cmd.player != offer.to {
+            return Err(invalid("solo el destinatario puede aceptar la oferta"));
+        }
+
+        let board = world.resource::<BoardResource>().spaces.clone();
+        let players = world.resource::<PlayersResource>();
+
+        let from_money = players.money.get(&offer.from).copied().unwrap_or(0);
+        if from_money < offer.offered_cash as i64 {
+            return Err(invalid("el proponente ya no tiene suficiente efectivo"));
+        }
+        let to_money = players.money.get(&offer.to).copied().unwrap_or(0);
+        if to_money < offer.requested_cash as i64 {
+            return Err(invalid(
+                "no tienes suficiente efectivo para aceptar el intercambio",
+            ));
+        }
+
+        for &space_idx in &offer.offered_spaces {
+            if players.properties.get(&space_idx) != Some(&offer.from) {
+                return Err(invalid(
+                    "el proponente ya no posee una de las propiedades ofrecidas",
+                ));
+            }
+        }
+        for &space_idx in &offer.requested_spaces {
+            if players.properties.get(&space_idx) != Some(&offer.to) {
+                return Err(invalid("ya no posees una de las propiedades solicitadas"));
+            }
+        }
+
+        if world.contains_resource::<BuildingsResource>() {
+            let buildings = world.resource::<BuildingsResource>();
+            for &space_idx in offer
+                .offered_spaces
+                .iter()
+                .chain(offer.requested_spaces.iter())
+            {
+                if buildings.buildings.get(&space_idx).copied().unwrap_or(0) > 0 {
+                    return Err(invalid("no se puede transferir una propiedad con edificios"));
+                }
+                if let SpaceKind::Property { group, .. } = &board[space_idx] {
+                    for (idx, space) in board.iter().enumerate() {
+                        if let SpaceKind::Property { group: g, .. } = space {
+                            if g == group
+                                && buildings.buildings.get(&idx).copied().unwrap_or(0) > 0
+                            {
+                                return Err(invalid(
+                                    "no se puede transferir una propiedad de un grupo con edificios",
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut players = world.resource_mut::<PlayersResource>();
+
+        for &space_idx in &offer.offered_spaces {
+            players.properties.insert(space_idx, offer.to);
+        }
+        for &space_idx in &offer.requested_spaces {
+            players.properties.insert(space_idx, offer.from);
+        }
+
+        if offer.offered_cash > 0 {
+            let current_from = players.money.get(&offer.from).copied().unwrap_or(0);
+            players
+                .money
+                .insert(offer.from, current_from - offer.offered_cash as i64);
+
+            let current_to = players.money.get(&offer.to).copied().unwrap_or(0);
+            players
+                .money
+                .insert(offer.to, current_to + offer.offered_cash as i64);
+        }
+        if offer.requested_cash > 0 {
+            let current_to = players.money.get(&offer.to).copied().unwrap_or(0);
+            players
+                .money
+                .insert(offer.to, current_to - offer.requested_cash as i64);
+
+            let current_from = players.money.get(&offer.from).copied().unwrap_or(0);
+            players
+                .money
+                .insert(offer.from, current_from + offer.requested_cash as i64);
+        }
+
+        let mut trade_res = world.resource_mut::<TradeOfferResource>();
+        trade_res.clear();
+
+        let events: Vec<Box<dyn Event>> = vec![Box::new(TradeAcceptedEvent {
+            player: cmd.player,
+            target: offer.from,
+            offered_spaces: offer.offered_spaces,
+            requested_spaces: offer.requested_spaces,
+            offered_cash: offer.offered_cash,
+            requested_cash: offer.requested_cash,
+        })];
+
+        Ok(events)
+    });
+
+    rules.register::<RejectTradeCommand, _>(|cmd, world| {
+        if !world.contains_resource::<TradeOfferResource>() {
+            return Err(invalid("no hay ninguna oferta de intercambio activa"));
+        }
+
+        let offer = {
+            let trade_res = world.resource::<TradeOfferResource>();
+            trade_res
+                .offer
+                .as_ref()
+                .ok_or_else(|| invalid("no hay ninguna oferta de intercambio activa"))?
+                .clone()
+        };
+
+        if cmd.player != offer.to && cmd.player != offer.from {
+            return Err(invalid("no tienes permiso para rechazar esta oferta"));
+        }
+
+        let mut trade_res = world.resource_mut::<TradeOfferResource>();
+        trade_res.clear();
+
+        let events: Vec<Box<dyn Event>> = vec![Box::new(TradeRejectedEvent {
+            player: cmd.player,
         })];
 
         Ok(events)

@@ -62,3 +62,26 @@ pub struct UseJailCardCommand {
     #[issuer]
     pub player: PlayerId,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct ProposeTradeCommand {
+    #[issuer]
+    pub player: PlayerId,
+    pub target: PlayerId,
+    pub offered_spaces: Vec<usize>,
+    pub requested_spaces: Vec<usize>,
+    pub offered_cash: u32,
+    pub requested_cash: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct AcceptTradeCommand {
+    #[issuer]
+    pub player: PlayerId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct RejectTradeCommand {
+    #[issuer]
+    pub player: PlayerId,
+}

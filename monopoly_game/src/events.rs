@@ -131,3 +131,28 @@ pub struct PropertyUnmortgagedEvent {
 pub struct JailCardUsedEvent {
     pub player: PlayerId,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct TradeProposedEvent {
+    pub player: PlayerId,
+    pub target: PlayerId,
+    pub offered_spaces: Vec<usize>,
+    pub requested_spaces: Vec<usize>,
+    pub offered_cash: u32,
+    pub requested_cash: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct TradeAcceptedEvent {
+    pub player: PlayerId,
+    pub target: PlayerId,
+    pub offered_spaces: Vec<usize>,
+    pub requested_spaces: Vec<usize>,
+    pub offered_cash: u32,
+    pub requested_cash: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct TradeRejectedEvent {
+    pub player: PlayerId,
+}

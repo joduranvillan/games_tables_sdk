@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use open_table_core::ids::PlayerId;
 use open_table_macros::GameResource;
+use serde::{Deserialize, Serialize};
 
 use crate::board::{board_layout, Space, STARTING_MONEY};
 
@@ -138,4 +139,36 @@ pub struct AuctionResource {
 #[derive(GameResource, Default, Clone, Debug)]
 pub struct BuildingsResource {
     pub buildings: HashMap<usize, u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TradeOffer {
+    pub from: PlayerId,
+    pub to: PlayerId,
+    pub offered_spaces: Vec<usize>,
+    pub requested_spaces: Vec<usize>,
+    pub offered_cash: u32,
+    pub requested_cash: u32,
+}
+
+#[derive(GameResource, Default, Clone, Debug)]
+pub struct TradeOfferResource {
+    pub offer: Option<TradeOffer>,
+    pub current_offer: Option<TradeOffer>,
+}
+
+impl TradeOfferResource {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_offer(&mut self, offer: TradeOffer) {
+        self.offer = Some(offer.clone());
+        self.current_offer = Some(offer);
+    }
+
+    pub fn clear(&mut self) {
+        self.offer = None;
+        self.current_offer = None;
+    }
 }

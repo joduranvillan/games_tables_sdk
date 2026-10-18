@@ -19,20 +19,20 @@ pub use board::{
     GO_TO_JAIL_SPACE, JAIL_SPACE, STARTING_MONEY,
 };
 pub use commands::{
-    AuctionBidCommand, BuildHouseCommand, BuyPropertyCommand, MortgagePropertyCommand,
-    PayJailFeeCommand, RollAndMoveCommand, SellHouseCommand, UnmortgagePropertyCommand,
-    UseJailCardCommand,
+    AcceptTradeCommand, AuctionBidCommand, BuildHouseCommand, BuyPropertyCommand,
+    MortgagePropertyCommand, PayJailFeeCommand, ProposeTradeCommand, RejectTradeCommand,
+    RollAndMoveCommand, SellHouseCommand, UnmortgagePropertyCommand, UseJailCardCommand,
 };
 pub use events::{
     AuctionStartedEvent, AuctionWonEvent, BankruptcyEvent, ChanceCardDrawnEvent,
     CommunityChestCardDrawnEvent, GameOverEvent, HouseBuiltEvent, HouseSoldEvent,
     JailCardUsedEvent, JailedEvent, PlayerMovedEvent, PropertyMortgagedEvent,
     PropertyPurchasedEvent, PropertyUnmortgagedEvent, RailroadRentPaidEvent, RentPaidEvent,
-    TaxPaidEvent, UtilityRentPaidEvent,
+    TaxPaidEvent, TradeAcceptedEvent, TradeProposedEvent, TradeRejectedEvent, UtilityRentPaidEvent,
 };
 pub use resources::{
     AuctionResource, BoardResource, BuildingsResource, JailResource, PendingPurchaseResource,
-    PlayersResource,
+    PlayersResource, TradeOffer, TradeOfferResource,
 };
 pub use rules::{apply_land_effect, build_monopoly_rules};
 
@@ -66,5 +66,8 @@ pub fn new_monopoly_session(
     session
         .world_mut()
         .insert_resource(BuildingsResource::default());
+    session
+        .world_mut()
+        .insert_resource(TradeOfferResource::default());
     session
 }

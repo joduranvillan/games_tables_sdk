@@ -48,6 +48,80 @@ func _initialize() -> void:
 	# 3. Comprobar que no hubo rechazo inesperado al tirar los dados
 	results.append(["Tirada inicial procesada sin rechazo de movimiento", move_rejected_reasons.size() == 0])
 
+	# 4. Probar ProposeTradeCommand y AcceptTradeCommand
+	events_received.clear()
+	bridge.send_command_json(1, JSON.stringify({
+		"command_type": "ProposeTradeCommand",
+		"player": 1,
+		"target": 2,
+		"offered_spaces": [],
+		"requested_spaces": [],
+		"offered_cash": 100,
+		"requested_cash": 50
+	}))
+
+	var has_trade_proposed = false
+	for ev in events_received:
+		var et = ev.get("event_type", ev.get("command_type", ""))
+		if "TradeProposedEvent" in et:
+			has_trade_proposed = true
+			break
+	results.append(["ProposeTradeCommand emite TradeProposedEvent", has_trade_proposed])
+
+	# 5. Aceptar intercambio
+	events_received.clear()
+	bridge.send_command_json(2, JSON.stringify({
+		"command_type": "AcceptTradeCommand",
+		"player": 2
+	}))
+
+	var has_trade_accepted = false
+	for ev in events_received:
+		var et = ev.get("event_type", ev.get("command_type", ""))
+		if "TradeAcceptedEvent" in et:
+			has_trade_accepted = true
+			break
+	results.append(["AcceptTradeCommand emite TradeAcceptedEvent", has_trade_accepted])
+
+	# 6. Proponer y rechazar intercambio
+	bridge.send_command_json(1, JSON.stringify({
+		"command_type": "ProposeTradeCommand",
+		"player": 1,
+		"target": 2,
+		"offered_spaces": [],
+		"requested_spaces": [],
+		"offered_cash": 50,
+		"requested_cash": 0
+	}))
+
+	events_received.clear()
+	bridge.send_command_json(2, JSON.stringify({
+		"command_type": "RejectTradeCommand",
+		"player": 2
+	}))
+
+	var has_trade_rejected = false
+	for ev in events_received:
+		var et = ev.get("event_type", ev.get("command_type", ""))
+		if "TradeRejectedEvent" in et:
+			has_trade_rejected = true
+			break
+	results.append(["RejectTradeCommand emite TradeRejectedEvent", has_trade_rejected])
+
+	# 7. Verificar que monopoly_board contiene los botones de gestión de propiedades
+	var board_script = load("res://monopoly_board.gd")
+	if board_script != null:
+		var board_inst = board_script.new()
+		root.add_child(board_inst)
+
+		var has_build_btn = board_inst.find_child("BuildHouseButton", true, false) != null
+		var has_mortgage_btn = board_inst.find_child("MortgageButton", true, false) != null
+		var has_trade_btn = board_inst.find_child("TradeButton", true, false) != null
+		results.append(["monopoly_board contiene botón 🏠 Construir Casa/Hotel", has_build_btn])
+		results.append(["monopoly_board contiene botón 🏦 Hipotecar/Deshipotecar", has_mortgage_btn])
+		results.append(["monopoly_board contiene botón 🤝 Proponer Intercambio", has_trade_btn])
+		board_inst.free()
+
 	var ok := true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
