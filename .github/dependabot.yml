@@ -1,30 +1,52 @@
 version: 2
 updates:
+  # Dependabot para dependencias de Cargo (Rust crates del workspace)
+  # Configurado para generar un solo Pull Request agrupado con actualizaciones estables (minor y patch)
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "monthly"
-      day: "1"
-    open-pull-requests-limit: 3
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Argentina/Buenos_Aires"
+    open-pull-requests-limit: 1
     groups:
-      cargo-all:
+      stable-dependencies:
+        applies-to: version-updates
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     assignees:
       - "joduranvillan"
     reviewers:
       - "joduranvillan"
 
+  # Dependabot para GitHub Actions
+  # Agrupa en un solo PR y solo versiones estables
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
-      day: "1"
-    open-pull-requests-limit: 2
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Argentina/Buenos_Aires"
+    open-pull-requests-limit: 1
     groups:
-      actions-all:
+      stable-actions:
+        applies-to: version-updates
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     assignees:
       - "joduranvillan"
     reviewers:
