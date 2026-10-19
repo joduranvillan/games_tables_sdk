@@ -1,7 +1,7 @@
 use open_table_engine::prelude::*;
 use open_table_macros::GameResource;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CardColor {
@@ -42,6 +42,9 @@ pub struct UnoState {
     pub active_color: CardColor,
     pub draw_penalty: usize,
     pub wild_draw_four_illegal: bool,
+    pub uno_called: HashSet<PlayerId>,
+    pub last_wild_draw_four_player: Option<PlayerId>,
+    pub allow_bluff_wild_draw_four: bool,
 }
 
 impl UnoState {
@@ -103,6 +106,9 @@ impl UnoState {
             active_color,
             draw_penalty: 0,
             wild_draw_four_illegal: false,
+            uno_called: HashSet::new(),
+            last_wild_draw_four_player: None,
+            allow_bluff_wild_draw_four: false,
         }
     }
 

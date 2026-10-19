@@ -8,10 +8,14 @@ use open_table_engine::prelude::*;
 
 pub use ai::{best_move, most_frequent_color, UnoCommand, UnoStateAccess};
 pub use board::{Card, CardColor, CardValue, UnoState};
-pub use commands::{DrawCardCommand, InterceptCommand, PlayCardCommand};
+pub use commands::{
+    CallUnoCommand, CatchUnoFailureCommand, ChallengeWildDrawFourCommand, DrawCardCommand,
+    InterceptCommand, PlayCardCommand,
+};
 pub use events::{
     CardPlayedEvent, CardsDrawnEvent, DrewAndPlayedEvent, GameOverEvent, InterceptedEvent,
-    PlayerSkippedEvent, TurnReversedEvent,
+    PlayerSkippedEvent, TurnReversedEvent, UnoCalledEvent, UnoPenaltyEvent,
+    WildDrawFourChallengedEvent,
 };
 pub use rules::build_uno_rules;
 

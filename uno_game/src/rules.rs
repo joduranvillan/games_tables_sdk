@@ -1,8 +1,12 @@
 use crate::board::{CardColor, CardValue, UnoState};
-use crate::commands::{DrawCardCommand, InterceptCommand, PlayCardCommand};
+use crate::commands::{
+    CallUnoCommand, CatchUnoFailureCommand, ChallengeWildDrawFourCommand, DrawCardCommand,
+    InterceptCommand, PlayCardCommand,
+};
 use crate::events::{
     CardPlayedEvent, CardsDrawnEvent, DrewAndPlayedEvent, GameOverEvent, InterceptedEvent,
-    PlayerSkippedEvent, TurnReversedEvent,
+    PlayerSkippedEvent, TurnReversedEvent, UnoCalledEvent, UnoPenaltyEvent,
+    WildDrawFourChallengedEvent,
 };
 use open_table_engine::prelude::*;
 
@@ -40,13 +44,20 @@ pub fn build_uno_rules() -> RuleEngine {
 
             if card.value == CardValue::WildDrawFour {
                 if hand.iter().any(|c| c.color == state.active_color) {
-                    return Err(EngineError::InvalidCommand {
-                        reason:
-                            "Cannot play Wild Draw Four when holding a card matching active color"
-                                .into(),
-                    });
+                    if !state.allow_bluff_wild_draw_four {
+                        return Err(EngineError::InvalidCommand {
+                            reason:
+                                "Cannot play Wild Draw Four when holding a card matching active color"
+                                    .into(),
+                        });
+                    }
+                    state.wild_draw_four_illegal = true;
+                } else {
+                    state.wild_draw_four_illegal = false;
                 }
-                state.wild_draw_four_illegal = false;
+                state.last_wild_draw_four_player = Some(cmd.player);
+            } else {
+                state.last_wild_draw_four_player = None;
             }
 
             let is_wild = card.color == CardColor::WildColor;
@@ -79,6 +90,10 @@ pub fn build_uno_rules() -> RuleEngine {
             cards_left = hand.len();
             state.discard_pile.push(card_obj);
             played_card = Some(card_obj);
+
+            if cards_left != 1 {
+                state.uno_called.remove(&cmd.player);
+            }
 
             events.push(Box::new(CardPlayedEvent {
                 player: cmd.player,
@@ -169,6 +184,14 @@ pub fn build_uno_rules() -> RuleEngine {
                 }
             }
 
+            {
+                let mut state = world.resource_mut::<UnoState>();
+                if state.hands.get(&cmd.player).map(|h| h.len()).unwrap_or(0) > 1 {
+                    state.uno_called.remove(&cmd.player);
+                }
+                state.last_wild_draw_four_player = None;
+            }
+
             let events: Vec<Box<dyn Event>> = vec![Box::new(CardsDrawnEvent {
                 player: cmd.player,
                 count: count_to_draw,
@@ -230,11 +253,19 @@ pub fn build_uno_rules() -> RuleEngine {
                     state.draw_penalty += 2;
                 } else if drawn_card.value == CardValue::WildDrawFour {
                     state.draw_penalty += 4;
+                    state.last_wild_draw_four_player = Some(cmd.player);
+                    state.wild_draw_four_illegal = false;
+                } else {
+                    state.last_wild_draw_four_player = None;
                 }
 
                 state.discard_pile.push(drawn_card);
                 let hand = state.hands.get(&cmd.player).unwrap();
                 cards_left = hand.len();
+
+                if cards_left != 1 {
+                    state.uno_called.remove(&cmd.player);
+                }
 
                 events.push(Box::new(DrewAndPlayedEvent {
                     player: cmd.player,
@@ -278,6 +309,10 @@ pub fn build_uno_rules() -> RuleEngine {
             {
                 let mut state = world.resource_mut::<UnoState>();
                 state.hands.entry(cmd.player).or_default().push(drawn_card);
+                if state.hands.get(&cmd.player).map(|h| h.len()).unwrap_or(0) > 1 {
+                    state.uno_called.remove(&cmd.player);
+                }
+                state.last_wild_draw_four_player = None;
             }
 
             let events: Vec<Box<dyn Event>> = vec![Box::new(CardsDrawnEvent {
@@ -389,6 +424,151 @@ pub fn build_uno_rules() -> RuleEngine {
             }));
             world.resource_mut::<TurnResource>().0.advance_n(skips + 1);
         } else {
+            world.resource_mut::<TurnResource>().0.advance();
+        }
+
+        Ok(events)
+    });
+
+    rules.register::<CallUnoCommand, _>(|cmd, world| {
+        let mut state = world.resource_mut::<UnoState>();
+        let hand_len = state.hands.get(&cmd.player).map(|h| h.len()).unwrap_or(0);
+        if hand_len != 1 && hand_len != 2 {
+            return Err(EngineError::InvalidCommand {
+                reason: "Cannot call UNO unless you have 1 or 2 cards in hand".into(),
+            });
+        }
+
+        state.uno_called.insert(cmd.player);
+        let events: Vec<Box<dyn Event>> = vec![Box::new(UnoCalledEvent {
+            player: cmd.player,
+        })];
+
+        Ok(events)
+    });
+
+    rules.register::<CatchUnoFailureCommand, _>(|cmd, world| {
+        if cmd.accuser == cmd.target {
+            return Err(EngineError::InvalidCommand {
+                reason: "Cannot accuse yourself".into(),
+            });
+        }
+
+        let target_hand_len = {
+            let state = world.resource::<UnoState>();
+            state.hands.get(&cmd.target).map(|h| h.len()).unwrap_or(0)
+        };
+
+        if target_hand_len != 1 {
+            return Err(EngineError::InvalidCommand {
+                reason: "Target does not have exactly 1 card in hand".into(),
+            });
+        }
+
+        {
+            let state = world.resource::<UnoState>();
+            if state.uno_called.contains(&cmd.target) {
+                return Err(EngineError::InvalidCommand {
+                    reason: "Target already called UNO".into(),
+                });
+            }
+        }
+
+        let mut rng = world.resource_mut::<RandomResource>();
+        let mut state = world.resource_mut::<UnoState>();
+        let drawn = state.draw_cards(cmd.target, 2, &mut rng.0);
+        let count = drawn.len();
+
+        if state.hands.get(&cmd.target).map(|h| h.len()).unwrap_or(0) > 1 {
+            state.uno_called.remove(&cmd.target);
+        }
+
+        let events: Vec<Box<dyn Event>> = vec![
+            Box::new(UnoPenaltyEvent {
+                target: cmd.target,
+                accuser: cmd.accuser,
+                drawn: count,
+            }),
+            Box::new(CardsDrawnEvent {
+                player: cmd.target,
+                count,
+            }),
+        ];
+
+        Ok(events)
+    });
+
+    rules.register::<ChallengeWildDrawFourCommand, _>(|cmd, world| {
+        if !world.resource::<TurnResource>().0.is_current(cmd.challenger) {
+            return Err(EngineError::InvalidCommand {
+                reason: "Not your turn".into(),
+            });
+        }
+
+        let bluffer = {
+            let state = world.resource::<UnoState>();
+            state.last_wild_draw_four_player.ok_or_else(|| {
+                EngineError::InvalidCommand {
+                    reason: "No Wild Draw Four to challenge".into(),
+                }
+            })?
+        };
+
+        let was_illegal = {
+            let state = world.resource::<UnoState>();
+            state.wild_draw_four_illegal
+        };
+
+        let mut events: Vec<Box<dyn Event>> = vec![];
+
+        if was_illegal {
+            // El infractor roba las 4 cartas
+            let count = {
+                let mut rng = world.resource_mut::<RandomResource>();
+                let mut state = world.resource_mut::<UnoState>();
+                state.draw_penalty = 0;
+                state.last_wild_draw_four_player = None;
+                state.wild_draw_four_illegal = false;
+                let drawn = state.draw_cards(bluffer, 4, &mut rng.0);
+                drawn.len()
+            };
+
+            events.push(Box::new(WildDrawFourChallengedEvent {
+                challenger: cmd.challenger,
+                target: bluffer,
+                was_illegal: true,
+                penalty_player: bluffer,
+                cards_drawn: count,
+            }));
+            events.push(Box::new(CardsDrawnEvent {
+                player: bluffer,
+                count,
+            }));
+        } else {
+            // El retador roba 6 cartas (4 + 2 de penalización)
+            let count = {
+                let mut rng = world.resource_mut::<RandomResource>();
+                let mut state = world.resource_mut::<UnoState>();
+                state.draw_penalty = 0;
+                state.last_wild_draw_four_player = None;
+                state.wild_draw_four_illegal = false;
+                let drawn = state.draw_cards(cmd.challenger, 6, &mut rng.0);
+                drawn.len()
+            };
+
+            events.push(Box::new(WildDrawFourChallengedEvent {
+                challenger: cmd.challenger,
+                target: bluffer,
+                was_illegal: false,
+                penalty_player: cmd.challenger,
+                cards_drawn: count,
+            }));
+            events.push(Box::new(CardsDrawnEvent {
+                player: cmd.challenger,
+                count,
+            }));
+
+            // El retador pierde su turno
             world.resource_mut::<TurnResource>().0.advance();
         }
 

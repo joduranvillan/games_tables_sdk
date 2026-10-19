@@ -23,3 +23,22 @@ pub struct InterceptCommand {
     pub player: PlayerId,
     pub card_index: usize,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct CallUnoCommand {
+    #[issuer]
+    pub player: PlayerId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct CatchUnoFailureCommand {
+    #[issuer]
+    pub accuser: PlayerId,
+    pub target: PlayerId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct ChallengeWildDrawFourCommand {
+    #[issuer]
+    pub challenger: PlayerId,
+}

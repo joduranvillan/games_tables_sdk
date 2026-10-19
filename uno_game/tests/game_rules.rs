@@ -1,7 +1,9 @@
 use open_table_engine::prelude::*;
 use uno_game::{
-    new_uno_session, Card, CardColor, CardValue, DrawCardCommand, DrewAndPlayedEvent,
-    InterceptCommand, InterceptedEvent, PlayCardCommand, UnoState,
+    new_uno_session, CallUnoCommand, Card, CardColor, CardValue, CatchUnoFailureCommand,
+    ChallengeWildDrawFourCommand, DrawCardCommand, DrewAndPlayedEvent, InterceptCommand,
+    InterceptedEvent, PlayCardCommand, UnoCalledEvent, UnoPenaltyEvent, UnoState,
+    WildDrawFourChallengedEvent,
 };
 
 const P1: PlayerId = PlayerId(1);
@@ -400,4 +402,231 @@ fn test_intercepcion_invalida_con_carta_similar_pero_diferente_color() {
         matches!(result, Err(EngineError::InvalidCommand { .. })),
         "Intercepción con carta de distinto color debe ser rechazada"
     );
+}
+
+#[test]
+fn test_call_uno_con_una_o_dos_cartas_exito() {
+    let mut session = new_uno_session(SessionId(521), 0, vec![P1, P2]);
+
+    {
+        let mut state = session.world_mut().resource_mut::<UnoState>();
+        let hand = state.hands.get_mut(&P1).unwrap();
+        hand.clear();
+        hand.push(Card::new(CardColor::Red, CardValue::Number(1)));
+        hand.push(Card::new(CardColor::Red, CardValue::Number(2)));
+    }
+
+    // P1 con 2 cartas canta UNO
+    let events = session
+        .process_command(P1, Box::new(CallUnoCommand { player: P1 }))
+        .expect("debe permitir cantar UNO con 2 cartas");
+    assert_eq!(events.len(), 1);
+    assert!(events[0].as_any().is::<UnoCalledEvent>());
+    assert!(session.world().resource::<UnoState>().uno_called.contains(&P1));
+
+    // Ahora con 1 carta
+    {
+        let mut state = session.world_mut().resource_mut::<UnoState>();
+        state.uno_called.clear();
+        let hand = state.hands.get_mut(&P1).unwrap();
+        hand.pop();
+    }
+    let events = session
+        .process_command(P1, Box::new(CallUnoCommand { player: P1 }))
+        .expect("debe permitir cantar UNO con 1 carta");
+    assert_eq!(events.len(), 1);
+    assert!(session.world().resource::<UnoState>().uno_called.contains(&P1));
+}
+
+#[test]
+fn test_call_uno_con_mas_de_dos_cartas_falla() {
+    let mut session = new_uno_session(SessionId(522), 0, vec![P1, P2]);
+
+    {
+        let mut state = session.world_mut().resource_mut::<UnoState>();
+        let hand = state.hands.get_mut(&P1).unwrap();
+        hand.clear();
+        hand.push(Card::new(CardColor::Red, CardValue::Number(1)));
+        hand.push(Card::new(CardColor::Red, CardValue::Number(2)));
+        hand.push(Card::new(CardColor::Red, CardValue::Number(3)));
+    }
+
+    let err = session
+        .process_command(P1, Box::new(CallUnoCommand { player: P1 }))
+        .unwrap_err();
+    assert!(err.to_string().contains("1 or 2"));
+}
+
+#[test]
+fn test_catch_uno_failure_penaliza_dos_cartas() {
+    let mut session = new_uno_session(SessionId(523), 0, vec![P1, P2]);
+
+    {
+        let mut state = session.world_mut().resource_mut::<UnoState>();
+        let hand = state.hands.get_mut(&P1).unwrap();
+        hand.clear();
+        hand.push(Card::new(CardColor::Red, CardValue::Number(1)));
+        state.uno_called.clear();
+    }
+
+    // P2 acusa a P1 por no cantar UNO
+    let events = session
+        .process_command(
+            P2,
+            Box::new(CatchUnoFailureCommand {
+                accuser: P2,
+                target: P1,
+            }),
+        )
+        .expect("debe permitir acusar si target tiene 1 carta y no cantó UNO");
+
+    assert_eq!(events.len(), 2);
+    let penalty = events[0].as_any().downcast_ref::<UnoPenaltyEvent>().unwrap();
+    assert_eq!(penalty.target, P1);
+    assert_eq!(penalty.accuser, P2);
+    assert_eq!(penalty.drawn, 2);
+
+    // P1 ahora tiene 1 + 2 = 3 cartas
+    let state = session.world().resource::<UnoState>();
+    assert_eq!(state.hands[&P1].len(), 3);
+
+    // Si P1 ya cantó UNO, acusar debe fallar
+    {
+        let mut state = session.world_mut().resource_mut::<UnoState>();
+        let hand = state.hands.get_mut(&P1).unwrap();
+        hand.clear();
+        hand.push(Card::new(CardColor::Red, CardValue::Number(1)));
+        state.uno_called.insert(P1);
+    }
+    let err = session
+        .process_command(
+            P2,
+            Box::new(CatchUnoFailureCommand {
+                accuser: P2,
+                target: P1,
+            }),
+        )
+        .unwrap_err();
+    assert!(err.to_string().contains("already called UNO"));
+}
+
+#[test]
+fn test_challenge_wild_draw_four_infractor_bluffeando() {
+    let mut session = new_uno_session(SessionId(524), 0, vec![P1, P2]);
+
+    {
+        let mut state = session.world_mut().resource_mut::<UnoState>();
+        state.allow_bluff_wild_draw_four = true;
+        state.active_color = CardColor::Red;
+        let hand_p1 = state.hands.get_mut(&P1).unwrap();
+        hand_p1.clear();
+        // P1 tiene una carta roja (del color activo) y juega WildDrawFour ilegalmente (bluff)
+        hand_p1.push(Card::new(CardColor::Red, CardValue::Number(3)));
+        hand_p1.push(Card::new(CardColor::WildColor, CardValue::WildDrawFour));
+
+        let hand_p2 = state.hands.get_mut(&P2).unwrap();
+        hand_p2.clear();
+        hand_p2.push(Card::new(CardColor::Blue, CardValue::Number(5)));
+    }
+
+    // P1 juega WildDrawFour eligiendo Azul
+    session
+        .process_command(
+            P1,
+            Box::new(PlayCardCommand {
+                player: P1,
+                card_index: 1,
+                chosen_color: Some(CardColor::Blue),
+            }),
+        )
+        .expect("debe permitir jugar con allow_bluff_wild_draw_four");
+
+    assert_eq!(session.world().resource::<TurnResource>().0.current_player(), P2);
+    assert_eq!(session.world().resource::<UnoState>().draw_penalty, 4);
+    assert!(session.world().resource::<UnoState>().wild_draw_four_illegal);
+
+    // P2 desafía el WildDrawFour
+    let events = session
+        .process_command(
+            P2,
+            Box::new(ChallengeWildDrawFourCommand { challenger: P2 }),
+        )
+        .expect("desafío debe procesarse");
+
+    let challenge_ev = events[0]
+        .as_any()
+        .downcast_ref::<WildDrawFourChallengedEvent>()
+        .unwrap();
+    assert_eq!(challenge_ev.challenger, P2);
+    assert_eq!(challenge_ev.target, P1);
+    assert!(challenge_ev.was_illegal);
+    assert_eq!(challenge_ev.penalty_player, P1);
+    assert_eq!(challenge_ev.cards_drawn, 4);
+
+    let state = session.world().resource::<UnoState>();
+    assert_eq!(state.draw_penalty, 0);
+    // P1 tenía 1 carta y robó 4 -> 5 cartas
+    assert_eq!(state.hands[&P1].len(), 5);
+    // P2 mantiene su única carta
+    assert_eq!(state.hands[&P2].len(), 1);
+    // P2 mantiene su turno para jugar
+    assert_eq!(session.world().resource::<TurnResource>().0.current_player(), P2);
+}
+
+#[test]
+fn test_challenge_wild_draw_four_legal_retador_penalizado() {
+    let mut session = new_uno_session(SessionId(525), 0, vec![P1, P2]);
+
+    {
+        let mut state = session.world_mut().resource_mut::<UnoState>();
+        state.allow_bluff_wild_draw_four = true;
+        state.active_color = CardColor::Red;
+        let hand_p1 = state.hands.get_mut(&P1).unwrap();
+        hand_p1.clear();
+        // P1 NO tiene cartas rojas: juega legalmente
+        hand_p1.push(Card::new(CardColor::Yellow, CardValue::Number(3)));
+        hand_p1.push(Card::new(CardColor::WildColor, CardValue::WildDrawFour));
+
+        let hand_p2 = state.hands.get_mut(&P2).unwrap();
+        hand_p2.clear();
+        hand_p2.push(Card::new(CardColor::Blue, CardValue::Number(5)));
+    }
+
+    session
+        .process_command(
+            P1,
+            Box::new(PlayCardCommand {
+                player: P1,
+                card_index: 1,
+                chosen_color: Some(CardColor::Blue),
+            }),
+        )
+        .expect("jugada legal");
+
+    assert!(!session.world().resource::<UnoState>().wild_draw_four_illegal);
+
+    // P2 desafía erróneamente
+    let events = session
+        .process_command(
+            P2,
+            Box::new(ChallengeWildDrawFourCommand { challenger: P2 }),
+        )
+        .expect("desafío procesado");
+
+    let challenge_ev = events[0]
+        .as_any()
+        .downcast_ref::<WildDrawFourChallengedEvent>()
+        .unwrap();
+    assert_eq!(challenge_ev.challenger, P2);
+    assert_eq!(challenge_ev.target, P1);
+    assert!(!challenge_ev.was_illegal);
+    assert_eq!(challenge_ev.penalty_player, P2);
+    assert_eq!(challenge_ev.cards_drawn, 6);
+
+    let state = session.world().resource::<UnoState>();
+    assert_eq!(state.draw_penalty, 0);
+    // P2 tenía 1 carta y robó 6 -> 7 cartas
+    assert_eq!(state.hands[&P2].len(), 7);
+    // Turno avanza de vuelta a P1
+    assert_eq!(session.world().resource::<TurnResource>().0.current_player(), P1);
 }

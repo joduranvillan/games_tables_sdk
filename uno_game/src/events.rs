@@ -41,3 +41,24 @@ pub struct InterceptedEvent {
     pub player: PlayerId,
     pub card: Card,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct UnoCalledEvent {
+    pub player: PlayerId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct UnoPenaltyEvent {
+    pub target: PlayerId,
+    pub accuser: PlayerId,
+    pub drawn: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct WildDrawFourChallengedEvent {
+    pub challenger: PlayerId,
+    pub target: PlayerId,
+    pub was_illegal: bool,
+    pub penalty_player: PlayerId,
+    pub cards_drawn: usize,
+}
