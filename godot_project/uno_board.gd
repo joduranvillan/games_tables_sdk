@@ -104,6 +104,18 @@ var rules_popup: RulesPopup
 var current_theme: BoardTheme
 var _pause_menu: CanvasLayer
 
+# Local Player & Official UNO Rule State (Prompts 512, 513)
+var local_player: int = P1
+var uno_called_players: Array = []
+var last_wild_draw_four_player: int = -1
+
+# Action buttons bar & special buttons
+var action_buttons_bar: HBoxContainer
+var call_uno_btn: Button
+var catch_uno_btn: Button
+var challenge_wild_four_btn: Button
+var jump_in_btn: Button
+
 @onready var status: Label = get_node_or_null("Status") if has_node("Status") else null
 
 func _ready() -> void:
@@ -339,6 +351,9 @@ func _setup_ui() -> void:
 	hand_container.size = Vector2(660, 220)
 	add_child(hand_container)
 
+	# Action Buttons Bar (🔥 ¡UNO!, 🚨 Acusar UNO, ⚡ Desafiar +4, ⚡ Jump-In)
+	_setup_action_buttons()
+
 	# Wild Color Picker Dialog Modal
 	_setup_wild_picker_modal()
 
@@ -349,6 +364,98 @@ func _setup_ui() -> void:
 	add_child(rules_popup)
 
 	_apply_theme_styling()
+
+func _setup_action_buttons() -> void:
+	action_buttons_bar = HBoxContainer.new()
+	action_buttons_bar.name = "ActionButtonsBar"
+	action_buttons_bar.position = Vector2(60, 442)
+	action_buttons_bar.size = Vector2(600, 34)
+	action_buttons_bar.alignment = BoxContainer.ALIGNMENT_CENTER
+	action_buttons_bar.add_theme_constant_override("separation", 14)
+	add_child(action_buttons_bar)
+
+	# 1. Botón "🔥 ¡UNO!"
+	call_uno_btn = Button.new()
+	call_uno_btn.name = "CallUnoButton"
+	call_uno_btn.text = "🔥 ¡UNO!"
+	call_uno_btn.custom_minimum_size = Vector2(120, 34)
+	var cu_sb = StyleBoxFlat.new()
+	cu_sb.bg_color = Color(0.85, 0.2, 0.1, 0.95)
+	cu_sb.border_color = Color(1.0, 0.85, 0.2)
+	cu_sb.set_border_width_all(2)
+	cu_sb.set_corner_radius_all(8)
+	call_uno_btn.add_theme_stylebox_override("normal", cu_sb)
+	var cu_sb_h = cu_sb.duplicate()
+	cu_sb_h.border_color = Color(1.0, 1.0, 0.4)
+	cu_sb_h.set_border_width_all(3)
+	call_uno_btn.add_theme_stylebox_override("hover", cu_sb_h)
+	call_uno_btn.add_theme_color_override("font_color", Color.WHITE)
+	call_uno_btn.add_theme_font_size_override("font_size", 13)
+	call_uno_btn.pressed.connect(_on_call_uno_pressed)
+	action_buttons_bar.add_child(call_uno_btn)
+
+	# 2. Botón "🚨 Acusar UNO"
+	catch_uno_btn = Button.new()
+	catch_uno_btn.name = "CatchUnoButton"
+	catch_uno_btn.text = "🚨 Acusar UNO"
+	catch_uno_btn.custom_minimum_size = Vector2(130, 34)
+	var ca_sb = StyleBoxFlat.new()
+	ca_sb.bg_color = Color(0.65, 0.12, 0.25, 0.95)
+	ca_sb.border_color = Color(1.0, 0.4, 0.3)
+	ca_sb.set_border_width_all(2)
+	ca_sb.set_corner_radius_all(8)
+	catch_uno_btn.add_theme_stylebox_override("normal", ca_sb)
+	var ca_sb_h = ca_sb.duplicate()
+	ca_sb_h.border_color = Color(1.0, 0.7, 0.5)
+	ca_sb_h.set_border_width_all(3)
+	catch_uno_btn.add_theme_stylebox_override("hover", ca_sb_h)
+	catch_uno_btn.add_theme_color_override("font_color", Color.WHITE)
+	catch_uno_btn.add_theme_font_size_override("font_size", 13)
+	catch_uno_btn.visible = false
+	catch_uno_btn.pressed.connect(_on_catch_uno_pressed)
+	action_buttons_bar.add_child(catch_uno_btn)
+
+	# 3. Botón "⚡ Desafiar +4"
+	challenge_wild_four_btn = Button.new()
+	challenge_wild_four_btn.name = "ChallengeWildFourButton"
+	challenge_wild_four_btn.text = "⚡ Desafiar +4"
+	challenge_wild_four_btn.custom_minimum_size = Vector2(130, 34)
+	var ch_sb = StyleBoxFlat.new()
+	ch_sb.bg_color = Color(0.2, 0.15, 0.45, 0.95)
+	ch_sb.border_color = Color(0.85, 0.6, 1.0)
+	ch_sb.set_border_width_all(2)
+	ch_sb.set_corner_radius_all(8)
+	challenge_wild_four_btn.add_theme_stylebox_override("normal", ch_sb)
+	var ch_sb_h = ch_sb.duplicate()
+	ch_sb_h.border_color = Color(1.0, 0.85, 0.3)
+	ch_sb_h.set_border_width_all(3)
+	challenge_wild_four_btn.add_theme_stylebox_override("hover", ch_sb_h)
+	challenge_wild_four_btn.add_theme_color_override("font_color", Color.WHITE)
+	challenge_wild_four_btn.add_theme_font_size_override("font_size", 13)
+	challenge_wild_four_btn.visible = false
+	challenge_wild_four_btn.pressed.connect(_on_challenge_wild_four_pressed)
+	action_buttons_bar.add_child(challenge_wild_four_btn)
+
+	# 4. Botón "⚡ Jump-In (Intercepción)"
+	jump_in_btn = Button.new()
+	jump_in_btn.name = "JumpInButton"
+	jump_in_btn.text = "⚡ Jump-In"
+	jump_in_btn.custom_minimum_size = Vector2(110, 34)
+	var ji_sb = StyleBoxFlat.new()
+	ji_sb.bg_color = Color(0.08, 0.35, 0.5, 0.95)
+	ji_sb.border_color = Color(0.2, 0.9, 1.0)
+	ji_sb.set_border_width_all(2)
+	ji_sb.set_corner_radius_all(8)
+	jump_in_btn.add_theme_stylebox_override("normal", ji_sb)
+	var ji_sb_h = ji_sb.duplicate()
+	ji_sb_h.border_color = Color(0.6, 1.0, 1.0)
+	ji_sb_h.set_border_width_all(3)
+	jump_in_btn.add_theme_stylebox_override("hover", ji_sb_h)
+	jump_in_btn.add_theme_color_override("font_color", Color.WHITE)
+	jump_in_btn.add_theme_font_size_override("font_size", 13)
+	jump_in_btn.visible = false
+	jump_in_btn.pressed.connect(_on_jump_in_pressed)
+	action_buttons_bar.add_child(jump_in_btn)
 
 func _setup_center_play_area() -> void:
 	# 1. Discard Pile Area (Left Center)
@@ -614,7 +721,7 @@ func _init_default_game_state() -> void:
 # -------------------------------------------------------------------------
 # CARD CREATION & RENDERING HELPER (a, b)
 # -------------------------------------------------------------------------
-func _create_card_visual(card: Dictionary, is_playable: bool = true, is_large: bool = false) -> Control:
+func _create_card_visual(card: Dictionary, is_playable: bool = true, is_large: bool = false, is_interceptable: bool = false) -> Control:
 	var c_color = card.get("color", "Red")
 	var c_val = str(card.get("value", "0"))
 
@@ -632,10 +739,15 @@ func _create_card_visual(card: Dictionary, is_playable: bool = true, is_large: b
 	var style = StyleBoxFlat.new()
 	style.bg_color = base_col
 	style.set_corner_radius_all(10)
-	style.set_border_width_all(3 if is_playable else 1)
+	style.set_border_width_all(4 if is_interceptable else (3 if is_playable else 1))
 
-	# Visual Playable Highlight (b)
-	if is_playable:
+	# Visual Playable Highlight (b) & Jump-In Electric Border (Prompt 513)
+	if is_interceptable:
+		style.border_color = Color(0.2, 0.95, 1.0, 1.0) # Borde eléctrico neón cian
+		style.shadow_color = Color(0.0, 0.85, 1.0, 0.85)
+		style.shadow_size = 9
+		card_panel.modulate = Color(1.15, 1.25, 1.4, 1.0)
+	elif is_playable:
 		style.border_color = Color(1.0, 0.88, 0.2, 1.0) # Radiant Gold
 		style.shadow_color = Color(1.0, 0.85, 0.2, 0.45)
 		style.shadow_size = 6
@@ -720,6 +832,17 @@ func _create_card_visual(card: Dictionary, is_playable: bool = true, is_large: b
 			quad_container.add_child(q_rect)
 		card_panel.add_child(quad_container)
 
+	if is_interceptable:
+		var ji_badge = Label.new()
+		ji_badge.text = "⚡ JUMP-IN"
+		ji_badge.position = Vector2(0, height - 19)
+		ji_badge.size = Vector2(width, 16)
+		ji_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ji_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		ji_badge.add_theme_font_size_override("font_size", 9)
+		ji_badge.add_theme_color_override("font_color", Color(0.3, 1.0, 1.0))
+		card_panel.add_child(ji_badge)
+
 	return card_panel
 
 func _create_card_back_visual() -> Control:
@@ -797,6 +920,27 @@ func _get_card_mini_symbol(val: String) -> String:
 # -------------------------------------------------------------------------
 # UI REFRESH & HAND FAN DISPLAY (b)
 # -------------------------------------------------------------------------
+func _is_card_interceptable(card: Dictionary) -> bool:
+	# Jump-In: Si no es el turno del jugador local pero tiene en mano una carta
+	# exactamente idéntica (mismo color y valor) al tope del descarte.
+	if current == local_player:
+		return false
+	if discard_pile.is_empty():
+		return false
+
+	var c_color = str(card.get("color", ""))
+	var c_val = str(card.get("value", ""))
+
+	# No se puede interceptar con comodines (regla oficial UNO)
+	if c_color in ["Wild", "WildColor"] or c_val in ["Wild", "WildDrawFour"]:
+		return false
+
+	var top_card = discard_pile.back()
+	var top_color = str(top_card.get("color", ""))
+	var top_val = str(top_card.get("value", ""))
+
+	return c_color == top_color and c_val == top_val
+
 func _is_card_playable(card: Dictionary) -> bool:
 	var c_color = card.get("color", "Red")
 	var c_val = str(card.get("value", "0"))
@@ -861,14 +1005,18 @@ func _update_ui(animate_drawn_index: int = -1) -> void:
 	var start_x = center_x - ((n_cards - 1) * spread) / 2.0 - card_w / 2.0
 
 	var has_any_playable = false
+	var has_any_interceptable = false
 
 	for i in range(n_cards):
 		var card = player_hand[i]
-		var is_playable = _is_card_playable(card)
+		var is_playable = (current == local_player) and _is_card_playable(card)
+		var is_interceptable = _is_card_interceptable(card)
 		if is_playable:
 			has_any_playable = true
+		if is_interceptable:
+			has_any_interceptable = true
 
-		var card_node = _create_card_visual(card, is_playable, false)
+		var card_node = _create_card_visual(card, is_playable, false, is_interceptable)
 
 		# Fan angle spread (-18° to +18°)
 		var angle_deg = 0.0
@@ -876,17 +1024,21 @@ func _update_ui(animate_drawn_index: int = -1) -> void:
 			angle_deg = lerp(-16.0, 16.0, float(i) / float(n_cards - 1))
 		card_node.rotation_degrees = angle_deg
 
-		# Playable cards get an inviting slight natural elevation (+8px)
-		var extra_lift = -10.0 if is_playable else 0.0
+		# Playable or interceptable cards get an inviting slight natural elevation (+8px)
+		var extra_lift = -10.0 if (is_playable or is_interceptable) else 0.0
 		var resting_pos = Vector2(start_x + i * spread, 35.0 + abs(angle_deg) * 1.1 + extra_lift)
 		card_node.position = resting_pos
 		card_node.set_meta("resting_y", resting_pos.y)
 
-		# Pulsing glow animation on playable cards (b)
-		if is_playable:
+		# Pulsing glow animation on playable or interceptable cards (b, Prompt 513)
+		if is_playable or is_interceptable:
 			var tw_pulse = card_node.create_tween().set_loops()
-			tw_pulse.tween_property(card_node, "modulate", Color(1.2, 1.2, 0.85, 1.0), 0.5)
-			tw_pulse.tween_property(card_node, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.5)
+			if is_interceptable:
+				tw_pulse.tween_property(card_node, "modulate", Color(1.3, 1.45, 1.6, 1.0), 0.35)
+				tw_pulse.tween_property(card_node, "modulate", Color(0.9, 1.05, 1.25, 1.0), 0.35)
+			else:
+				tw_pulse.tween_property(card_node, "modulate", Color(1.2, 1.2, 0.85, 1.0), 0.5)
+				tw_pulse.tween_property(card_node, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.5)
 
 			# Hover Elevation & Zoom
 			card_node.mouse_entered.connect(func():
@@ -905,7 +1057,10 @@ func _update_ui(animate_drawn_index: int = -1) -> void:
 			var card_idx = i
 			card_node.gui_input.connect(func(event: InputEvent):
 				if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-					_on_card_pressed(card_idx, card_node)
+					if is_interceptable:
+						_execute_intercept_card(card_idx, card_node.global_position)
+					elif is_playable:
+						_on_card_pressed(card_idx, card_node)
 			)
 
 		hand_container.add_child(card_node)
@@ -922,10 +1077,30 @@ func _update_ui(animate_drawn_index: int = -1) -> void:
 
 	# Glow on Draw Pile if no playable cards are in hand
 	if draw_pile_button != null:
-		if not has_any_playable:
+		if not has_any_playable and current == local_player:
 			draw_pile_button.modulate = Color(1.2, 1.2, 0.8)
 		else:
 			draw_pile_button.modulate = Color(1.0, 1.0, 1.0)
+
+	# Actualizar botones de acción de UNO (Prompt 513)
+	var opponent_id = P2 if local_player == P1 else P1
+	if catch_uno_btn != null:
+		var can_catch = (opponent_card_count == 1 and not uno_called_players.has(opponent_id))
+		catch_uno_btn.visible = can_catch
+
+	if challenge_wild_four_btn != null:
+		var can_challenge = (last_wild_draw_four_player == opponent_id and current == local_player)
+		challenge_wild_four_btn.visible = can_challenge
+
+	if jump_in_btn != null:
+		jump_in_btn.visible = has_any_interceptable and (current != local_player)
+
+	if call_uno_btn != null:
+		var can_call = (player_hand.size() <= 2 and not uno_called_players.has(local_player))
+		if can_call:
+			call_uno_btn.modulate = Color(1.2, 1.1, 0.9)
+		else:
+			call_uno_btn.modulate = Color(1.0, 1.0, 1.0)
 
 func _update_discard_display() -> void:
 	for child in discard_card_node.get_children():
@@ -1024,7 +1199,13 @@ func _execute_play_card(idx: int, start_pos: Vector2, chosen_col: String) -> voi
 		discard_pile.append(played_card)
 		active_color = chosen_col
 
-		var val_name = _get_card_display_symbol(str(played_card.get("value", "")))
+		var val_str = str(played_card.get("value", ""))
+		if val_str == "WildDrawFour":
+			last_wild_draw_four_player = current
+		else:
+			last_wild_draw_four_player = -1
+
+		var val_name = _get_card_display_symbol(val_str)
 		event_banner_label.text = "Jugador %d jugó %s %s" % [
 			current,
 			COLOR_NAMES_ES.get(played_card.get("color", ""), ""),
@@ -1062,6 +1243,79 @@ func _on_draw_pile_pressed() -> void:
 		_update_ui(drawn_idx)
 
 # -------------------------------------------------------------------------
+# UNO OFFICIAL RULES ACTIONS & HANDLERS (Prompt 513)
+# -------------------------------------------------------------------------
+func _on_call_uno_pressed() -> void:
+	if winner != -1:
+		return
+	var cmd = {
+		"type": "CallUnoCommand",
+		"command_type": "CallUnoCommand",
+		"player": local_player
+	}
+	bridge.send_command_json(local_player, JSON.stringify(cmd))
+
+func _on_catch_uno_pressed() -> void:
+	if winner != -1:
+		return
+	var opponent_id = P2 if local_player == P1 else P1
+	var cmd = {
+		"type": "CatchUnoFailureCommand",
+		"command_type": "CatchUnoFailureCommand",
+		"accuser": local_player,
+		"target": opponent_id
+	}
+	bridge.send_command_json(local_player, JSON.stringify(cmd))
+
+func _on_challenge_wild_four_pressed() -> void:
+	if winner != -1:
+		return
+	var cmd = {
+		"type": "ChallengeWildDrawFourCommand",
+		"command_type": "ChallengeWildDrawFourCommand",
+		"challenger": local_player
+	}
+	bridge.send_command_json(local_player, JSON.stringify(cmd))
+
+func _on_jump_in_pressed() -> void:
+	if winner != -1:
+		return
+	for i in range(player_hand.size()):
+		if _is_card_interceptable(player_hand[i]):
+			var btn_pos = hand_container.global_position + Vector2(250, 50)
+			_execute_intercept_card(i, btn_pos)
+			break
+
+func _execute_intercept_card(idx: int, start_pos: Vector2) -> void:
+	if idx < 0 or idx >= player_hand.size():
+		return
+	var cmd = {
+		"type": "InterceptCommand",
+		"command_type": "InterceptCommand",
+		"player": local_player,
+		"card_index": idx
+	}
+	bridge.send_command_json(local_player, JSON.stringify(cmd))
+
+	var played_card = player_hand[idx]
+	player_hand.remove_at(idx)
+	discard_pile.append(played_card)
+	active_color = played_card.get("color", active_color)
+
+	var val_name = _get_card_display_symbol(str(played_card.get("value", "")))
+	event_banner_label.text = "⚡ ¡Jugador %d ejecutó JUMP-IN con %s %s!" % [
+		local_player,
+		COLOR_NAMES_ES.get(played_card.get("color", ""), ""),
+		val_name
+	]
+
+	if (is_inside_tree() and has_node("/root/AudioManager")):
+		get_node("/root/AudioManager").play_card_flip()
+
+	_animate_card_to_discard(played_card, start_pos)
+	_update_ui()
+
+# -------------------------------------------------------------------------
 # EVENT JSON PROCESSING (SYNC FROM RUST OPEN_TABLE ENGINE)
 # -------------------------------------------------------------------------
 func _on_event_json(json_str: String) -> void:
@@ -1078,6 +1332,22 @@ func _on_event_json(json_str: String) -> void:
 					discard_pile.append(c)
 					if p != current:
 						opponent_card_count = max(0, opponent_card_count - 1)
+						_animate_card_to_discard(c, Vector2(340, 130))
+					var val_str = str(c.get("value", ""))
+					if val_str == "WildDrawFour":
+						last_wild_draw_four_player = p
+					else:
+						last_wild_draw_four_player = -1
+				if event.has("new_color"):
+					active_color = str(event["new_color"])
+				_update_active_color_indicator()
+
+			elif event_type == "DrewAndPlayedEvent" or event_type == "uno_game::DrewAndPlayedEvent":
+				var p = int(event.get("player", current))
+				if event.has("card"):
+					var c = event["card"]
+					discard_pile.append(c)
+					if p != current:
 						_animate_card_to_discard(c, Vector2(340, 130))
 				if event.has("new_color"):
 					active_color = str(event["new_color"])
@@ -1111,6 +1381,43 @@ func _on_event_json(json_str: String) -> void:
 				var w = event.get("winner", -1)
 				if w == null: w = 0
 				_on_game_over(int(w))
+
+			elif event_type == "UnoCalledEvent" or event_type == "uno_game::UnoCalledEvent":
+				var p = int(event.get("player", 0))
+				if not uno_called_players.has(p):
+					uno_called_players.append(p)
+				event_banner_label.text = "🔥 ¡Jugador %d gritó ¡¡UNO!! 🔥" % p
+				if uno_alert_banner != null:
+					uno_alert_banner.visible = true
+					uno_alert_label.text = "🔥 ¡¡ JUGADOR %d CANTÓ UNO !! 🔥" % p
+
+			elif event_type == "UnoPenaltyEvent" or event_type == "uno_game::UnoPenaltyEvent":
+				var target_p = int(event.get("target", 0))
+				var accuser_p = int(event.get("accuser", 0))
+				var drawn_cnt = int(event.get("drawn", 2))
+				event_banner_label.text = "🚨 ¡Jugador %d acusó al Jugador %d! (+%d cartas de penalización)" % [accuser_p, target_p, drawn_cnt]
+				uno_called_players.erase(target_p)
+
+			elif event_type == "WildDrawFourChallengedEvent" or event_type == "uno_game::WildDrawFourChallengedEvent":
+				var ch = int(event.get("challenger", 0))
+				var tg = int(event.get("target", 0))
+				var was_illegal = bool(event.get("was_illegal", false))
+				var drawn_cnt = int(event.get("cards_drawn", 0))
+				if was_illegal:
+					event_banner_label.text = "⚡ ¡Desafío exitoso! Jugador %d tenía carta del color y roba %d cartas" % [tg, drawn_cnt]
+				else:
+					event_banner_label.text = "⚡ ¡Desafío fallido! Jugador %d jugó legal. Jugador %d roba %d cartas" % [tg, ch, drawn_cnt]
+				last_wild_draw_four_player = -1
+
+			elif event_type == "InterceptedEvent" or event_type == "uno_game::InterceptedEvent":
+				var p = int(event.get("player", 0))
+				if event.has("card"):
+					var c = event["card"]
+					discard_pile.append(c)
+					if p != local_player:
+						opponent_card_count = max(0, opponent_card_count - 1)
+						_animate_card_to_discard(c, Vector2(340, 130))
+				event_banner_label.text = "⚡ ¡JUMP-IN! Jugador %d interceptó el juego con una carta idéntica" % p
 
 	current = bridge.current_player()
 	_update_ui()
@@ -1153,6 +1460,9 @@ func _on_layout_changed(layout: int) -> void:
 		top_bar.size = Vector2(355, 38)
 		center_play_area.position = Vector2(10, 210)
 		center_play_area.size = Vector2(355, 200)
+		if action_buttons_bar != null:
+			action_buttons_bar.position = Vector2(10, 415)
+			action_buttons_bar.size = Vector2(355, 30)
 		hand_container.position = Vector2(5, 450)
 		hand_container.size = Vector2(365, 210)
 	else: # DESKTOP or TABLET
@@ -1162,6 +1472,9 @@ func _on_layout_changed(layout: int) -> void:
 		top_bar.size = Vector2(640, 42)
 		center_play_area.position = Vector2(50, 230)
 		center_play_area.size = Vector2(620, 210)
+		if action_buttons_bar != null:
+			action_buttons_bar.position = Vector2(60, 442)
+			action_buttons_bar.size = Vector2(600, 34)
 		hand_container.position = Vector2(30, 460)
 		hand_container.size = Vector2(660, 220)
 
