@@ -1,4 +1,4 @@
-use crate::board::{CardColor, CardValue, UnoState};
+use crate::board::{Card, CardColor, CardValue, UnoState};
 use crate::commands::{
     CallUnoCommand, CatchUnoFailureCommand, ChallengeWildDrawFourCommand, DrawCardCommand,
     InterceptCommand, PlayCardCommand,
@@ -474,13 +474,14 @@ pub fn build_uno_rules() -> RuleEngine {
             }
         }
 
-        let mut rng = world.resource_mut::<RandomResource>();
-        let mut state = world.resource_mut::<UnoState>();
-        let drawn = state.draw_cards(cmd.target, 2, &mut rng.0);
+        let drawn = draw_cards_for_player(world, cmd.target, 2);
         let count = drawn.len();
 
-        if state.hands.get(&cmd.target).map(|h| h.len()).unwrap_or(0) > 1 {
-            state.uno_called.remove(&cmd.target);
+        {
+            let mut state = world.resource_mut::<UnoState>();
+            if state.hands.get(&cmd.target).map(|h| h.len()).unwrap_or(0) > 1 {
+                state.uno_called.remove(&cmd.target);
+            }
         }
 
         let events: Vec<Box<dyn Event>> = vec![
@@ -523,15 +524,14 @@ pub fn build_uno_rules() -> RuleEngine {
 
         if was_illegal {
             // El infractor roba las 4 cartas
-            let count = {
-                let mut rng = world.resource_mut::<RandomResource>();
+            {
                 let mut state = world.resource_mut::<UnoState>();
                 state.draw_penalty = 0;
                 state.last_wild_draw_four_player = None;
                 state.wild_draw_four_illegal = false;
-                let drawn = state.draw_cards(bluffer, 4, &mut rng.0);
-                drawn.len()
-            };
+            }
+            let drawn = draw_cards_for_player(world, bluffer, 4);
+            let count = drawn.len();
 
             events.push(Box::new(WildDrawFourChallengedEvent {
                 challenger: cmd.challenger,
@@ -546,15 +546,14 @@ pub fn build_uno_rules() -> RuleEngine {
             }));
         } else {
             // El retador roba 6 cartas (4 + 2 de penalización)
-            let count = {
-                let mut rng = world.resource_mut::<RandomResource>();
+            {
                 let mut state = world.resource_mut::<UnoState>();
                 state.draw_penalty = 0;
                 state.last_wild_draw_four_player = None;
                 state.wild_draw_four_illegal = false;
-                let drawn = state.draw_cards(cmd.challenger, 6, &mut rng.0);
-                drawn.len()
-            };
+            }
+            let drawn = draw_cards_for_player(world, cmd.challenger, 6);
+            let count = drawn.len();
 
             events.push(Box::new(WildDrawFourChallengedEvent {
                 challenger: cmd.challenger,
@@ -576,4 +575,46 @@ pub fn build_uno_rules() -> RuleEngine {
     });
 
     rules
+}
+
+
+fn draw_cards_for_player(world: &mut World, player: PlayerId, count: usize) -> Vec<Card> {
+    let mut drawn = Vec::new();
+    for _ in 0..count {
+        let needs_reshuffle = {
+            let s = world.resource::<UnoState>();
+            s.deck.is_empty() && s.discard_pile.len() > 1
+        };
+        if needs_reshuffle {
+            let mut deck_for_shuffle = {
+                let mut s = world.resource_mut::<UnoState>();
+                if let Some(top) = s.discard_pile.pop() {
+                    let mut pile = std::mem::take(&mut s.discard_pile);
+                    s.deck.append(&mut pile);
+                    let deck = std::mem::take(&mut s.deck);
+                    s.discard_pile.push(top);
+                    deck
+                } else {
+                    Vec::new()
+                }
+            };
+            if !deck_for_shuffle.is_empty() {
+                world
+                    .resource_mut::<RandomResource>()
+                    .0
+                    .shuffle(&mut deck_for_shuffle);
+                world.resource_mut::<UnoState>().deck = deck_for_shuffle;
+            }
+        }
+        if let Some(card) = world.resource_mut::<UnoState>().deck.pop() {
+            world
+                .resource_mut::<UnoState>()
+                .hands
+                .entry(player)
+                .or_default()
+                .push(card.clone());
+            drawn.push(card);
+        }
+    }
+    drawn
 }
