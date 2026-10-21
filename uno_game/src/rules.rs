@@ -612,7 +612,7 @@ fn draw_cards_for_player(world: &mut World, player: PlayerId, count: usize) -> V
                 .hands
                 .entry(player)
                 .or_default()
-                .push(card.clone());
+                .push(card);
             drawn.push(card);
         }
     }
