@@ -1329,7 +1329,9 @@ pub fn build_monopoly_rules() -> RuleEngine {
                 return Err(invalid("casilla fuera de rango"));
             }
             if players.properties.get(&space_idx) != Some(&cmd.player) {
-                return Err(invalid("no eres el dueño de una de las propiedades ofrecidas"));
+                return Err(invalid(
+                    "no eres el dueño de una de las propiedades ofrecidas",
+                ));
             }
             if world.contains_resource::<BuildingsResource>() {
                 let buildings = world.resource::<BuildingsResource>();
@@ -1339,7 +1341,8 @@ pub fn build_monopoly_rules() -> RuleEngine {
                 if let SpaceKind::Property { group, .. } = &board[space_idx] {
                     for (idx, space) in board.iter().enumerate() {
                         if let SpaceKind::Property { group: g, .. } = space {
-                            if g == group && buildings.buildings.get(&idx).copied().unwrap_or(0) > 0 {
+                            if g == group && buildings.buildings.get(&idx).copied().unwrap_or(0) > 0
+                            {
                                 return Err(invalid(
                                     "no se puede comerciar una propiedad de un grupo con edificios",
                                 ));
@@ -1368,7 +1371,8 @@ pub fn build_monopoly_rules() -> RuleEngine {
                 if let SpaceKind::Property { group, .. } = &board[space_idx] {
                     for (idx, space) in board.iter().enumerate() {
                         if let SpaceKind::Property { group: g, .. } = space {
-                            if g == group && buildings.buildings.get(&idx).copied().unwrap_or(0) > 0 {
+                            if g == group && buildings.buildings.get(&idx).copied().unwrap_or(0) > 0
+                            {
                                 return Err(invalid(
                                     "no se puede comerciar una propiedad de un grupo con edificios",
                                 ));
@@ -1545,9 +1549,7 @@ pub fn build_monopoly_rules() -> RuleEngine {
         let mut trade_res = world.resource_mut::<TradeOfferResource>();
         trade_res.clear();
 
-        let events: Vec<Box<dyn Event>> = vec![Box::new(TradeRejectedEvent {
-            player: cmd.player,
-        })];
+        let events: Vec<Box<dyn Event>> = vec![Box::new(TradeRejectedEvent { player: cmd.player })];
 
         Ok(events)
     });

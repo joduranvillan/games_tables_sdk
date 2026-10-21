@@ -422,7 +422,11 @@ fn test_call_uno_con_una_o_dos_cartas_exito() {
         .expect("debe permitir cantar UNO con 2 cartas");
     assert_eq!(events.len(), 1);
     assert!(events[0].as_any().is::<UnoCalledEvent>());
-    assert!(session.world().resource::<UnoState>().uno_called.contains(&P1));
+    assert!(session
+        .world()
+        .resource::<UnoState>()
+        .uno_called
+        .contains(&P1));
 
     // Ahora con 1 carta
     {
@@ -435,7 +439,11 @@ fn test_call_uno_con_una_o_dos_cartas_exito() {
         .process_command(P1, Box::new(CallUnoCommand { player: P1 }))
         .expect("debe permitir cantar UNO con 1 carta");
     assert_eq!(events.len(), 1);
-    assert!(session.world().resource::<UnoState>().uno_called.contains(&P1));
+    assert!(session
+        .world()
+        .resource::<UnoState>()
+        .uno_called
+        .contains(&P1));
 }
 
 #[test]
@@ -481,7 +489,10 @@ fn test_catch_uno_failure_penaliza_dos_cartas() {
         .expect("debe permitir acusar si target tiene 1 carta y no cantó UNO");
 
     assert_eq!(events.len(), 2);
-    let penalty = events[0].as_any().downcast_ref::<UnoPenaltyEvent>().unwrap();
+    let penalty = events[0]
+        .as_any()
+        .downcast_ref::<UnoPenaltyEvent>()
+        .unwrap();
     assert_eq!(penalty.target, P1);
     assert_eq!(penalty.accuser, P2);
     assert_eq!(penalty.drawn, 2);
@@ -541,9 +552,21 @@ fn test_challenge_wild_draw_four_infractor_bluffeando() {
         )
         .expect("debe permitir jugar con allow_bluff_wild_draw_four");
 
-    assert_eq!(session.world().resource::<TurnResource>().0.current_player(), P2);
+    assert_eq!(
+        session
+            .world()
+            .resource::<TurnResource>()
+            .0
+            .current_player(),
+        P2
+    );
     assert_eq!(session.world().resource::<UnoState>().draw_penalty, 4);
-    assert!(session.world().resource::<UnoState>().wild_draw_four_illegal);
+    assert!(
+        session
+            .world()
+            .resource::<UnoState>()
+            .wild_draw_four_illegal
+    );
 
     // P2 desafía el WildDrawFour
     let events = session
@@ -570,7 +593,14 @@ fn test_challenge_wild_draw_four_infractor_bluffeando() {
     // P2 mantiene su única carta
     assert_eq!(state.hands[&P2].len(), 1);
     // P2 mantiene su turno para jugar
-    assert_eq!(session.world().resource::<TurnResource>().0.current_player(), P2);
+    assert_eq!(
+        session
+            .world()
+            .resource::<TurnResource>()
+            .0
+            .current_player(),
+        P2
+    );
 }
 
 #[test]
@@ -603,7 +633,12 @@ fn test_challenge_wild_draw_four_legal_retador_penalizado() {
         )
         .expect("jugada legal");
 
-    assert!(!session.world().resource::<UnoState>().wild_draw_four_illegal);
+    assert!(
+        !session
+            .world()
+            .resource::<UnoState>()
+            .wild_draw_four_illegal
+    );
 
     // P2 desafía erróneamente
     let events = session
@@ -628,5 +663,12 @@ fn test_challenge_wild_draw_four_legal_retador_penalizado() {
     // P2 tenía 1 carta y robó 6 -> 7 cartas
     assert_eq!(state.hands[&P2].len(), 7);
     // Turno avanza de vuelta a P1
-    assert_eq!(session.world().resource::<TurnResource>().0.current_player(), P1);
+    assert_eq!(
+        session
+            .world()
+            .resource::<TurnResource>()
+            .0
+            .current_player(),
+        P1
+    );
 }

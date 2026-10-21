@@ -10,7 +10,7 @@ fn sgf_coord(x: usize, y: usize) -> String {
 }
 
 impl BoardResource {
-    /// Exporta el estado actual del tablero de Go en formato estándar SGF (Smart Game Format FF[4]).
+    /// Exporta el estado actual del tablero de Go en formato estándar SGF (Smart Game Format `FF[4]`).
     pub fn export_sgf(&self) -> String {
         let mut sgf = format!(
             "(;GM[1]FF[4]CA[UTF-8]AP[OpenTable]SZ[{}]KM[6.5]PB[Black]PW[White]",

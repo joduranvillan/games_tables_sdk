@@ -440,9 +440,7 @@ pub fn build_uno_rules() -> RuleEngine {
         }
 
         state.uno_called.insert(cmd.player);
-        let events: Vec<Box<dyn Event>> = vec![Box::new(UnoCalledEvent {
-            player: cmd.player,
-        })];
+        let events: Vec<Box<dyn Event>> = vec![Box::new(UnoCalledEvent { player: cmd.player })];
 
         Ok(events)
     });
@@ -500,7 +498,11 @@ pub fn build_uno_rules() -> RuleEngine {
     });
 
     rules.register::<ChallengeWildDrawFourCommand, _>(|cmd, world| {
-        if !world.resource::<TurnResource>().0.is_current(cmd.challenger) {
+        if !world
+            .resource::<TurnResource>()
+            .0
+            .is_current(cmd.challenger)
+        {
             return Err(EngineError::InvalidCommand {
                 reason: "Not your turn".into(),
             });
@@ -508,11 +510,11 @@ pub fn build_uno_rules() -> RuleEngine {
 
         let bluffer = {
             let state = world.resource::<UnoState>();
-            state.last_wild_draw_four_player.ok_or_else(|| {
-                EngineError::InvalidCommand {
+            state
+                .last_wild_draw_four_player
+                .ok_or_else(|| EngineError::InvalidCommand {
                     reason: "No Wild Draw Four to challenge".into(),
-                }
-            })?
+                })?
         };
 
         let was_illegal = {
@@ -576,7 +578,6 @@ pub fn build_uno_rules() -> RuleEngine {
 
     rules
 }
-
 
 fn draw_cards_for_player(world: &mut World, player: PlayerId, count: usize) -> Vec<Card> {
     let mut drawn = Vec::new();

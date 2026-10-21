@@ -1429,7 +1429,10 @@ fn test_propose_trade_valida_propiedades_y_efectivo() {
 
     // TradeOfferResource debe registrar la oferta
     let trade_res = session.world().resource::<TradeOfferResource>();
-    let offer = trade_res.offer.as_ref().expect("debe haber una oferta registrada");
+    let offer = trade_res
+        .offer
+        .as_ref()
+        .expect("debe haber una oferta registrada");
     assert_eq!(offer.from, P1);
     assert_eq!(offer.to, P2);
 }
@@ -1494,7 +1497,10 @@ fn test_propose_trade_rechaza_casos_invalidos() {
             }),
         )
         .unwrap_err();
-    assert!(err_target_not_owner.to_string().contains("dueño") || err_target_not_owner.to_string().contains("objetivo"));
+    assert!(
+        err_target_not_owner.to_string().contains("dueño")
+            || err_target_not_owner.to_string().contains("objetivo")
+    );
 
     // 4. Ofrecer más efectivo del que tiene
     let err_cash = session
@@ -1600,11 +1606,17 @@ fn test_accept_trade_transfiere_atomicamente_propiedades_y_dinero() {
     assert_eq!(acc.target, P1);
 
     // Verificar transferencia de propiedades
-    let players = session
-        .world()
-        .resource::<monopoly_game::PlayersResource>();
-    assert_eq!(players.properties.get(&1), Some(&P2), "Casilla 1 ahora debe pertenecer a P2");
-    assert_eq!(players.properties.get(&3), Some(&P1), "Casilla 3 ahora debe pertenecer a P1");
+    let players = session.world().resource::<monopoly_game::PlayersResource>();
+    assert_eq!(
+        players.properties.get(&1),
+        Some(&P2),
+        "Casilla 1 ahora debe pertenecer a P2"
+    );
+    assert_eq!(
+        players.properties.get(&3),
+        Some(&P1),
+        "Casilla 3 ahora debe pertenecer a P1"
+    );
 
     // P1 pagó 200 y recibió 50 -> neto -150: 1500 - 150 = 1350
     assert_eq!(players.money[&P1], 1350);
@@ -1642,7 +1654,11 @@ fn test_reject_trade_limpia_la_oferta() {
         )
         .expect("propuesta válida");
 
-    assert!(session.world().resource::<TradeOfferResource>().offer.is_some());
+    assert!(session
+        .world()
+        .resource::<TradeOfferResource>()
+        .offer
+        .is_some());
 
     // P2 rechaza la oferta
     let events = session
@@ -1653,5 +1669,9 @@ fn test_reject_trade_limpia_la_oferta() {
     assert!(events[0].as_any().is::<TradeRejectedEvent>());
 
     // Oferta limpia
-    assert!(session.world().resource::<TradeOfferResource>().offer.is_none());
+    assert!(session
+        .world()
+        .resource::<TradeOfferResource>()
+        .offer
+        .is_none());
 }
