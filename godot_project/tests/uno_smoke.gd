@@ -91,6 +91,8 @@ func _initialize() -> void:
 	if board_script != null:
 		var board_inst = board_script.new()
 		root.add_child(board_inst)
+		if board_inst.find_child("CallUnoButton", true, false) == null and board_inst.has_method("_ready"):
+			board_inst._ready()
 
 		var has_call_uno_btn = board_inst.find_child("CallUnoButton", true, false) != null
 		var has_catch_uno_btn = board_inst.find_child("CatchUnoButton", true, false) != null
@@ -104,6 +106,7 @@ func _initialize() -> void:
 		results.append(["uno_board contiene botón ⚡ Jump-In (JumpInButton)", has_jump_in_btn])
 		results.append(["uno_board implementa lógica Jump-In (_is_card_interceptable)", has_intercept_method])
 
+		root.remove_child(board_inst)
 		board_inst.free()
 
 	var ok := true
