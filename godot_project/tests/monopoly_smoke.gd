@@ -113,6 +113,8 @@ func _initialize() -> void:
 	if board_script != null:
 		var board_inst = board_script.new()
 		root.add_child(board_inst)
+		if board_inst.find_child("BuildHouseButton", true, false) == null and board_inst.has_method("_ready"):
+			board_inst._ready()
 
 		var has_build_btn = board_inst.find_child("BuildHouseButton", true, false) != null
 		var has_mortgage_btn = board_inst.find_child("MortgageButton", true, false) != null
@@ -120,6 +122,7 @@ func _initialize() -> void:
 		results.append(["monopoly_board contiene botón 🏠 Construir Casa/Hotel", has_build_btn])
 		results.append(["monopoly_board contiene botón 🏦 Hipotecar/Deshipotecar", has_mortgage_btn])
 		results.append(["monopoly_board contiene botón 🤝 Proponer Intercambio", has_trade_btn])
+		root.remove_child(board_inst)
 		board_inst.free()
 
 	var ok := true
