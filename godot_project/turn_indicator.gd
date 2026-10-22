@@ -41,7 +41,8 @@ func _init() -> void:
 	add_theme_constant_override("separation", 12)
 	
 func _ready() -> void:
-	_setup_nodes()
+	if timer_bar == null:
+		_setup_nodes()
 	_find_and_bind_bridge()
 
 func _find_and_bind_bridge() -> void:
@@ -74,6 +75,8 @@ func _on_turn_changed(player_id: int) -> void:
 	set_turn(player_id, p_name, p_col)
 
 func _setup_nodes() -> void:
+	if timer_bar != null:
+		return
 	# 1. Color avatar box
 	color_rect = ColorRect.new()
 	color_rect.name = "PlayerColor"
@@ -151,6 +154,8 @@ func get_configured_player_name(player_id: int, fallback_name: String = "") -> S
 	return "Jugador %d" % player_id
 
 func set_turn(player_id: int, player_name: String, player_color: Color) -> void:
+	if timer_bar == null:
+		_setup_nodes()
 	current_player_id = player_id
 	if color_rect:
 		color_rect.color = player_color
@@ -184,16 +189,22 @@ func _animate_label_slide() -> void:
 	tween.tween_property(label, "modulate:a", 1.0, 0.3)
 
 func start_timer(seconds: float) -> void:
+	if timer_bar == null:
+		_setup_nodes()
 	time_max = seconds
 	time_left = seconds
 	timer_active = true
-	timer_bar.value = 100.0
+	if timer_bar != null:
+		timer_bar.value = 100.0
 	if turn_timer_hud != null:
 		turn_timer_hud.start_turn_timer(current_player_id, seconds)
 
 func stop_timer() -> void:
+	if timer_bar == null:
+		_setup_nodes()
 	timer_active = false
-	timer_bar.value = 0.0
+	if timer_bar != null:
+		timer_bar.value = 0.0
 	if turn_timer_hud != null:
 		turn_timer_hud.stop_turn_timer()
 	if pulse_tween != null and pulse_tween.is_valid():
@@ -205,7 +216,8 @@ func _process(delta: float) -> void:
 		if time_left <= 0.0:
 			time_left = 0.0
 			timer_active = false
-		timer_bar.value = (time_left / time_max) * 100.0
+		if timer_bar != null:
+			timer_bar.value = (time_left / time_max) * 100.0
 	_update_undo_redo_status()
 
 func _on_undo_pressed() -> void:
