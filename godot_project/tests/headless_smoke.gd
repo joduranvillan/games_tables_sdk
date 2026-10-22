@@ -30,6 +30,8 @@ func _initialize() -> void:
 	var board_scene: PackedScene = load("res://checkers_board.tscn")
 	var board_node = board_scene.instantiate()
 	root.add_child(board_node)
+	if board_node.board.is_empty() and board_node.has_method("_ready"):
+		board_node._ready()
 
 	# Simular evento de salto en el que el turno continúa perteneciendo al jugador 1 (multicaptura activa)
 	board_node.board[3][4] = {"owner": 2, "king": false}

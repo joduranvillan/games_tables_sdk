@@ -43,6 +43,7 @@ var valid_moves: Array[Vector2i] = [] # Posiciones de destino válidas para resa
 var animating: bool = false # Bloquea el input durante las animaciones
 var current: int = P_TOP  # de quién es el turno (según el motor)
 var winner: int = -1
+var multi_capture_cell = null # {"row": int, "col": int} o null para salto obligatorio múltiple
 
 var drag_layer: DragDropLayer
 var turn_indicator: TurnIndicator
@@ -65,6 +66,8 @@ func _ready() -> void:
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
 
+	if status == null:
+		status = get_node_or_null("Status")
 	_init_board()
 	_setup_ui_layers()
 
@@ -523,7 +526,13 @@ func _on_piece_moved(player: int, from_row: int, from_col: int, to_row: int, to_
 		if (is_inside_tree() and has_node("/root/AudioManager")):
 			get_node("/root/AudioManager").play_piece_place()
 
-	current = bridge.current_player()
+	if bridge != null and bridge.has_method("current_player"):
+		current = bridge.current_player()
+	if captured_row >= 0 and captured_col >= 0 and current == player:
+		multi_capture_cell = {"row": to_row, "col": to_col}
+		selected = {"row": to_row, "col": to_col}
+	else:
+		multi_capture_cell = null
 	_update_status()
 	queue_redraw()
 
@@ -551,6 +560,7 @@ func _on_piece_moved(player: int, from_row: int, from_col: int, to_row: int, to_
 func _on_game_over(w: int) -> void:
 	winner = w
 	selected = null
+	multi_capture_cell = null
 	valid_moves.clear()
 	_update_status()
 	queue_redraw()
@@ -583,6 +593,11 @@ func _draw() -> void:
 	# Casilla seleccionada
 	if selected != null:
 		draw_rect(Rect2(selected.col * CELL, selected.row * CELL, CELL, CELL), col_sel)
+
+	# Resaltar casilla de multicaptura obligatoria con borde dorado
+	if multi_capture_cell != null:
+		var mc_rect := Rect2(multi_capture_cell.col * CELL + 2.0, multi_capture_cell.row * CELL + 2.0, CELL - 4.0, CELL - 4.0)
+		draw_rect(mc_rect, Color(1.0, 0.84, 0.0, 0.95), false, 4.0)
 
 	# Resaltar movimientos válidos con círculos semitransparentes
 	for move_pos in valid_moves:
@@ -649,6 +664,10 @@ func _handle_gamepad_input(event: InputEvent) -> void:
 			JOY_BUTTON_START: gamepad_open_pause_menu()
 
 func _update_status() -> void:
+	if status == null:
+		status = get_node_or_null("Status")
+	if status == null:
+		return
 	if winner != -1:
 		var who: String = "rojo (1)" if winner == P_TOP else "negro (2)"
 		status.text = "¡Ganó el jugador %s!" % who
