@@ -10,7 +10,7 @@ func _initialize() -> void:
 	var bridge := OpenTableBridge.new()
 
 	# 1. Backgammon vs IA
-	var bg_started = bridge.start_local_match_backgammon_vs_ai(1, 2, 1)
+	var bg_started = bridge.start_local_match_backgammon_vs_ai(1, 2)
 	results.append(["Backgammon vs IA: inició correctamente", bg_started])
 	for _f in range(15):
 		if bridge.has_method("_process"):
@@ -93,6 +93,33 @@ func _initialize() -> void:
 	bridge = OpenTableBridge.new()
 	var checkers_started = bridge.start_local_match_checkers_vs_ai(42, 1, 2)
 	results.append(["Checkers vs IA: inició correctamente", checkers_started])
+	for _f in range(15):
+		if bridge.has_method("_process"):
+			bridge._process(0.016)
+	bridge.free()
+
+	# 11. Ludo vs IA
+	bridge = OpenTableBridge.new()
+	var ludo_started = bridge.start_local_match_ludo_vs_ai(1, 2)
+	results.append(["Ludo vs IA: inició correctamente", ludo_started])
+	for _f in range(15):
+		if bridge.has_method("_process"):
+			bridge._process(0.016)
+	bridge.free()
+
+	# 12. Shogi vs IA
+	bridge = OpenTableBridge.new()
+	var shogi_started = bridge.start_local_match_shogi_vs_ai(1, 2, 1)
+	results.append(["Shogi vs IA: inició correctamente", shogi_started])
+	for _f in range(15):
+		if bridge.has_method("_process"):
+			bridge._process(0.016)
+	bridge.free()
+
+	# 13. Xiangqi vs IA
+	bridge = OpenTableBridge.new()
+	var xiangqi_started = bridge.start_local_match_xiangqi_vs_ai(1, 2)
+	results.append(["Xiangqi vs IA: inició correctamente", xiangqi_started])
 	for _f in range(15):
 		if bridge.has_method("_process"):
 			bridge._process(0.016)

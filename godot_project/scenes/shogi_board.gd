@@ -92,7 +92,7 @@ func _ready() -> void:
 	bridge.connect("event_json", _on_event_json)
 
 	if gm != null and gm.get_game_mode() == "vs_ai":
-		bridge.start_local_match_shogi_vs_ai(P_SENTE, P_GOTE)
+		bridge.start_local_match_shogi_vs_ai(P_SENTE, P_GOTE, 1)
 		if mode_option_button != null:
 			mode_option_button.selected = 1
 	else:
@@ -260,7 +260,7 @@ func _on_mode_selected(index: int) -> void:
 
 	if bridge != null:
 		if index == 1:
-			bridge.start_local_match_shogi_vs_ai(P_SENTE, P_GOTE)
+			bridge.start_local_match_shogi_vs_ai(P_SENTE, P_GOTE, 1)
 		else:
 			bridge.start_local_match_shogi(P_SENTE, P_GOTE)
 
