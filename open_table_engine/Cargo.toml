@@ -21,6 +21,7 @@ typetag = "0.2"
 flate2 = "1.0"
 hmac = "0.13.0"
 sha2 = "0.11.0"
+ctutils = ">=0.4.5"
 
 [dev-dependencies]
 criterion = "0.8"

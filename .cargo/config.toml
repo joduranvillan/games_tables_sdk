@@ -3,3 +3,7 @@ GODOT4_BIN = { value = "tools/redot_gdext_shim.sh", relative = true }
 
 [build]
 rustflags = ["-C", "debuginfo=0"]
+
+[resolver]
+incompatible-rust-versions = "allow"
+
