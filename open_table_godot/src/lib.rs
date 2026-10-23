@@ -4072,50 +4072,66 @@ impl OpenTableBridge {
                                     .map(|c| Box::new(c) as Box<dyn Command>)
                             }
                             "go" => {
-                                if let Some(dead_marking) = session.world().get_resource::<go_game::board::DeadMarkingResource>() {
-                                    if dead_marking.active && !dead_marking.confirmed_players.contains(&curr_p) {
-                                        return Some(Box::new(go_game::ConfirmDeadCommand { player: curr_p }) as Box<dyn Command>);
-                                    }
-                                }
-                                go_game::ai::best_move(session, curr_p, self.ai_difficulty)
-                                    .map(|c| Box::new(c) as Box<dyn Command>)
-                                    .or_else(|| {
-                                        Some(Box::new(go_game::PassCommand { player: curr_p })
-                                            as Box<dyn Command>)
+                                let confirm_dead = session
+                                    .world()
+                                    .get_resource::<go_game::board::DeadMarkingResource>()
+                                    .filter(|dm| {
+                                        dm.active && !dm.confirmed_players.contains(&curr_p)
                                     })
+                                    .map(|_| {
+                                        Box::new(go_game::ConfirmDeadCommand { player: curr_p })
+                                            as Box<dyn Command>
+                                    });
+                                confirm_dead.or_else(|| {
+                                    go_game::ai::best_move(session, curr_p, self.ai_difficulty)
+                                        .map(|c| Box::new(c) as Box<dyn Command>)
+                                        .or_else(|| {
+                                            Some(Box::new(go_game::PassCommand { player: curr_p })
+                                                as Box<dyn Command>)
+                                        })
+                                })
                             }
                             "backgammon" if is_ai_turn => {
-                                if let Some(cube) = session.world().get_resource::<backgammon_game::DoublingCubeResource>() {
-                                    if cube.offered && cube.offered_by != Some(*ai_p) {
-                                        let accept = backgammon_game::should_accept_double(session, *ai_p);
-                                        return if accept {
-                                            Some(Box::new(backgammon_game::AcceptDoubleCommand { player: *ai_p }) as Box<dyn Command>)
-                                        } else {
-                                            Some(Box::new(backgammon_game::RejectDoubleCommand { player: *ai_p }) as Box<dyn Command>)
-                                        };
-                                    }
-                                }
-                                let has_pending = session
+                                let cube_response = session
                                     .world()
-                                    .get_resource::<backgammon_game::PendingDiceResource>()
-                                    .and_then(|p| p.pending.get(ai_p))
-                                    .map(|d| !d.is_empty())
-                                    .unwrap_or(false);
-                                if !has_pending {
-                                    if self.ai_difficulty != open_table_engine::ai::AiDifficulty::Easy
-                                        && backgammon_game::should_offer_double(session, *ai_p)
-                                    {
-                                        Some(Box::new(backgammon_game::OfferDoubleCommand {
-                                            player: *ai_p,
-                                        }) as Box<dyn Command>)
-                                    } else {
-                                        Some(Box::new(backgammon_game::RollDiceCommand {
-                                            player: *ai_p,
-                                        }) as Box<dyn Command>)
-                                    }
+                                    .get_resource::<backgammon_game::DoublingCubeResource>()
+                                    .filter(|cube| cube.offered && cube.offered_by != Some(*ai_p))
+                                    .map(|_| {
+                                        if backgammon_game::should_accept_double(session, *ai_p) {
+                                            Box::new(backgammon_game::AcceptDoubleCommand {
+                                                player: *ai_p,
+                                            }) as Box<dyn Command>
+                                        } else {
+                                            Box::new(backgammon_game::RejectDoubleCommand {
+                                                player: *ai_p,
+                                            }) as Box<dyn Command>
+                                        }
+                                    });
+                                if let Some(resp) = cube_response {
+                                    Some(resp)
                                 } else {
-                                    backgammon_game::backgammon_ai_pick_move(session, *ai_p)
-                                        .map(|c| Box::new(c) as Box<dyn Command>)
+                                    let has_pending = session
+                                        .world()
+                                        .get_resource::<backgammon_game::PendingDiceResource>()
+                                        .and_then(|p| p.pending.get(ai_p))
+                                        .map(|d| !d.is_empty())
+                                        .unwrap_or(false);
+                                    if !has_pending {
+                                        if self.ai_difficulty != AiDifficulty::Easy
+                                            && backgammon_game::should_offer_double(session, *ai_p)
+                                        {
+                                            Some(Box::new(backgammon_game::OfferDoubleCommand {
+                                                player: *ai_p,
+                                            }) as Box<dyn Command>)
+                                        } else {
+                                            Some(Box::new(backgammon_game::RollDiceCommand {
+                                                player: *ai_p,
+                                            }) as Box<dyn Command>)
+                                        }
+                                    } else {
+                                        backgammon_game::backgammon_ai_pick_move(session, *ai_p)
+                                            .map(|c| Box::new(c) as Box<dyn Command>)
+                                    }
                                 }
                             }
                             "ludo" if is_ai_turn => {
