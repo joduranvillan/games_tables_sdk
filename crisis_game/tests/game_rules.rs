@@ -1,8 +1,9 @@
 use crisis_game::{
-    check_objective, new_crisis_session, AttackResolvedEvent, BoardResource, DeclareAttackCommand,
-    EliminatedPlayersResource, EndPhaseCommand, FortifyCommand, ObjectiveCard, PendingAttack,
-    PendingAttackResource, PlaceArmiesCommand, PlayerEliminatedEvent, PlayerObjectivesResource,
-    RollAttackCommand, TegGameOverEvent, TerritoryConqueredEvent, TerritoryId,
+    check_objective, new_crisis_session, AttackResolvedEvent, BoardResource, CardType,
+    CardsExchangedEvent, DeclareAttackCommand, EliminatedPlayersResource, EndPhaseCommand,
+    ExchangeCardsCommand, FortifyCommand, ObjectiveCard, PendingAttack, PendingAttackResource,
+    PlaceArmiesCommand, PlayerCardsResource, PlayerEliminatedEvent, PlayerObjectivesResource,
+    RollAttackCommand, TegGameOverEvent, TerritoryCard, TerritoryConqueredEvent, TerritoryId,
     TerritoryMapResource, TerritoryStateResource, TurnPhase, TurnStateResource,
     CONTINENT_SOUTH_AMERICA,
 };
@@ -504,4 +505,258 @@ fn test_crisis_error_paths_cobertura_de_ramas() {
         )
         .unwrap_err();
     assert!(format!("{err:?}").contains("no estás en la fase de fortificación"));
+}
+
+#[test]
+fn test_primera_conquista_del_turno_roba_tarjeta_automaticamente() {
+    for seed in 1..200 {
+        let mut session = new_crisis_session(SessionId(1), seed, &[P1, P2]).unwrap();
+        {
+            let mut turn_state = session.world_mut().resource_mut::<TurnStateResource>();
+            turn_state.phase = TurnPhase::Attack;
+            let mut territory_state = session.world_mut().resource_mut::<TerritoryStateResource>();
+            territory_state.set_owner_and_armies(TerritoryId(0), P1, 10);
+            territory_state.set_owner_and_armies(TerritoryId(1), P2, 1);
+        }
+
+        let _ = session.process_command(
+            P1,
+            Box::new(DeclareAttackCommand {
+                player: P1,
+                from: TerritoryId(0),
+                to: TerritoryId(1),
+                dice: 3,
+            }),
+        );
+
+        let events = session.process_command(P1, Box::new(RollAttackCommand { player: P1 }));
+        if let Ok(evts) = events {
+            if let Some(conq_evt) = evts
+                .iter()
+                .find_map(|e| e.as_any().downcast_ref::<TerritoryConqueredEvent>())
+            {
+                assert!(
+                    conq_evt.card_drawn.is_some(),
+                    "La primera conquista debe otorgar una tarjeta"
+                );
+                let drawn_card = conq_evt.card_drawn.as_ref().unwrap();
+
+                let player_cards = session.world().resource::<PlayerCardsResource>();
+                assert!(
+                    player_cards.conquered_this_turn,
+                    "conquered_this_turn debe ser true"
+                );
+                let p1_cards = player_cards
+                    .cards
+                    .get(&P1)
+                    .expect("P1 debe tener lista de tarjetas");
+                assert_eq!(p1_cards.len(), 1, "P1 debe tener exactamente 1 tarjeta");
+                assert_eq!(
+                    &p1_cards[0], drawn_card,
+                    "La tarjeta en la mano debe ser la robada"
+                );
+                return;
+            }
+        }
+    }
+    panic!("No se pudo lograr una tirada victoriosa para el test");
+}
+
+#[test]
+fn test_segunda_conquista_en_mismo_turno_no_roba_segunda_tarjeta() {
+    for seed in 1..200 {
+        let mut session = new_crisis_session(SessionId(1), seed, &[P1, P2]).unwrap();
+        {
+            let mut turn_state = session.world_mut().resource_mut::<TurnStateResource>();
+            turn_state.phase = TurnPhase::Attack;
+            let mut territory_state = session.world_mut().resource_mut::<TerritoryStateResource>();
+            territory_state.set_owner_and_armies(TerritoryId(0), P1, 10);
+            territory_state.set_owner_and_armies(TerritoryId(1), P2, 1);
+            territory_state.set_owner_and_armies(TerritoryId(2), P2, 1);
+        }
+
+        // Primera conquista
+        let _ = session.process_command(
+            P1,
+            Box::new(DeclareAttackCommand {
+                player: P1,
+                from: TerritoryId(0),
+                to: TerritoryId(1),
+                dice: 3,
+            }),
+        );
+        let evts1 = session.process_command(P1, Box::new(RollAttackCommand { player: P1 }));
+        let first_conq = evts1.is_ok()
+            && evts1
+                .unwrap()
+                .iter()
+                .any(|e| e.as_any().is::<TerritoryConqueredEvent>());
+        if !first_conq {
+            continue;
+        }
+
+        // Segunda conquista en el mismo turno
+        let _ = session.process_command(
+            P1,
+            Box::new(DeclareAttackCommand {
+                player: P1,
+                from: TerritoryId(0),
+                to: TerritoryId(2),
+                dice: 3,
+            }),
+        );
+        let evts2 = session.process_command(P1, Box::new(RollAttackCommand { player: P1 }));
+        if let Ok(evts) = evts2 {
+            if let Some(conq_evt2) = evts
+                .iter()
+                .find_map(|e| e.as_any().downcast_ref::<TerritoryConqueredEvent>())
+            {
+                assert!(
+                    conq_evt2.card_drawn.is_none(),
+                    "La segunda conquista en el mismo turno no debe robar tarjeta"
+                );
+                let player_cards = session.world().resource::<PlayerCardsResource>();
+                let p1_cards = player_cards.cards.get(&P1).unwrap();
+                assert_eq!(
+                    p1_cards.len(),
+                    1,
+                    "P1 debe conservar solo 1 tarjeta robada en el turno"
+                );
+                return;
+            }
+        }
+    }
+    panic!("No se pudo lograr doble conquista para el test");
+}
+
+#[test]
+fn test_conquista_con_cinco_tarjetas_no_roba_mas() {
+    for seed in 1..200 {
+        let mut session = new_crisis_session(SessionId(1), seed, &[P1, P2]).unwrap();
+        {
+            let mut turn_state = session.world_mut().resource_mut::<TurnStateResource>();
+            turn_state.phase = TurnPhase::Attack;
+            let mut territory_state = session.world_mut().resource_mut::<TerritoryStateResource>();
+            territory_state.set_owner_and_armies(TerritoryId(0), P1, 10);
+            territory_state.set_owner_and_armies(TerritoryId(1), P2, 1);
+
+            let mut player_cards = session.world_mut().resource_mut::<PlayerCardsResource>();
+            player_cards.cards.insert(
+                P1,
+                (0..5)
+                    .map(|i| TerritoryCard {
+                        territory: TerritoryId(i),
+                        card_type: CardType::Infantry,
+                    })
+                    .collect(),
+            );
+        }
+
+        let _ = session.process_command(
+            P1,
+            Box::new(DeclareAttackCommand {
+                player: P1,
+                from: TerritoryId(0),
+                to: TerritoryId(1),
+                dice: 3,
+            }),
+        );
+        let events = session.process_command(P1, Box::new(RollAttackCommand { player: P1 }));
+        if let Ok(evts) = events {
+            if let Some(conq_evt) = evts
+                .iter()
+                .find_map(|e| e.as_any().downcast_ref::<TerritoryConqueredEvent>())
+            {
+                assert!(
+                    conq_evt.card_drawn.is_none(),
+                    "Con 5 tarjetas no se debe robar tarjeta adicional"
+                );
+                let player_cards = session.world().resource::<PlayerCardsResource>();
+                assert_eq!(player_cards.cards.get(&P1).unwrap().len(), 5);
+                return;
+            }
+        }
+    }
+    panic!("No se pudo lograr conquista para el test de límite de tarjetas");
+}
+
+#[test]
+fn test_canje_de_tarjetas_con_territorio_propio_agrega_dos_ejercitos_directamente() {
+    let mut session = new_crisis_session(SessionId(1), 42, &[P1, P2]).unwrap();
+    {
+        let mut territory_state = session.world_mut().resource_mut::<TerritoryStateResource>();
+        // P1 es dueño de los territorios 0 y 1 con 3 ejércitos cada uno
+        territory_state.set_owner_and_armies(TerritoryId(0), P1, 3);
+        territory_state.set_owner_and_armies(TerritoryId(1), P1, 3);
+        // Territorio 2 pertenece a P2
+        territory_state.set_owner_and_armies(TerritoryId(2), P2, 5);
+
+        let mut player_cards = session.world_mut().resource_mut::<PlayerCardsResource>();
+        player_cards.cards.insert(
+            P1,
+            vec![
+                TerritoryCard {
+                    territory: TerritoryId(0), // Propio
+                    card_type: CardType::Infantry,
+                },
+                TerritoryCard {
+                    territory: TerritoryId(1), // Propio
+                    card_type: CardType::Cavalry,
+                },
+                TerritoryCard {
+                    territory: TerritoryId(2), // Ajeno
+                    card_type: CardType::Cannon,
+                },
+            ],
+        );
+
+        let mut turn_state = session.world_mut().resource_mut::<TurnStateResource>();
+        turn_state.phase = TurnPhase::PlaceArmies {
+            armies_remaining: 3,
+        };
+    }
+
+    let events = session
+        .process_command(
+            P1,
+            Box::new(ExchangeCardsCommand {
+                player: P1,
+                card_indices: [0, 1, 2],
+            }),
+        )
+        .expect("El canje debe ser exitoso");
+
+    let exchanged_evt = events
+        .iter()
+        .find_map(|e| e.as_any().downcast_ref::<CardsExchangedEvent>())
+        .expect("Debe emitirse CardsExchangedEvent");
+    assert_eq!(exchanged_evt.armies_gained, 4);
+
+    let territory_state = session.world().resource::<TerritoryStateResource>();
+    // Territorio 0 debe tener 3 iniciales + 2 de bono por tarjeta propia = 5
+    assert_eq!(
+        territory_state.armies.get(&TerritoryId(0)).copied(),
+        Some(5),
+        "Territorio 0 debe haber recibido +2 ejércitos directamente"
+    );
+    // Territorio 1 debe tener 3 iniciales + 2 de bono por tarjeta propia = 5
+    assert_eq!(
+        territory_state.armies.get(&TerritoryId(1)).copied(),
+        Some(5),
+        "Territorio 1 debe haber recibido +2 ejércitos directamente"
+    );
+    // Territorio 2 pertenece a P2, debe mantenerse en 5
+    assert_eq!(
+        territory_state.armies.get(&TerritoryId(2)).copied(),
+        Some(5),
+        "Territorio 2 ajeno no debe haber recibido bono"
+    );
+
+    // Además, el armies_remaining general debe ser 3 + 4 = 7
+    let turn_state = session.world().resource::<TurnStateResource>();
+    if let TurnPhase::PlaceArmies { armies_remaining } = turn_state.phase {
+        assert_eq!(armies_remaining, 7);
+    } else {
+        panic!("La fase debe seguir siendo PlaceArmies");
+    }
 }

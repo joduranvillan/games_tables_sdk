@@ -11,7 +11,7 @@ pub mod events;
 pub mod resources;
 pub mod rules;
 
-pub use ai::backgammon_ai_pick_move;
+pub use ai::{backgammon_ai_pick_move, best_move, calculate_pip_count, should_accept_double, should_offer_double, BackgammonCommand};
 pub use board::{must_use_larger_die_check, BoardResource, Sides, CHECKERS_PER_PLAYER, POINTS};
 pub use commands::{
     AcceptDoubleCommand, MoveCheckerCommand, OfferDoubleCommand, RejectDoubleCommand,

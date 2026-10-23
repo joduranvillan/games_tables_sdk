@@ -14,7 +14,7 @@ use open_table_engine::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::board::{Card, CardColor, CardValue, UnoState};
-use crate::commands::{DrawCardCommand, InterceptCommand, PlayCardCommand};
+use crate::commands::{CallUnoCommand, DrawCardCommand, InterceptCommand, PlayCardCommand};
 
 /// Trait de acceso para permitir llamar `best_move(&uno_state, ...)` o `best_move(&session, ...)`.
 pub trait UnoStateAccess {
@@ -39,6 +39,7 @@ pub enum UnoCommand {
     PlayCard(PlayCardCommand),
     DrawCard(DrawCardCommand),
     Intercept(InterceptCommand),
+    CallUno(CallUnoCommand),
 }
 
 impl UnoCommand {
@@ -48,6 +49,7 @@ impl UnoCommand {
             Self::PlayCard(cmd) => Box::new(cmd),
             Self::DrawCard(cmd) => Box::new(cmd),
             Self::Intercept(cmd) => Box::new(cmd),
+            Self::CallUno(cmd) => Box::new(cmd),
         }
     }
 
@@ -55,7 +57,7 @@ impl UnoCommand {
         match self {
             Self::PlayCard(cmd) => Some(cmd.card_index),
             Self::Intercept(cmd) => Some(cmd.card_index),
-            Self::DrawCard(_) => None,
+            Self::DrawCard(_) | Self::CallUno(_) => None,
         }
     }
 
@@ -134,6 +136,19 @@ pub fn best_move<S: UnoStateAccess>(
 ) -> Option<UnoCommand> {
     let uno = state.as_uno_state()?;
     let hand = uno.hands.get(&ai)?;
+
+    // Cuando el bot queda con 1 carta tras jugar (o si tiene 1 carta y no ha cantado UNO),
+    // emite CallUnoCommand. En Easy tiene 30% de probabilidad de olvidarlo para permitir CatchUnoFailureCommand.
+    if hand.len() == 1 && !uno.uno_called.contains(&ai) {
+        let forgets = if difficulty == AiDifficulty::Easy {
+            (uno.discard_pile.len() * 37 + ai.0 as usize * 17) % 10 < 3
+        } else {
+            false
+        };
+        if !forgets {
+            return Some(UnoCommand::CallUno(CallUnoCommand { player: ai }));
+        }
+    }
 
     let playable: Vec<(usize, Card)> = hand
         .iter()
@@ -253,6 +268,41 @@ mod tests {
         let easy_cmd = best_move(&session, P1, AiDifficulty::Easy).unwrap();
         assert_eq!(
             easy_cmd,
+            UnoCommand::PlayCard(PlayCardCommand {
+                player: P1,
+                card_index: 0,
+                chosen_color: None,
+            })
+        );
+    }
+
+    #[test]
+    fn uno_ai_calls_uno_when_left_with_one_card() {
+        let mut session = new_uno_session(SessionId(1), 42, vec![P1, P2]);
+        {
+            let mut state = session.world_mut().resource_mut::<UnoState>();
+            state.active_color = CardColor::Red;
+            state.discard_pile = vec![Card::new(CardColor::Red, CardValue::Number(5))];
+            // P1 tiene exactamente 1 carta y no ha cantado UNO
+            state.hands.insert(
+                P1,
+                vec![Card::new(CardColor::Red, CardValue::Number(2))],
+            );
+            state.uno_called.clear();
+        }
+
+        // En Hard, debe cantar UNO inmediatamente
+        let cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
+        assert_eq!(cmd, UnoCommand::CallUno(CallUnoCommand { player: P1 }));
+
+        // Tras cantar UNO, vuelve a emitir la jugada de la carta
+        {
+            let mut state = session.world_mut().resource_mut::<UnoState>();
+            state.uno_called.insert(P1);
+        }
+        let play_cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
+        assert_eq!(
+            play_cmd,
             UnoCommand::PlayCard(PlayCardCommand {
                 player: P1,
                 card_index: 0,

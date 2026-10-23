@@ -14,10 +14,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::board::{Space, SpaceKind};
 use crate::commands::{
-    AuctionBidCommand, BuyPropertyCommand, PayJailFeeCommand, RollAndMoveCommand,
+    AuctionBidCommand, BuildHouseCommand, BuyPropertyCommand, PayJailFeeCommand,
+    RollAndMoveCommand,
 };
+use crate::rules::house_cost_for_space;
 use crate::resources::{
-    AuctionResource, BoardResource, JailResource, PendingPurchaseResource, PlayersResource,
+    AuctionResource, BoardResource, BuildingsResource, JailResource, PendingPurchaseResource,
+    PlayersResource,
 };
 
 /// Estado de partida de Monopoly.
@@ -30,6 +33,7 @@ pub enum MonopolyCommand {
     BuyProperty(BuyPropertyCommand),
     PayJailFee(PayJailFeeCommand),
     AuctionBid(AuctionBidCommand),
+    BuildHouse(BuildHouseCommand),
 }
 
 impl MonopolyCommand {
@@ -40,6 +44,7 @@ impl MonopolyCommand {
             Self::BuyProperty(cmd) => Box::new(cmd),
             Self::PayJailFee(cmd) => Box::new(cmd),
             Self::AuctionBid(cmd) => Box::new(cmd),
+            Self::BuildHouse(cmd) => Box::new(cmd),
         }
     }
 }
@@ -188,7 +193,71 @@ pub fn best_move(
         }
     }
 
-    // 4. Tirar dados y avanzar
+    // 4. Construir casas si posee un grupo de color completo y tiene más de $400 de reserva (Medium/Hard/Expert)
+    if difficulty != AiDifficulty::Easy && cash > 400 {
+        let buildings_res = state.world().get_resource::<BuildingsResource>();
+        let empty_buildings = std::collections::HashMap::new();
+        let buildings_map = buildings_res.map(|b| &b.buildings).unwrap_or(&empty_buildings);
+
+        for (space_idx, space) in board.spaces.iter().enumerate() {
+            if let SpaceKind::Property { group, .. } = space {
+                if players.properties.get(&space_idx) == Some(&ai)
+                    && players.owns_full_group(&board.spaces, ai, group)
+                {
+                    // No se puede construir si alguna propiedad del grupo está hipotecada
+                    let group_has_mortgaged = board.spaces.iter().enumerate().any(|(idx, s)| {
+                        if let SpaceKind::Property { group: g, .. } = s {
+                            g == group && players.mortgaged.contains(&idx)
+                        } else {
+                            false
+                        }
+                    });
+                    if group_has_mortgaged {
+                        continue;
+                    }
+
+                    let current_level = buildings_map.get(&space_idx).copied().unwrap_or(0);
+                    if current_level >= 5 {
+                        continue;
+                    }
+
+                    // Regla de construcción uniforme
+                    let group_spaces: Vec<usize> = board
+                        .spaces
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(idx, s)| match s {
+                            SpaceKind::Property { group: g, .. } if g == group => Some(idx),
+                            _ => None,
+                        })
+                        .collect();
+
+                    let other_spaces: Vec<usize> = group_spaces
+                        .into_iter()
+                        .filter(|&idx| idx != space_idx)
+                        .collect();
+
+                    let min_other = other_spaces
+                        .iter()
+                        .map(|&idx| buildings_map.get(&idx).copied().unwrap_or(0))
+                        .min()
+                        .unwrap_or(0);
+
+                    if current_level <= min_other {
+                        let cost = house_cost_for_space(space_idx);
+                        if cash >= cost as i64 {
+                            return Some(MonopolyCommand::BuildHouse(BuildHouseCommand {
+                                player: ai,
+                                space: space_idx,
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 5. Tirar dados y avanzar
     Some(MonopolyCommand::RollAndMove(RollAndMoveCommand {
         player: ai,
     }))
@@ -286,6 +355,46 @@ mod tests {
                 player: P1,
                 amount: 150,
             })
+        );
+    }
+
+    #[test]
+    fn monopoly_ai_builds_house_when_owning_group_and_has_reserve() {
+        let mut session = new_monopoly_session(SessionId(1), 42, P1, P2);
+        {
+            let mut players = session.world_mut().resource_mut::<PlayersResource>();
+            // P1 es dueño de ambas propiedades del grupo Marrón (casillas 1 y 3)
+            players.properties.insert(1, P1);
+            players.properties.insert(3, P1);
+            players.money.insert(P1, 1000); // > 400$ de reserva
+        }
+
+        // En Hard, debe proponer construir casa en casilla 1
+        let cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
+        assert_eq!(
+            cmd,
+            MonopolyCommand::BuildHouse(BuildHouseCommand {
+                player: P1,
+                space: 1,
+            })
+        );
+
+        // En Easy, ignora la construcción y tira dados
+        let easy_cmd = best_move(&session, P1, AiDifficulty::Easy).unwrap();
+        assert_eq!(
+            easy_cmd,
+            MonopolyCommand::RollAndMove(RollAndMoveCommand { player: P1 })
+        );
+
+        // Si P1 tiene $400 o menos (ej: $350), no construye y tira dados
+        {
+            let mut players = session.world_mut().resource_mut::<PlayersResource>();
+            players.money.insert(P1, 350);
+        }
+        let low_cash_cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
+        assert_eq!(
+            low_cash_cmd,
+            MonopolyCommand::RollAndMove(RollAndMoveCommand { player: P1 })
         );
     }
 }

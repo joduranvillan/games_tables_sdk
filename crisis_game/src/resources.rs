@@ -1,5 +1,5 @@
 use crate::board::{Continent, ObjectiveCard, Territory, TerritoryId, CONTINENTS, TERRITORIES};
-use crate::events::TerritoryCard;
+use crate::events::{CardType, TerritoryCard};
 use open_table_core::ids::PlayerId;
 use open_table_macros::GameResource;
 use serde::{Deserialize, Serialize};
@@ -141,9 +141,42 @@ impl ExchangeCountResource {
     }
 }
 
-#[derive(GameResource, Default, Debug, Clone)]
+pub fn default_card_deck() -> Vec<TerritoryCard> {
+    let mut deck = Vec::new();
+    for i in 0..30u8 {
+        let card_type = match i % 3 {
+            0 => CardType::Infantry,
+            1 => CardType::Cavalry,
+            _ => CardType::Cannon,
+        };
+        deck.push(TerritoryCard {
+            territory: TerritoryId(i),
+            card_type,
+        });
+    }
+    deck
+}
+
+#[derive(GameResource, Debug, Clone)]
 pub struct PlayerCardsResource {
     pub cards: HashMap<PlayerId, Vec<TerritoryCard>>,
+    pub card_deck: Vec<TerritoryCard>,
+    pub conquered_this_turn: bool,
+}
+
+impl Default for PlayerCardsResource {
+    fn default() -> Self {
+        Self {
+            cards: HashMap::new(),
+            card_deck: default_card_deck(),
+            conquered_this_turn: false,
+        }
+    }
+}
+
+#[derive(GameResource, Default, Debug, Clone)]
+pub struct ConquestTrackerResource {
+    pub conquered_this_turn: bool,
 }
 
 #[derive(GameResource, Default, Debug, Clone)]

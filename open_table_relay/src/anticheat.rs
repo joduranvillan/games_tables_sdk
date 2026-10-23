@@ -189,6 +189,8 @@ impl AntiCheatSession {
 
         let explicit_player = cmd_val
             .get("player")
+            .or_else(|| cmd_val.get("accuser"))
+            .or_else(|| cmd_val.get("challenger"))
             .and_then(|v| v.as_u64())
             .and_then(|v| u32::try_from(v).ok())
             .map(PlayerId);
@@ -287,6 +289,20 @@ fn try_parse_typetag_command(
     }
 
     let ct = obj.get("command_type")?.as_str()?.to_string();
+    if ct.ends_with("CatchUnoFailureCommand") {
+        let p = obj
+            .get("player")
+            .cloned()
+            .unwrap_or_else(|| json!(default_player.0));
+        obj.entry("accuser").or_insert(p);
+    } else if ct.ends_with("ChallengeWildDrawFourCommand") {
+        let p = obj
+            .get("player")
+            .cloned()
+            .unwrap_or_else(|| json!(default_player.0));
+        obj.entry("challenger").or_insert(p);
+    }
+
     if ct.contains("::") {
         return serde_json::from_value::<Box<dyn Command>>(candidate).ok();
     }
@@ -507,6 +523,18 @@ fn parse_backgammon_command(val: &Value, default_player: PlayerId) -> Option<Box
 }
 
 fn parse_battleship_command(val: &Value, default_player: PlayerId) -> Option<Box<dyn Command>> {
+    if is_resign_action(val) {
+        return Some(Box::new(battleship_game::ResignCommand {
+            player: default_player,
+        }));
+    }
+    if val.get("extra_turn_on_hit").is_some()
+        || val.get("action").and_then(|v| v.as_str()) == Some("set_rules")
+    {
+        return serde_json::from_value::<battleship_game::SetBattleshipRulesCommand>(val.clone())
+            .ok()
+            .map(|c| Box::new(c) as Box<dyn Command>);
+    }
     if val.get("ships").is_some() {
         return serde_json::from_value::<battleship_game::PlaceFleetCommand>(val.clone())
             .ok()
@@ -605,6 +633,49 @@ fn parse_mille_bornes_command(val: &Value, default_player: PlayerId) -> Option<B
 }
 
 fn parse_monopoly_command(val: &Value, default_player: PlayerId) -> Option<Box<dyn Command>> {
+    let action = val.get("action").and_then(|v| v.as_str()).unwrap_or("");
+    if action == "build_house" {
+        return serde_json::from_value::<monopoly_game::BuildHouseCommand>(val.clone())
+            .ok()
+            .map(|c| Box::new(c) as Box<dyn Command>);
+    }
+    if action == "sell_house" {
+        return serde_json::from_value::<monopoly_game::SellHouseCommand>(val.clone())
+            .ok()
+            .map(|c| Box::new(c) as Box<dyn Command>);
+    }
+    if action == "mortgage" || action == "mortgage_property" {
+        return serde_json::from_value::<monopoly_game::MortgagePropertyCommand>(val.clone())
+            .ok()
+            .map(|c| Box::new(c) as Box<dyn Command>);
+    }
+    if action == "unmortgage" || action == "unmortgage_property" {
+        return serde_json::from_value::<monopoly_game::UnmortgagePropertyCommand>(val.clone())
+            .ok()
+            .map(|c| Box::new(c) as Box<dyn Command>);
+    }
+    if action == "use_jail_card"
+        || val.get("use_jail_card").and_then(|v| v.as_bool()) == Some(true)
+    {
+        return Some(Box::new(monopoly_game::UseJailCardCommand {
+            player: default_player,
+        }));
+    }
+    if action == "propose_trade" || val.get("offered_spaces").is_some() {
+        return serde_json::from_value::<monopoly_game::ProposeTradeCommand>(val.clone())
+            .ok()
+            .map(|c| Box::new(c) as Box<dyn Command>);
+    }
+    if action == "accept_trade" || val.get("accept_trade").and_then(|v| v.as_bool()) == Some(true) {
+        return Some(Box::new(monopoly_game::AcceptTradeCommand {
+            player: default_player,
+        }));
+    }
+    if action == "reject_trade" || val.get("reject_trade").and_then(|v| v.as_bool()) == Some(true) {
+        return Some(Box::new(monopoly_game::RejectTradeCommand {
+            player: default_player,
+        }));
+    }
     if val.get("buy").is_some() {
         return serde_json::from_value::<monopoly_game::BuyPropertyCommand>(val.clone())
             .ok()
@@ -615,7 +686,6 @@ fn parse_monopoly_command(val: &Value, default_player: PlayerId) -> Option<Box<d
             .ok()
             .map(|c| Box::new(c) as Box<dyn Command>);
     }
-    let action = val.get("action").and_then(|v| v.as_str()).unwrap_or("");
     if action == "pay_jail_fee" || val.get("pay_jail_fee").and_then(|v| v.as_bool()) == Some(true) {
         return Some(Box::new(monopoly_game::PayJailFeeCommand {
             player: default_player,
@@ -628,6 +698,30 @@ fn parse_monopoly_command(val: &Value, default_player: PlayerId) -> Option<Box<d
 
 fn parse_uno_command(val: &Value, default_player: PlayerId) -> Option<Box<dyn Command>> {
     let action = val.get("action").and_then(|v| v.as_str()).unwrap_or("");
+    if action == "call_uno" || val.get("call_uno").and_then(|v| v.as_bool()) == Some(true) {
+        return Some(Box::new(uno_game::CallUnoCommand {
+            player: default_player,
+        }));
+    }
+    if action == "catch_uno_failure" || val.get("accuser").is_some() || val.get("target").is_some()
+    {
+        let mut candidate = val.clone();
+        if let Some(obj) = candidate.as_object_mut() {
+            obj.entry("accuser")
+                .or_insert_with(|| json!(default_player.0));
+        }
+        return serde_json::from_value::<uno_game::CatchUnoFailureCommand>(candidate)
+            .ok()
+            .map(|c| Box::new(c) as Box<dyn Command>);
+    }
+    if action == "challenge_wild_draw_four"
+        || val.get("challenger").is_some()
+        || val.get("challenge_wd4").and_then(|v| v.as_bool()) == Some(true)
+    {
+        return Some(Box::new(uno_game::ChallengeWildDrawFourCommand {
+            challenger: default_player,
+        }));
+    }
     if action == "intercept" || val.get("intercept").and_then(|v| v.as_bool()) == Some(true) {
         return serde_json::from_value::<uno_game::InterceptCommand>(val.clone())
             .ok()
@@ -954,5 +1048,131 @@ mod tests {
             r#"{"player":2,"from":{"row":7,"col":4},"to":{"row":4,"col":4}}"#.to_string(),
         );
         assert_eq!(ac.validate_and_apply(2, &illegal_str), Err("illegal_move"));
+    }
+
+    #[test]
+    fn test_anticheat_polymorphic_deserialization_and_validation_new_commands() {
+        let p1 = PlayerId(1);
+        let p2 = PlayerId(2);
+
+        // 1. BuildHouseCommand
+        let build_house_val = json!({
+            "command_type": "monopoly_game::BuildHouseCommand",
+            "player": 1,
+            "space": 1
+        });
+        let cmd = parse_game_command("monopoly", &build_house_val, p1).unwrap();
+        assert_eq!(cmd.issuer(), Some(p1));
+        assert!(cmd
+            .as_any()
+            .downcast_ref::<monopoly_game::BuildHouseCommand>()
+            .is_some());
+
+        // 2. SellHouseCommand
+        let sell_house_val = json!({
+            "command_type": "monopoly_game::SellHouseCommand",
+            "player": 1,
+            "space": 3
+        });
+        let cmd = parse_game_command("monopoly", &sell_house_val, p1).unwrap();
+        assert_eq!(cmd.issuer(), Some(p1));
+        assert!(cmd
+            .as_any()
+            .downcast_ref::<monopoly_game::SellHouseCommand>()
+            .is_some());
+
+        // 3. MortgagePropertyCommand
+        let mortgage_val = json!({
+            "command_type": "monopoly_game::MortgagePropertyCommand",
+            "player": 1,
+            "space": 6
+        });
+        let cmd = parse_game_command("monopoly", &mortgage_val, p1).unwrap();
+        assert_eq!(cmd.issuer(), Some(p1));
+        assert!(cmd
+            .as_any()
+            .downcast_ref::<monopoly_game::MortgagePropertyCommand>()
+            .is_some());
+
+        // 4. UnmortgagePropertyCommand
+        let unmortgage_val = json!({
+            "command_type": "monopoly_game::UnmortgagePropertyCommand",
+            "player": 1,
+            "space": 6
+        });
+        let cmd = parse_game_command("monopoly", &unmortgage_val, p1).unwrap();
+        assert_eq!(cmd.issuer(), Some(p1));
+        assert!(cmd
+            .as_any()
+            .downcast_ref::<monopoly_game::UnmortgagePropertyCommand>()
+            .is_some());
+
+        // 5. ProposeTradeCommand
+        let propose_trade_val = json!({
+            "command_type": "monopoly_game::ProposeTradeCommand",
+            "player": 1,
+            "target": 2,
+            "offered_spaces": [1],
+            "requested_spaces": [3],
+            "offered_cash": 100,
+            "requested_cash": 50
+        });
+        let cmd = parse_game_command("monopoly", &propose_trade_val, p1).unwrap();
+        assert_eq!(cmd.issuer(), Some(p1));
+        assert!(cmd
+            .as_any()
+            .downcast_ref::<monopoly_game::ProposeTradeCommand>()
+            .is_some());
+
+        // 6. CallUnoCommand
+        let call_uno_val = json!({
+            "command_type": "uno_game::CallUnoCommand",
+            "player": 1
+        });
+        let cmd = parse_game_command("uno", &call_uno_val, p1).unwrap();
+        assert_eq!(cmd.issuer(), Some(p1));
+        assert!(cmd
+            .as_any()
+            .downcast_ref::<uno_game::CallUnoCommand>()
+            .is_some());
+
+        // 7. CatchUnoFailureCommand
+        let catch_uno_val = json!({
+            "command_type": "uno_game::CatchUnoFailureCommand",
+            "accuser": 1,
+            "target": 2
+        });
+        let cmd = parse_game_command("uno", &catch_uno_val, p1).unwrap();
+        assert_eq!(cmd.issuer(), Some(p1));
+        assert!(cmd
+            .as_any()
+            .downcast_ref::<uno_game::CatchUnoFailureCommand>()
+            .is_some());
+
+        // 8. ChallengeWildDrawFourCommand
+        let challenge_wd4_val = json!({
+            "command_type": "uno_game::ChallengeWildDrawFourCommand",
+            "challenger": 2
+        });
+        let cmd = parse_game_command("uno", &challenge_wd4_val, p2).unwrap();
+        assert_eq!(cmd.issuer(), Some(p2));
+        assert!(cmd
+            .as_any()
+            .downcast_ref::<uno_game::ChallengeWildDrawFourCommand>()
+            .is_some());
+
+        // 9. SetBattleshipRulesCommand (y ejecución en AntiCheatSession)
+        let set_bs_rules_val = json!({
+            "command_type": "battleship_game::SetBattleshipRulesCommand",
+            "extra_turn_on_hit": true
+        });
+        let cmd = parse_game_command("battleship", &set_bs_rules_val, p1).unwrap();
+        assert!(cmd
+            .as_any()
+            .downcast_ref::<battleship_game::SetBattleshipRulesCommand>()
+            .is_some());
+
+        let mut bs_ac = AntiCheatSession::for_game(Some("battleship")).unwrap();
+        assert!(bs_ac.validate_and_apply(1, &set_bs_rules_val).is_ok());
     }
 }

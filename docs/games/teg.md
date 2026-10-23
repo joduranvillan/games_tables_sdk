@@ -1,163 +1,79 @@
-# Crisis (TEG) — Documentación del Juego
+# Crisis / T.E.G. (`crisis_game`) — Documentación Técnica del Juego
 
-## 1. Descripción de TEG y Diferencias con Risk Estándar
-TEG (Plan Táctico y Estratégico de Guerra) es el juego clásico de estrategia militar rioplatense. A diferencia del Risk estándar estadounidense:
-- **Combate**: El atacante tira hasta 3 dados y el defensor hasta 3 dados (en lugar de 2 del defensor en Risk). El defensor gana en caso de empate dado a dado.
-- **Canje de Tarjetas**: Escalado fijo de ejércitos adicionales al canjear tríos de tarjetas de país.
-- **Objetivos Secretos**: Además de la conquista global (30 territorios), cada jugador recibe una tarjeta de objetivo secreto que le otorga una condición de victoria particular (conquistar continentes específicos o eliminar a un rival).
+## 1. Resumen de Reglas Oficiales Implementadas
+- **Mapa geopolítico de 30 territorios agrupados en 6 continentes** con soporte multilingüe (`crisis_game::territory_name(id, lang)` en `"es"`, `"en"`, `"fr"`, `"de"`, `"pt"`):
+  - **América del Sur** (`0..4`, bono `+2`), **América del Norte** (`5..8`, bono `+3`), **Europa** (`9..13`, bono `+5`), **África** (`14..17`, bono `+3`), **Asia** (`18..25`, bono `+7`) y **Oceanía** (`26..29`, bono `+2`).
+- **Tres Fases Secuenciales por Turno**:
+  1. `PlaceArmies`: incorporación de refuerzos según territorios propios (`max(territorios / 2, 3)`) más bonos por continentes controlados al 100%.
+  2. `Attack`: declaración (`DeclareAttackCommand`) y resolución de combate con dados (`RollAttackCommand`) desde territorios con ≥2 ejércitos hacia territorios enemigos limítrofes. El atacante tira hasta 3 dados (`ejércitos - 1`) y el defensor hasta 3 dados; se comparan ordenados de mayor a menor y **el defensor gana todos los empates**.
+  3. `Fortify`: reagrupamiento táctico de ejércitos entre territorios propios adyacentes (`FortifyCommand`).
+- **Tarjetas de Territorio, Bono de +2 por País Propio y Canjes Crecientes**:
+  - Conquistar al menos un territorio durante la fase de ataque otorga automáticamente una tarjeta de país (`card_drawn` en `TerritoryConqueredEvent`) al finalizar la fase.
+  - Si al recibir o poseer una tarjeta el jugador es dueño de ese territorio específico, recibe un bono automático de **+2 ejércitos** en dicho país.
+  - Canjear 3 tarjetas con símbolos iguales (`Infantry`, `Cavalry`, `Cannon`), 3 distintos o con comodín (`Wild`) mediante `ExchangeCardsCommand` otorga refuerzos escalados (`4, 7, 10, 15, 20...`).
+- **Objetivos Secretos y Conquista Global**:
+  - Cada comandante recibe al inicio un `SecretObjective` (`ConquerContinent`, `ConquerTwoSmallContinents`, `Exterminate(PlayerId)` o `ConquerTerritories(u8)`). Cumplir el objetivo secreto o controlar los 30 territorios emite `TegGameOverEvent`.
 
-## 2. Mapa de 30 Territorios y Continentes
+## 2. Tabla Completa de Comandos (`Commands`)
+| Comando | Descripción | Esquema JSON Exacto (`#[typetag::serde]`) |
+|---|---|---|
+| `PlaceArmiesCommand` | Coloca `count` ejércitos de refuerzo en el territorio propio `territory` (`0..29`). | `{"command_type": "crisis_game::PlaceArmiesCommand", "player": 1, "territory": 0, "count": 3}` |
+| `DeclareAttackCommand` | Declara un ataque desde el territorio propio `from` hacia el limítrofe enemigo `to` con `dice` dados (`1..3`). | `{"command_type": "crisis_game::DeclareAttackCommand", "player": 1, "from": 0, "to": 1, "dice": 3}` |
+| `RollAttackCommand` | Lanza los dados y resuelve el ataque previamente declarado. | `{"command_type": "crisis_game::RollAttackCommand", "player": 1}` |
+| `FortifyCommand` | Reagrupa `armies` ejércitos desde el territorio propio `from` hacia el adyacente propio `to`. | `{"command_type": "crisis_game::FortifyCommand", "player": 1, "from": 0, "to": 2, "armies": 2}` |
+| `ExchangeCardsCommand` | Canjea el trío de tarjetas en las posiciones `card_indices` de la mano por ejércitos adicionales. | `{"command_type": "crisis_game::ExchangeCardsCommand", "player": 1, "card_indices": [0, 1, 2]}` |
+| `EndPhaseCommand` | Avanza de `PlaceArmies` → `Attack` → `Fortify` → fin de turno (otorgando tarjeta si hubo conquista). | `{"command_type": "crisis_game::EndPhaseCommand", "player": 1}` |
 
-### Soporte Multilingüe (i18n)
-El juego expone `crisis_game::territory_name(id: TerritoryId, lang: &str) -> &'static str` con traducciones en español ("es"), inglés ("en"), francés ("fr"), alemán ("de") y portugués ("pt").
+## 3. Tabla Completa de Eventos (`Events`)
+| Evento | Campos | Esquema JSON Exacto |
+|---|---|---|
+| `TerritoryClaimedEvent` | `player: PlayerId`, `territory: TerritoryId`, `armies: u32` | `{"event_type": "crisis_game::TerritoryClaimedEvent", "player": 1, "territory": 0, "armies": 1}` |
+| `ArmiesPlacedEvent` | `player: PlayerId`, `territory: TerritoryId`, `count: u32`, `armies_remaining: u32` | `{"event_type": "crisis_game::ArmiesPlacedEvent", "player": 1, "territory": 0, "count": 3, "armies_remaining": 0}` |
+| `AttackDeclaredEvent` | `attacker: PlayerId`, `from: TerritoryId`, `to: TerritoryId`, `dice: u8` | `{"event_type": "crisis_game::AttackDeclaredEvent", "attacker": 1, "from": 0, "to": 1, "dice": 3}` |
+| `AttackResolvedEvent` | `attacker: PlayerId`, `defender: PlayerId`, `from: TerritoryId`, `to: TerritoryId`, `attacker_rolls: Vec<u32>`, `defender_rolls: Vec<u32>`, `attacker_losses: u32`, `defender_losses: u32`, `territory_conquered: bool` | `{"event_type": "crisis_game::AttackResolvedEvent", "attacker": 1, "defender": 2, "from": 0, "to": 1, "attacker_rolls": [6, 4, 2], "defender_rolls": [5, 3], "attacker_losses": 0, "defender_losses": 2, "territory_conquered": true}` |
+| `TerritoryConqueredEvent` | `player: PlayerId`, `territory: TerritoryId`, `from: TerritoryId`, `from_armies: u32`, `to_armies: u32`, `card_drawn: Option<TerritoryCard>` | `{"event_type": "crisis_game::TerritoryConqueredEvent", "player": 1, "territory": 1, "from": 0, "from_armies": 2, "to_armies": 3, "card_drawn": {"territory": 1, "card_type": "Cannon"}}` |
+| `PlayerEliminatedEvent` | `player: PlayerId`, `by: PlayerId` | `{"event_type": "crisis_game::PlayerEliminatedEvent", "player": 2, "by": 1}` |
+| `FortifiedEvent` | `player: PlayerId`, `from: TerritoryId`, `to: TerritoryId`, `armies: u32` | `{"event_type": "crisis_game::FortifiedEvent", "player": 1, "from": 0, "to": 2, "armies": 2}` |
+| `CardsExchangedEvent` | `player: PlayerId`, `armies_gained: u32` | `{"event_type": "crisis_game::CardsExchangedEvent", "player": 1, "armies_gained": 4}` |
+| `PhaseChangedEvent` | `player: PlayerId`, `new_phase: String` | `{"event_type": "crisis_game::PhaseChangedEvent", "player": 1, "new_phase": "Attack"}` |
+| `TegGameOverEvent` | `winner: PlayerId`, `objective: String` | `{"event_type": "crisis_game::TegGameOverEvent", "winner": 1, "objective": "ConquerContinent(SouthAmerica)"}` |
 
-### América del Sur (5 territorios, Bono: +2 ejércitos)
-- `0`: Argentina (es: Argentina, fr: Argentine, de: Argentinien)
-- `1`: Brasil (es: Brasil, en: Brazil, fr: Brésil, de: Brasilien)
-- `2`: Chile (es: Chile, fr: Chili)
-- `3`: Colombia (es: Colombia, fr: Colombie, de: Kolumbien)
-- `4`: Perú (es: Perú, en: Peru, fr: Pérou)
-
-### América del Norte (4 territorios, Bono: +3 ejércitos)
-- `5`: México (es: México, en: Mexico, fr: Mexique)
-- `6`: California (es: California, fr: Californie, de: Kalifornien)
-- `7`: Nueva York (es: Nueva York, en: New York, pt: Nova Iorque)
-- `8`: Canadá (es: Canadá, en: Canada, de: Kanada)
-
-### Europa (5 territorios, Bono: +5 ejércitos)
-- `9`: Gran Bretaña (es: Gran Bretaña, en: Great Britain, fr: Grande-Bretagne)
-- `10`: España (es: España, en: Spain, fr: Espagne, de: Spanien)
-- `11`: Francia (es: Francia, en: France, de: Frankreich)
-- `12`: Alemania (es: Alemania, en: Germany, fr: Allemagne, de: Deutschland)
-- `13`: Rusia (es: Rusia, en: Russia, fr: Russie, de: Russland)
-
-### África (4 territorios, Bono: +3 ejércitos)
-- `14`: Sahara (es: Sahara, pt: Saara)
-- `15`: Egipto (es: Egipto, en: Egypt, fr: Égypte, de: Ägypten)
-- `16`: Congo (es: Congo, de: Kongo)
-- `17`: Sudáfrica (es: Sudáfrica, en: South Africa, fr: Afrique du Sud, de: Südafrika)
-
-### Asia (8 territorios, Bono: +7 ejércitos)
-- `18`: Aral
-- `19`: Tartaria (es: Tartaria, en: Tartary, fr: Tartarie)
-- `20`: Taymir (es: Taymir, en: Taymyr, de: Taimyr)
-- `21`: Siberia (es: Siberia, fr: Sibérie, de: Sibirien)
-- `22`: Kamchatka (es: Kamchatka, fr: Kamtchatka)
-- `23`: China (es: China, fr: Chine)
-- `24`: India (es: India, fr: Inde, de: Indien, pt: Índia)
-- `25`: Japón (es: Japón, en: Japan, fr: Japon)
-
-### Oceanía (4 territorios, Bono: +2 ejércitos)
-- `26`: Australia (es: Australia, fr: Australie, de: Australien)
-- `27`: Java
-- `28`: Sumatra
-- `29`: Borneo (es: Borneo, fr: Bornéo, pt: Bornéu)
-
-## 3. Tabla de Adyacencias
+## 4. Tabla de Adyacencias de los 30 Territorios
 | Territorio Origen | Territorios Adyacentes |
 |---|---|
-| **Argentina** (0) | Brasil (1), Chile (2), Perú (4) |
-| **Brasil** (1) | Argentina (0), Chile (2), Colombia (3), Perú (4), Sahara (14) |
-| **Chile** (2) | Argentina (0), Brasil (1), Perú (4), Australia (26) |
-| **Colombia** (3) | Brasil (1), Perú (4), México (5) |
-| **Perú** (4) | Argentina (0), Brasil (1), Chile (2), Colombia (3) |
-| **México** (5) | Colombia (3), California (6) |
-| **California** (6) | México (5), Nueva York (7), Canadá (8) |
-| **Nueva York** (7) | California (6), Canadá (8), España (10) |
-| **Canadá** (8) | California (6), Nueva York (7), Kamchatka (22) |
-| **Gran Bretaña** (9) | España (10), Francia (11), Alemania (12) |
-| **España** (10) | Nueva York (7), Gran Bretaña (9), Francia (11), Sahara (14) |
-| **Francia** (11) | Gran Bretaña (9), España (10), Alemania (12) |
-| **Alemania** (12) | Gran Bretaña (9), Francia (11), Rusia (13) |
-| **Rusia** (13) | Alemania (12), Aral (18), Tartaria (19) |
-| **Sahara** (14) | Brasil (1), España (10), Egipto (15), Congo (16) |
-| **Egipto** (15) | Sahara (14), Congo (16), Sudáfrica (17), Aral (18) |
-| **Congo** (16) | Sahara (14), Egipto (15), Sudáfrica (17) |
-| **Sudáfrica** (17) | Egipto (15), Congo (16) |
-| **Aral** (18) | Rusia (13), Egipto (15), Tartaria (19), India (24) |
-| **Tartaria** (19) | Rusia (13), Aral (18), Taymir (20), Siberia (21), China (23) |
-| **Taymir** (20) | Tartaria (19), Siberia (21) |
-| **Siberia** (21) | Tartaria (19), Taymir (20), Kamchatka (22), China (23) |
-| **Kamchatka** (22) | Canadá (8), Siberia (21), Japón (25) |
-| **China** (23) | Tartaria (19), Siberia (21), India (24), Japón (25), Sumatra (28) |
-| **India** (24) | Aral (18), China (23), Sumatra (28) |
-| **Japón** (25) | Kamchatka (22), China (23) |
-| **Australia** (26) | Chile (2), Java (27) |
-| **Java** (27) | Australia (26), Borneo (29) |
-| **Sumatra** (28) | China (23), India (24), Borneo (29) |
-| **Borneo** (29) | Java (27), Sumatra (28) |
+| **0: Argentina** | Brasil (1), Chile (2), Perú (4) |
+| **1: Brasil** | Argentina (0), Chile (2), Colombia (3), Perú (4), Sahara (14) |
+| **2: Chile** | Argentina (0), Brasil (1), Perú (4), Australia (26) |
+| **3: Colombia** | Brasil (1), Perú (4), México (5) |
+| **4: Perú** | Argentina (0), Brasil (1), Chile (2), Colombia (3) |
+| **5: México** | Colombia (3), California (6) |
+| **6: California** | México (5), Nueva York (7), Canadá (8) |
+| **7: Nueva York** | California (6), Canadá (8), España (10) |
+| **8: Canadá** | California (6), Nueva York (7), Kamchatka (22) |
+| **9: Gran Bretaña** | España (10), Francia (11), Alemania (12) |
+| **10: España** | Nueva York (7), Gran Bretaña (9), Francia (11), Sahara (14) |
+| **11: Francia** | Gran Bretaña (9), España (10), Alemania (12) |
+| **12: Alemania** | Gran Bretaña (9), Francia (11), Rusia (13) |
+| **13: Rusia** | Alemania (12), Aral (18), Tartaria (19) |
+| **14: Sahara** | Brasil (1), España (10), Egipto (15), Congo (16) |
+| **15: Egipto** | Sahara (14), Congo (16), Sudáfrica (17), Aral (18) |
+| **16: Congo** | Sahara (14), Egipto (15), Sudáfrica (17) |
+| **17: Sudáfrica** | Egipto (15), Congo (16) |
+| **18: Aral** | Rusia (13), Egipto (15), Tartaria (19), India (24) |
+| **19: Tartaria** | Rusia (13), Aral (18), Taymir (20), Siberia (21), China (23) |
+| **20: Taymir** | Tartaria (19), Siberia (21) |
+| **21: Siberia** | Tartaria (19), Taymir (20), Kamchatka (22), China (23) |
+| **22: Kamchatka** | Canadá (8), Siberia (21), Japón (25) |
+| **23: China** | Tartaria (19), Siberia (21), India (24), Japón (25), Sumatra (28) |
+| **24: India** | Aral (18), China (23), Sumatra (28) |
+| **25: Japón** | Kamchatka (22), China (23) |
+| **26: Australia** | Chile (2), Java (27) |
+| **27: Java** | Australia (26), Borneo (29) |
+| **28: Sumatra** | China (23), India (24), Borneo (29) |
+| **29: Borneo** | Java (27), Sumatra (28) |
 
-## 4. Fases de Turno y Comandos Disponibles
-
-1. **PlaceArmies**: Colocación de ejércitos al inicio del turno.
-   - Comando: `PlaceArmiesCommand`
-2. **Attack**: Declaración y ejecución de ataques a territorios enemigos adyacentes.
-   - Comandos: `DeclareAttackCommand`, `RollAttackCommand`, `ExchangeCardsCommand`
-3. **Fortify**: Reubicación de ejércitos entre territorios propios conectados.
-   - Comando: `FortifyCommand`
-4. **EndPhase**: Transición entre fases o fin de turno.
-   - Comando: `EndPhaseCommand`
-
-## 5. Tipos de Objetivos Secretos
-- `ConquerContinent(ContinentId)`: Dominar un continente completo.
-- `ConquerTwoSmallContinents`: Dominar 2 continentes pequeños (≤5 territorios cada uno).
-- `Exterminate(PlayerId)`: Destruir completamente al jugador indicado.
-- `ConquerTerritories(u8)`: Controlar una cantidad determinada de territorios ocupados con al menos 2 ejércitos.
-
-## 6. Sistema de Tarjetas y Canje
-- Al conquistar al menos un territorio en el turno, el jugador roba una tarjeta de territorio.
-- Trío válido: 3 tarjetas del mismo símbolo (`Infantry`, `Cavalry`, `Cannon`) o 3 símbolos distintos o combinación con `Wild`.
-- Premio de canje: 4, 7, 10, 15... ejércitos adicionales acumulativos.
-
-## 7. API de Comandos y Eventos (`crisis_game`)
-
-### Ejemplos JSON de Comandos
-
-`PlaceArmiesCommand`:
-```json
-{
-  "type": "PlaceArmiesCommand",
-  "player": 1,
-  "territory": 0,
-  "count": 3
-}
-```
-
-`DeclareAttackCommand`:
-```json
-{
-  "type": "DeclareAttackCommand",
-  "player": 1,
-  "from": 0,
-  "to": 1,
-  "dice": 3
-}
-```
-
-`FortifyCommand`:
-```json
-{
-  "type": "FortifyCommand",
-  "player": 1,
-  "from": 0,
-  "to": 2,
-  "armies": 2
-}
-```
-
-### Eventos Principales
-- `ArmiesPlacedEvent`: `{ "player": 1, "territory": 0, "count": 3, "armies_remaining": 0 }`
-- `AttackResolvedEvent`: `{ "attacker": 1, "defender": 2, "from": 0, "to": 1, "attacker_rolls": [6, 4, 2], "defender_rolls": [5, 3], "attacker_losses": 0, "defender_losses": 2, "territory_conquered": true }`
-- `TegGameOverEvent`: `{ "winner": 1, "objective": "Conquistar América del Sur" }`
-
-## 8. Simplificaciones Aplicadas Respecto a TEG Real
-- Sin pactos o alianzas diplomáticas explícitas en el motor.
-- Sin guerras nucleares ni misiles (reglas de exp. TEG 2).
-- Tablero optimizado a 30 territorios principales para partidas más dinámicas en partidas rápidas móviles.
-
-## 9. Ejemplo de Partida Mínima
-1. **Inicio**: Sesión iniciada para Jugador 1 y Jugador 2. 30 territorios repartidos.
-2. **Movimiento 1**: Jugador 1 coloca 3 ejércitos en Argentina (`PlaceArmiesCommand`).
-3. **Movimiento 2**: Jugador 1 declara ataque desde Argentina a Brasil (`DeclareAttackCommand`).
-4. **Movimiento 3**: Lanzamiento de dados (`RollAttackCommand`), conquista Brasil y fortifica.
-5. **Fin**: Jugador 1 cumple su objetivo secreto y se emite `TegGameOverEvent`.
+## 5. Flujo de Partida de Referencia
+1. **Inicio**: `new_crisis_session(SessionId(1), seed, &[PlayerId(1), PlayerId(2)])` reparte equitativamente los 30 territorios y asigna objetivos secretos.
+2. **Refuerzo (`PlaceArmiesCommand`)**: Jugador 1 despliega sus ejércitos disponibles.
+3. **Ataque (`DeclareAttackCommand` + `RollAttackCommand`)**: Jugador 1 conquista un territorio limítrofe y recibe tarjeta de país.
+4. **Fin**: Al cumplir su objetivo secreto o conquistar los 30 países, se emite `TegGameOverEvent`.

@@ -13,7 +13,7 @@
 use open_table_engine::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::card::{Card, Hazard};
+use crate::card::{Card, Hazard, Safety};
 use crate::commands::{
     DiscardCardCommand, DrawCardCommand, PlayCardCommand, PlayDistanceCommand, PlayHazardCommand,
     PlaySafetyCommand,
@@ -161,7 +161,33 @@ pub fn best_move(
 
     let opponent = resolve_opponent(state, ai);
 
-    // 1) Safety si en mano (ignorada en Easy)
+    // 1) Safety: priorizar jugar cualquier Card::Safety(_) cuando su peligro correspondiente amenaza,
+    // o para obtener el turno extra (en Medium/Hard/Expert).
+    let current_hazard = deck.hazard.get(&ai).copied().flatten();
+    let is_speed_limited = speed_limit
+        .map(|s| s.limited.contains(&ai))
+        .unwrap_or(false)
+        || current_hazard == Some(Hazard::SpeedLimit);
+
+    // Si un peligro nos amenaza y tenemos la Safety correspondiente (de las 4 Safeties),
+    // jugarla de inmediato para curar el peligro y obtener turno extra
+    let threatening_safety_idx = hand.iter().position(|&card| match (current_hazard, card) {
+        (Some(Hazard::FlatTire), Card::Safety(Safety::PunctureProof)) => true,
+        (Some(Hazard::OutOfGas), Card::Safety(Safety::ExtraTank)) => true,
+        (Some(Hazard::Accident), Card::Safety(Safety::DrivingAce)) => true,
+        _ if is_speed_limited && matches!(card, Card::Safety(Safety::RightOfWay) | Card::RightOfWay) => true,
+        _ => false,
+    });
+
+    if let Some(idx) = threatening_safety_idx {
+        return Some(MilleBornesCommand::PlayCard(PlayCardCommand {
+            player: ai,
+            card_index: idx,
+        }));
+    }
+
+    // Si no hay peligro amenazante inmediato, pero tenemos cualquier Safety (o RightOfWay),
+    // jugarla para obtener el turno extra y protección permanente
     if difficulty != AiDifficulty::Easy {
         for (idx, card) in hand.iter().enumerate() {
             if matches!(card, Card::Safety(_) | Card::RightOfWay) {
@@ -174,11 +200,6 @@ pub fn best_move(
     }
 
     // 2) Remedy si bloqueado
-    let current_hazard = deck.hazard.get(&ai).copied().flatten();
-    let is_speed_limited = speed_limit
-        .map(|s| s.limited.contains(&ai))
-        .unwrap_or(false)
-        || current_hazard == Some(Hazard::SpeedLimit);
 
     if let Some(h) = current_hazard {
         if h != Hazard::SpeedLimit {
@@ -315,5 +336,52 @@ mod tests {
                 card_index: 3,
             })
         );
+    }
+
+    #[test]
+    fn mille_bornes_ai_prioritizes_all_four_safeties_when_threatened() {
+        let safeties_and_hazards = [
+            (Hazard::FlatTire, Card::Safety(Safety::PunctureProof)),
+            (Hazard::OutOfGas, Card::Safety(Safety::ExtraTank)),
+            (Hazard::Accident, Card::Safety(Safety::DrivingAce)),
+            (Hazard::SpeedLimit, Card::Safety(Safety::RightOfWay)),
+        ];
+
+        for (hazard, safety_card) in safeties_and_hazards {
+            let mut session = new_mille_bornes_session(SessionId(1), 42, P1, P2);
+            {
+                if hazard == Hazard::SpeedLimit {
+                    session
+                        .world_mut()
+                        .resource_mut::<SpeedLimitResource>()
+                        .limited
+                        .insert(P1);
+                } else {
+                    let mut deck = session.world_mut().resource_mut::<DeckResource>();
+                    deck.hazard.insert(P1, Some(hazard));
+                }
+                let mut deck = session.world_mut().resource_mut::<DeckResource>();
+                deck.hands.insert(
+                    P1,
+                    vec![
+                        Card::Distance(200),
+                        Card::Remedy(hazard),
+                        safety_card,
+                    ],
+                );
+            }
+
+            // Debe priorizar la Safety correspondiente (índice 2) sobre el Remedy o la Distance
+            let cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
+            assert_eq!(
+                cmd,
+                MilleBornesCommand::PlayCard(PlayCardCommand {
+                    player: P1,
+                    card_index: 2,
+                }),
+                "Debe priorizar Safety ante el peligro {:?}",
+                hazard
+            );
+        }
     }
 }

@@ -31,10 +31,10 @@ pub use events::{
 };
 use open_table_engine::turn::TurnResource;
 pub use resources::{
-    BoardResource, EliminatedPlayersResource, ExchangeCountResource, PendingAttack,
-    PendingAttackResource, PlayerCardsResource, PlayerHandResource, PlayerObjectivesResource,
-    PlayersResource, TerritoryMapResource, TerritoryStateResource, TurnPhase, TurnPhaseResource,
-    TurnStateResource,
+    default_card_deck, BoardResource, ConquestTrackerResource, EliminatedPlayersResource,
+    ExchangeCountResource, PendingAttack, PendingAttackResource, PlayerCardsResource,
+    PlayerHandResource, PlayerObjectivesResource, PlayersResource, TerritoryMapResource,
+    TerritoryStateResource, TurnPhase, TurnPhaseResource, TurnStateResource,
 };
 pub use rules::{build_crisis_rules, is_valid_card_set};
 
@@ -106,9 +106,19 @@ pub fn new_crisis_session(
     session
         .world_mut()
         .insert_resource(ExchangeCountResource::default());
+    let mut deck = default_card_deck();
+    {
+        let mut random_res = session.world_mut().resource_mut::<RandomResource>();
+        random_res.0.shuffle(&mut deck);
+    }
+    session.world_mut().insert_resource(PlayerCardsResource {
+        cards: std::collections::HashMap::new(),
+        card_deck: deck,
+        conquered_this_turn: false,
+    });
     session
         .world_mut()
-        .insert_resource(PlayerCardsResource::default());
+        .insert_resource(ConquestTrackerResource::default());
     session
         .world_mut()
         .insert_resource(TurnResource(TurnOrder::new(players.to_vec())));

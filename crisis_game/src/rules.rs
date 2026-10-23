@@ -298,13 +298,75 @@ pub fn build_crisis_rules() -> RuleEngine {
                 (rem_from_armies, remaining_def_territories)
             };
 
+            let card_drawn = {
+                let (is_first_conquest, card_count, deck_len) = {
+                    let player_cards_res = world.resource::<PlayerCardsResource>();
+                    (
+                        !player_cards_res.conquered_this_turn,
+                        player_cards_res
+                            .cards
+                            .get(&cmd.player)
+                            .map(|c| c.len())
+                            .unwrap_or(0),
+                        player_cards_res.card_deck.len(),
+                    )
+                };
+
+                let random_draw_spec = if is_first_conquest && card_count < 5 {
+                    let mut random_res = world.resource_mut::<RandomResource>();
+                    if deck_len > 0 {
+                        let idx = (random_res.0.next_u32() as usize) % deck_len;
+                        Some((true, idx, 0u8, CardType::Infantry))
+                    } else {
+                        let t_id = (random_res.0.next_u32() % 30) as u8;
+                        let c_type = match random_res.0.next_u32() % 3 {
+                            0 => CardType::Infantry,
+                            1 => CardType::Cavalry,
+                            _ => CardType::Cannon,
+                        };
+                        Some((false, 0, t_id, c_type))
+                    }
+                } else {
+                    None
+                };
+
+                let mut player_cards_res = world.resource_mut::<PlayerCardsResource>();
+                player_cards_res.conquered_this_turn = true;
+
+                if let Some((from_deck, idx, t_id, c_type)) = random_draw_spec {
+                    let card = if from_deck && !player_cards_res.card_deck.is_empty() {
+                        let safe_idx = idx % player_cards_res.card_deck.len();
+                        player_cards_res.card_deck.remove(safe_idx)
+                    } else {
+                        crate::events::TerritoryCard {
+                            territory: TerritoryId(t_id),
+                            card_type: c_type,
+                        }
+                    };
+                    player_cards_res
+                        .cards
+                        .entry(cmd.player)
+                        .or_default()
+                        .push(card.clone());
+                    Some(card)
+                } else {
+                    None
+                }
+            };
+
+            if let Some(mut tracker) =
+                world.get_resource_mut::<crate::resources::ConquestTrackerResource>()
+            {
+                tracker.conquered_this_turn = true;
+            }
+
             events.push(Box::new(TerritoryConqueredEvent {
                 player: cmd.player,
                 territory: attack.to,
                 from: attack.from,
                 from_armies: rem_from_armies,
                 to_armies: attack.dice as u32,
-                card_drawn: None,
+                card_drawn,
             }));
 
             if remaining_def_territories == 0 {
@@ -412,6 +474,15 @@ pub fn build_crisis_rules() -> RuleEngine {
                 };
                 turn_state.fortified = false;
 
+                if let Some(mut cards_res) = world.get_resource_mut::<PlayerCardsResource>() {
+                    cards_res.conquered_this_turn = false;
+                }
+                if let Some(mut tracker) =
+                    world.get_resource_mut::<crate::resources::ConquestTrackerResource>()
+                {
+                    tracker.conquered_this_turn = false;
+                }
+
                 Ok(vec![Box::new(PhaseChangedEvent {
                     player: next_player,
                     new_phase: "PlaceArmies".to_string(),
@@ -515,10 +586,21 @@ pub fn build_crisis_rules() -> RuleEngine {
             return Err(invalid("combinación de tarjetas inválida"));
         }
 
-        idxs.sort_unstable_by(|a, b| b.cmp(a));
-        for idx in idxs {
-            cards.remove(idx);
-        }
+        let (exchanged_cards, removed_cards) = {
+            let cards = player_cards_res.cards.entry(cmd.player).or_default();
+            let exchanged = [
+                cards[idxs[0]].clone(),
+                cards[idxs[1]].clone(),
+                cards[idxs[2]].clone(),
+            ];
+            idxs.sort_unstable_by(|a, b| b.cmp(a));
+            let mut removed = Vec::new();
+            for idx in idxs {
+                removed.push(cards.remove(idx));
+            }
+            (exchanged, removed)
+        };
+        player_cards_res.card_deck.extend(removed_cards);
 
         let mut exchange_count = world.resource_mut::<ExchangeCountResource>();
         let bonus_armies = exchange_count.next_bonus();
@@ -528,6 +610,16 @@ pub fn build_crisis_rules() -> RuleEngine {
         turn_state.phase = TurnPhase::PlaceArmies {
             armies_remaining: new_remaining,
         };
+
+        // Bono +2 ejércitos directamente en el territorio por cada tarjeta cuyo territorio pertenezca al jugador
+        {
+            let mut territory_state = world.resource_mut::<TerritoryStateResource>();
+            for card in &exchanged_cards {
+                if territory_state.owners.get(&card.territory) == Some(&cmd.player) {
+                    *territory_state.armies.entry(card.territory).or_insert(0) += 2;
+                }
+            }
+        }
 
         Ok(vec![Box::new(CardsExchangedEvent {
             player: cmd.player,

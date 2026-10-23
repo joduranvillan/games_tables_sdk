@@ -1,28 +1,27 @@
-use open_table_engine::prelude::*;
-
 use crate::board::{BoardResource, Sides, POINTS};
-use crate::commands::MoveCheckerCommand;
+use crate::commands::{
+    AcceptDoubleCommand, MoveCheckerCommand, OfferDoubleCommand, RejectDoubleCommand,
+    RollDiceCommand,
+};
 use crate::dice::PendingDiceResource;
 use crate::resources::{DoublingCubeResource, MatchStateResource};
-
-/// Clona el estado actual de la sesión de Backgammon para evaluar jugadas candidatas.
+use open_table_engine::prelude::*;
+use serde::{Deserialize, Serialize};
 pub fn clone_backgammon_session(session: &Session) -> Session {
     let (inc, dec) = session
         .world()
         .get_resource::<Sides>()
         .map(|s| (s.increasing, s.decreasing))
         .unwrap_or((PlayerId(1), PlayerId(2)));
-
     let mut new_session = crate::new_backgammon_session(session.id, 0, inc, dec);
-
     if let Some(board) = session.world().get_resource::<BoardResource>() {
         new_session.world_mut().insert_resource(board.clone());
     }
     if let Some(sides) = session.world().get_resource::<Sides>() {
         new_session.world_mut().insert_resource(*sides);
     }
-    if let Some(dice) = session.world().get_resource::<PendingDiceResource>() {
-        new_session.world_mut().insert_resource(dice.clone());
+    if let Some(pending) = session.world().get_resource::<PendingDiceResource>() {
+        new_session.world_mut().insert_resource(pending.clone());
     }
     if let Some(cube) = session.world().get_resource::<DoublingCubeResource>() {
         new_session.world_mut().insert_resource(cube.clone());
@@ -39,11 +38,9 @@ pub fn clone_backgammon_session(session: &Session) -> Session {
     if let Some(winner) = session.world().get_resource::<WinnerResource>() {
         new_session.world_mut().insert_resource(*winner);
     }
-
     new_session
 }
 
-/// Indica si una posición está en el campo/cuadrante del oponente.
 fn is_in_opponent_field(sides: &Sides, player: PlayerId, point: usize) -> bool {
     if player == sides.increasing {
         point < 12
@@ -222,6 +219,188 @@ pub fn backgammon_ai_pick_move(session: &Session, player: PlayerId) -> Option<Mo
     }
 }
 
+
+/// Calcula el pip count (distancia total restante para sacar todas las fichas) de un jugador.
+pub fn calculate_pip_count(board: &BoardResource, sides: &Sides, player: PlayerId) -> u32 {
+    let owner_sign = sides.owner_sign(player);
+    let mut pips = 0u32;
+
+    let on_bar = board.bar.get(&player).copied().unwrap_or(0);
+    pips += on_bar * 25;
+
+    for idx in 0..POINTS {
+        let count = board.points[idx] * owner_sign;
+        if count > 0 {
+            let distance = if player == sides.increasing {
+                24 - idx as u32
+            } else {
+                idx as u32 + 1
+            };
+            pips += (count as u32) * distance;
+        }
+    }
+    pips
+}
+
+/// Determina si el jugador tiene suficiente ventaja para proponer doblar la apuesta.
+pub fn should_offer_double(session: &Session, player: PlayerId) -> bool {
+    if session
+        .world()
+        .get_resource::<GameOverResource>()
+        .is_some_and(|r| r.0)
+    {
+        return false;
+    }
+    if session.current_player() != player {
+        return false;
+    }
+    if session
+        .world()
+        .get_resource::<MatchStateResource>()
+        .map(|m| m.crawford_game)
+        .unwrap_or(false)
+    {
+        return false;
+    }
+    let pending = session.world().get_resource::<PendingDiceResource>();
+    if pending
+        .map(|p| p.pending.get(&player).map(|d| !d.is_empty()).unwrap_or(false))
+        .unwrap_or(false)
+    {
+        return false;
+    }
+    let cube = match session.world().get_resource::<DoublingCubeResource>() {
+        Some(c) => c,
+        None => return false,
+    };
+    if let Some(owner) = cube.owner {
+        if owner != player {
+            return false;
+        }
+    }
+    if cube.offered || cube.offered_by.is_some() {
+        return false;
+    }
+
+    let board = match session.world().get_resource::<BoardResource>() {
+        Some(b) => b,
+        None => return false,
+    };
+    let sides = match session.world().get_resource::<Sides>() {
+        Some(s) => s,
+        None => return false,
+    };
+
+    let opp = sides.opponent_of(player);
+    let my_pips = calculate_pip_count(board, sides, player);
+    let opp_pips = calculate_pip_count(board, sides, opp);
+
+    let my_bar = board.bar.get(&player).copied().unwrap_or(0);
+    let opp_bar = board.bar.get(&opp).copied().unwrap_or(0);
+
+    // Ventaja clara de doblaje:
+    // 1) Si el rival tiene fichas en la barra y nosotros ninguna, y no estamos muy atrasados
+    if opp_bar > 0 && my_bar == 0 && my_pips <= opp_pips + 10 {
+        return true;
+    }
+    // 2) Ventaja en pip count (carrera): al menos 15 pips por delante
+    if my_bar == 0 && my_pips + 15 <= opp_pips {
+        return true;
+    }
+
+    false
+}
+
+/// Determina si el jugador debe aceptar una oferta de doblaje del oponente.
+pub fn should_accept_double(session: &Session, player: PlayerId) -> bool {
+    let board = match session.world().get_resource::<BoardResource>() {
+        Some(b) => b,
+        None => return false,
+    };
+    let sides = match session.world().get_resource::<Sides>() {
+        Some(s) => s,
+        None => return false,
+    };
+
+    let opp = sides.opponent_of(player);
+    let my_pips = calculate_pip_count(board, sides, player);
+    let opp_pips = calculate_pip_count(board, sides, opp);
+
+    my_pips <= opp_pips + 40
+}
+
+/// Comando devuelto por la IA de Backgammon.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BackgammonCommand {
+    Move(MoveCheckerCommand),
+    OfferDouble(OfferDoubleCommand),
+    AcceptDouble(AcceptDoubleCommand),
+    RejectDouble(RejectDoubleCommand),
+    RollDice(RollDiceCommand),
+}
+
+impl BackgammonCommand {
+    pub fn into_command(self) -> Box<dyn Command> {
+        match self {
+            Self::Move(c) => Box::new(c),
+            Self::OfferDouble(c) => Box::new(c),
+            Self::AcceptDouble(c) => Box::new(c),
+            Self::RejectDouble(c) => Box::new(c),
+            Self::RollDice(c) => Box::new(c),
+        }
+    }
+}
+
+/// Selecciona la mejor acción para `player` según su nivel de dificultad.
+pub fn best_move(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+) -> Option<BackgammonCommand> {
+    if session
+        .world()
+        .get_resource::<GameOverResource>()
+        .is_some_and(|r| r.0)
+    {
+        return None;
+    }
+
+    // 1. Si el rival propuso doblar al jugador, responder
+    if let Some(cube) = session.world().get_resource::<DoublingCubeResource>() {
+        if cube.offered {
+            let opp = session.world().get_resource::<Sides>().map(|s| s.opponent_of(player));
+            if cube.offered_by == opp {
+                if should_accept_double(session, player) {
+                    return Some(BackgammonCommand::AcceptDouble(AcceptDoubleCommand { player }));
+                } else {
+                    return Some(BackgammonCommand::RejectDouble(RejectDoubleCommand { player }));
+                }
+            }
+        }
+    }
+
+    if session.current_player() != player {
+        return None;
+    }
+
+    // 2. Si no ha tirado los dados:
+    let pending_dice = session.world().get_resource::<PendingDiceResource>();
+    let has_pending = pending_dice
+        .and_then(|p| p.pending.get(&player))
+        .map(|d| !d.is_empty())
+        .unwrap_or(false);
+
+    if !has_pending {
+        if difficulty != AiDifficulty::Easy && should_offer_double(session, player) {
+            return Some(BackgammonCommand::OfferDouble(OfferDoubleCommand { player }));
+        }
+        return Some(BackgammonCommand::RollDice(RollDiceCommand { player }));
+    }
+
+    // 3. Mover fichas con los dados pendientes
+    backgammon_ai_pick_move(session, player).map(BackgammonCommand::Move)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325,5 +504,47 @@ mod tests {
             "La IA debe preferir mover desde el punto 8 hacia el 10 para crear un bloque (+5) en lugar de otra jugada"
         );
         assert_eq!(mv.die, 2);
+    }
+
+    #[test]
+    fn test_backgammon_ai_offers_double_with_advantage() {
+        let mut session = new_backgammon_session(SessionId(1), 42, P1, P2);
+        // Colocar ficha en barra de P2 para dar clara ventaja posicional a P1
+        {
+            let mut board = session.world_mut().resource_mut::<BoardResource>();
+            board.bar.insert(P2, 1);
+        }
+
+        assert!(
+            should_offer_double(&session, P1),
+            "P1 debe detectar ventaja y proponer doblar"
+        );
+
+        let cmd = best_move(&session, P1, AiDifficulty::Hard).unwrap();
+        assert_eq!(
+            cmd,
+            BackgammonCommand::OfferDouble(OfferDoubleCommand { player: P1 })
+        );
+
+        // En Easy, no dobla y opta por tirar dados
+        let easy_cmd = best_move(&session, P1, AiDifficulty::Easy).unwrap();
+        assert_eq!(
+            easy_cmd,
+            BackgammonCommand::RollDice(RollDiceCommand { player: P1 })
+        );
+    }
+
+    #[test]
+    fn test_backgammon_ai_does_not_double_when_crawford_or_behind() {
+        let mut session = new_backgammon_session(SessionId(1), 42, P1, P2);
+        {
+            let mut match_state = session.world_mut().resource_mut::<MatchStateResource>();
+            match_state.crawford_game = true;
+        }
+
+        assert!(
+            !should_offer_double(&session, P1),
+            "No debe doblar durante juego Crawford"
+        );
     }
 }

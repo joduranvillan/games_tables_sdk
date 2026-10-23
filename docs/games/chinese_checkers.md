@@ -1,29 +1,29 @@
-# Damas Chinas (`chinese_checkers_game`) — Documentación del Juego
+# Damas Chinas (`chinese_checkers_game`) — Documentación Técnica del Juego
 
-## 1. Resumen de Reglas Implementadas
-- Tablero oficial en forma de estrella de 6 puntas con **121 casillas** en coordenadas axiales hexagonales `(q, r)` (`BOARD_RADIUS = 4` + 6 puntas de 10 casillas).
-- Soporte configurable para **2, 3, 4 o 6 jugadores** con asignación simétrica de puntas de salida y puntas objetivo opuestas.
-- Movimiento de 1 paso a casilla adyacente vacía o **saltos múltiples encadenados (`path`)** sobre fichas propias o rivales (sin capturarlas).
-- Detección automática de victoria cuando el jugador ocupa las 10 casillas de su triángulo objetivo opuesto.
+## 1. Resumen de Reglas Oficiales Implementadas
+- **Estrella hexagonal oficial de 121 casillas**: centro hexagonal de radio 4 (`BOARD_RADIUS = 4`) más 6 puntas triangulares de 10 casillas cada una en coordenadas axiales `(q, r)`.
+- **Soporte multijugador simétrico (2, 3, 4 o 6 jugadores)**: asignación automática de triángulos de salida y triángulos de meta directamente opuestos.
+- **Movimiento y Saltos en Cadena**:
+  - Paso simple a cualquiera de las 6 casillas hexagonales adyacentes vacías.
+  - Saltos encadenados (`path`) sobre canicas adyacentes (propias o ajenas) aterrizando en la casilla simétrica inmediatamente posterior, sin retirar nunca las fichas saltadas.
+- **Regla Oficial Anti-Bloqueo (*Home-Camp Spoiling Rule*)**:
+  - Ninguna canica que haya ingresado a su triángulo de meta opuesto puede abandonarlo.
+  - Si las 10 casillas del triángulo objetivo de un jugador están completamente ocupadas y al menos una canica pertenece a dicho jugador (aunque existan canicas rivales bloqueando posiciones internas), se adjudica la victoria legítima.
 
-## 2. Tabla de Comandos
-| Comando | Descripción | Ejemplo JSON |
+## 2. Tabla Completa de Comandos (`Commands`)
+| Comando | Descripción | Esquema JSON Exacto (`#[typetag::serde]`) |
 |---|---|---|
-| `MovePegCommand` | Mueve una canica un paso adyacente o mediante una cadena de saltos | `{"type": "MovePegCommand", "player": 1, "from": {"q": -5, "r": 1}, "to": {"q": -3, "r": 1}, "path": [{"q": -3, "r": 1}]}` |
+| `MovePegCommand` | Mueve una canica desde `from` hasta `to`, especificando opcionalmente la secuencia de saltos en `path`. | `{"command_type": "chinese_checkers_game::MovePegCommand", "player": 1, "from": {"q": -5, "r": 1}, "to": {"q": -3, "r": 1}, "path": [{"q": -3, "r": 1}]}` |
+| `ResignCommand` | Se rinde inmediatamente y adjudica la victoria al adversario. | `{"command_type": "chinese_checkers_game::ResignCommand", "player": 1}` |
 
-## 3. Tabla de Eventos
-| Evento | Campos |
-|---|---|
-| `PegMovedEvent` | `player`, `from`, `to`, `was_jump` |
-| `GameOverEvent` | `winner` |
+## 3. Tabla Completa de Eventos (`Events`)
+| Evento | Campos | Esquema JSON Exacto |
+|---|---|---|
+| `PegMovedEvent` | `player: PlayerId`, `from: Position`, `to: Position`, `was_jump: bool` | `{"event_type": "chinese_checkers_game::PegMovedEvent", "player": 1, "from": {"q": -5, "r": 1}, "to": {"q": -3, "r": 1}, "was_jump": true}` |
+| `GameOverEvent` | `winner: Option<PlayerId>` | `{"event_type": "chinese_checkers_game::GameOverEvent", "winner": 1}` |
 
-## 4. Reglas Adicionales en `PROMPTS13.md`
-- Regla oficial de **Anti-Bloqueo en punta de meta (Home-Camp Spoiling Rule)**: victoria si las 10 casillas destino están ocupadas y al menos una ficha es del jugador propietario de esa meta.
-- Registro de `ChineseCheckersLegalMoveGenerator` en `RuleEngine` y `ResignCommand`.
-
-## 5. Ejemplo de Partida Mínima
-1. **Inicio**: Estrella de 121 casillas inicializada con 10 canicas por jugador en puntas opuestas.
-2. **Movimiento 1**: Jugador 1 avanza una canica desde `(-5, 1)` a `(-4, 1)`.
-3. **Movimiento 2**: Jugador 2 avanza una canica desde `(5, -1)` a `(4, -1)`.
-4. **Movimiento 3**: Jugador 1 realiza un salto encadenado sobre dos canicas intermedias especificando `path`.
-5. **Fin**: Al completar las 10 casillas del triángulo opuesto se emite `GameOverEvent`.
+## 4. Flujo de Partida de Referencia
+1. **Inicio**: `new_chinese_checkers_session(SessionId(1), seed, vec![PlayerId(1), PlayerId(2)])` coloca 10 canicas en las puntas norte y sur de la estrella de 121 casillas.
+2. **Despliegue**: Jugador 1 avanza una canica un paso adyacente (`was_jump: false`).
+3. **Escalera de Saltos**: Jugador 1 encadena múltiples saltos sobre fichas propias y rivales usando `MovePegCommand` (`was_jump: true`).
+4. **Fin**: Al completar las 10 casillas del triángulo objetivo opuesto se emite `GameOverEvent`.
