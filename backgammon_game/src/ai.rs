@@ -219,7 +219,6 @@ pub fn backgammon_ai_pick_move(session: &Session, player: PlayerId) -> Option<Mo
     }
 }
 
-
 /// Calcula el pip count (distancia total restante para sacar todas las fichas) de un jugador.
 pub fn calculate_pip_count(board: &BoardResource, sides: &Sides, player: PlayerId) -> u32 {
     let owner_sign = sides.owner_sign(player);
@@ -264,7 +263,12 @@ pub fn should_offer_double(session: &Session, player: PlayerId) -> bool {
     }
     let pending = session.world().get_resource::<PendingDiceResource>();
     if pending
-        .map(|p| p.pending.get(&player).map(|d| !d.is_empty()).unwrap_or(false))
+        .map(|p| {
+            p.pending
+                .get(&player)
+                .map(|d| !d.is_empty())
+                .unwrap_or(false)
+        })
         .unwrap_or(false)
     {
         return false;
@@ -368,12 +372,19 @@ pub fn best_move(
     // 1. Si el rival propuso doblar al jugador, responder
     if let Some(cube) = session.world().get_resource::<DoublingCubeResource>() {
         if cube.offered {
-            let opp = session.world().get_resource::<Sides>().map(|s| s.opponent_of(player));
+            let opp = session
+                .world()
+                .get_resource::<Sides>()
+                .map(|s| s.opponent_of(player));
             if cube.offered_by == opp {
                 if should_accept_double(session, player) {
-                    return Some(BackgammonCommand::AcceptDouble(AcceptDoubleCommand { player }));
+                    return Some(BackgammonCommand::AcceptDouble(AcceptDoubleCommand {
+                        player,
+                    }));
                 } else {
-                    return Some(BackgammonCommand::RejectDouble(RejectDoubleCommand { player }));
+                    return Some(BackgammonCommand::RejectDouble(RejectDoubleCommand {
+                        player,
+                    }));
                 }
             }
         }
@@ -392,7 +403,9 @@ pub fn best_move(
 
     if !has_pending {
         if difficulty != AiDifficulty::Easy && should_offer_double(session, player) {
-            return Some(BackgammonCommand::OfferDouble(OfferDoubleCommand { player }));
+            return Some(BackgammonCommand::OfferDouble(OfferDoubleCommand {
+                player,
+            }));
         }
         return Some(BackgammonCommand::RollDice(RollDiceCommand { player }));
     }

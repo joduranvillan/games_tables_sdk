@@ -284,10 +284,9 @@ mod tests {
             state.active_color = CardColor::Red;
             state.discard_pile = vec![Card::new(CardColor::Red, CardValue::Number(5))];
             // P1 tiene exactamente 1 carta y no ha cantado UNO
-            state.hands.insert(
-                P1,
-                vec![Card::new(CardColor::Red, CardValue::Number(2))],
-            );
+            state
+                .hands
+                .insert(P1, vec![Card::new(CardColor::Red, CardValue::Number(2))]);
             state.uno_called.clear();
         }
 

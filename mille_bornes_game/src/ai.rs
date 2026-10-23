@@ -175,7 +175,11 @@ pub fn best_move(
         (Some(Hazard::FlatTire), Card::Safety(Safety::PunctureProof)) => true,
         (Some(Hazard::OutOfGas), Card::Safety(Safety::ExtraTank)) => true,
         (Some(Hazard::Accident), Card::Safety(Safety::DrivingAce)) => true,
-        _ if is_speed_limited && matches!(card, Card::Safety(Safety::RightOfWay) | Card::RightOfWay) => true,
+        _ if is_speed_limited
+            && matches!(card, Card::Safety(Safety::RightOfWay) | Card::RightOfWay) =>
+        {
+            true
+        }
         _ => false,
     });
 
@@ -363,11 +367,7 @@ mod tests {
                 let mut deck = session.world_mut().resource_mut::<DeckResource>();
                 deck.hands.insert(
                     P1,
-                    vec![
-                        Card::Distance(200),
-                        Card::Remedy(hazard),
-                        safety_card,
-                    ],
+                    vec![Card::Distance(200), Card::Remedy(hazard), safety_card],
                 );
             }
 

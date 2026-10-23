@@ -46,7 +46,11 @@ fn canonical_casas_hoteles_e_hipotecas() {
     }
 
     assert_eq!(
-        session.world().resource::<BuildingsResource>().buildings.get(&1),
+        session
+            .world()
+            .resource::<BuildingsResource>()
+            .buildings
+            .get(&1),
         Some(&5)
     );
 

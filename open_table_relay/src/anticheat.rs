@@ -654,8 +654,7 @@ fn parse_monopoly_command(val: &Value, default_player: PlayerId) -> Option<Box<d
             .ok()
             .map(|c| Box::new(c) as Box<dyn Command>);
     }
-    if action == "use_jail_card"
-        || val.get("use_jail_card").and_then(|v| v.as_bool()) == Some(true)
+    if action == "use_jail_card" || val.get("use_jail_card").and_then(|v| v.as_bool()) == Some(true)
     {
         return Some(Box::new(monopoly_game::UseJailCardCommand {
             player: default_player,

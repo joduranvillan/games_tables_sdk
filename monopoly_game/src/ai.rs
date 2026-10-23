@@ -14,14 +14,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::board::{Space, SpaceKind};
 use crate::commands::{
-    AuctionBidCommand, BuildHouseCommand, BuyPropertyCommand, PayJailFeeCommand,
-    RollAndMoveCommand,
+    AuctionBidCommand, BuildHouseCommand, BuyPropertyCommand, PayJailFeeCommand, RollAndMoveCommand,
 };
-use crate::rules::house_cost_for_space;
 use crate::resources::{
     AuctionResource, BoardResource, BuildingsResource, JailResource, PendingPurchaseResource,
     PlayersResource,
 };
+use crate::rules::house_cost_for_space;
 
 /// Estado de partida de Monopoly.
 pub type MonopolyState = Session;
@@ -197,7 +196,9 @@ pub fn best_move(
     if difficulty != AiDifficulty::Easy && cash > 400 {
         let buildings_res = state.world().get_resource::<BuildingsResource>();
         let empty_buildings = std::collections::HashMap::new();
-        let buildings_map = buildings_res.map(|b| &b.buildings).unwrap_or(&empty_buildings);
+        let buildings_map = buildings_res
+            .map(|b| &b.buildings)
+            .unwrap_or(&empty_buildings);
 
         for (space_idx, space) in board.spaces.iter().enumerate() {
             if let SpaceKind::Property { group, .. } = space {

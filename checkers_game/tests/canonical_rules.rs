@@ -56,7 +56,9 @@ fn canonical_victoria_por_bloqueo_sin_movimientos_legales() {
     let game_over = events
         .iter()
         .find_map(|e| e.as_any().downcast_ref::<GameOverEvent>())
-        .expect("debe emitirse GameOverEvent cuando el rival queda bloqueado sin movimientos legales");
+        .expect(
+            "debe emitirse GameOverEvent cuando el rival queda bloqueado sin movimientos legales",
+        );
 
     assert_eq!(game_over.winner, P1);
     assert!(!game_over.is_draw);
@@ -127,7 +129,9 @@ fn canonical_tablas_por_40_turnos_sin_captura_ni_coronacion() {
             let go = ev2
                 .iter()
                 .find_map(|e| e.as_any().downcast_ref::<GameOverEvent>())
-                .expect("al llegar a 80 medios turnos (40 turnos completos) debe declararse tablas");
+                .expect(
+                    "al llegar a 80 medios turnos (40 turnos completos) debe declararse tablas",
+                );
             assert!(go.is_draw);
         }
     }

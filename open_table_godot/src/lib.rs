@@ -4100,11 +4100,13 @@ impl OpenTableBridge {
                                         if backgammon_game::should_accept_double(session, *ai_p) {
                                             Box::new(backgammon_game::AcceptDoubleCommand {
                                                 player: *ai_p,
-                                            }) as Box<dyn Command>
+                                            })
+                                                as Box<dyn Command>
                                         } else {
                                             Box::new(backgammon_game::RejectDoubleCommand {
                                                 player: *ai_p,
-                                            }) as Box<dyn Command>
+                                            })
+                                                as Box<dyn Command>
                                         }
                                     });
                                 if let Some(resp) = cube_response {
@@ -4122,11 +4124,13 @@ impl OpenTableBridge {
                                         {
                                             Some(Box::new(backgammon_game::OfferDoubleCommand {
                                                 player: *ai_p,
-                                            }) as Box<dyn Command>)
+                                            })
+                                                as Box<dyn Command>)
                                         } else {
                                             Some(Box::new(backgammon_game::RollDiceCommand {
                                                 player: *ai_p,
-                                            }) as Box<dyn Command>)
+                                            })
+                                                as Box<dyn Command>)
                                         }
                                     } else {
                                         backgammon_game::backgammon_ai_pick_move(session, *ai_p)

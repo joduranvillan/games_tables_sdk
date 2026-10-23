@@ -51,7 +51,10 @@ fn canonical_enroque_en_passant_y_tablas_50_movimientos() {
             }),
         )
         .expect("enroque corto válido");
-    let moved = events[0].as_any().downcast_ref::<PieceMovedEvent>().unwrap();
+    let moved = events[0]
+        .as_any()
+        .downcast_ref::<PieceMovedEvent>()
+        .unwrap();
     assert!(moved.castled);
 
     // Regla de 50 movimientos (100 medios turnos)
