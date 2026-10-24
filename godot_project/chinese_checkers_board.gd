@@ -290,8 +290,8 @@ func _get_peg_symbol(p_id: int) -> String:
 		_: return "●"
 
 func _update_peg_visuals() -> void:
-	var slot_color = current_theme.dark_color if current_theme else Color(0.3, 0.25, 0.2, 0.6)
-	var slot_rim = current_theme.line_color if current_theme else Color(0.6, 0.5, 0.4, 0.8)
+	var slot_color = current_theme.dark_color if current_theme else Color(0.24, 0.18, 0.14, 0.78)
+	var slot_rim = current_theme.line_color if current_theme else Color(0.55, 0.45, 0.35, 0.85)
 
 	for pos in board_pegs.keys():
 		var btn = peg_buttons.get(pos)
@@ -304,18 +304,29 @@ func _update_peg_visuals() -> void:
 
 		for x in range(30):
 			for y in range(30):
-				var dist = Vector2(x - 15, y - 15).length()
+				var v = Vector2(x - 15.0, y - 15.0)
+				var dist = v.length()
 				if p_id > 0:
-					if dist <= 11:
-						img.set_pixel(x, y, p_color)
-					elif dist <= 13:
-						img.set_pixel(x, y, Color.BLACK)
+					if dist <= 11.5:
+						var light_dist = Vector2(x - 11.0, y - 10.5).length() / 13.0
+						var shade = clampf(1.22 - light_dist * 0.55, 0.62, 1.25)
+						var c = Color(
+							clampf(p_color.r * shade, 0.0, 1.0),
+							clampf(p_color.g * shade, 0.0, 1.0),
+							clampf(p_color.b * shade, 0.0, 1.0),
+							1.0
+						)
+						if Vector2(x - 11.0, y - 10.0).length() <= 3.2:
+							c = c.lerp(Color(1.0, 1.0, 1.0, 1.0), 0.55)
+						img.set_pixel(x, y, c)
+					elif dist <= 13.2:
+						img.set_pixel(x, y, Color(0.08, 0.08, 0.10, 0.92))
 					else:
 						img.set_pixel(x, y, Color(0, 0, 0, 0))
 				else:
-					if dist <= 7:
+					if dist <= 6.8:
 						img.set_pixel(x, y, slot_color)
-					elif dist <= 9:
+					elif dist <= 8.6:
 						img.set_pixel(x, y, slot_rim)
 					else:
 						img.set_pixel(x, y, Color(0, 0, 0, 0))

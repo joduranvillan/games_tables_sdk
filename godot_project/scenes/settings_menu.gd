@@ -1,3 +1,4 @@
+class_name SettingsMenu
 extends Control
 
 signal settings_saved()

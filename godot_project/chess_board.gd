@@ -449,10 +449,29 @@ func _init_board_state() -> void:
 		_create_piece_sprite(6, c, P1, "Pawn")
 		_create_piece_sprite(7, c, P1, backline[c])
 
+var _piece_texture_cache: Dictionary = {}
+
 func _get_piece_texture_path(kind: String, player: int) -> String:
 	var color_prefix = "white" if player == P1 else "black"
 	var type_name = kind.to_lower()
 	return "res://assets/chess/" + color_prefix + "_" + type_name + ".png"
+
+func _load_piece_texture_safe(tex_path: String) -> Texture2D:
+	if _piece_texture_cache.has(tex_path):
+		return _piece_texture_cache[tex_path]
+	if ResourceLoader.exists(tex_path + ".import"):
+		var imported = load(tex_path) as Texture2D
+		if imported != null:
+			_piece_texture_cache[tex_path] = imported
+			return imported
+	var abs_path := ProjectSettings.globalize_path(tex_path)
+	if FileAccess.file_exists(abs_path):
+		var img := Image.load_from_file(abs_path)
+		if img != null and not img.is_empty():
+			var tex := ImageTexture.create_from_image(img)
+			_piece_texture_cache[tex_path] = tex
+			return tex
+	return null
 
 func _create_piece_sprite(row: int, col: int, player: int, kind: String) -> Node2D:
 	var piece_node = Node2D.new()
@@ -461,37 +480,38 @@ func _create_piece_sprite(row: int, col: int, player: int, kind: String) -> Node
 	var created_texture = false
 	if use_texture_pieces:
 		var tex_path = _get_piece_texture_path(kind, player)
-		if ResourceLoader.exists(tex_path):
-			var tex = load(tex_path) as Texture2D
-			if tex != null:
-				var sprite = Sprite2D.new()
-				sprite.texture = tex
-				var tex_size = tex.get_size()
-				if tex_size.x > 0 and tex_size.y > 0:
-					var scale_factor = (CELL_SIZE * 0.75) / max(tex_size.x, tex_size.y)
-					sprite.scale = Vector2(scale_factor, scale_factor)
-				piece_node.add_child(sprite)
-				created_texture = true
+		var tex = _load_piece_texture_safe(tex_path)
+		if tex != null:
+			var sprite = Sprite2D.new()
+			sprite.texture = tex
+			var tex_size = tex.get_size()
+			if tex_size.x > 0 and tex_size.y > 0:
+				var scale_factor = (CELL_SIZE * 0.82) / max(tex_size.x, tex_size.y)
+				sprite.scale = Vector2(scale_factor, scale_factor)
+			piece_node.add_child(sprite)
+			created_texture = true
 
 	if not created_texture and fallback_to_unicode:
-		var shadow_label = Label.new()
-		shadow_label.text = _get_piece_symbol(kind, player)
-		shadow_label.add_theme_font_size_override("font_size", 42)
-		shadow_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		shadow_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		shadow_label.size = Vector2(CELL_SIZE, CELL_SIZE)
-		shadow_label.position = -Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0) + Vector2(2, 2)
-		shadow_label.add_theme_color_override("font_color", Color(0, 0, 0, 0.4))
-		piece_node.add_child(shadow_label)
+		var badge := Node2D.new()
+		var is_white := (player == P1)
+		var disc_fill := Color(0.98, 0.95, 0.88) if is_white else Color(0.14, 0.16, 0.21)
+		var disc_rim := Color(0.22, 0.18, 0.14) if is_white else Color(0.85, 0.78, 0.58)
+		badge.draw.connect(func():
+			badge.draw_circle(Vector2(2, 3), CELL_SIZE * 0.36, Color(0, 0, 0, 0.35))
+			badge.draw_circle(Vector2.ZERO, CELL_SIZE * 0.36, disc_fill)
+			badge.draw_arc(Vector2.ZERO, CELL_SIZE * 0.36, 0.0, TAU, 36, disc_rim, 2.5)
+			badge.draw_arc(Vector2.ZERO, CELL_SIZE * 0.30, 0.0, TAU, 36, Color(disc_rim.r, disc_rim.g, disc_rim.b, 0.45), 1.2)
+		)
+		piece_node.add_child(badge)
 
 		var label = Label.new()
 		label.text = _get_piece_symbol(kind, player)
-		label.add_theme_font_size_override("font_size", 42)
+		label.add_theme_font_size_override("font_size", 40)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		label.size = Vector2(CELL_SIZE, CELL_SIZE)
 		label.position = -Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-		var text_color = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(player) - 1, 6)] as Color)
+		var text_color = Color(0.12, 0.12, 0.15) if is_white else Color(0.96, 0.93, 0.84)
 		label.add_theme_color_override("font_color", text_color)
 		piece_node.add_child(label)
 

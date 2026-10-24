@@ -1,4 +1,3 @@
-class_name LeaderboardScreen
 extends Control
 
 const GAMES := [

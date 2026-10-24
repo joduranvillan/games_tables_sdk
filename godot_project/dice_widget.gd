@@ -56,10 +56,11 @@ func _generate_dice_textures() -> void:
 				if x < 2 or x >= 46 or y < 2 or y >= 46:
 					img.set_pixel(x, y, Color(0.2, 0.2, 0.2, 1.0))
 				# Rounded corners
-				if (x < 4 and y < 4 and (x-4)*(x-4) + (y-4)*(y-4) > 16) or \
-				   (x >= 44 and y < 4 and (x-43)*(x-43) + (y-4)*(y-4) > 16) or \
-				   (x < 4 and y >= 44 and (x-4)*(x-4) + (y-43)*(y-43) > 16) or \
-				   (x >= 44 and y >= 44 and (x-43)*(x-43) + (y-43)*(y-43) > 16):
+				var c1 := x < 4 and y < 4 and (x - 4) * (x - 4) + (y - 4) * (y - 4) > 16
+				var c2 := x >= 44 and y < 4 and (x - 43) * (x - 43) + (y - 4) * (y - 4) > 16
+				var c3 := x < 4 and y >= 44 and (x - 4) * (x - 4) + (y - 43) * (y - 43) > 16
+				var c4 := x >= 44 and y >= 44 and (x - 43) * (x - 43) + (y - 43) * (y - 43) > 16
+				if c1 or c2 or c3 or c4:
 					img.set_pixel(x, y, Color(0, 0, 0, 0))
 
 		# Pips (dots)

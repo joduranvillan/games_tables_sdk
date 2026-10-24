@@ -308,6 +308,24 @@ func _init_board_state() -> void:
 func _is_promoted(kind: String) -> bool:
 	return kind.begins_with("Promoted") or kind == "Horse" or kind == "Dragon"
 
+func _get_western_abbr(kind: String) -> String:
+	match kind:
+		"King", "Jewel": return "K"
+		"Rook": return "R"
+		"Bishop": return "B"
+		"Gold": return "G"
+		"Silver": return "S"
+		"Knight": return "N"
+		"Lance": return "L"
+		"Pawn": return "P"
+		"Dragon": return "+R"
+		"Horse": return "+B"
+		"PromotedSilver": return "+S"
+		"PromotedKnight": return "+N"
+		"PromotedLance": return "+L"
+		"PromotedPawn": return "+P"
+		_: return ""
+
 func _create_pentagon_piece_node(player: int, kind: String) -> Control:
 	var w = CELL_SIZE - 6.0
 	var h = CELL_SIZE - 6.0
@@ -318,18 +336,27 @@ func _create_pentagon_piece_node(player: int, kind: String) -> Control:
 
 	# Pentagon points
 	var pts = PackedVector2Array()
+	var sh_pts = PackedVector2Array()
 	if player == P_SENTE: # Pointing UP
 		pts.append(Vector2(w * 0.5, 2.0))
-		pts.append(Vector2(w - 2.0, h * 0.35))
-		pts.append(Vector2(w - 4.0, h - 2.0))
-		pts.append(Vector2(4.0, h - 2.0))
-		pts.append(Vector2(2.0, h * 0.35))
+		pts.append(Vector2(w - 3.0, h * 0.32))
+		pts.append(Vector2(w - 5.0, h - 2.0))
+		pts.append(Vector2(5.0, h - 2.0))
+		pts.append(Vector2(3.0, h * 0.32))
 	else: # Pointing DOWN for Gote
 		pts.append(Vector2(w * 0.5, h - 2.0))
-		pts.append(Vector2(w - 2.0, h * 0.65))
-		pts.append(Vector2(w - 4.0, 2.0))
-		pts.append(Vector2(4.0, 2.0))
-		pts.append(Vector2(2.0, h * 0.65))
+		pts.append(Vector2(w - 3.0, h * 0.68))
+		pts.append(Vector2(w - 5.0, 2.0))
+		pts.append(Vector2(5.0, 2.0))
+		pts.append(Vector2(3.0, h * 0.68))
+
+	for pt in pts:
+		sh_pts.append(pt + Vector2(2.0, 3.0))
+
+	var shadow_poly = Polygon2D.new()
+	shadow_poly.polygon = sh_pts
+	shadow_poly.color = Color(0, 0, 0, 0.30)
+	piece_ctrl.add_child(shadow_poly)
 
 	var bg_poly = Polygon2D.new()
 	bg_poly.polygon = pts
@@ -345,15 +372,25 @@ func _create_pentagon_piece_node(player: int, kind: String) -> Control:
 
 	var kanji = Label.new()
 	kanji.text = KANJI_MAP.get(kind, "?")
-	kanji.add_theme_font_size_override("font_size", 30)
+	kanji.add_theme_font_size_override("font_size", 26)
 	kanji.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	kanji.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	kanji.size = Vector2(w, h)
+	kanji.size = Vector2(w, h - 10.0)
+	kanji.position = Vector2(0, 0 if player == P_SENTE else 6.0)
 
 	# Promoted pieces display RED text
-	var text_col = Color(0.85, 0.15, 0.15) if _is_promoted(kind) else Color(0.1, 0.1, 0.1)
+	var text_col = Color(0.82, 0.12, 0.12) if _is_promoted(kind) else Color(0.10, 0.08, 0.06)
 	kanji.add_theme_color_override("font_color", text_col)
 	piece_ctrl.add_child(kanji)
+
+	var abbr = Label.new()
+	abbr.text = _get_western_abbr(kind)
+	abbr.add_theme_font_size_override("font_size", 10)
+	abbr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	abbr.size = Vector2(w, 14.0)
+	abbr.position = Vector2(0, h - 15.0 if player == P_SENTE else 2.0)
+	abbr.add_theme_color_override("font_color", Color(text_col.r, text_col.g, text_col.b, 0.72))
+	piece_ctrl.add_child(abbr)
 
 	return piece_ctrl
 
@@ -643,6 +680,14 @@ func _on_move_rejected(reason: String) -> void:
 		get_node("/root/AudioManager").play_error_buzz()
 
 func _draw() -> void:
+	# Marco exterior del Shogiban y puntos estelares de zona de promoción (Hoshi)
+	var b_rect := Rect2(120, 20, BOARD_SIZE * CELL_SIZE, BOARD_SIZE * CELL_SIZE)
+	draw_rect(Rect2(116, 16, BOARD_SIZE * CELL_SIZE + 8, BOARD_SIZE * CELL_SIZE + 8), Color(0.28, 0.18, 0.10), false, 4.0)
+	draw_rect(b_rect, COL_LINE, false, 2.0)
+	for r_idx in [3, 6]:
+		for c_idx in [3, 6]:
+			draw_circle(Vector2(120 + c_idx * CELL_SIZE, 20 + r_idx * CELL_SIZE), 4.0, COL_LINE)
+
 	if selected_board_pos != null:
 		var rect = Rect2(120 + selected_board_pos.y * CELL_SIZE, 20 + selected_board_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
 		draw_rect(rect, COL_SELECT)

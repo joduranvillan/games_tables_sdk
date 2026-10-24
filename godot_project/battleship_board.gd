@@ -381,13 +381,20 @@ func _spawn_shot_animation(player: int, row: int, col: int, is_hit: bool) -> voi
 	var center_pos = btn.global_position + Vector2(btn.size.x / 2.0, btn.size.y / 2.0)
 	var local_pos = to_local(center_pos)
 
-	var explosion_tex_path = "res://assets/explosion.png"
-	if not ResourceLoader.exists(explosion_tex_path):
-		explosion_tex_path = "res://assets/icons/explosion.svg"
+	var explosion_tex: Texture2D = null
+	var explosion_tex_path := "res://assets/explosion.png"
+	if ResourceLoader.exists(explosion_tex_path + ".import"):
+		explosion_tex = load(explosion_tex_path) as Texture2D
+	else:
+		var abs_exp := ProjectSettings.globalize_path(explosion_tex_path)
+		if FileAccess.file_exists(abs_exp):
+			var img := Image.load_from_file(abs_exp)
+			if img != null and not img.is_empty():
+				explosion_tex = ImageTexture.create_from_image(img)
 
-	if ResourceLoader.exists(explosion_tex_path):
+	if explosion_tex != null:
 		var sprite = Sprite2D.new()
-		sprite.texture = load(explosion_tex_path)
+		sprite.texture = explosion_tex
 		sprite.position = local_pos
 		sprite.scale = Vector2(0.2, 0.2)
 		sprite.z_index = 20

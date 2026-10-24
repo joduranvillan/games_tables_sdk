@@ -172,9 +172,21 @@ func _setup_ui() -> void:
 	tutorial_btn.name = "GoTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
 	tutorial_btn.position = Vector2(360, BOARD_SIZE * CELL_SIZE + 48)
-	tutorial_btn.custom_minimum_size = Vector2(160, 32)
+	tutorial_btn.custom_minimum_size = Vector2(120, 32)
 	tutorial_btn.pressed.connect(start_go_tutorial)
 	add_child(tutorial_btn)
+
+	# Botón Pasar Turno (PassTurnCommand)
+	var pass_btn := Button.new()
+	pass_btn.name = "PassTurnButton"
+	pass_btn.text = "⏭️ Pasar"
+	pass_btn.position = Vector2(255, BOARD_SIZE * CELL_SIZE + 48)
+	pass_btn.custom_minimum_size = Vector2(95, 32)
+	pass_btn.pressed.connect(func():
+		if winner == -1 and bridge != null:
+			bridge.send_command_json(current, JSON.stringify({"command_type": "PassTurnCommand", "player": current}))
+	)
+	add_child(pass_btn)
 
 	export_toast_label = Label.new()
 	export_toast_label.name = "ExportToastLabel"
@@ -328,14 +340,24 @@ func _place_stone(row: int, col: int, player: int) -> void:
 	stone.scale = Vector2.ZERO
 	
 	var img = Image.create(64, 64, false, Image.FORMAT_RGBA8)
-	var col_color = COL_BLACK_STONE if player == P_BLACK else COL_WHITE_STONE
+	var is_black := (player == P_BLACK)
 	for x in range(64):
 		for y in range(64):
+			var shadow_dist = Vector2(x - 34, y - 35).length()
 			var dist = Vector2(x - 32, y - 32).length()
-			if dist <= 28:
-				img.set_pixel(x, y, col_color)
-			elif dist <= 30:
-				img.set_pixel(x, y, Color(0, 0, 0, 0.4))
+			if dist <= 28.0:
+				var light_dist = Vector2(x - 23, y - 22).length() / 36.0
+				var shade = clampf(1.0 - light_dist * 0.55, 0.35, 1.0)
+				if is_black:
+					var v = lerpf(0.08, 0.34, shade * shade)
+					img.set_pixel(x, y, Color(v, v, v + 0.02, 1.0))
+				else:
+					var v = lerpf(0.82, 0.99, shade)
+					img.set_pixel(x, y, Color(v, v - 0.01, v - 0.03, 1.0))
+			elif dist <= 29.5:
+				img.set_pixel(x, y, Color(0.08, 0.08, 0.10, 0.85))
+			elif shadow_dist <= 29.0:
+				img.set_pixel(x, y, Color(0, 0, 0, 0.28))
 			else:
 				img.set_pixel(x, y, Color(0, 0, 0, 0))
 				
@@ -498,10 +520,14 @@ func _draw() -> void:
 	var bg_col = current_theme.board_color if current_theme else COL_BOARD
 	var line_col = current_theme.line_color if current_theme else COL_LINE
 
-	# Draw wooden board background
+	# Draw wooden Goban board background with outer bevel border
 	var board_rect = Rect2(0, 0, BOARD_SIZE * CELL_SIZE, BOARD_SIZE * CELL_SIZE)
 	draw_rect(board_rect, bg_col)
+	draw_rect(board_rect, line_col.darkened(0.2), false, 4.0)
+	draw_rect(Rect2(CELL_SIZE / 2.0 - 2.0, CELL_SIZE / 2.0 - 2.0, (BOARD_SIZE - 1) * CELL_SIZE + 4.0, (BOARD_SIZE - 1) * CELL_SIZE + 4.0), line_col, false, 2.5)
 	
+	var font: Font = ThemeDB.fallback_font
+	var letters := ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T"]
 	# Draw grid lines intersecting at CELL_SIZE * (i + 0.5)
 	for i in range(BOARD_SIZE):
 		var start_h = Vector2(CELL_SIZE / 2.0, i * CELL_SIZE + CELL_SIZE / 2.0)
@@ -511,6 +537,9 @@ func _draw() -> void:
 		var start_v = Vector2(i * CELL_SIZE + CELL_SIZE / 2.0, CELL_SIZE / 2.0)
 		var end_v = Vector2(i * CELL_SIZE + CELL_SIZE / 2.0, (BOARD_SIZE - 0.5) * CELL_SIZE)
 		draw_line(start_v, end_v, line_col, 2.0)
+		if font != null and i < letters.size():
+			draw_string(font, Vector2(i * CELL_SIZE + CELL_SIZE / 2.0 - 5.0, 16.0), letters[i], HORIZONTAL_ALIGNMENT_CENTER, 12.0, 12, Color(line_col.r, line_col.g, line_col.b, 0.75))
+			draw_string(font, Vector2(6.0, i * CELL_SIZE + CELL_SIZE / 2.0 + 5.0), str(BOARD_SIZE - i), HORIZONTAL_ALIGNMENT_LEFT, 18.0, 12, Color(line_col.r, line_col.g, line_col.b, 0.75))
 		
 	# Star points (Hoshi) for Go board:
 	# 9 points on canonical intersections: 3-3, 3-7, 5-5 (indices 2, 4, 6) on 9x9; 3-3, 3-9, 3-15 (indices 3, 9, 15) on 19x19

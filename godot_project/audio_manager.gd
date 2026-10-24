@@ -54,7 +54,7 @@ func _load_sounds() -> void:
 	sfx_disconnect = _try_load("res://assets/audio/disconnect.wav")
 
 func _try_load(path: String) -> AudioStream:
-	if ResourceLoader.exists(path):
+	if ResourceLoader.exists(path + ".import"):
 		var res = load(path)
 		if res is AudioStream:
 			return res

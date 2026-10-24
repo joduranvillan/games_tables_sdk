@@ -1,3 +1,4 @@
+class_name ReplayViewer
 extends Control
 
 const PLAYBACK_SPEEDS: Array[float] = [1.0, 2.0, 4.0]
@@ -322,7 +323,8 @@ func _populate_move_list() -> void:
 	if move_list_vbox == null:
 		return
 	for child in move_list_vbox.get_children():
-		child.queue_free()
+		move_list_vbox.remove_child(child)
+		child.free()
 
 	for i in range(parsed_commands.size()):
 		var btn := Button.new()
@@ -335,7 +337,9 @@ func _populate_move_list() -> void:
 
 func _reload_board_scene() -> void:
 	if board_instance != null:
-		board_instance.queue_free()
+		if board_instance.get_parent() != null:
+			board_instance.get_parent().remove_child(board_instance)
+		board_instance.free()
 		board_instance = null
 
 	var scene_path = GAME_SCENES.get(game_type, "res://checkers_board.tscn")

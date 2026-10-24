@@ -27,12 +27,24 @@ class PieceSprite extends Node2D:
 	const COL_KING := Color(1.0, 0.85, 0.0)
 
 	func _draw() -> void:
-		draw_circle(Vector2(3, 4), cell_size * 0.36, Color(0, 0, 0, 0.35))
-		var pcolor: Color = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(owner_id) - 1, 6)] as Color)
-		draw_circle(Vector2.ZERO, cell_size * 0.38, pcolor)
-		draw_arc(Vector2.ZERO, cell_size * 0.38, 0.0, TAU, 32, Color(1, 1, 1, 0.6), 2.0)
+		# Sombra proyectada suave
+		draw_circle(Vector2(3, 4), cell_size * 0.38, Color(0, 0, 0, 0.42))
+		# Colores clásicos de Damas: Carmesí Rubí (P1) vs Ébano/Marfil Oscuro (P2)
+		var base_col: Color = Color(0.80, 0.16, 0.18) if owner_id == 1 else Color(0.16, 0.19, 0.25)
+		var rim_col: Color = Color(0.98, 0.78, 0.72, 0.85) if owner_id == 1 else Color(0.78, 0.84, 0.92, 0.85)
+		var inner_col: Color = base_col.lightened(0.14)
+		draw_circle(Vector2.ZERO, cell_size * 0.38, base_col)
+		draw_circle(Vector2(-2, -3), cell_size * 0.31, inner_col)
+		draw_circle(Vector2.ZERO, cell_size * 0.24, base_col.darkened(0.10))
+		draw_arc(Vector2.ZERO, cell_size * 0.38, 0.0, TAU, 40, rim_col, 2.4)
+		draw_arc(Vector2.ZERO, cell_size * 0.27, 0.0, TAU, 36, Color(rim_col.r, rim_col.g, rim_col.b, 0.55), 1.6)
+		draw_arc(Vector2.ZERO, cell_size * 0.33, PI * 1.1, PI * 1.75, 20, Color(1, 1, 1, 0.35), 2.0)
 		if king:
-			draw_circle(Vector2.ZERO, cell_size * 0.16, COL_KING)
+			draw_circle(Vector2.ZERO, cell_size * 0.17, COL_KING)
+			draw_arc(Vector2.ZERO, cell_size * 0.17, 0.0, TAU, 28, Color(0.55, 0.38, 0.02), 1.8)
+			var font: Font = ThemeDB.fallback_font
+			if font != null:
+				draw_string(font, Vector2(-cell_size * 0.14, cell_size * 0.07), "♛", HORIZONTAL_ALIGNMENT_CENTER, cell_size * 0.28, int(cell_size * 0.22), Color(0.28, 0.16, 0.0))
 
 var bridge                # OpenTableBridge (nodo nativo del GDExtension)
 var board: Array = []     # board[row][col] = null | {"owner": int, "king": bool}
@@ -583,26 +595,33 @@ func _draw() -> void:
 	var col_d = current_theme.dark_color if current_theme else COL_DARK
 	var col_sel = current_theme.select_color if current_theme else COL_SELECT
 
-	# Casillas
+	# Marco exterior de madera y casillas
+	draw_rect(Rect2(-4, -4, BOARD * CELL + 8, BOARD * CELL + 8), Color(0.22, 0.13, 0.07))
 	for row in BOARD:
 		for col in BOARD:
 			var dark: bool = (row + col) % 2 == 1
 			var color: Color = col_d if dark else col_l
-			draw_rect(Rect2(col * CELL, row * CELL, CELL, CELL), color)
+			var cell_rect := Rect2(col * CELL, row * CELL, CELL, CELL)
+			draw_rect(cell_rect, color)
+			if dark:
+				draw_rect(Rect2(col * CELL + 2, row * CELL + 2, CELL - 4, CELL - 4), color.darkened(0.08), false, 1.0)
+	draw_rect(Rect2(0, 0, BOARD * CELL, BOARD * CELL), Color(0.18, 0.10, 0.05), false, 3.0)
 
 	# Casilla seleccionada
 	if selected != null:
 		draw_rect(Rect2(selected.col * CELL, selected.row * CELL, CELL, CELL), col_sel)
+		draw_rect(Rect2(selected.col * CELL + 2, selected.row * CELL + 2, CELL - 4, CELL - 4), Color(1.0, 0.85, 0.15, 0.95), false, 3.0)
 
 	# Resaltar casilla de multicaptura obligatoria con borde dorado
 	if multi_capture_cell != null:
 		var mc_rect := Rect2(multi_capture_cell.col * CELL + 2.0, multi_capture_cell.row * CELL + 2.0, CELL - 4.0, CELL - 4.0)
 		draw_rect(mc_rect, Color(1.0, 0.84, 0.0, 0.95), false, 4.0)
 
-	# Resaltar movimientos válidos con círculos semitransparentes
+	# Resaltar movimientos válidos con anillos esmeralda
 	for move_pos in valid_moves:
 		var center = Vector2(move_pos.y * CELL + CELL / 2.0, move_pos.x * CELL + CELL / 2.0)
-		draw_circle(center, 20.0, Color(1.0, 1.0, 1.0, 0.5))
+		draw_circle(center, 18.0, Color(0.15, 0.88, 0.45, 0.45))
+		draw_arc(center, 18.0, 0.0, TAU, 28, Color(0.35, 1.0, 0.60, 0.90), 2.5)
 
 	# Cursor virtual de Gamepad / Steam Deck
 	if gamepad_cursor_active and gamepad_cursor.x >= 0 and gamepad_cursor.x < BOARD and gamepad_cursor.y >= 0 and gamepad_cursor.y < BOARD:

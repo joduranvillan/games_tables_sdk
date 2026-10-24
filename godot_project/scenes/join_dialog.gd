@@ -1,3 +1,4 @@
+class_name JoinDialog
 extends Control
 
 signal code_submitted(room_code: String)

@@ -797,7 +797,7 @@ func _on_join_code_pressed() -> void:
 			dialog.close()
 			dialog.queue_free()
 			var gm_ref = get_node_or_null("/root/GameManager") if is_inside_tree() else null
-		var active_id: String = String(gm_ref.active_game) if gm_ref != null and "active_game" in gm_ref and not String(gm_ref.active_game).is_empty() else "checkers"
+			var active_id: String = String(gm_ref.active_game) if gm_ref != null and "active_game" in gm_ref and not String(gm_ref.active_game).is_empty() else "checkers"
 			var scene_path := "res://%s_board.tscn" % active_id
 			if not ResourceLoader.exists(scene_path):
 				scene_path = "res://checkers_board.tscn"

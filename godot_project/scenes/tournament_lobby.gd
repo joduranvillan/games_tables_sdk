@@ -1,4 +1,3 @@
-class_name TournamentLobby
 extends Control
 
 const GAMES := [

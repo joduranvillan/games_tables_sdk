@@ -33,10 +33,16 @@ var checker_nodes = []
 
 # UI Controls
 var roll_btn: Button
+var double_btn: Button
+var cube_label: Label
+var double_modal: PanelContainer
 var dice_label: Label
 var dice_widget: DiceWidget
 var rules_popup: RulesPopup
 var mode_option_button: OptionButton
+var cube_value: int = 1
+var cube_owner: int = 0
+var cube_offered: bool = false
 
 var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
@@ -162,6 +168,64 @@ func _setup_ui() -> void:
 	dice_widget = DiceWidget.new()
 	dice_widget.position = Vector2(610, 360)
 	add_child(dice_widget)
+
+	# Doubling Cube Panel & Controls (Prompt 504)
+	cube_label = Label.new()
+	cube_label.name = "CubeLabel"
+	cube_label.position = Vector2(610, 420)
+	cube_label.size = Vector2(150, 26)
+	cube_label.text = "Cubo: ×1 (Centro)"
+	cube_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cube_label.add_theme_font_size_override("font_size", 14)
+	cube_label.add_theme_color_override("font_color", Color(0.98, 0.90, 0.60))
+	add_child(cube_label)
+
+	double_btn = Button.new()
+	double_btn.name = "OfferDoubleButton"
+	double_btn.position = Vector2(610, 450)
+	double_btn.custom_minimum_size = Vector2(150, 36)
+	double_btn.text = "🎲×2 Doblar Apuesta"
+	double_btn.add_theme_font_size_override("font_size", 13)
+	double_btn.pressed.connect(func():
+		if winner == -1 and bridge != null:
+			bridge.send_command_json(current, JSON.stringify({"command_type": "OfferDoubleCommand", "player": current}))
+	)
+	add_child(double_btn)
+
+	double_modal = PanelContainer.new()
+	double_modal.name = "DoubleOfferModal"
+	double_modal.position = Vector2(180, 210)
+	double_modal.custom_minimum_size = Vector2(300, 120)
+	double_modal.visible = false
+	var dm_vbox := VBoxContainer.new()
+	dm_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	var dm_lbl := Label.new()
+	dm_lbl.text = "¡El rival ofrece doblar la apuesta!"
+	dm_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dm_vbox.add_child(dm_lbl)
+	var dm_hbox := HBoxContainer.new()
+	dm_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	var btn_acc := Button.new()
+	btn_acc.name = "AcceptDoubleButton"
+	btn_acc.text = "✅ Aceptar Doblaje"
+	btn_acc.pressed.connect(func():
+		double_modal.visible = false
+		var resp_p := P2 if current == P1 else P1
+		bridge.send_command_json(resp_p, JSON.stringify({"command_type": "AcceptDoubleCommand", "player": resp_p}))
+	)
+	dm_hbox.add_child(btn_acc)
+	var btn_rej := Button.new()
+	btn_rej.name = "RejectDoubleButton"
+	btn_rej.text = "🏳️ Rechazar"
+	btn_rej.pressed.connect(func():
+		double_modal.visible = false
+		var resp_p := P2 if current == P1 else P1
+		bridge.send_command_json(resp_p, JSON.stringify({"command_type": "RejectDoubleCommand", "player": resp_p}))
+	)
+	dm_hbox.add_child(btn_rej)
+	dm_vbox.add_child(dm_hbox)
+	double_modal.add_child(dm_vbox)
+	add_child(double_modal)
 
 	# Rules Button
 	var rules_btn = Button.new()
@@ -347,10 +411,13 @@ func _create_checker_button(owner: int, badge_text: String = "") -> Control:
 	for x in range(30):
 		for y in range(30):
 			var dist = Vector2(x - 15, y - 15).length()
-			if dist <= 12:
-				img.set_pixel(x, y, col)
-			elif dist <= 14:
-				img.set_pixel(x, y, Color.BLACK)
+			if dist <= 12.5:
+				var ring = abs(dist - 8.5) < 1.1
+				var light = clampf(1.0 - Vector2(x - 11, y - 10).length() / 18.0, 0.65, 1.2)
+				var pixel_col = col.lightened(0.28) if ring else Color(col.r * light, col.g * light, col.b * light, 1.0)
+				img.set_pixel(x, y, pixel_col)
+			elif dist <= 14.2:
+				img.set_pixel(x, y, Color(0.92, 0.84, 0.65, 0.95) if owner == P2 else Color(0.25, 0.08, 0.06, 0.95))
 			else:
 				img.set_pixel(x, y, Color(0, 0, 0, 0))
 				
@@ -380,14 +447,13 @@ func _animate_arc_movement(owner: int, start_pos: Vector2, end_pos: Vector2) -> 
 		get_node("/root/AudioManager").play_piece_place()
 
 	var tween = create_tween()
-	# Curved arc control point
 	var duration = 0.35
-	tween.tween_method(func(t: float):
+	var arc_step := func(t: float) -> void:
 		if is_instance_valid(anim_checker):
 			var linear_pos = start_pos.lerp(end_pos, t)
-			var height_arc = sin(t * PI) * 90.0 # Curving upwards
+			var height_arc = sin(t * PI) * 90.0
 			anim_checker.position = Vector2(linear_pos.x, linear_pos.y - height_arc)
-	, 0.0, 1.0, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_method(arc_step, 0.0, 1.0, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 	tween.finished.connect(func():
 		if is_instance_valid(anim_checker):
@@ -440,6 +506,21 @@ func _on_event_json(json_str: String) -> void:
 				dice_label.text = "Dados: %s" % str(rolled_dice)
 				
 				_animate_arc_movement(p, start_pos, end_pos)
+			elif event_type == "DoubleOfferedEvent":
+				cube_offered = true
+				var new_stakes := int(event.get("new_stakes", cube_value * 2))
+				if cube_label != null:
+					cube_label.text = "Cubo propuesto: ×%d" % new_stakes
+				if double_modal != null:
+					double_modal.visible = true
+			elif event_type == "DoubleAcceptedEvent":
+				cube_offered = false
+				cube_value = int(event.get("stakes", cube_value * 2))
+				cube_owner = int(event.get("owner", 0))
+				if cube_label != null:
+					cube_label.text = "Cubo: ×%d (J%d)" % [cube_value, cube_owner]
+				if double_modal != null:
+					double_modal.visible = false
 			elif event_type == "GameOverEvent":
 				var w = event.get("winner", -1)
 				if w == null: w = 0
@@ -488,7 +569,8 @@ func _draw() -> void:
 	draw_string(ThemeDB.fallback_font, Vector2(620, 110), "P1 (Rojo): %d/15" % borne_off_checkers[P1], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, PLAYER_COLORS[P1])
 	draw_string(ThemeDB.fallback_font, Vector2(620, 140), "P2 (Azul): %d/15" % borne_off_checkers[P2], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, PLAYER_COLORS[P2])
 	
-	# 24 Triangular Points with alternate colors
+	# 24 Triangular Points with alternate colors, borders, and point numbers
+	var font: Font = ThemeDB.fallback_font
 	for pt in range(TOTAL_POINTS):
 		var base_pos = _get_point_base_pos(pt)
 		var is_top = (pt >= 12)
@@ -498,11 +580,15 @@ func _draw() -> void:
 		var p2: Vector2 = base_pos + Vector2(18, 0)
 		var p3: Vector2
 		if is_top:
-			p3 = base_pos + Vector2(0, 200)
+			p3 = base_pos + Vector2(0, 195)
 		else:
-			p3 = base_pos + Vector2(0, -200)
+			p3 = base_pos + Vector2(0, -195)
 			
 		draw_colored_polygon(PackedVector2Array([p1, p2, p3]), tri_col)
+		draw_polyline(PackedVector2Array([p1, p3, p2]), Color(0.18, 0.12, 0.08, 0.55), 1.4)
+		if font != null:
+			var num_y := 52.0 if is_top else 514.0
+			draw_string(font, Vector2(base_pos.x - 10.0, num_y), str(pt + 1), HORIZONTAL_ALIGNMENT_CENTER, 20.0, 10, Color(0.92, 0.85, 0.72, 0.85))
 		
 	# Selected highlight
 	if selected_from >= 0:

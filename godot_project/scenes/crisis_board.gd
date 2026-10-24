@@ -1350,9 +1350,25 @@ func _on_event_json(json_str: String) -> void:
 	var parser = JSON.new()
 	if parser.parse(json_str) == OK:
 		var evt = parser.data
-		if evt is Dictionary and evt.has("command_type"):
-			if evt["command_type"] == "PhaseChangedEvent":
+		if evt is Dictionary:
+			var et = evt.get("event_type", evt.get("command_type", ""))
+			if "PhaseChangedEvent" in et:
 				current_phase = evt.get("new_phase", current_phase)
+			elif "TerritoryConqueredEvent" in et:
+				var p = int(evt.get("player", -1))
+				var card = evt.get("card_drawn", null)
+				if card != null and p != -1:
+					if not player_cards.has(p):
+						player_cards[p] = []
+					player_cards[p].append(card)
+					_render_cards_deck()
+					if action_info_label:
+						var t_id = int(card.get("territory", 0))
+						var t_name = TERRITORY_NAMES[t_id] if t_id >= 0 and t_id < TERRITORY_NAMES.size() else "Territorio %d" % t_id
+						action_info_label.text = "🃏 ¡Conquista exitosa! Tarjeta obtenida: %s" % t_name
+				_sync_all_from_bridge()
+			elif "CardsExchangedEvent" in et:
+				_sync_all_from_bridge()
 	_update_ui_state()
 
 # -------------------------------------------------------------------------
