@@ -3003,9 +3003,10 @@ impl OpenTableBridge {
                         hand_arr.push(&Variant::from(format_card(card)));
                     }
                 }
-                dict.set("hand", hand_arr);
+                dict.set("hand", &hand_arr);
                 if let Some(top) = state.discard_pile.last() {
-                    dict.set("top_card", format_card(top));
+                    let top_dict = format_card(top);
+                    dict.set("top_card", &top_dict);
                 }
                 dict.set("active_color", format_color(state.active_color));
                 dict.set("deck_count", state.deck.len() as i64);
