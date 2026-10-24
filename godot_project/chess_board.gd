@@ -207,6 +207,7 @@ func _setup_ui() -> void:
 	drag_layer.piece_drag_started.connect(_on_drag_started)
 	drag_layer.piece_dropped.connect(_on_piece_dropped)
 	add_child(drag_layer)
+	drag_layer.set_process_unhandled_input(false)
 	
 	# Turn Indicator Widget
 	turn_indicator = TurnIndicator.new()
@@ -309,6 +310,8 @@ func _on_mode_selected(index: int) -> void:
 	selected_pos = null
 	valid_moves.clear()
 	winner = -1
+	animating = false
+	active_animations = 0
 	_init_board_state()
 
 	if bridge != null:
@@ -607,7 +610,6 @@ func _gui_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseMotion:
 		_handle_mouse_hover(event.position)
-	_handle_unified_input(event)
 
 func _input(event: InputEvent) -> void:
 	_handle_gamepad_input(event)
@@ -798,6 +800,18 @@ func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promo
 			r_tw.tween_property(rook_sprite, "position", rook_pos, 0.22)
 	
 	var target_pos = Vector2(to_c * CELL_SIZE + CELL_SIZE / 2.0, to_r * CELL_SIZE + CELL_SIZE / 2.0)
+	if not is_inside_tree():
+		piece.position = target_pos
+		if is_promotion and is_instance_valid(piece):
+			piece.queue_free()
+			piece_sprites[to_r][to_c] = null
+			_create_piece_sprite(to_r, to_c, piece_player, promoted_kind)
+		active_animations = max(0, active_animations - 1)
+		if active_animations <= 0:
+			animating = false
+			animation_finished.emit()
+		return
+
 	var tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_property(piece, "position", target_pos, 0.22)
 

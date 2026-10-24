@@ -355,9 +355,13 @@ func _ready() -> void:
 		var human_p = gm.get_human_player_id() if gm.has_method("get_human_player_id") else 1
 		var ai_p = 2 if human_p == 1 else 1
 		var diff = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
-		bridge.start_local_match_crisis_vs_ai(42, human_p, ai_p, diff)
+		bridge.start_local_match_crisis_vs_ai(human_p, ai_p, diff)
+		if mode_option_button != null:
+			mode_option_button.selected = 1 if human_p == 1 else 2
 	else:
 		bridge.start_local_match_crisis(42, [1, 2])
+		if mode_option_button != null:
+			mode_option_button.selected = 0
 	current_player_id = bridge.current_player()
 
 	_sync_all_from_bridge()
@@ -394,7 +398,7 @@ func _on_mode_selected(index: int) -> void:
 			gm.set_game_mode("vs_ai")
 		if gm != null and gm.has_method("set_human_player_id"):
 			gm.set_human_player_id(human_p)
-		bridge.start_local_match_crisis_vs_ai(42, human_p, ai_p, diff)
+		bridge.start_local_match_crisis_vs_ai(human_p, ai_p, diff)
 	current_player_id = bridge.current_player()
 	_sync_all_from_bridge()
 	_update_ui_state()

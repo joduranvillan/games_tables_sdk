@@ -49,6 +49,8 @@ var hand_p1 = ["Distance 25", "Distance 50", "Distance 75", "Distance 100", "Luz
 var speed_limit = {P1: false, P2: false}
 var deck_count: int = 44
 var discard_pile: Array = []
+var local_player: int = P1
+var is_vs_ai: bool = false
 
 # UI Nodes
 var main_vbox: VBoxContainer
@@ -123,14 +125,15 @@ func _ready() -> void:
 		var human_p = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P1
 		var ai_p = P2 if human_p == P1 else P1
 		var diff = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
+		is_vs_ai = true
+		local_player = human_p
 		bridge.start_local_match_mille_bornes_vs_ai(human_p, ai_p, diff)
-		bridge.send_command_json(P1, JSON.stringify({"command_type": "SetupDeckCommand"}))
-		if ai_p == P1 and bridge.has_method("trigger_ai_turn"):
-			bridge.trigger_ai_turn()
 	else:
+		is_vs_ai = false
+		local_player = P1
 		bridge.start_local_match_mille_bornes(P1, P2)
-		bridge.send_command_json(P1, JSON.stringify({"command_type": "SetupDeckCommand"}))
 	current = bridge.current_player()
+	_sync_hand_from_bridge()
 
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_hand_ui()
@@ -158,8 +161,9 @@ func _on_mode_selected(index: int) -> void:
 	if index == 0:
 		if gm != null and gm.has_method("set_game_mode"):
 			gm.set_game_mode("local")
+		is_vs_ai = false
+		local_player = P1
 		bridge.start_local_match_mille_bornes(P1, P2)
-		bridge.send_command_json(P1, JSON.stringify({"command_type": "SetupDeckCommand"}))
 	else:
 		var human_p = P1 if index == 1 else P2
 		var ai_p = P2 if human_p == P1 else P1
@@ -168,14 +172,23 @@ func _on_mode_selected(index: int) -> void:
 			gm.set_game_mode("vs_ai")
 		if gm != null and gm.has_method("set_human_player_id"):
 			gm.set_human_player_id(human_p)
+		is_vs_ai = true
+		local_player = human_p
 		bridge.start_local_match_mille_bornes_vs_ai(human_p, ai_p, diff)
-		bridge.send_command_json(P1, JSON.stringify({"command_type": "SetupDeckCommand"}))
-		if ai_p == P1 and bridge.has_method("trigger_ai_turn"):
-			bridge.trigger_ai_turn()
 	current = bridge.current_player()
+	_sync_hand_from_bridge()
 	_update_hand_ui()
 	_update_tableaus()
 	_update_status()
+
+func _sync_hand_from_bridge() -> void:
+	if bridge != null and bridge.has_method("get_mille_bornes_hand"):
+		var target_p: int = local_player if is_vs_ai else current
+		var raw_hand = bridge.get_mille_bornes_hand(target_p)
+		if raw_hand is Array and raw_hand.size() > 0:
+			hand_p1.clear()
+			for c in raw_hand:
+				hand_p1.append(str(c))
 
 func _create_default_theme() -> void:
 	current_theme = BoardTheme.new()
@@ -573,7 +586,7 @@ func _update_hand_ui() -> void:
 # CARD PLAY ANIMATION (b) & EXECUTION
 # -------------------------------------------------------------------------
 func _on_card_clicked_with_animation(idx: int, card_panel: Control) -> void:
-	if winner != -1 or current != P1:
+	if winner != -1 or (is_vs_ai and current != local_player):
 		return
 
 	# Animación de salida: desplazar hacia el tablero superior y desvanecer
@@ -597,41 +610,30 @@ func _on_card_clicked_with_animation(idx: int, card_panel: Control) -> void:
 
 func _on_card_pressed(idx: int) -> void:
 	_sfx_card_flip()
-	if winner != -1 or current != P1:
+	if winner != -1 or (is_vs_ai and current != local_player):
 		return
 
+	var acting_p := current
 	if discard_mode.button_pressed:
-		var cmd = {
-			"command_type": "DiscardCardCommand",
-			"player": P1,
-			"card_index": idx
-		}
-		bridge.send_command_json(P1, JSON.stringify(cmd))
 		if idx < hand_p1.size():
 			discard_pile.append(hand_p1[idx])
-			hand_p1.remove_at(idx)
-		_update_hand_ui()
-		_update_tableaus()
+		var cmd = {
+			"command_type": "DiscardCardCommand",
+			"player": acting_p,
+			"card_index": idx
+		}
+		bridge.send_command_json(acting_p, JSON.stringify(cmd))
 	else:
 		var cmd = {
 			"command_type": "PlayCardCommand",
-			"player": P1,
+			"player": acting_p,
 			"card_index": idx
 		}
-		bridge.send_command_json(P1, JSON.stringify(cmd))
-		if idx < hand_p1.size():
-			var card = hand_p1[idx]
-			if "Distance" in card or "distancia" in card.to_lower() or card.to_lower().begins_with("25") or card.to_lower().begins_with("50") or card.to_lower().begins_with("75") or card.to_lower().begins_with("100") or card.to_lower().begins_with("200"):
-				var dist_val = 0
-				for part in card.split(" "):
-					if part.is_valid_int():
-						dist_val = int(part)
-						break
-				if dist_val > 0:
-					distance[P1] += dist_val
-			hand_p1.remove_at(idx)
-		_update_hand_ui()
-		_update_tableaus()
+		bridge.send_command_json(acting_p, JSON.stringify(cmd))
+
+	_sync_hand_from_bridge()
+	_update_hand_ui()
+	_update_tableaus()
 
 func _on_draw_pressed() -> void:
 	_sfx_card_flip()
@@ -835,10 +837,20 @@ func _on_event_json(json_str: String) -> void:
 				_on_game_over(int(w))
 
 	current = bridge.current_player()
+	_sync_hand_from_bridge()
+	_update_hand_ui()
+	_update_tableaus()
 	_update_status()
 
 func _on_turn_changed(player_id: int) -> void:
 	current = player_id
+	if winner == -1 and bridge != null and (not is_vs_ai or current == local_player):
+		_sync_hand_from_bridge()
+		if hand_p1.size() < 6 and deck_count > 0:
+			bridge.send_command_json(current, JSON.stringify({"command_type": "DrawCardCommand", "player": current}))
+			_sync_hand_from_bridge()
+	_update_hand_ui()
+	_update_tableaus()
 	_update_status()
 	if turn_indicator != null:
 		turn_indicator.current_player_id = player_id

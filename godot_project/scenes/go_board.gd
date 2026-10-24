@@ -181,6 +181,7 @@ func _setup_ui() -> void:
 	drag_layer.board_bounds = Vector2i(BOARD_SIZE, BOARD_SIZE)
 	drag_layer.cell_clicked.connect(_on_cell_clicked)
 	add_child(drag_layer)
+	drag_layer.set_process_unhandled_input(false)
 
 	# Turn Indicator Widget
 	turn_indicator = TurnIndicator.new()
@@ -196,7 +197,7 @@ func _setup_ui() -> void:
 	pass_btn.custom_minimum_size = Vector2(120, 36)
 	pass_btn.pressed.connect(func():
 		if winner == -1 and bridge != null:
-			bridge.send_command_json(current, JSON.stringify({"command_type": "PassTurnCommand", "player": current}))
+			bridge.send_command_json(current, JSON.stringify({"command_type": "go_game::PassCommand", "player": current}))
 	)
 	add_child(pass_btn)
 

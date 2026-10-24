@@ -18,6 +18,8 @@ var bridge
 var phase: Phase = Phase.PLACEMENT_P1
 var current: int = P1
 var winner: int = -1
+var is_vs_ai: bool = false
+var local_player: int = P1
 
 var p1_ships: Array = [] # Array of Arrays of Vector2i
 var p2_ships: Array = []
@@ -85,11 +87,15 @@ func _ready() -> void:
 		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P1
 		var ai_p: int = P2 if human_p == P1 else P1
 		var diff: int = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
+		is_vs_ai = true
+		local_player = human_p
 		bridge.start_local_match_battleship_vs_ai(human_p, ai_p, diff)
 		phase = Phase.PLACEMENT_P1 if human_p == P1 else Phase.PLACEMENT_P2
 		if mode_option_button != null:
 			mode_option_button.selected = 1 if human_p == P1 else 2
 	else:
+		is_vs_ai = false
+		local_player = P1
 		bridge.start_local_match_battleship(P1, P2)
 		if mode_option_button != null:
 			mode_option_button.selected = 0
@@ -278,12 +284,18 @@ func _on_mode_selected(index: int) -> void:
 	if bridge != null:
 		match index:
 			1:
+				is_vs_ai = true
+				local_player = P1
 				phase = Phase.PLACEMENT_P1
 				bridge.start_local_match_battleship_vs_ai(P1, P2, 1)
 			2:
+				is_vs_ai = true
+				local_player = P2
 				phase = Phase.PLACEMENT_P2
 				bridge.start_local_match_battleship_vs_ai(P2, P1, 1)
 			_:
+				is_vs_ai = false
+				local_player = P1
 				phase = Phase.PLACEMENT_P1
 				bridge.start_local_match_battleship(P1, P2)
 	current = bridge.current_player() if bridge else P1
@@ -490,7 +502,8 @@ func _spawn_shot_animation(player: int, row: int, col: int, is_hit: bool) -> voi
 		timer.timeout.connect(particles.queue_free)
 
 func _on_shot_result(player: int, row: int, col: int, is_hit: bool) -> void:
-	if player == current:
+	var my_player := local_player if is_vs_ai else P1
+	if player == my_player:
 		opp_shot_grid[row][col] = "hit" if is_hit else "miss"
 	else:
 		own_shot_grid[row][col] = "hit" if is_hit else "miss"
@@ -516,11 +529,15 @@ func _on_event_json(json_str: String) -> void:
 			var ev_type: String = raw_type.split("::")[-1]
 			if ev_type == "FleetPlacedEvent":
 				var player_id = int(event.get("player", 1))
-				if player_id == P1:
-					phase = Phase.PLACEMENT_P2
-					current_ship_index = 0
-				elif player_id == P2:
-					phase = Phase.FIRE
+				if is_vs_ai:
+					if player_id == local_player:
+						phase = Phase.FIRE
+				else:
+					if player_id == P1:
+						phase = Phase.PLACEMENT_P2
+						current_ship_index = 0
+					elif player_id == P2:
+						phase = Phase.FIRE
 			elif ev_type == "ShotResultEvent":
 				var target = event.get("target", {})
 				var r = int(target.get("row", 0))
@@ -528,7 +545,8 @@ func _on_event_json(json_str: String) -> void:
 				var res_str: String = event.get("result", "")
 				var is_hit = (res_str == "Hit" or res_str == "Sunk")
 				var shooting_player = int(event.get("player", event.get("shooter", current)))
-				if shooting_player == current:
+				var my_player := local_player if is_vs_ai else P1
+				if shooting_player == my_player:
 					opp_shot_grid[r][c] = "sunk" if res_str == "Sunk" else ("hit" if is_hit else "miss")
 				else:
 					own_shot_grid[r][c] = "sunk" if res_str == "Sunk" else ("hit" if is_hit else "miss")
@@ -631,7 +649,7 @@ func _update_status() -> void:
 		opp_vbox.modulate = Color(1.0, 1.0, 1.0, 1.0) if is_opp_active else Color(1.0, 1.0, 1.0, 0.6)
 
 func _update_grid_ui() -> void:
-	var active_ships = p1_ships if phase == Phase.PLACEMENT_P1 else p2_ships
+	var active_ships = p2_ships if (phase == Phase.PLACEMENT_P2 or (is_vs_ai and local_player == P2)) else p1_ships
 
 	# Update Own Grid UI
 	for r in BOARD_SIZE:

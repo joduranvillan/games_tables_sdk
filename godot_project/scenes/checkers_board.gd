@@ -158,6 +158,7 @@ func _setup_ui_layers() -> void:
 	drag_layer.piece_drag_started.connect(_on_drag_started)
 	drag_layer.piece_dropped.connect(_on_piece_dropped)
 	add_child(drag_layer)
+	drag_layer.set_process_unhandled_input(false)
 
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
@@ -434,8 +435,8 @@ var touch_start_cell: Vector2i = Vector2i(-1, -1)
 var is_touch_dragging: bool = false
 const DEAD_ZONE: float = 8.0
 
-func _gui_input(event: InputEvent) -> void:
-	_handle_unified_input(event)
+func _gui_input(_event: InputEvent) -> void:
+	pass
 
 func _input(event: InputEvent) -> void:
 	_handle_gamepad_input(event)
@@ -584,6 +585,7 @@ func _on_piece_moved(player: int, from_row: int, from_col: int, to_row: int, to_
 	if captured_row >= 0 and captured_col >= 0 and current == player:
 		multi_capture_cell = {"row": to_row, "col": to_col}
 		selected = {"row": to_row, "col": to_col}
+		valid_moves = _calculate_valid_moves(to_row, to_col)
 	else:
 		multi_capture_cell = null
 	_update_status()
@@ -604,6 +606,16 @@ func _on_piece_moved(player: int, from_row: int, from_col: int, to_row: int, to_
 			animating = false
 			animation_finished.emit()
 		)
+	else:
+		if moving_sprite != null and is_instance_valid(moving_sprite):
+			moving_sprite.position = Vector2(to_col * CELL + CELL / 2.0, to_row * CELL + CELL / 2.0)
+			if promoted:
+				moving_sprite.king = true
+				moving_sprite.queue_redraw()
+		if captured_sprite != null and is_instance_valid(captured_sprite):
+			captured_sprite.queue_free()
+		animating = false
+		animation_finished.emit()
 	else:
 		if moving_sprite != null and is_instance_valid(moving_sprite):
 			moving_sprite.position = Vector2(to_col * CELL + CELL / 2.0, to_row * CELL + CELL / 2.0)

@@ -733,9 +733,9 @@ func _launch_game(game: Dictionary, mode: String, difficulty_level: int = 1, hum
 					bridge.call(ai_method, 42, human_p, ai_p)
 			elif game["id"] == "go":
 				if bridge.has_method("start_local_match_go_vs_ai_ext"):
-					bridge.call(ai_method, human_p, ai_p, board_size, difficulty_level)
+					bridge.call("start_local_match_go_vs_ai_ext", human_p, ai_p, board_size, difficulty_level)
 				elif bridge.has_method(ai_method):
-					bridge.call(ai_method, human_p, ai_p, difficulty_level)
+					bridge.call(ai_method, human_p, ai_p, board_size)
 			elif game["id"] in ["shogi", "uno", "crisis", "chinese_checkers", "mille_bornes", "monopoly", "battleship"]:
 				if bridge.has_method(ai_method):
 					bridge.call(ai_method, human_p, ai_p, difficulty_level)

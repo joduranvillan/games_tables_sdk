@@ -89,6 +89,8 @@ const PLAYER_COLORS = {
 var bridge
 var current = P1
 var winner = -1
+var is_vs_ai: bool = false
+var local_player: int = P1
 
 # Game State
 var positions = {P1: 0, P2: 0}
@@ -203,8 +205,12 @@ func _ready() -> void:
 		var human_p = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P1
 		var ai_p = P2 if human_p == P1 else P1
 		var diff = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
+		is_vs_ai = true
+		local_player = human_p
 		bridge.start_local_match_monopoly_vs_ai(human_p, ai_p, diff)
 	else:
+		is_vs_ai = false
+		local_player = P1
 		bridge.start_local_match_monopoly(P1, P2)
 	current = bridge.current_player()
 
@@ -234,9 +240,15 @@ func _on_mode_selected(index: int) -> void:
 	property_owners.clear()
 	property_houses.clear()
 	jailed_players = {P1: 0, P2: 0}
+	if buy_modal != null:
+		buy_modal.visible = false
+	if auction_modal != null:
+		auction_modal.visible = false
 	if index == 0:
 		if gm != null and gm.has_method("set_game_mode"):
 			gm.set_game_mode("local")
+		is_vs_ai = false
+		local_player = P1
 		bridge.start_local_match_monopoly(P1, P2)
 	else:
 		var human_p = P1 if index == 1 else P2
@@ -246,6 +258,8 @@ func _on_mode_selected(index: int) -> void:
 			gm.set_game_mode("vs_ai")
 		if gm != null and gm.has_method("set_human_player_id"):
 			gm.set_human_player_id(human_p)
+		is_vs_ai = true
+		local_player = human_p
 		bridge.start_local_match_monopoly_vs_ai(human_p, ai_p, diff)
 	current = bridge.current_player()
 	_update_token_positions()
@@ -777,16 +791,22 @@ func _animate_player_move(p: int, target_space: int) -> void:
 	var offset = Vector2(-10, -10) if p == P1 else Vector2(10, 10)
 	var target_pos = base_pos + offset - Vector2(11, 11)
 
-	var tween = create_tween()
-	tween.tween_property(player_tokens[p], "position", target_pos, 0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tween.finished.connect(func(): _check_pending_purchase(p, target_space))
+	_check_pending_purchase(p, target_space)
+	if is_inside_tree():
+		var tween = create_tween()
+		tween.tween_property(player_tokens[p], "position", target_pos, 0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tween.finished.connect(func(): _check_pending_purchase(p, target_space))
+	else:
+		player_tokens[p].position = target_pos
 
 func _check_pending_purchase(p: int, space: int) -> void:
 	if space < 0 or space >= SPACES.size():
 		return
+	if is_vs_ai and p != local_player:
+		return
 	var prop = SPACES[space]
 	if prop["price"] > 0 and not property_owners.has(space):
-		if p == current:
+		if (is_vs_ai and p == local_player) or (not is_vs_ai and p == current):
 			pending_buy_space = space
 			buy_title_lbl.text = prop["name"]
 			buy_header_bar.color = GROUP_COLORS.get(prop["group"], Color.DARK_GRAY)
@@ -995,6 +1015,9 @@ func _on_event_json(json_str: String) -> void:
 				var pr = int(event.get("price", 0))
 				property_owners[sp] = p
 				money[p] -= pr
+				if pending_buy_space == sp:
+					pending_buy_space = -1
+					buy_modal.visible = false
 				card_event_label.text = "Jugador %d compró %s por $%d" % [p, SPACES[sp]["name"], pr]
 				_check_monopoly_houses(sp, p)
 

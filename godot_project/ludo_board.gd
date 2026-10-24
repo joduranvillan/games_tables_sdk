@@ -93,7 +93,9 @@ func _ready() -> void:
 		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else 1
 		var ai_p: int = 2 if human_p == 1 else 1
 		var diff: int = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
-		bridge.start_local_match_ludo_vs_ai(human_p, ai_p, diff)
+		if bridge.has_method("set_ai_difficulty"):
+			bridge.set_ai_difficulty(diff)
+		bridge.start_local_match_ludo_vs_ai(human_p, ai_p)
 		if mode_option_button != null:
 			mode_option_button.selected = 1 if human_p == 1 else 2
 	else:
@@ -279,11 +281,15 @@ func _on_mode_selected(index: int) -> void:
 	}
 	_update_token_positions()
 	if bridge != null:
+		var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+		var diff: int = gm.get_ai_difficulty() if (gm != null and gm.has_method("get_ai_difficulty")) else 1
+		if bridge.has_method("set_ai_difficulty"):
+			bridge.set_ai_difficulty(diff)
 		match index:
 			1:
-				bridge.start_local_match_ludo_vs_ai(1, 2, 1)
+				bridge.start_local_match_ludo_vs_ai(1, 2)
 			2:
-				bridge.start_local_match_ludo_vs_ai(2, 1, 1)
+				bridge.start_local_match_ludo_vs_ai(2, 1)
 			_:
 				bridge.start_local_match_ludo(1, 2)
 	current_p = bridge.current_player() if bridge else 1

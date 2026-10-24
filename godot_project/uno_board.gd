@@ -106,6 +106,7 @@ var _pause_menu: CanvasLayer
 
 # Local Player & Official UNO Rule State (Prompts 512, 513)
 var local_player: int = P1
+var is_vs_ai: bool = false
 var uno_called_players: Array = []
 var last_wild_draw_four_player: int = -1
 
@@ -161,12 +162,15 @@ func _ready() -> void:
 		var human_p = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P1
 		var ai_p = P2 if human_p == P1 else P1
 		var diff = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
+		is_vs_ai = true
 		local_player = human_p
 		bridge.start_local_match_uno_vs_ai(human_p, ai_p, diff)
 	else:
+		is_vs_ai = false
 		local_player = P1
 		bridge.start_local_match_uno(P1, P2)
 	current = bridge.current_player()
+	_sync_uno_state_from_bridge()
 
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_ui()
@@ -191,6 +195,7 @@ func _on_mode_selected(index: int) -> void:
 	if index == 0:
 		if gm != null and gm.has_method("set_game_mode"):
 			gm.set_game_mode("local")
+		is_vs_ai = false
 		local_player = P1
 		bridge.start_local_match_uno(P1, P2)
 	else:
@@ -201,9 +206,11 @@ func _on_mode_selected(index: int) -> void:
 			gm.set_game_mode("vs_ai")
 		if gm != null and gm.has_method("set_human_player_id"):
 			gm.set_human_player_id(human_p)
+		is_vs_ai = true
 		local_player = human_p
 		bridge.start_local_match_uno_vs_ai(human_p, ai_p, diff)
 	current = bridge.current_player()
+	_sync_uno_state_from_bridge()
 	_update_ui()
 	_update_status()
 
@@ -764,6 +771,32 @@ func _init_default_game_state() -> void:
 	opponent_card_count = 7
 	is_clockwise = true
 
+func _sync_uno_state_from_bridge() -> void:
+	if bridge == null or not bridge.has_method("get_uno_state"):
+		return
+	var target_p: int = local_player if is_vs_ai else current
+	var st = bridge.get_uno_state(target_p)
+	if not (st is Dictionary) or st.is_empty():
+		return
+	if st.has("hand") and st["hand"] is Array:
+		player_hand.clear()
+		for c in st["hand"]:
+			if c is Dictionary:
+				player_hand.append({"color": str(c.get("color", "Red")), "value": str(c.get("value", "0"))})
+	if st.has("top_card") and st["top_card"] is Dictionary:
+		var tc = st["top_card"]
+		var formatted_tc = {"color": str(tc.get("color", "Red")), "value": str(tc.get("value", "0"))}
+		if discard_pile.is_empty():
+			discard_pile.append(formatted_tc)
+		else:
+			discard_pile[discard_pile.size() - 1] = formatted_tc
+	if st.has("active_color"):
+		active_color = str(st["active_color"])
+	if st.has("deck_count"):
+		deck_count = int(st["deck_count"])
+	if st.has("opponent_card_count"):
+		opponent_card_count = int(st["opponent_card_count"])
+
 # -------------------------------------------------------------------------
 # CARD CREATION & RENDERING HELPER (a, b)
 # -------------------------------------------------------------------------
@@ -1231,62 +1264,49 @@ func _on_wild_color_chosen(chosen_col: String) -> void:
 	pending_wild_card_idx = -1
 
 func _execute_play_card(idx: int, start_pos: Vector2, chosen_col: String) -> void:
+	var played_card = player_hand[idx] if (idx >= 0 and idx < player_hand.size()) else null
+	var acting_p := current
 	var cmd = {
 		"command_type": "PlayCardCommand",
-		"player": current,
+		"player": acting_p,
 		"card_index": idx,
 		"chosen_color": chosen_col
 	}
-	bridge.send_command_json(current, JSON.stringify(cmd))
+	bridge.send_command_json(acting_p, JSON.stringify(cmd))
 
-	if idx >= 0 and idx < player_hand.size():
-		var played_card = player_hand[idx]
-		player_hand.remove_at(idx)
-		discard_pile.append(played_card)
-		active_color = chosen_col
-
+	if played_card != null:
 		var val_str = str(played_card.get("value", ""))
-		if val_str == "WildDrawFour":
-			last_wild_draw_four_player = current
-		else:
-			last_wild_draw_four_player = -1
-
 		var val_name = _get_card_display_symbol(val_str)
 		event_banner_label.text = "Jugador %d jugó %s %s" % [
-			current,
+			acting_p,
 			COLOR_NAMES_ES.get(played_card.get("color", ""), ""),
 			val_name
 		]
-
 		if (is_inside_tree() and has_node("/root/AudioManager")):
 			get_node("/root/AudioManager").play_card_flip()
-
 		_animate_card_to_discard(played_card, start_pos)
-		_update_ui()
+	_sync_uno_state_from_bridge()
+	_update_ui()
 
 func _on_draw_pile_pressed() -> void:
 	_sfx_card_flip()
 	if winner != -1 or wild_picker_modal.visible:
 		return
 
+	var acting_p := current
 	var cmd = {
 		"command_type": "DrawCardCommand",
-		"player": current
+		"player": acting_p
 	}
-	bridge.send_command_json(current, JSON.stringify(cmd))
+	bridge.send_command_json(acting_p, JSON.stringify(cmd))
 
-	if deck_count > 0:
-		deck_count -= 1
-		# Predictive local draw placeholder until event syncs
-		var drawn_card = {"color": active_color, "value": str(randi_range(0, 9))}
-		player_hand.append(drawn_card)
-		var drawn_idx = player_hand.size() - 1
-		event_banner_label.text = "Jugador %d robó una carta del mazo" % current
+	event_banner_label.text = "Jugador %d robó una carta del mazo" % acting_p
+	if (is_inside_tree() and has_node("/root/AudioManager")):
+		get_node("/root/AudioManager").play_card_flip()
 
-		if (is_inside_tree() and has_node("/root/AudioManager")):
-			get_node("/root/AudioManager").play_card_flip()
-
-		_update_ui(drawn_idx)
+	_sync_uno_state_from_bridge()
+	var drawn_idx = max(-1, player_hand.size() - 1)
+	_update_ui(drawn_idx)
 
 # -------------------------------------------------------------------------
 # UNO OFFICIAL RULES ACTIONS & HANDLERS (Prompt 513)
@@ -1376,7 +1396,7 @@ func _on_event_json(json_str: String) -> void:
 				if event.has("card"):
 					var c = event["card"]
 					discard_pile.append(c)
-					if p != current:
+					if p != local_player:
 						opponent_card_count = max(0, opponent_card_count - 1)
 						_animate_card_to_discard(c, Vector2(340, 130))
 					var val_str = str(c.get("value", ""))
@@ -1393,7 +1413,7 @@ func _on_event_json(json_str: String) -> void:
 				if event.has("card"):
 					var c = event["card"]
 					discard_pile.append(c)
-					if p != current:
+					if p != local_player:
 						_animate_card_to_discard(c, Vector2(340, 130))
 				if event.has("new_color"):
 					active_color = str(event["new_color"])
@@ -1419,7 +1439,7 @@ func _on_event_json(json_str: String) -> void:
 				var p = int(event.get("player", current))
 				var cnt = int(event.get("count", 1))
 				deck_count = max(0, deck_count - cnt)
-				if p != current:
+				if p != local_player:
 					opponent_card_count += cnt
 				event_banner_label.text = "🎴 Jugador %d robó %d carta(s)" % [p, cnt]
 
@@ -1466,11 +1486,13 @@ func _on_event_json(json_str: String) -> void:
 				event_banner_label.text = "⚡ ¡JUMP-IN! Jugador %d interceptó el juego con una carta idéntica" % p
 
 	current = bridge.current_player()
+	_sync_uno_state_from_bridge()
 	_update_ui()
 	_update_status()
 
 func _on_turn_changed(player_id: int) -> void:
 	current = player_id
+	_sync_uno_state_from_bridge()
 	_update_ui()
 	_update_status()
 	if turn_indicator != null:

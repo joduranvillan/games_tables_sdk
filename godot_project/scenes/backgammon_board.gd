@@ -335,6 +335,28 @@ func _input(event: InputEvent) -> void:
 				queue_redraw()
 				return
 				
+		# Check click on Bearing-Off tray (when a checker is selected)
+		if selected_from >= 0 and Rect2(610, 40, 150, 200).has_point(click_pos):
+			var die_val = rolled_dice.front() if rolled_dice.size() > 0 else 1
+			var needed_die = (24 - selected_from) if current == P1 else (selected_from + 1)
+			if needed_die in rolled_dice:
+				die_val = needed_die
+			else:
+				for d in rolled_dice:
+					if int(d) >= needed_die:
+						die_val = int(d)
+						break
+			var cmd = {
+				"command_type": "MoveCheckerCommand",
+				"player": current,
+				"from": selected_from,
+				"die": die_val
+			}
+			selected_from = -2
+			queue_redraw()
+			bridge.send_command_json(current, JSON.stringify(cmd))
+			return
+
 		# Check click on points 0..23
 		for pt in range(TOTAL_POINTS):
 			var base_px = _get_point_base_pos(pt)
@@ -350,6 +372,8 @@ func _input(event: InputEvent) -> void:
 				return
 
 func _handle_point_click(pt: int) -> void:
+	if selected_from == -2 and bar_checkers[current] > 0:
+		selected_from = -1
 	if selected_from == -2:
 		var count = points[pt]
 		var belongs_to_current = (count > 0 and current == P1) or (count < 0 and current == P2)
@@ -367,6 +391,10 @@ func _handle_point_click(pt: int) -> void:
 			var diff = abs(pt - from_val)
 			if diff in rolled_dice:
 				die_val = diff
+		elif from_val == null and rolled_dice.size() > 0:
+			var bar_die = (pt + 1) if current == P1 else (24 - pt)
+			if bar_die in rolled_dice:
+				die_val = bar_die
 				
 		var cmd = {
 			"command_type": "MoveCheckerCommand",
@@ -518,7 +546,18 @@ func _on_event_json(json_str: String) -> void:
 					else: points[t_idx] -= 1
 					
 				if rolled_dice.size() > 0:
-					rolled_dice.pop_front()
+					var used_die := -1
+					if from_p != null and to_p != null:
+						used_die = abs(int(to_p) - int(from_p))
+					elif from_p == null and to_p != null:
+						used_die = (int(to_p) + 1) if p == P1 else (24 - int(to_p))
+					elif from_p != null and to_p == null:
+						used_die = (24 - int(from_p)) if p == P1 else (int(from_p) + 1)
+					var rm_idx := rolled_dice.find(used_die)
+					if rm_idx != -1:
+						rolled_dice.remove_at(rm_idx)
+					else:
+						rolled_dice.pop_front()
 				dice_label.text = "Dados: %s" % str(rolled_dice)
 				
 				_animate_arc_movement(p, start_pos, end_pos)

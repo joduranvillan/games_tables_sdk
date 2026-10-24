@@ -2869,6 +2869,155 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn get_mille_bornes_hand(&self, player_id: i64) -> Array<Variant> {
+        let p_id = PlayerId(player_id.max(1) as u32);
+        let mut out = Array::new();
+        let format_card = |c: &mille_bornes_game::Card| -> String {
+            match c {
+                mille_bornes_game::Card::Distance(v) => format!("Distance {v}"),
+                mille_bornes_game::Card::Hazard(mille_bornes_game::Hazard::OutOfGas) => {
+                    "Sin Gasolina".to_string()
+                }
+                mille_bornes_game::Card::Hazard(mille_bornes_game::Hazard::FlatTire) => {
+                    "Pinchazo".to_string()
+                }
+                mille_bornes_game::Card::Hazard(mille_bornes_game::Hazard::Accident) => {
+                    "Accidente".to_string()
+                }
+                mille_bornes_game::Card::Hazard(mille_bornes_game::Hazard::SpeedLimit) => {
+                    "Límite de Velocidad".to_string()
+                }
+                mille_bornes_game::Card::Remedy(mille_bornes_game::Hazard::OutOfGas) => {
+                    "Gasolina".to_string()
+                }
+                mille_bornes_game::Card::Remedy(mille_bornes_game::Hazard::FlatTire) => {
+                    "Rueda de Repuesto".to_string()
+                }
+                mille_bornes_game::Card::Remedy(mille_bornes_game::Hazard::Accident) => {
+                    "Reparaciones".to_string()
+                }
+                mille_bornes_game::Card::Remedy(mille_bornes_game::Hazard::SpeedLimit) => {
+                    "Fin de Límite".to_string()
+                }
+                mille_bornes_game::Card::Safety(mille_bornes_game::Safety::ExtraTank) => {
+                    "Cisterna".to_string()
+                }
+                mille_bornes_game::Card::Safety(mille_bornes_game::Safety::PunctureProof) => {
+                    "Impenetrable".to_string()
+                }
+                mille_bornes_game::Card::Safety(mille_bornes_game::Safety::DrivingAce) => {
+                    "As del Volante".to_string()
+                }
+                mille_bornes_game::Card::Safety(mille_bornes_game::Safety::RightOfWay)
+                | mille_bornes_game::Card::RightOfWay => "Prioridad".to_string(),
+            }
+        };
+        match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::Replay { session, .. }
+            | BridgeMode::Tournament { session, .. } => {
+                if let Some(deck) = session
+                    .world()
+                    .get_resource::<mille_bornes_game::DeckResource>()
+                {
+                    if let Some(hand) = deck.hands.get(&p_id) {
+                        for card in hand {
+                            out.push(&Variant::from(format_card(card)));
+                        }
+                    }
+                }
+            }
+            BridgeMode::MultiSession { sessions, active } => {
+                if let Some((_, session)) = sessions.get(*active) {
+                    if let Some(deck) = session
+                        .world()
+                        .get_resource::<mille_bornes_game::DeckResource>()
+                    {
+                        if let Some(hand) = deck.hands.get(&p_id) {
+                            for card in hand {
+                                out.push(&Variant::from(format_card(card)));
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        out
+    }
+
+    #[func]
+    pub fn get_uno_state(&self, player_id: i64) -> Dictionary<Variant, Variant> {
+        let p_id = PlayerId(player_id.max(1) as u32);
+        let opp_id = if p_id.0 == 1 {
+            PlayerId(2)
+        } else {
+            PlayerId(1)
+        };
+        let mut dict = Dictionary::new();
+        let format_color = |c: uno_game::CardColor| -> &'static str {
+            match c {
+                uno_game::CardColor::Red => "Red",
+                uno_game::CardColor::Yellow => "Yellow",
+                uno_game::CardColor::Green => "Green",
+                uno_game::CardColor::Blue => "Blue",
+                uno_game::CardColor::WildColor => "Wild",
+            }
+        };
+        let format_card = |card: &uno_game::Card| -> Dictionary<Variant, Variant> {
+            let mut c_dict = Dictionary::new();
+            c_dict.set("color", format_color(card.color));
+            let val_str = match card.value {
+                uno_game::CardValue::Number(n) => n.to_string(),
+                uno_game::CardValue::Skip => "Skip".to_string(),
+                uno_game::CardValue::Reverse => "Reverse".to_string(),
+                uno_game::CardValue::DrawTwo => "DrawTwo".to_string(),
+                uno_game::CardValue::Wild => "Wild".to_string(),
+                uno_game::CardValue::WildDrawFour => "WildDrawFour".to_string(),
+            };
+            c_dict.set("value", val_str);
+            c_dict
+        };
+
+        let session_opt = match &self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::Replay { session, .. }
+            | BridgeMode::Tournament { session, .. } => Some(session),
+            BridgeMode::MultiSession { sessions, active } => {
+                sessions.get(*active).map(|(_, session)| session)
+            }
+            _ => None,
+        };
+
+        if let Some(session) = session_opt {
+            if let Some(state) = session.world().get_resource::<uno_game::UnoState>() {
+                let mut hand_arr = Array::new();
+                if let Some(hand) = state.hands.get(&p_id) {
+                    for card in hand {
+                        hand_arr.push(&Variant::from(format_card(card)));
+                    }
+                }
+                dict.set("hand", hand_arr);
+                if let Some(top) = state.discard_pile.last() {
+                    dict.set("top_card", format_card(top));
+                }
+                dict.set("active_color", format_color(state.active_color));
+                dict.set("deck_count", state.deck.len() as i64);
+                let opp_cnt = state.hands.get(&opp_id).map(Vec::len).unwrap_or(0) as i64;
+                dict.set("opponent_card_count", opp_cnt);
+            }
+        }
+
+        dict
+    }
+
+    #[func]
     pub fn get_crisis_territory_owner(&self, territory_id: i64) -> i64 {
         let t_id = crisis_game::TerritoryId(territory_id.clamp(0, 29) as u8);
         match &self.mode {
@@ -4178,11 +4327,7 @@ impl OpenTableBridge {
 
     fn process_ai_turn_if_needed(&mut self) {
         let mut steps = 0;
-        let max_steps = if self.current_game_type == "crisis" {
-            20
-        } else {
-            12
-        };
+        let max_steps = 64;
         loop {
             if steps >= max_steps {
                 break;
@@ -4260,29 +4405,28 @@ impl OpenTableBridge {
                                 if let Some(resp) = cube_response {
                                     Some(resp)
                                 } else {
-                                    let has_pending = session
+                                    let cube_pending_by_ai = session
                                         .world()
-                                        .get_resource::<backgammon_game::PendingDiceResource>()
-                                        .and_then(|p| p.pending.get(ai_p))
-                                        .map(|d| !d.is_empty())
-                                        .unwrap_or(false);
-                                    if !has_pending {
-                                        if self.ai_difficulty != AiDifficulty::Easy
-                                            && backgammon_game::should_offer_double(session, *ai_p)
-                                        {
-                                            Some(Box::new(backgammon_game::OfferDoubleCommand {
-                                                player: *ai_p,
-                                            })
-                                                as Box<dyn Command>)
-                                        } else {
+                                        .get_resource::<backgammon_game::DoublingCubeResource>()
+                                        .is_some_and(|cube| cube.offered);
+                                    if cube_pending_by_ai {
+                                        None
+                                    } else {
+                                        let has_pending = session
+                                            .world()
+                                            .get_resource::<backgammon_game::PendingDiceResource>()
+                                            .and_then(|p| p.pending.get(ai_p))
+                                            .map(|d| !d.is_empty())
+                                            .unwrap_or(false);
+                                        if !has_pending {
                                             Some(Box::new(backgammon_game::RollDiceCommand {
                                                 player: *ai_p,
                                             })
                                                 as Box<dyn Command>)
+                                        } else {
+                                            backgammon_game::backgammon_ai_pick_move(session, *ai_p)
+                                                .map(|c| Box::new(c) as Box<dyn Command>)
                                         }
-                                    } else {
-                                        backgammon_game::backgammon_ai_pick_move(session, *ai_p)
-                                            .map(|c| Box::new(c) as Box<dyn Command>)
                                     }
                                 }
                             }
@@ -4329,8 +4473,28 @@ impl OpenTableBridge {
                                 }
                             }
                             "mille_bornes" | "mille-bornes" | "millebornes" if is_ai_turn => {
-                                mille_bornes_game::ai::best_move(session, *ai_p, self.ai_difficulty)
+                                let needs_draw = session
+                                    .world()
+                                    .get_resource::<mille_bornes_game::DeckResource>()
+                                    .is_some_and(|deck| {
+                                        let hand_len =
+                                            deck.hands.get(ai_p).map(Vec::len).unwrap_or(0);
+                                        hand_len < mille_bornes_game::MAX_HAND_SIZE
+                                            && (!deck.draw_pile.is_empty()
+                                                || !deck.discard_pile.is_empty())
+                                    });
+                                if needs_draw {
+                                    Some(Box::new(mille_bornes_game::DrawCardCommand {
+                                        player: *ai_p,
+                                    }) as Box<dyn Command>)
+                                } else {
+                                    mille_bornes_game::ai::best_move(
+                                        session,
+                                        *ai_p,
+                                        self.ai_difficulty,
+                                    )
                                     .map(|c| c.into_command())
+                                }
                             }
                             "uno" if is_ai_turn => {
                                 uno_game::ai::best_move(session, *ai_p, self.ai_difficulty)
@@ -4370,7 +4534,9 @@ impl OpenTableBridge {
 
             if let Some(cmd) = cmd_opt {
                 steps += 1;
-                let _ = self.process_and_emit(acting_p, cmd);
+                if self.process_and_emit(acting_p, cmd).is_err() {
+                    break;
+                }
             } else {
                 break;
             }
