@@ -114,6 +114,16 @@ var pay_jail_btn: Button
 var card_event_banner: PanelContainer
 var card_event_label: Label
 
+# Property Management & Trade UI
+var mortgaged_properties: Array = []
+var active_trade_offer: Dictionary = {}
+var property_mgmt_panel: PanelContainer
+var build_house_btn: Button
+var mortgage_btn: Button
+var trade_btn: Button
+var accept_trade_btn: Button
+var reject_trade_btn: Button
+
 # Purchase Dialog
 var buy_modal: PanelContainer
 var buy_header_bar: ColorRect
@@ -188,7 +198,14 @@ func _ready() -> void:
 	if bridge.has_signal("turn_changed"):
 		bridge.connect("turn_changed", _on_turn_changed)
 
-	bridge.start_local_match_monopoly(P1, P2)
+	var is_ai_mode = (gm != null and gm.has_method("get_game_mode") and gm.get_game_mode() == "vs_ai")
+	if is_ai_mode:
+		var human_p = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P1
+		var ai_p = P2 if human_p == P1 else P1
+		var diff = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
+		bridge.start_local_match_monopoly_vs_ai(human_p, ai_p, diff)
+	else:
+		bridge.start_local_match_monopoly(P1, P2)
 	current = bridge.current_player()
 
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
@@ -208,6 +225,33 @@ func _on_quit_to_menu() -> void:
 	else:
 		if is_inside_tree():
 			get_tree().change_scene_to_file("res://main.tscn")
+
+func _on_mode_selected(index: int) -> void:
+	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	winner = -1
+	positions = {P1: 0, P2: 0}
+	money = {P1: 1500, P2: 1500}
+	property_owners.clear()
+	property_houses.clear()
+	jailed_players = {P1: 0, P2: 0}
+	if index == 0:
+		if gm != null and gm.has_method("set_game_mode"):
+			gm.set_game_mode("local")
+		bridge.start_local_match_monopoly(P1, P2)
+	else:
+		var human_p = P1 if index == 1 else P2
+		var ai_p = P2 if human_p == P1 else P1
+		var diff = gm.get_ai_difficulty() if (gm != null and gm.has_method("get_ai_difficulty")) else 1
+		if gm != null and gm.has_method("set_game_mode"):
+			gm.set_game_mode("vs_ai")
+		if gm != null and gm.has_method("set_human_player_id"):
+			gm.set_human_player_id(human_p)
+		bridge.start_local_match_monopoly_vs_ai(human_p, ai_p, diff)
+	current = bridge.current_player()
+	_update_token_positions()
+	_update_hud_display()
+	_update_status()
+	queue_redraw()
 
 func _create_default_theme() -> void:
 	current_theme = BoardTheme.new()
@@ -257,6 +301,20 @@ func _setup_ui() -> void:
 	btn_rules.custom_minimum_size = Vector2(90, 36)
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("monopoly"))
 	top_bar.add_child(btn_rules)
+
+	var mode_opt := OptionButton.new()
+	mode_opt.name = "ModeOptionButton"
+	mode_opt.add_item("👥 Hotseat", 0)
+	mode_opt.add_item("🤖 vs IA (J1)", 1)
+	mode_opt.add_item("🤖 vs IA (J2)", 2)
+	var gm_ref = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	if gm_ref != null and gm_ref.has_method("get_game_mode") and gm_ref.get_game_mode() == "vs_ai":
+		var hp = gm_ref.get_human_player_id() if gm_ref.has_method("get_human_player_id") else P1
+		mode_opt.selected = 1 if hp == P1 else 2
+	else:
+		mode_opt.selected = 0
+	mode_opt.item_selected.connect(_on_mode_selected)
+	top_bar.add_child(mode_opt)
 
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
@@ -347,6 +405,86 @@ func _setup_ui() -> void:
 	pay_jail_btn.visible = false
 	pay_jail_btn.pressed.connect(_on_pay_jail_pressed)
 	actions_hbox.add_child(pay_jail_btn)
+
+	# Property Management & Trade Panel
+	property_mgmt_panel = PanelContainer.new()
+	property_mgmt_panel.name = "PropertyManagementPanel"
+	var mgmt_style = StyleBoxFlat.new()
+	mgmt_style.bg_color = Color(0.12, 0.16, 0.22, 0.85)
+	mgmt_style.corner_radius_top_left = 6
+	mgmt_style.corner_radius_top_right = 6
+	mgmt_style.corner_radius_bottom_right = 6
+	mgmt_style.corner_radius_bottom_left = 6
+	mgmt_style.content_margin_left = 6
+	mgmt_style.content_margin_right = 6
+	mgmt_style.content_margin_top = 4
+	mgmt_style.content_margin_bottom = 4
+	property_mgmt_panel.add_theme_stylebox_override("panel", mgmt_style)
+	center_vbox.add_child(property_mgmt_panel)
+
+	var mgmt_vbox = VBoxContainer.new()
+	mgmt_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	mgmt_vbox.add_theme_constant_override("separation", 4)
+	property_mgmt_panel.add_child(mgmt_vbox)
+
+	var mgmt_title = Label.new()
+	mgmt_title.text = "🏢 Gestión de Propiedades e Intercambios"
+	mgmt_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mgmt_title.add_theme_font_size_override("font_size", 11)
+	mgmt_title.add_theme_color_override("font_color", Color(0.9, 0.85, 0.6))
+	mgmt_vbox.add_child(mgmt_title)
+
+	var mgmt_btns_hbox = HBoxContainer.new()
+	mgmt_btns_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	mgmt_btns_hbox.add_theme_constant_override("separation", 8)
+	mgmt_vbox.add_child(mgmt_btns_hbox)
+
+	build_house_btn = Button.new()
+	build_house_btn.name = "BuildHouseButton"
+	build_house_btn.text = "🏠 Construir Casa/Hotel"
+	build_house_btn.custom_minimum_size = Vector2(140, 32)
+	build_house_btn.add_theme_font_size_override("font_size", 11)
+	build_house_btn.pressed.connect(_on_build_house_pressed)
+	mgmt_btns_hbox.add_child(build_house_btn)
+
+	mortgage_btn = Button.new()
+	mortgage_btn.name = "MortgageButton"
+	mortgage_btn.text = "🏦 Hipotecar/Deshipotecar"
+	mortgage_btn.custom_minimum_size = Vector2(150, 32)
+	mortgage_btn.add_theme_font_size_override("font_size", 11)
+	mortgage_btn.pressed.connect(_on_mortgage_pressed)
+	mgmt_btns_hbox.add_child(mortgage_btn)
+
+	trade_btn = Button.new()
+	trade_btn.name = "TradeButton"
+	trade_btn.text = "🤝 Proponer Intercambio"
+	trade_btn.custom_minimum_size = Vector2(150, 32)
+	trade_btn.add_theme_font_size_override("font_size", 11)
+	trade_btn.pressed.connect(_on_trade_pressed)
+	mgmt_btns_hbox.add_child(trade_btn)
+
+	var trade_resp_hbox = HBoxContainer.new()
+	trade_resp_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	trade_resp_hbox.add_theme_constant_override("separation", 8)
+	mgmt_vbox.add_child(trade_resp_hbox)
+
+	accept_trade_btn = Button.new()
+	accept_trade_btn.name = "AcceptTradeButton"
+	accept_trade_btn.text = "✅ Aceptar Trato"
+	accept_trade_btn.visible = false
+	accept_trade_btn.custom_minimum_size = Vector2(120, 28)
+	accept_trade_btn.add_theme_font_size_override("font_size", 11)
+	accept_trade_btn.pressed.connect(_on_accept_trade_pressed)
+	trade_resp_hbox.add_child(accept_trade_btn)
+
+	reject_trade_btn = Button.new()
+	reject_trade_btn.name = "RejectTradeButton"
+	reject_trade_btn.text = "❌ Rechazar Trato"
+	reject_trade_btn.visible = false
+	reject_trade_btn.custom_minimum_size = Vector2(120, 28)
+	reject_trade_btn.add_theme_font_size_override("font_size", 11)
+	reject_trade_btn.pressed.connect(_on_reject_trade_pressed)
+	trade_resp_hbox.add_child(reject_trade_btn)
 
 	# Player Token Sprites
 	for p in [P1, P2]:
@@ -701,6 +839,109 @@ func _on_pay_jail_pressed() -> void:
 	var cmd = {"command_type": "PayJailFeeCommand", "player": current}
 	bridge.send_command_json(current, JSON.stringify(cmd))
 
+func _on_build_house_pressed() -> void:
+	if winner != -1:
+		return
+	var target_space: int = -1
+	for space_idx in property_owners.keys():
+		if property_owners[space_idx] == current:
+			var grp = SPACES[space_idx]["group"]
+			if grp in ["Especial", "Ferrocarril", "Suministros", "Impuesto"]:
+				continue
+			var owns_full = true
+			for i in range(SPACES.size()):
+				if SPACES[i]["group"] == grp and property_owners.get(i, -1) != current:
+					owns_full = false
+					break
+			if owns_full:
+				var lvl = property_houses.get(space_idx, 0)
+				if lvl < 5:
+					target_space = space_idx
+					break
+
+	if target_space != -1:
+		var cmd = {
+			"command_type": "BuildHouseCommand",
+			"player": current,
+			"space": target_space
+		}
+		bridge.send_command_json(current, JSON.stringify(cmd))
+	else:
+		if card_event_label:
+			card_event_label.text = "ℹ️ No posees un grupo completo apto para construir casas."
+
+func _on_mortgage_pressed() -> void:
+	if winner != -1:
+		return
+	var target_space: int = -1
+	var is_unmortgage: bool = false
+	for space_idx in property_owners.keys():
+		if property_owners[space_idx] == current:
+			if mortgaged_properties.has(space_idx):
+				target_space = space_idx
+				is_unmortgage = true
+				break
+			elif target_space == -1:
+				target_space = space_idx
+
+	if target_space != -1:
+		var cmd_type = "UnmortgagePropertyCommand" if is_unmortgage else "MortgagePropertyCommand"
+		var cmd = {
+			"command_type": cmd_type,
+			"player": current,
+			"space": target_space
+		}
+		bridge.send_command_json(current, JSON.stringify(cmd))
+	else:
+		if card_event_label:
+			card_event_label.text = "ℹ️ No tienes propiedades para hipotecar."
+
+func _on_trade_pressed() -> void:
+	if winner != -1:
+		return
+	var opponent = P2 if current == P1 else P1
+	var offered: Array = []
+	var requested: Array = []
+
+	for s in property_owners.keys():
+		if property_owners[s] == current and offered.is_empty():
+			offered.append(s)
+		elif property_owners[s] == opponent and requested.is_empty():
+			requested.append(s)
+
+	var cmd = {
+		"command_type": "ProposeTradeCommand",
+		"player": current,
+		"target": opponent,
+		"offered_spaces": offered,
+		"requested_spaces": requested,
+		"offered_cash": 50 if money.get(current, 0) >= 50 else 0,
+		"requested_cash": 0
+	}
+	bridge.send_command_json(current, JSON.stringify(cmd))
+
+func _on_accept_trade_pressed() -> void:
+	if winner != -1:
+		return
+	var cmd = {
+		"command_type": "AcceptTradeCommand",
+		"player": current
+	}
+	bridge.send_command_json(current, JSON.stringify(cmd))
+	accept_trade_btn.visible = false
+	reject_trade_btn.visible = false
+
+func _on_reject_trade_pressed() -> void:
+	if winner != -1:
+		return
+	var cmd = {
+		"command_type": "RejectTradeCommand",
+		"player": current
+	}
+	bridge.send_command_json(current, JSON.stringify(cmd))
+	accept_trade_btn.visible = false
+	reject_trade_btn.visible = false
+
 func _update_hud_display() -> void:
 	var p1_count = 0
 	var p2_count = 0
@@ -733,7 +974,8 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var event_type = event.get("command_type", event.get("event_type", ""))
+			var raw_type = str(event.get("command_type", event.get("event_type", "")))
+			var event_type = raw_type.split("::")[-1]
 			if event_type == "PlayerMovedEvent":
 				var p = int(event.get("player", current))
 				var new_pos = int(event.get("new_position", 0))
@@ -810,6 +1052,82 @@ func _on_event_json(json_str: String) -> void:
 			elif event_type == "BankruptcyEvent":
 				var p = int(event.get("player", 0))
 				card_event_label.text = "💥 ¡Jugador %d cayó en BANCARROTA!" % p
+
+			elif event_type == "TradeProposedEvent":
+				var p = int(event.get("player", 0))
+				var target_p = int(event.get("target", 0))
+				active_trade_offer = event
+				card_event_label.text = "🤝 ¡Jugador %d propuso un intercambio a Jugador %d!" % [p, target_p]
+				if current == target_p:
+					accept_trade_btn.visible = true
+					reject_trade_btn.visible = true
+
+			elif event_type == "TradeAcceptedEvent":
+				var p = int(event.get("player", 0))
+				var target_p = int(event.get("target", 0))
+				var off_spaces = event.get("offered_spaces", [])
+				var req_spaces = event.get("requested_spaces", [])
+				var off_cash = int(event.get("offered_cash", 0))
+				var req_cash = int(event.get("requested_cash", 0))
+
+				for s in off_spaces:
+					property_owners[int(s)] = p
+				for s in req_spaces:
+					property_owners[int(s)] = target_p
+
+				money[target_p] -= off_cash
+				money[p] += off_cash
+				money[p] -= req_cash
+				money[target_p] += req_cash
+
+				active_trade_offer = {}
+				accept_trade_btn.visible = false
+				reject_trade_btn.visible = false
+				card_event_label.text = "🎉 ¡Intercambio aceptado entre Jugador %d y %d!" % [target_p, p]
+
+			elif event_type == "TradeRejectedEvent":
+				active_trade_offer = {}
+				accept_trade_btn.visible = false
+				reject_trade_btn.visible = false
+				card_event_label.text = "❌ Oferta de intercambio rechazada."
+
+			elif event_type == "HouseBuiltEvent":
+				var sp = int(event.get("space", 0))
+				var lvl = int(event.get("level", 1))
+				var cost = int(event.get("cost", 50))
+				var p = int(event.get("player", current))
+				property_houses[sp] = lvl
+				money[p] -= cost
+				card_event_label.text = "🏠 ¡Jugador %d construyó en %s (Nivel %d)!" % [p, SPACES[sp]["name"], lvl]
+
+			elif event_type == "HouseSoldEvent":
+				var sp = int(event.get("space", 0))
+				var lvl = int(event.get("level", 0))
+				var refund = int(event.get("refund", 25))
+				var p = int(event.get("player", current))
+				if lvl == 0:
+					property_houses.erase(sp)
+				else:
+					property_houses[sp] = lvl
+				money[p] += refund
+				card_event_label.text = "🏠 ¡Jugador %d vendió casa en %s por $%d!" % [p, SPACES[sp]["name"], refund]
+
+			elif event_type == "PropertyMortgagedEvent":
+				var sp = int(event.get("space", 0))
+				var amt = int(event.get("amount", 0))
+				var p = int(event.get("player", current))
+				if not mortgaged_properties.has(sp):
+					mortgaged_properties.append(sp)
+				money[p] += amt
+				card_event_label.text = "🏦 ¡Jugador %d hipotecó %s por $%d!" % [p, SPACES[sp]["name"], amt]
+
+			elif event_type == "PropertyUnmortgagedEvent":
+				var sp = int(event.get("space", 0))
+				var cost = int(event.get("cost", 0))
+				var p = int(event.get("player", current))
+				mortgaged_properties.erase(sp)
+				money[p] -= cost
+				card_event_label.text = "🏦 ¡Jugador %d deshipotecó %s pagando $%d!" % [p, SPACES[sp]["name"], cost]
 
 			elif event_type == "GameOverEvent":
 				var w = event.get("winner", -1)

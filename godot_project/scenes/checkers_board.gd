@@ -9,7 +9,7 @@ extends Node2D
 signal animation_finished
 
 const BOARD := 8
-const CELL := 90.0
+const CELL := 76.0
 const P_TOP := 1     # "increasing": arranca en filas 0-2, avanza hacia abajo
 const P_BOTTOM := 2  # "decreasing": arranca en filas 5-7, avanza hacia arriba
 
@@ -27,12 +27,24 @@ class PieceSprite extends Node2D:
 	const COL_KING := Color(1.0, 0.85, 0.0)
 
 	func _draw() -> void:
-		draw_circle(Vector2(3, 4), cell_size * 0.36, Color(0, 0, 0, 0.35))
-		var pcolor: Color = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(owner_id) - 1, 6)] as Color)
-		draw_circle(Vector2.ZERO, cell_size * 0.38, pcolor)
-		draw_arc(Vector2.ZERO, cell_size * 0.38, 0.0, TAU, 32, Color(1, 1, 1, 0.6), 2.0)
+		# Sombra proyectada suave
+		draw_circle(Vector2(3, 4), cell_size * 0.38, Color(0, 0, 0, 0.42))
+		# Colores clásicos de Damas: Carmesí Rubí (P1) vs Ébano/Marfil Oscuro (P2)
+		var base_col: Color = Color(0.80, 0.16, 0.18) if owner_id == 1 else Color(0.16, 0.19, 0.25)
+		var rim_col: Color = Color(0.98, 0.78, 0.72, 0.85) if owner_id == 1 else Color(0.78, 0.84, 0.92, 0.85)
+		var inner_col: Color = base_col.lightened(0.14)
+		draw_circle(Vector2.ZERO, cell_size * 0.38, base_col)
+		draw_circle(Vector2(-2, -3), cell_size * 0.31, inner_col)
+		draw_circle(Vector2.ZERO, cell_size * 0.24, base_col.darkened(0.10))
+		draw_arc(Vector2.ZERO, cell_size * 0.38, 0.0, TAU, 40, rim_col, 2.4)
+		draw_arc(Vector2.ZERO, cell_size * 0.27, 0.0, TAU, 36, Color(rim_col.r, rim_col.g, rim_col.b, 0.55), 1.6)
+		draw_arc(Vector2.ZERO, cell_size * 0.33, PI * 1.1, PI * 1.75, 20, Color(1, 1, 1, 0.35), 2.0)
 		if king:
-			draw_circle(Vector2.ZERO, cell_size * 0.16, COL_KING)
+			draw_circle(Vector2.ZERO, cell_size * 0.17, COL_KING)
+			draw_arc(Vector2.ZERO, cell_size * 0.17, 0.0, TAU, 28, Color(0.55, 0.38, 0.02), 1.8)
+			var font: Font = ThemeDB.fallback_font
+			if font != null:
+				draw_string(font, Vector2(-cell_size * 0.14, cell_size * 0.07), "♛", HORIZONTAL_ALIGNMENT_CENTER, cell_size * 0.28, int(cell_size * 0.22), Color(0.28, 0.16, 0.0))
 
 var bridge                # OpenTableBridge (nodo nativo del GDExtension)
 var board: Array = []     # board[row][col] = null | {"owner": int, "king": bool}
@@ -43,12 +55,14 @@ var valid_moves: Array[Vector2i] = [] # Posiciones de destino válidas para resa
 var animating: bool = false # Bloquea el input durante las animaciones
 var current: int = P_TOP  # de quién es el turno (según el motor)
 var winner: int = -1
+var multi_capture_cell = null # {"row": int, "col": int} o null para salto obligatorio múltiple
 
 var drag_layer: DragDropLayer
 var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
 var network_hud: NetworkStatusHUD
 var mandatory_label: Label
+var mode_option_button: OptionButton
 var rules_popup: RulesPopup
 var _pause_menu: CanvasLayer
 
@@ -65,6 +79,12 @@ func _ready() -> void:
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
 
+	if status == null:
+		status = get_node_or_null("Status")
+	if status == null:
+		status = Label.new()
+		status.name = "Status"
+		add_child(status)
 	_init_board()
 	_setup_ui_layers()
 
@@ -90,38 +110,42 @@ func _ready() -> void:
 	bridge.connect("move_rejected", _on_move_rejected)
 
 	if gm != null and gm.get_game_mode() == "vs_ai":
-		bridge.start_local_match_checkers_vs_ai(42, P_TOP, P_BOTTOM)
+		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P_TOP
+		var ai_p: int = P_BOTTOM if human_p == P_TOP else P_TOP
+		bridge.start_local_match_checkers_vs_ai(42, human_p, ai_p)
+		if mode_option_button != null:
+			mode_option_button.selected = 1 if human_p == P_TOP else 2
 	else:
 		bridge.start_local_match(P_TOP, P_BOTTOM)
+		if mode_option_button != null:
+			mode_option_button.selected = 0
 	current = bridge.current_player()
 
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_status()
 	queue_redraw()
 
-func _on_layout_changed(layout: int) -> void:
+func _on_layout_changed(_layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 	
-	if layout == 2: # PHONE
-		if turn_indicator != null:
-			turn_indicator.position = Vector2(10, BOARD * CELL + 15)
-		if status != null:
-			status.position = Vector2(10, BOARD * CELL + 55)
-	else: # DESKTOP or TABLET
-		if turn_indicator != null:
-			turn_indicator.position = Vector2(10, BOARD * CELL + 45)
-		if status != null:
-			status.position = Vector2(10, BOARD * CELL + 85)
+	var side_x := 640.0
+	if mode_option_button != null:
+		mode_option_button.position = Vector2(side_x, 24)
+	if turn_indicator != null:
+		turn_indicator.position = Vector2(side_x, 80)
+	if status != null:
+		status.position = Vector2(side_x, 165)
 
 func _setup_ui_layers() -> void:
-	# Mandatory capture banner at top
+	var side_x := 640.0
+	# Mandatory capture banner in right panel
 	mandatory_label = Label.new()
 	mandatory_label.name = "MandatoryCaptureLabel"
 	mandatory_label.text = "¡Captura obligatoria!"
-	mandatory_label.position = Vector2(10, 10)
-	mandatory_label.size = Vector2(BOARD * CELL - 20, 40)
-	mandatory_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mandatory_label.position = Vector2(side_x, 290)
+	mandatory_label.size = Vector2(560, 40)
+	mandatory_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	mandatory_label.add_theme_font_size_override("font_size", 22)
 	mandatory_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2))
 	mandatory_label.hide()
@@ -135,26 +159,39 @@ func _setup_ui_layers() -> void:
 	drag_layer.piece_dropped.connect(_on_piece_dropped)
 	add_child(drag_layer)
 
+	mode_option_button = OptionButton.new()
+	mode_option_button.name = "ModeOptionButton"
+	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.custom_minimum_size = Vector2(360, 36)
+	mode_option_button.add_item("Hotseat (2 jugadores)")
+	mode_option_button.add_item("vs IA (Humano J1 - Rojo)")
+	mode_option_button.add_item("vs IA (Humano J2 - Negro, IA inicia)")
+	mode_option_button.item_selected.connect(_on_mode_selected)
+	add_child(mode_option_button)
+
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(10, BOARD * CELL + 45)
+	turn_indicator.position = Vector2(side_x, 80)
 	add_child(turn_indicator)
 
-	var btn_rules = Button.new()
-	btn_rules.name = "RulesButton"
-	btn_rules.text = "📖 Reglas"
-	btn_rules.position = Vector2(BOARD * CELL - 95, BOARD * CELL + 45)
-	btn_rules.custom_minimum_size = Vector2(90, 36)
-	btn_rules.pressed.connect(func(): rules_popup.show_for_game("checkers"))
-	add_child(btn_rules)
+	if status != null:
+		status.position = Vector2(side_x, 165)
 
 	var tutorial_btn := Button.new()
 	tutorial_btn.name = "CheckersTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(BOARD * CELL - 205, BOARD * CELL + 45)
-	tutorial_btn.custom_minimum_size = Vector2(105, 36)
+	tutorial_btn.position = Vector2(side_x, 225)
+	tutorial_btn.custom_minimum_size = Vector2(140, 36)
 	tutorial_btn.pressed.connect(start_checkers_tutorial)
 	add_child(tutorial_btn)
+
+	var btn_rules = Button.new()
+	btn_rules.name = "RulesButton"
+	btn_rules.text = "📖 Reglas"
+	btn_rules.position = Vector2(side_x + 155, 225)
+	btn_rules.custom_minimum_size = Vector2(120, 36)
+	btn_rules.pressed.connect(func(): rules_popup.show_for_game("checkers"))
+	add_child(btn_rules)
 
 	rules_popup = RulesPopup.new()
 	rules_popup.visible = false
@@ -165,6 +202,25 @@ func _setup_ui_layers() -> void:
 		_pause_menu = load("res://pause_menu.tscn").instantiate()
 		_pause_menu.connect("quit_game_requested", _on_quit_to_menu)
 		add_child(_pause_menu)
+
+func _on_mode_selected(index: int) -> void:
+	winner = -1
+	selected = null
+	multi_capture_cell = null
+	valid_moves.clear()
+	animating = false
+	_init_board()
+	if bridge != null:
+		match index:
+			0:
+				bridge.start_local_match(P_TOP, P_BOTTOM)
+			1:
+				bridge.start_local_match_checkers_vs_ai(42, P_TOP, P_BOTTOM)
+			2:
+				bridge.start_local_match_checkers_vs_ai(42, P_BOTTOM, P_TOP)
+	current = bridge.current_player() if bridge else P_TOP
+	_update_status()
+	queue_redraw()
 
 func start_checkers_tutorial() -> void:
 	var CheckersTut = load("res://scripts/tutorials/checkers_tutorial.gd")
@@ -523,11 +579,17 @@ func _on_piece_moved(player: int, from_row: int, from_col: int, to_row: int, to_
 		if (is_inside_tree() and has_node("/root/AudioManager")):
 			get_node("/root/AudioManager").play_piece_place()
 
-	current = bridge.current_player()
+	if bridge != null and bridge.has_method("current_player"):
+		current = bridge.current_player()
+	if captured_row >= 0 and captured_col >= 0 and current == player:
+		multi_capture_cell = {"row": to_row, "col": to_col}
+		selected = {"row": to_row, "col": to_col}
+	else:
+		multi_capture_cell = null
 	_update_status()
 	queue_redraw()
 
-	if moving_sprite != null:
+	if moving_sprite != null and is_inside_tree():
 		var target_pos := Vector2(to_col * CELL + CELL / 2.0, to_row * CELL + CELL / 2.0)
 		var tween := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 		tween.tween_property(moving_sprite, "position", target_pos, 0.25)
@@ -543,6 +605,11 @@ func _on_piece_moved(player: int, from_row: int, from_col: int, to_row: int, to_
 			animation_finished.emit()
 		)
 	else:
+		if moving_sprite != null and is_instance_valid(moving_sprite):
+			moving_sprite.position = Vector2(to_col * CELL + CELL / 2.0, to_row * CELL + CELL / 2.0)
+			if promoted:
+				moving_sprite.king = true
+				moving_sprite.queue_redraw()
 		if captured_sprite != null and is_instance_valid(captured_sprite):
 			captured_sprite.queue_free()
 		animating = false
@@ -551,6 +618,7 @@ func _on_piece_moved(player: int, from_row: int, from_col: int, to_row: int, to_
 func _on_game_over(w: int) -> void:
 	winner = w
 	selected = null
+	multi_capture_cell = null
 	valid_moves.clear()
 	_update_status()
 	queue_redraw()
@@ -573,21 +641,33 @@ func _draw() -> void:
 	var col_d = current_theme.dark_color if current_theme else COL_DARK
 	var col_sel = current_theme.select_color if current_theme else COL_SELECT
 
-	# Casillas
+	# Marco exterior de madera y casillas
+	draw_rect(Rect2(-4, -4, BOARD * CELL + 8, BOARD * CELL + 8), Color(0.22, 0.13, 0.07))
 	for row in BOARD:
 		for col in BOARD:
 			var dark: bool = (row + col) % 2 == 1
 			var color: Color = col_d if dark else col_l
-			draw_rect(Rect2(col * CELL, row * CELL, CELL, CELL), color)
+			var cell_rect := Rect2(col * CELL, row * CELL, CELL, CELL)
+			draw_rect(cell_rect, color)
+			if dark:
+				draw_rect(Rect2(col * CELL + 2, row * CELL + 2, CELL - 4, CELL - 4), color.darkened(0.08), false, 1.0)
+	draw_rect(Rect2(0, 0, BOARD * CELL, BOARD * CELL), Color(0.18, 0.10, 0.05), false, 3.0)
 
 	# Casilla seleccionada
 	if selected != null:
 		draw_rect(Rect2(selected.col * CELL, selected.row * CELL, CELL, CELL), col_sel)
+		draw_rect(Rect2(selected.col * CELL + 2, selected.row * CELL + 2, CELL - 4, CELL - 4), Color(1.0, 0.85, 0.15, 0.95), false, 3.0)
 
-	# Resaltar movimientos válidos con círculos semitransparentes
+	# Resaltar casilla de multicaptura obligatoria con borde dorado
+	if multi_capture_cell != null:
+		var mc_rect := Rect2(multi_capture_cell.col * CELL + 2.0, multi_capture_cell.row * CELL + 2.0, CELL - 4.0, CELL - 4.0)
+		draw_rect(mc_rect, Color(1.0, 0.84, 0.0, 0.95), false, 4.0)
+
+	# Resaltar movimientos válidos con anillos esmeralda
 	for move_pos in valid_moves:
 		var center = Vector2(move_pos.y * CELL + CELL / 2.0, move_pos.x * CELL + CELL / 2.0)
-		draw_circle(center, 20.0, Color(1.0, 1.0, 1.0, 0.5))
+		draw_circle(center, 18.0, Color(0.15, 0.88, 0.45, 0.45))
+		draw_arc(center, 18.0, 0.0, TAU, 28, Color(0.35, 1.0, 0.60, 0.90), 2.5)
 
 	# Cursor virtual de Gamepad / Steam Deck
 	if gamepad_cursor_active and gamepad_cursor.x >= 0 and gamepad_cursor.x < BOARD and gamepad_cursor.y >= 0 and gamepad_cursor.y < BOARD:
@@ -649,6 +729,10 @@ func _handle_gamepad_input(event: InputEvent) -> void:
 			JOY_BUTTON_START: gamepad_open_pause_menu()
 
 func _update_status() -> void:
+	if status == null:
+		status = get_node_or_null("Status")
+	if status == null:
+		return
 	if winner != -1:
 		var who: String = "rojo (1)" if winner == P_TOP else "negro (2)"
 		status.text = "¡Ganó el jugador %s!" % who

@@ -2,7 +2,7 @@ extends Node2D
 
 const BOARD_RADIUS = 4
 
-const CENTER = Vector2(400, 370)
+const CENTER = Vector2(340, 355)
 const HEX_SPACING = 38.0
 
 const DIRECTIONS = [
@@ -46,6 +46,7 @@ var network_hud: NetworkStatusHUD
 var rules_popup: RulesPopup
 var player_select_box: HBoxContainer
 var player_count_option: OptionButton
+var mode_option_button: OptionButton
 var _pause_menu: CanvasLayer
 
 @onready var status: Label = get_node_or_null("Status")
@@ -62,6 +63,9 @@ func _ready() -> void:
 		gm.layout_changed.connect(_on_layout_changed)
 
 	_setup_ui_layers()
+	if gm != null and gm.get_game_mode() == "vs_ai" and mode_option_button != null:
+		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else 1
+		mode_option_button.selected = 1 if human_p == 1 else 2
 	start_match(num_players)
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
 
@@ -176,10 +180,17 @@ func start_match(p_count: int = 2) -> void:
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
 
-	if bridge.has_method("start_local_match_chinese_checkers_n_players"):
+	var use_ai_mode := 0
+	if mode_option_button != null:
+		use_ai_mode = mode_option_button.selected
+	if use_ai_mode > 0 and num_players == 2:
+		var human_p := 1 if use_ai_mode == 1 else 2
+		var ai_p := 2 if human_p == 1 else 1
+		var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
+		var diff: int = gm.get_ai_difficulty() if (gm != null and gm.has_method("get_ai_difficulty")) else 1
+		bridge.start_local_match_chinese_checkers_vs_ai(human_p, ai_p, diff)
+	elif bridge.has_method("start_local_match_chinese_checkers_n_players"):
 		bridge.start_local_match_chinese_checkers_n_players(num_players)
-	elif num_players == 2:
-		bridge.start_local_match_chinese_checkers(1, 2)
 	else:
 		bridge.start_local_match_chinese_checkers(1, 2)
 
@@ -202,27 +213,34 @@ func start_match(p_count: int = 2) -> void:
 	queue_redraw()
 
 func _setup_ui_layers() -> void:
-	turn_indicator = TurnIndicator.new()
-	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(20, 20)
-	add_child(turn_indicator)
+	var side_x := 660.0
+	if status == null:
+		status = get_node_or_null("Status")
+	if status == null:
+		status = Label.new()
+		status.name = "Status"
+		add_child(status)
+	status.position = Vector2(side_x, 225)
 
-	var btn_rules = Button.new()
-	btn_rules.name = "RulesButton"
-	btn_rules.text = "📖 Reglas"
-	btn_rules.position = Vector2(690, 20)
-	btn_rules.custom_minimum_size = Vector2(90, 40)
-	btn_rules.pressed.connect(func(): rules_popup.show_for_game("chinese_checkers"))
-	add_child(btn_rules)
-
-	rules_popup = RulesPopup.new()
-	rules_popup.visible = false
-	rules_popup.position = Vector2(80, 100)
-	add_child(rules_popup)
+	mode_option_button = OptionButton.new()
+	mode_option_button.name = "ModeOptionButton"
+	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.custom_minimum_size = Vector2(360, 36)
+	mode_option_button.add_item("Hotseat (Local)")
+	mode_option_button.add_item("vs IA (Humano J1 - Rojo)")
+	mode_option_button.add_item("vs IA (Humano J2 - Azul, IA inicia)")
+	mode_option_button.item_selected.connect(func(_idx):
+		if mode_option_button.selected > 0:
+			num_players = 2
+			if player_count_option != null:
+				player_count_option.selected = 0
+		start_match(num_players)
+	)
+	add_child(mode_option_button)
 
 	# Selector de número de jugadores (2 a 6)
 	player_select_box = HBoxContainer.new()
-	player_select_box.position = Vector2(450, 24)
+	player_select_box.position = Vector2(side_x, 72)
 	player_select_box.add_theme_constant_override("separation", 8)
 	add_child(player_select_box)
 
@@ -239,9 +257,29 @@ func _setup_ui_layers() -> void:
 	player_count_option.selected = 0
 	player_count_option.item_selected.connect(func(index):
 		var count = player_count_option.get_item_id(index)
+		if count > 2 and mode_option_button != null:
+			mode_option_button.selected = 0
 		start_match(count)
 	)
 	player_select_box.add_child(player_count_option)
+
+	turn_indicator = TurnIndicator.new()
+	turn_indicator.name = "TurnIndicator"
+	turn_indicator.position = Vector2(side_x, 125)
+	add_child(turn_indicator)
+
+	var btn_rules = Button.new()
+	btn_rules.name = "RulesButton"
+	btn_rules.text = "📖 Reglas"
+	btn_rules.position = Vector2(side_x, 275)
+	btn_rules.custom_minimum_size = Vector2(120, 40)
+	btn_rules.pressed.connect(func(): rules_popup.show_for_game("chinese_checkers"))
+	add_child(btn_rules)
+
+	rules_popup = RulesPopup.new()
+	rules_popup.visible = false
+	rules_popup.position = Vector2(80, 100)
+	add_child(rules_popup)
 
 func _setup_peg_buttons() -> void:
 	for btn in peg_buttons.values():
@@ -417,7 +455,8 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var event_type = event.get("command_type", event.get("event_type", ""))
+			var raw_type := str(event.get("command_type", event.get("event_type", "")))
+			var event_type := raw_type.split("::")[-1]
 			if event_type == "PegMovedEvent" or event_type == "TokenMovedEvent":
 				var from_dict = event.get("from", {})
 				var to_dict = event.get("to", {})

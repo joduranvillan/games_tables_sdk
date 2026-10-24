@@ -46,6 +46,7 @@ var token_buttons = {1: [], 2: [], 3: [], 4: []}
 var dice_button: Button
 var dice_label: Label
 var dice_widget: DiceWidget
+var mode_option_button: OptionButton
 var rules_popup: RulesPopup
 
 var turn_indicator: TurnIndicator
@@ -88,7 +89,17 @@ func _ready() -> void:
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
 
-	bridge.start_local_match_ludo(1, 2)
+	if gm != null and gm.get_game_mode() == "vs_ai":
+		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else 1
+		var ai_p: int = 2 if human_p == 1 else 1
+		var diff: int = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
+		bridge.start_local_match_ludo_vs_ai(human_p, ai_p, diff)
+		if mode_option_button != null:
+			mode_option_button.selected = 1 if human_p == 1 else 2
+	else:
+		bridge.start_local_match_ludo(1, 2)
+		if mode_option_button != null:
+			mode_option_button.selected = 0
 	current_p = bridge.current_player()
 	
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
@@ -119,10 +130,35 @@ func _on_layout_changed(_layout: int) -> void:
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 func _setup_ui() -> void:
+	var side_x := 640.0
+	if status == null:
+		status = get_node_or_null("Status")
+	if status == null:
+		status = Label.new()
+		status.name = "Status"
+		add_child(status)
+	status.position = Vector2(side_x, 150)
+
+	mode_option_button = OptionButton.new()
+	mode_option_button.name = "ModeOptionButton"
+	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.custom_minimum_size = Vector2(360, 36)
+	mode_option_button.add_item("Hotseat (2 jugadores)")
+	mode_option_button.add_item("vs IA (Humano Rojo - J1)")
+	mode_option_button.add_item("vs IA (Humano Azul - J2, IA inicia)")
+	mode_option_button.item_selected.connect(_on_mode_selected)
+	add_child(mode_option_button)
+
+	# Turn Indicator Widget
+	turn_indicator = TurnIndicator.new()
+	turn_indicator.name = "TurnIndicator"
+	turn_indicator.position = Vector2(side_x, 76)
+	add_child(turn_indicator)
+
 	# Dice Roll Button
 	dice_button = Button.new()
-	dice_button.position = Vector2(640, 150)
-	dice_button.custom_minimum_size = Vector2(140, 60)
+	dice_button.position = Vector2(side_x, 195)
+	dice_button.custom_minimum_size = Vector2(150, 54)
 	dice_button.text = "Tirar Dado"
 	dice_button.add_theme_font_size_override("font_size", 18)
 	dice_button.pressed.connect(_on_roll_dice_pressed)
@@ -131,9 +167,9 @@ func _setup_ui() -> void:
 	# Dice Result Display
 	dice_label = Label.new()
 	dice_label.name = "DiceLabel"
-	dice_label.position = Vector2(640, 220)
-	dice_label.size = Vector2(140, 100)
-	dice_label.pivot_offset = Vector2(70, 50)
+	dice_label.position = Vector2(side_x, 260)
+	dice_label.size = Vector2(150, 90)
+	dice_label.pivot_offset = Vector2(75, 45)
 	dice_label.text = "🎲 -"
 	dice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dice_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -141,36 +177,30 @@ func _setup_ui() -> void:
 	add_child(dice_label)
 
 	dice_widget = DiceWidget.new()
-	dice_widget.position = Vector2(640, 320)
+	dice_widget.position = Vector2(side_x, 360)
 	add_child(dice_widget)
+
+	var tutorial_btn := Button.new()
+	tutorial_btn.name = "LudoTutorialButton"
+	tutorial_btn.text = "🎓 Tutorial"
+	tutorial_btn.position = Vector2(side_x, 450)
+	tutorial_btn.custom_minimum_size = Vector2(130, 36)
+	tutorial_btn.pressed.connect(start_ludo_tutorial)
+	add_child(tutorial_btn)
 
 	# Rules Button
 	var rules_btn = Button.new()
 	rules_btn.name = "RulesButton"
 	rules_btn.text = "📖 Reglas"
-	rules_btn.position = Vector2(620, 10)
-	rules_btn.custom_minimum_size = Vector2(90, 36)
+	rules_btn.position = Vector2(side_x + 145, 450)
+	rules_btn.custom_minimum_size = Vector2(115, 36)
 	rules_btn.pressed.connect(func(): rules_popup.show_for_game("ludo"))
 	add_child(rules_btn)
-
-	var tutorial_btn := Button.new()
-	tutorial_btn.name = "LudoTutorialButton"
-	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(510, 10)
-	tutorial_btn.custom_minimum_size = Vector2(105, 36)
-	tutorial_btn.pressed.connect(start_ludo_tutorial)
-	add_child(tutorial_btn)
 
 	rules_popup = RulesPopup.new()
 	rules_popup.visible = false
 	rules_popup.position = Vector2(80, 80)
 	add_child(rules_popup)
-
-	# Turn Indicator Widget
-	turn_indicator = TurnIndicator.new()
-	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(20, 595)
-	add_child(turn_indicator)
 	
 	# Create token circular buttons for players 1..4
 	for p in range(1, 5):
@@ -237,6 +267,28 @@ func start_ludo_tutorial() -> void:
 	var LudoTut = load("res://scripts/tutorials/ludo_tutorial.gd")
 	if LudoTut != null:
 		LudoTut.start_on_board(self)
+
+func _on_mode_selected(index: int) -> void:
+	winner = -1
+	last_dice_val = 0
+	token_steps = {
+		1: [0, 0, 0, 0],
+		2: [0, 0, 0, 0],
+		3: [0, 0, 0, 0],
+		4: [0, 0, 0, 0]
+	}
+	_update_token_positions()
+	if bridge != null:
+		match index:
+			1:
+				bridge.start_local_match_ludo_vs_ai(1, 2, 1)
+			2:
+				bridge.start_local_match_ludo_vs_ai(2, 1, 1)
+			_:
+				bridge.start_local_match_ludo(1, 2)
+	current_p = bridge.current_player() if bridge else 1
+	_update_status()
+	queue_redraw()
 
 func _is_colorblind_pattern_pixel(player_id: int, x: int, y: int) -> bool:
 	match player_id:
@@ -374,12 +426,20 @@ func get_path_from_to(from_cell: int, to_cell: int, player: int = 1, token_idx: 
 	return path
 
 func _update_token_positions() -> void:
+	var occupancy: Dictionary = {}
 	for p in range(1, 5):
 		for t in range(TOKENS_PER_PLAYER):
 			var btn = token_buttons[p][t]
 			var steps = token_steps[p][t]
-			var target_pos = _get_token_board_pos(p, t, steps) - btn.size / 2.0
-			btn.position = target_pos
+			var base_pos = _get_token_board_pos(p, t, steps)
+			var stack_offset := Vector2.ZERO
+			if steps > 0:
+				var key := "%d_%d" % [int(base_pos.x), int(base_pos.y)]
+				var idx: int = occupancy.get(key, 0)
+				occupancy[key] = idx + 1
+				var stack_offsets := [Vector2.ZERO, Vector2(5, -5), Vector2(-5, 5), Vector2(5, 5)]
+				stack_offset = stack_offsets[idx % stack_offsets.size()]
+			btn.position = base_pos + stack_offset - btn.size / 2.0
 
 func _animate_token_move(p: int, t_idx: int, to_steps: int) -> void:
 	var from_steps = token_steps[p][t_idx]
@@ -412,7 +472,8 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var event_type = event.get("command_type", event.get("event_type", ""))
+			var raw_type := str(event.get("command_type", event.get("event_type", "")))
+			var event_type := raw_type.split("::")[-1]
 			if event_type == "DiceRolledEvent":
 				var val = int(event.get("value", 1))
 				_animate_dice_roll(val)
@@ -472,41 +533,65 @@ func _draw() -> void:
 	]
 	for z in zones:
 		draw_rect(z.rect, z.col)
-		draw_rect(z.rect, line_col, false, 2.0)
-		draw_circle(z.rect.position + z.rect.size / 2.0, 65, Color.WHITE)
+		draw_rect(z.rect, line_col, false, 2.5)
+		var yard_center: Vector2 = z.rect.position + z.rect.size / 2.0
+		draw_rect(Rect2(yard_center - Vector2(68, 68), Vector2(136, 136)), Color(0.98, 0.98, 0.96))
+		draw_rect(Rect2(yard_center - Vector2(68, 68), Vector2(136, 136)), line_col, false, 2.0)
+		for off in [Vector2(-25, -25), Vector2(25, -25), Vector2(-25, 25), Vector2(25, 25)]:
+			draw_circle(yard_center + off, 16.0, z.col.lightened(0.25))
+			draw_arc(yard_center + off, 16.0, 0.0, TAU, 24, line_col, 1.8)
 		
 	# Cross track 52 cells
 	var margin = 55.0
 	var track_step = 35.0
 	for i in range(15):
 		for j in range(15):
-			# Skip 4 base corners
+			# Skip 4 base corners and 3x3 center goal
 			if (i < 6 and j < 6) or (i > 8 and j < 6) or (i < 6 and j > 8) or (i > 8 and j > 8):
 				continue
+			if i >= 6 and i <= 8 and j >= 6 and j <= 8:
+				continue
 			var cell_rect = Rect2(margin + i * track_step - 17.5, margin + j * track_step - 17.5, track_step, track_step)
+			draw_rect(cell_rect, Color(0.99, 0.99, 0.97))
 			draw_rect(cell_rect, line_col, false, 1.0)
 
 	# Draw home columns
 	for p in range(1, 5):
 		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(p) - 1, 6)] as Color)
-		p_col.a = 0.35
+		var fill_col = Color(p_col.r, p_col.g, p_col.b, 0.55)
 		for g in HOME_GRIDS[p]:
 			var h_rect = Rect2(margin + g.x * track_step - 17.5, margin + g.y * track_step - 17.5, track_step, track_step)
-			draw_rect(h_rect, p_col)
-			draw_rect(h_rect, line_col, false, 1.0)
+			draw_rect(h_rect, fill_col)
+			draw_rect(h_rect, line_col, false, 1.2)
 
-	# Safe squares permanent highlight (start and star cells)
-	var safe_color = Color(0.9, 0.9, 0.3, 0.35)
+	# Safe squares permanent highlight (start and star cells) with ★ icon
+	var safe_color = Color(0.98, 0.90, 0.32, 0.55)
+	var font: Font = ThemeDB.fallback_font
 	for p in range(1, 5):
+		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(p) - 1, 6)] as Color)
 		for s in [1, 9]:
 			var cpos = get_cell_position(s, p)
 			var safe_rect = Rect2(cpos.x - 17.5, cpos.y - 17.5, track_step, track_step)
-			draw_rect(safe_rect, safe_color)
+			draw_rect(safe_rect, Color(p_col.r, p_col.g, p_col.b, 0.45) if s == 1 else safe_color)
+			draw_rect(safe_rect, line_col, false, 1.5)
+			if font != null:
+				draw_string(font, Vector2(cpos.x - 14.0, cpos.y + 6.0), "★", HORIZONTAL_ALIGNMENT_CENTER, 28.0, 16, Color(0.25, 0.18, 0.02))
 
-	# Center Goal Zone
+	# Center Goal Zone (4 converging triangles)
 	var center = Vector2(300, 300)
-	draw_circle(center, 38, Color(0.9, 0.9, 0.9))
-	draw_circle(center, 38, Color.GOLD, false, 3.0)
+	var tl = Vector2(247.5, 247.5)
+	var tr_pt = Vector2(352.5, 247.5)
+	var br = Vector2(352.5, 352.5)
+	var bl = Vector2(247.5, 352.5)
+	draw_colored_polygon(PackedVector2Array([tl, bl, center]), Color.RED)
+	draw_colored_polygon(PackedVector2Array([tl, tr_pt, center]), Color.BLUE)
+	draw_colored_polygon(PackedVector2Array([tr_pt, br, center]), Color.GREEN)
+	draw_colored_polygon(PackedVector2Array([bl, br, center]), Color.YELLOW)
+	draw_rect(Rect2(tl, Vector2(105, 105)), line_col, false, 2.5)
+	draw_line(tl, br, line_col, 2.0)
+	draw_line(tr_pt, bl, line_col, 2.0)
+	draw_circle(center, 16, Color(1.0, 0.96, 0.80))
+	draw_arc(center, 16, 0.0, TAU, 24, Color.GOLD.darkened(0.25), 2.5)
 
 func _update_status() -> void:
 	if winner != -1:

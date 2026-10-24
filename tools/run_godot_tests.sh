@@ -13,6 +13,26 @@ BIN_REAL="$(realpath "$(command -v "$REDOT_BIN" 2>/dev/null || echo "")" 2>/dev/
 
 if ! command -v "$REDOT_BIN" &>/dev/null || [ "$BIN_REAL" = "$SHIM_REAL" ]; then
     echo "=== Redot/Godot no detectado en PATH ($REDOT_BIN); ejecutando validación estática headless de GDScript ==="
+    python3 -c '
+import os, re, sys
+root = "godot_project"
+class_names = {}
+for dirpath, _, filenames in os.walk(root):
+    for f in sorted(filenames):
+        if f.endswith(".gd"):
+            p = os.path.join(dirpath, f)
+            rel = os.path.relpath(p, root)
+            with open(p, "r", encoding="utf-8") as fh:
+                for i, line in enumerate(fh, 1):
+                    m = re.match(r"^\s*class_name\s+([A-Za-z0-9_]+)", line)
+                    if m:
+                        cn = m.group(1)
+                        class_names.setdefault(cn, []).append(f"{rel}:{i}")
+dups = {k: v for k, v in class_names.items() if len(v) > 1}
+if dups:
+    print(f"ERROR: class_name duplicado detectado: {dups}", file=sys.stderr)
+    sys.exit(1)
+'
     TEST_FILES=()
     if [ $# -gt 0 ]; then
         for arg in "$@"; do
@@ -56,6 +76,7 @@ fi
 
 echo "=== Inicializando cache e importación de Godot/Redot ==="
 mkdir -p godot_project/.godot
+rm -f godot_project/.godot/global_script_class_cache.cfg
 printf "res://open_table.gdextension\n" > godot_project/.godot/extension_list.cfg
 "$REDOT_BIN" --headless --path godot_project --editor --quit &>/dev/null || true
 

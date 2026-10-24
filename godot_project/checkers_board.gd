@@ -589,7 +589,7 @@ func _on_piece_moved(player: int, from_row: int, from_col: int, to_row: int, to_
 	_update_status()
 	queue_redraw()
 
-	if moving_sprite != null:
+	if moving_sprite != null and is_inside_tree():
 		var target_pos := Vector2(to_col * CELL + CELL / 2.0, to_row * CELL + CELL / 2.0)
 		var tween := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 		tween.tween_property(moving_sprite, "position", target_pos, 0.25)
@@ -605,6 +605,11 @@ func _on_piece_moved(player: int, from_row: int, from_col: int, to_row: int, to_
 			animation_finished.emit()
 		)
 	else:
+		if moving_sprite != null and is_instance_valid(moving_sprite):
+			moving_sprite.position = Vector2(to_col * CELL + CELL / 2.0, to_row * CELL + CELL / 2.0)
+			if promoted:
+				moving_sprite.king = true
+				moving_sprite.queue_redraw()
 		if captured_sprite != null and is_instance_valid(captured_sprite):
 			captured_sprite.queue_free()
 		animating = false

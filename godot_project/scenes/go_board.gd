@@ -1,7 +1,7 @@
 extends Node2D
 
 const BOARD_SIZE = 9
-const CELL_SIZE = 70.0
+const CELL_SIZE = 68.0
 const P_BLACK = 1
 const P_WHITE = 2
 
@@ -34,6 +34,7 @@ var current_theme: BoardTheme
 var network_hud: NetworkStatusHUD
 var export_game_button: Button
 var export_toast_label: Label
+var mode_option_button: OptionButton
 var _rules_popup: RulesPopup
 var _pause_menu: CanvasLayer
 
@@ -73,7 +74,17 @@ func _ready() -> void:
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
 	
-	bridge.start_local_match_go(P_BLACK, P_WHITE)
+	if gm != null and gm.get_game_mode() == "vs_ai":
+		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P_BLACK
+		var ai_p: int = P_WHITE if human_p == P_BLACK else P_BLACK
+		var diff: int = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
+		bridge.start_local_match_go_vs_ai(human_p, ai_p, diff)
+		if mode_option_button != null:
+			mode_option_button.selected = 1 if human_p == P_BLACK else 2
+	else:
+		bridge.start_local_match_go(P_BLACK, P_WHITE)
+		if mode_option_button != null:
+			mode_option_button.selected = 0
 	current = bridge.current_player()
 	
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
@@ -85,8 +96,8 @@ func _ready() -> void:
 	var btn_rules := Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
-	btn_rules.position = Vector2(BOARD_SIZE * CELL_SIZE - 95, BOARD_SIZE * CELL_SIZE + 45)
-	btn_rules.custom_minimum_size = Vector2(90, 36)
+	btn_rules.position = Vector2(930, 290)
+	btn_rules.custom_minimum_size = Vector2(110, 36)
 	btn_rules.pressed.connect(func(): _rules_popup.show_for_game("go"))
 	add_child(btn_rules)
 
@@ -108,25 +119,44 @@ func _on_quit_to_menu() -> void:
 			get_tree().change_scene_to_file("res://main.tscn")
 
 func _setup_ui() -> void:
+	var side_x := 640.0
+	if status == null:
+		status = get_node_or_null("Status")
+	if status == null:
+		status = Label.new()
+		status.name = "Status"
+		add_child(status)
+	status.position = Vector2(side_x, 165)
+
 	stones_container = Node2D.new()
 	stones_container.name = "StonesContainer"
 	add_child(stones_container)
 
-	# Captured Stones Top-Right Panel
+	mode_option_button = OptionButton.new()
+	mode_option_button.name = "ModeOptionButton"
+	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.custom_minimum_size = Vector2(360, 36)
+	mode_option_button.add_item("Hotseat (2 jugadores)")
+	mode_option_button.add_item("vs IA (Humano Negras - J1)")
+	mode_option_button.add_item("vs IA (Humano Blancas - J2, IA inicia)")
+	mode_option_button.item_selected.connect(_on_mode_selected)
+	add_child(mode_option_button)
+
+	# Captured Stones Panel in right sidebar
 	captured_score_label = Label.new()
 	captured_score_label.name = "CapturedScoreLabel"
-	captured_score_label.position = Vector2(380, 15)
-	captured_score_label.size = Vector2(300, 45)
-	captured_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	captured_score_label.position = Vector2(side_x, 205)
+	captured_score_label.size = Vector2(400, 32)
+	captured_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	captured_score_label.add_theme_font_size_override("font_size", 16)
 	captured_score_label.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
 	add_child(captured_score_label)
 
-	# Captured Stones Counters below the board
+	# Captured Stones Counters in right sidebar
 	var captures_container = HBoxContainer.new()
 	captures_container.name = "CapturesContainer"
-	captures_container.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
-	captures_container.size = Vector2(BOARD_SIZE * CELL_SIZE, 30)
+	captures_container.position = Vector2(side_x, 240)
+	captures_container.size = Vector2(400, 30)
 	captures_container.add_theme_constant_override("separation", 24)
 	add_child(captures_container)
 
@@ -155,47 +185,70 @@ func _setup_ui() -> void:
 	# Turn Indicator Widget
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 48)
+	turn_indicator.position = Vector2(side_x, 80)
 	add_child(turn_indicator)
-
-	# Botón Exportar Partida (SGF)
-	export_game_button = Button.new()
-	export_game_button.name = "ExportGameButton"
-	export_game_button.text = "Exportar Partida"
-	export_game_button.position = Vector2(360, BOARD_SIZE * CELL_SIZE + 10)
-	export_game_button.custom_minimum_size = Vector2(160, 32)
-	export_game_button.pressed.connect(_on_export_game_pressed)
-	add_child(export_game_button)
-
-	# Botón Tutorial Interactivo de Go (5 pasos)
-	var tutorial_btn := Button.new()
-	tutorial_btn.name = "GoTutorialButton"
-	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(360, BOARD_SIZE * CELL_SIZE + 48)
-	tutorial_btn.custom_minimum_size = Vector2(120, 32)
-	tutorial_btn.pressed.connect(start_go_tutorial)
-	add_child(tutorial_btn)
 
 	# Botón Pasar Turno (PassTurnCommand)
 	var pass_btn := Button.new()
 	pass_btn.name = "PassTurnButton"
 	pass_btn.text = "⏭️ Pasar"
-	pass_btn.position = Vector2(255, BOARD_SIZE * CELL_SIZE + 48)
-	pass_btn.custom_minimum_size = Vector2(95, 32)
+	pass_btn.position = Vector2(side_x, 290)
+	pass_btn.custom_minimum_size = Vector2(120, 36)
 	pass_btn.pressed.connect(func():
 		if winner == -1 and bridge != null:
 			bridge.send_command_json(current, JSON.stringify({"command_type": "PassTurnCommand", "player": current}))
 	)
 	add_child(pass_btn)
 
+	# Botón Tutorial Interactivo de Go (5 pasos)
+	var tutorial_btn := Button.new()
+	tutorial_btn.name = "GoTutorialButton"
+	tutorial_btn.text = "🎓 Tutorial"
+	tutorial_btn.position = Vector2(side_x + 135, 290)
+	tutorial_btn.custom_minimum_size = Vector2(140, 36)
+	tutorial_btn.pressed.connect(start_go_tutorial)
+	add_child(tutorial_btn)
+
+	# Botón Exportar Partida (SGF)
+	export_game_button = Button.new()
+	export_game_button.name = "ExportGameButton"
+	export_game_button.text = "Exportar Partida"
+	export_game_button.position = Vector2(side_x, 340)
+	export_game_button.custom_minimum_size = Vector2(170, 36)
+	export_game_button.pressed.connect(_on_export_game_pressed)
+	add_child(export_game_button)
+
 	export_toast_label = Label.new()
 	export_toast_label.name = "ExportToastLabel"
 	export_toast_label.text = ""
 	export_toast_label.visible = false
-	export_toast_label.position = Vector2(360, BOARD_SIZE * CELL_SIZE + 48)
+	export_toast_label.position = Vector2(side_x, 385)
 	export_toast_label.add_theme_font_size_override("font_size", 14)
 	export_toast_label.add_theme_color_override("font_color", Color(0.45, 0.95, 0.55))
 	add_child(export_toast_label)
+
+func _on_mode_selected(index: int) -> void:
+	winner = -1
+	black_captured = 0
+	white_captured = 0
+	black_score = 0.0
+	white_score = 0.0
+	if stones_container != null:
+		for ch in stones_container.get_children():
+			ch.queue_free()
+	_init_board()
+	if bridge != null:
+		match index:
+			1:
+				bridge.start_local_match_go_vs_ai(P_BLACK, P_WHITE, 1)
+			2:
+				bridge.start_local_match_go_vs_ai(P_WHITE, P_BLACK, 1)
+			_:
+				bridge.start_local_match_go(P_BLACK, P_WHITE)
+	current = bridge.current_player() if bridge else P_BLACK
+	_update_status()
+	_update_captured_score()
+	queue_redraw()
 
 func _on_export_game_pressed() -> void:
 	var sgf_text := ""

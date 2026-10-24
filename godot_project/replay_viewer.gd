@@ -1,4 +1,3 @@
-class_name ReplayViewer
 extends Control
 
 const PLAYBACK_SPEEDS: Array[float] = [1.0, 2.0, 4.0]
@@ -394,7 +393,7 @@ func _update_ui() -> void:
 			continue
 		var is_active := (i == current_step - 1)
 		row_btn.modulate = Color(1.0, 0.92, 0.4) if is_active else Color(1.0, 1.0, 1.0)
-		if is_active and move_list_scroll != null:
+		if is_active and move_list_scroll != null and move_list_scroll.is_inside_tree() and row_btn.is_inside_tree():
 			move_list_scroll.ensure_control_visible(row_btn)
 
 	_update_status("Replay cargado (%s) - Paso %d de %d (%.0fx)" % [game_type.capitalize(), current_step, total_steps, playback_speed])
