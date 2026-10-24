@@ -16,6 +16,8 @@ const PLAYER_COLORS: Array[Color] = [
 
 var active_game_type: String = ""
 var game_mode: String = "hotseat" # "hotseat" or "vs_ai"
+var human_player_id: int = 1 # 1 (Inicia Humano) or 2 (Inicia IA)
+var ai_difficulty: int = 1 # 0=Easy, 1=Normal, 2=Hard, 3=Expert
 var chess_ai_depth: int = 2
 var sfx_enabled: bool = true
 var animations_enabled: bool = true
@@ -44,6 +46,18 @@ func set_game_mode(mode: String) -> void:
 
 func get_game_mode() -> String:
 	return game_mode
+
+func set_human_player_id(pid: int) -> void:
+	human_player_id = 2 if pid == 2 else 1
+
+func get_human_player_id() -> int:
+	return human_player_id
+
+func set_ai_difficulty(diff: int) -> void:
+	ai_difficulty = clampi(diff, 0, 3)
+
+func get_ai_difficulty() -> int:
+	return ai_difficulty
 
 func set_chess_ai_depth(depth: int) -> void:
 	chess_ai_depth = depth

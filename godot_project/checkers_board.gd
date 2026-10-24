@@ -9,7 +9,7 @@ extends Node2D
 signal animation_finished
 
 const BOARD := 8
-const CELL := 90.0
+const CELL := 76.0
 const P_TOP := 1     # "increasing": arranca en filas 0-2, avanza hacia abajo
 const P_BOTTOM := 2  # "decreasing": arranca en filas 5-7, avanza hacia arriba
 
@@ -62,6 +62,7 @@ var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
 var network_hud: NetworkStatusHUD
 var mandatory_label: Label
+var mode_option_button: OptionButton
 var rules_popup: RulesPopup
 var _pause_menu: CanvasLayer
 
@@ -80,6 +81,10 @@ func _ready() -> void:
 
 	if status == null:
 		status = get_node_or_null("Status")
+	if status == null:
+		status = Label.new()
+		status.name = "Status"
+		add_child(status)
 	_init_board()
 	_setup_ui_layers()
 
@@ -105,38 +110,42 @@ func _ready() -> void:
 	bridge.connect("move_rejected", _on_move_rejected)
 
 	if gm != null and gm.get_game_mode() == "vs_ai":
-		bridge.start_local_match_checkers_vs_ai(42, P_TOP, P_BOTTOM)
+		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P_TOP
+		var ai_p: int = P_BOTTOM if human_p == P_TOP else P_TOP
+		bridge.start_local_match_checkers_vs_ai(42, human_p, ai_p)
+		if mode_option_button != null:
+			mode_option_button.selected = 1 if human_p == P_TOP else 2
 	else:
 		bridge.start_local_match(P_TOP, P_BOTTOM)
+		if mode_option_button != null:
+			mode_option_button.selected = 0
 	current = bridge.current_player()
 
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_status()
 	queue_redraw()
 
-func _on_layout_changed(layout: int) -> void:
+func _on_layout_changed(_layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 	
-	if layout == 2: # PHONE
-		if turn_indicator != null:
-			turn_indicator.position = Vector2(10, BOARD * CELL + 15)
-		if status != null:
-			status.position = Vector2(10, BOARD * CELL + 55)
-	else: # DESKTOP or TABLET
-		if turn_indicator != null:
-			turn_indicator.position = Vector2(10, BOARD * CELL + 45)
-		if status != null:
-			status.position = Vector2(10, BOARD * CELL + 85)
+	var side_x := 640.0
+	if mode_option_button != null:
+		mode_option_button.position = Vector2(side_x, 24)
+	if turn_indicator != null:
+		turn_indicator.position = Vector2(side_x, 80)
+	if status != null:
+		status.position = Vector2(side_x, 165)
 
 func _setup_ui_layers() -> void:
-	# Mandatory capture banner at top
+	var side_x := 640.0
+	# Mandatory capture banner in right panel
 	mandatory_label = Label.new()
 	mandatory_label.name = "MandatoryCaptureLabel"
 	mandatory_label.text = "¡Captura obligatoria!"
-	mandatory_label.position = Vector2(10, 10)
-	mandatory_label.size = Vector2(BOARD * CELL - 20, 40)
-	mandatory_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mandatory_label.position = Vector2(side_x, 290)
+	mandatory_label.size = Vector2(560, 40)
+	mandatory_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	mandatory_label.add_theme_font_size_override("font_size", 22)
 	mandatory_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2))
 	mandatory_label.hide()
@@ -150,26 +159,39 @@ func _setup_ui_layers() -> void:
 	drag_layer.piece_dropped.connect(_on_piece_dropped)
 	add_child(drag_layer)
 
+	mode_option_button = OptionButton.new()
+	mode_option_button.name = "ModeOptionButton"
+	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.custom_minimum_size = Vector2(360, 36)
+	mode_option_button.add_item("Hotseat (2 jugadores)")
+	mode_option_button.add_item("vs IA (Humano J1 - Rojo)")
+	mode_option_button.add_item("vs IA (Humano J2 - Negro, IA inicia)")
+	mode_option_button.item_selected.connect(_on_mode_selected)
+	add_child(mode_option_button)
+
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(10, BOARD * CELL + 45)
+	turn_indicator.position = Vector2(side_x, 80)
 	add_child(turn_indicator)
 
-	var btn_rules = Button.new()
-	btn_rules.name = "RulesButton"
-	btn_rules.text = "📖 Reglas"
-	btn_rules.position = Vector2(BOARD * CELL - 95, BOARD * CELL + 45)
-	btn_rules.custom_minimum_size = Vector2(90, 36)
-	btn_rules.pressed.connect(func(): rules_popup.show_for_game("checkers"))
-	add_child(btn_rules)
+	if status != null:
+		status.position = Vector2(side_x, 165)
 
 	var tutorial_btn := Button.new()
 	tutorial_btn.name = "CheckersTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(BOARD * CELL - 205, BOARD * CELL + 45)
-	tutorial_btn.custom_minimum_size = Vector2(105, 36)
+	tutorial_btn.position = Vector2(side_x, 225)
+	tutorial_btn.custom_minimum_size = Vector2(140, 36)
 	tutorial_btn.pressed.connect(start_checkers_tutorial)
 	add_child(tutorial_btn)
+
+	var btn_rules = Button.new()
+	btn_rules.name = "RulesButton"
+	btn_rules.text = "📖 Reglas"
+	btn_rules.position = Vector2(side_x + 155, 225)
+	btn_rules.custom_minimum_size = Vector2(120, 36)
+	btn_rules.pressed.connect(func(): rules_popup.show_for_game("checkers"))
+	add_child(btn_rules)
 
 	rules_popup = RulesPopup.new()
 	rules_popup.visible = false
@@ -180,6 +202,25 @@ func _setup_ui_layers() -> void:
 		_pause_menu = load("res://pause_menu.tscn").instantiate()
 		_pause_menu.connect("quit_game_requested", _on_quit_to_menu)
 		add_child(_pause_menu)
+
+func _on_mode_selected(index: int) -> void:
+	winner = -1
+	selected = null
+	multi_capture_cell = null
+	valid_moves.clear()
+	animating = false
+	_init_board()
+	if bridge != null:
+		match index:
+			0:
+				bridge.start_local_match(P_TOP, P_BOTTOM)
+			1:
+				bridge.start_local_match_checkers_vs_ai(42, P_TOP, P_BOTTOM)
+			2:
+				bridge.start_local_match_checkers_vs_ai(42, P_BOTTOM, P_TOP)
+	current = bridge.current_player() if bridge else P_TOP
+	_update_status()
+	queue_redraw()
 
 func start_checkers_tutorial() -> void:
 	var CheckersTut = load("res://scripts/tutorials/checkers_tutorial.gd")

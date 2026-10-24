@@ -46,6 +46,7 @@ var token_buttons = {1: [], 2: [], 3: [], 4: []}
 var dice_button: Button
 var dice_label: Label
 var dice_widget: DiceWidget
+var mode_option_button: OptionButton
 var rules_popup: RulesPopup
 
 var turn_indicator: TurnIndicator
@@ -88,7 +89,17 @@ func _ready() -> void:
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
 
-	bridge.start_local_match_ludo(1, 2)
+	if gm != null and gm.get_game_mode() == "vs_ai":
+		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else 1
+		var ai_p: int = 2 if human_p == 1 else 1
+		var diff: int = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
+		bridge.start_local_match_ludo_vs_ai(human_p, ai_p, diff)
+		if mode_option_button != null:
+			mode_option_button.selected = 1 if human_p == 1 else 2
+	else:
+		bridge.start_local_match_ludo(1, 2)
+		if mode_option_button != null:
+			mode_option_button.selected = 0
 	current_p = bridge.current_player()
 	
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
@@ -119,10 +130,35 @@ func _on_layout_changed(_layout: int) -> void:
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 func _setup_ui() -> void:
+	var side_x := 640.0
+	if status == null:
+		status = get_node_or_null("Status")
+	if status == null:
+		status = Label.new()
+		status.name = "Status"
+		add_child(status)
+	status.position = Vector2(side_x, 150)
+
+	mode_option_button = OptionButton.new()
+	mode_option_button.name = "ModeOptionButton"
+	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.custom_minimum_size = Vector2(360, 36)
+	mode_option_button.add_item("Hotseat (2 jugadores)")
+	mode_option_button.add_item("vs IA (Humano Rojo - J1)")
+	mode_option_button.add_item("vs IA (Humano Azul - J2, IA inicia)")
+	mode_option_button.item_selected.connect(_on_mode_selected)
+	add_child(mode_option_button)
+
+	# Turn Indicator Widget
+	turn_indicator = TurnIndicator.new()
+	turn_indicator.name = "TurnIndicator"
+	turn_indicator.position = Vector2(side_x, 76)
+	add_child(turn_indicator)
+
 	# Dice Roll Button
 	dice_button = Button.new()
-	dice_button.position = Vector2(640, 150)
-	dice_button.custom_minimum_size = Vector2(140, 60)
+	dice_button.position = Vector2(side_x, 195)
+	dice_button.custom_minimum_size = Vector2(150, 54)
 	dice_button.text = "Tirar Dado"
 	dice_button.add_theme_font_size_override("font_size", 18)
 	dice_button.pressed.connect(_on_roll_dice_pressed)
@@ -131,9 +167,9 @@ func _setup_ui() -> void:
 	# Dice Result Display
 	dice_label = Label.new()
 	dice_label.name = "DiceLabel"
-	dice_label.position = Vector2(640, 220)
-	dice_label.size = Vector2(140, 100)
-	dice_label.pivot_offset = Vector2(70, 50)
+	dice_label.position = Vector2(side_x, 260)
+	dice_label.size = Vector2(150, 90)
+	dice_label.pivot_offset = Vector2(75, 45)
 	dice_label.text = "🎲 -"
 	dice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dice_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -141,36 +177,30 @@ func _setup_ui() -> void:
 	add_child(dice_label)
 
 	dice_widget = DiceWidget.new()
-	dice_widget.position = Vector2(640, 320)
+	dice_widget.position = Vector2(side_x, 360)
 	add_child(dice_widget)
+
+	var tutorial_btn := Button.new()
+	tutorial_btn.name = "LudoTutorialButton"
+	tutorial_btn.text = "🎓 Tutorial"
+	tutorial_btn.position = Vector2(side_x, 450)
+	tutorial_btn.custom_minimum_size = Vector2(130, 36)
+	tutorial_btn.pressed.connect(start_ludo_tutorial)
+	add_child(tutorial_btn)
 
 	# Rules Button
 	var rules_btn = Button.new()
 	rules_btn.name = "RulesButton"
 	rules_btn.text = "📖 Reglas"
-	rules_btn.position = Vector2(620, 10)
-	rules_btn.custom_minimum_size = Vector2(90, 36)
+	rules_btn.position = Vector2(side_x + 145, 450)
+	rules_btn.custom_minimum_size = Vector2(115, 36)
 	rules_btn.pressed.connect(func(): rules_popup.show_for_game("ludo"))
 	add_child(rules_btn)
-
-	var tutorial_btn := Button.new()
-	tutorial_btn.name = "LudoTutorialButton"
-	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(510, 10)
-	tutorial_btn.custom_minimum_size = Vector2(105, 36)
-	tutorial_btn.pressed.connect(start_ludo_tutorial)
-	add_child(tutorial_btn)
 
 	rules_popup = RulesPopup.new()
 	rules_popup.visible = false
 	rules_popup.position = Vector2(80, 80)
 	add_child(rules_popup)
-
-	# Turn Indicator Widget
-	turn_indicator = TurnIndicator.new()
-	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(20, 595)
-	add_child(turn_indicator)
 	
 	# Create token circular buttons for players 1..4
 	for p in range(1, 5):
@@ -237,6 +267,28 @@ func start_ludo_tutorial() -> void:
 	var LudoTut = load("res://scripts/tutorials/ludo_tutorial.gd")
 	if LudoTut != null:
 		LudoTut.start_on_board(self)
+
+func _on_mode_selected(index: int) -> void:
+	winner = -1
+	last_dice_val = 0
+	token_steps = {
+		1: [0, 0, 0, 0],
+		2: [0, 0, 0, 0],
+		3: [0, 0, 0, 0],
+		4: [0, 0, 0, 0]
+	}
+	_update_token_positions()
+	if bridge != null:
+		match index:
+			1:
+				bridge.start_local_match_ludo_vs_ai(1, 2, 1)
+			2:
+				bridge.start_local_match_ludo_vs_ai(2, 1, 1)
+			_:
+				bridge.start_local_match_ludo(1, 2)
+	current_p = bridge.current_player() if bridge else 1
+	_update_status()
+	queue_redraw()
 
 func _is_colorblind_pattern_pixel(player_id: int, x: int, y: int) -> bool:
 	match player_id:
@@ -420,7 +472,8 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var event_type = event.get("command_type", event.get("event_type", ""))
+			var raw_type := str(event.get("command_type", event.get("event_type", "")))
+			var event_type := raw_type.split("::")[-1]
 			if event_type == "DiceRolledEvent":
 				var val = int(event.get("value", 1))
 				_animate_dice_roll(val)

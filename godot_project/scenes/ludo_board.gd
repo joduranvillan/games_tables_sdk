@@ -374,20 +374,12 @@ func get_path_from_to(from_cell: int, to_cell: int, player: int = 1, token_idx: 
 	return path
 
 func _update_token_positions() -> void:
-	var occupancy: Dictionary = {}
 	for p in range(1, 5):
 		for t in range(TOKENS_PER_PLAYER):
 			var btn = token_buttons[p][t]
 			var steps = token_steps[p][t]
-			var base_pos = _get_token_board_pos(p, t, steps)
-			var stack_offset := Vector2.ZERO
-			if steps > 0:
-				var key := "%d_%d" % [int(base_pos.x), int(base_pos.y)]
-				var idx: int = occupancy.get(key, 0)
-				occupancy[key] = idx + 1
-				var stack_offsets := [Vector2.ZERO, Vector2(5, -5), Vector2(-5, 5), Vector2(5, 5)]
-				stack_offset = stack_offsets[idx % stack_offsets.size()]
-			btn.position = base_pos + stack_offset - btn.size / 2.0
+			var target_pos = _get_token_board_pos(p, t, steps) - btn.size / 2.0
+			btn.position = target_pos
 
 func _animate_token_move(p: int, t_idx: int, to_steps: int) -> void:
 	var from_steps = token_steps[p][t_idx]
@@ -480,65 +472,41 @@ func _draw() -> void:
 	]
 	for z in zones:
 		draw_rect(z.rect, z.col)
-		draw_rect(z.rect, line_col, false, 2.5)
-		var yard_center: Vector2 = z.rect.position + z.rect.size / 2.0
-		draw_rect(Rect2(yard_center - Vector2(68, 68), Vector2(136, 136)), Color(0.98, 0.98, 0.96))
-		draw_rect(Rect2(yard_center - Vector2(68, 68), Vector2(136, 136)), line_col, false, 2.0)
-		for off in [Vector2(-25, -25), Vector2(25, -25), Vector2(-25, 25), Vector2(25, 25)]:
-			draw_circle(yard_center + off, 16.0, z.col.lightened(0.25))
-			draw_arc(yard_center + off, 16.0, 0.0, TAU, 24, line_col, 1.8)
+		draw_rect(z.rect, line_col, false, 2.0)
+		draw_circle(z.rect.position + z.rect.size / 2.0, 65, Color.WHITE)
 		
 	# Cross track 52 cells
 	var margin = 55.0
 	var track_step = 35.0
 	for i in range(15):
 		for j in range(15):
-			# Skip 4 base corners and 3x3 center goal
+			# Skip 4 base corners
 			if (i < 6 and j < 6) or (i > 8 and j < 6) or (i < 6 and j > 8) or (i > 8 and j > 8):
 				continue
-			if i >= 6 and i <= 8 and j >= 6 and j <= 8:
-				continue
 			var cell_rect = Rect2(margin + i * track_step - 17.5, margin + j * track_step - 17.5, track_step, track_step)
-			draw_rect(cell_rect, Color(0.99, 0.99, 0.97))
 			draw_rect(cell_rect, line_col, false, 1.0)
 
 	# Draw home columns
 	for p in range(1, 5):
 		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(p) - 1, 6)] as Color)
-		var fill_col = Color(p_col.r, p_col.g, p_col.b, 0.55)
+		p_col.a = 0.35
 		for g in HOME_GRIDS[p]:
 			var h_rect = Rect2(margin + g.x * track_step - 17.5, margin + g.y * track_step - 17.5, track_step, track_step)
-			draw_rect(h_rect, fill_col)
-			draw_rect(h_rect, line_col, false, 1.2)
+			draw_rect(h_rect, p_col)
+			draw_rect(h_rect, line_col, false, 1.0)
 
-	# Safe squares permanent highlight (start and star cells) with ★ icon
-	var safe_color = Color(0.98, 0.90, 0.32, 0.55)
-	var font: Font = ThemeDB.fallback_font
+	# Safe squares permanent highlight (start and star cells)
+	var safe_color = Color(0.9, 0.9, 0.3, 0.35)
 	for p in range(1, 5):
-		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(p) - 1, 6)] as Color)
 		for s in [1, 9]:
 			var cpos = get_cell_position(s, p)
 			var safe_rect = Rect2(cpos.x - 17.5, cpos.y - 17.5, track_step, track_step)
-			draw_rect(safe_rect, Color(p_col.r, p_col.g, p_col.b, 0.45) if s == 1 else safe_color)
-			draw_rect(safe_rect, line_col, false, 1.5)
-			if font != null:
-				draw_string(font, Vector2(cpos.x - 14.0, cpos.y + 6.0), "★", HORIZONTAL_ALIGNMENT_CENTER, 28.0, 16, Color(0.25, 0.18, 0.02))
+			draw_rect(safe_rect, safe_color)
 
-	# Center Goal Zone (4 converging triangles)
+	# Center Goal Zone
 	var center = Vector2(300, 300)
-	var tl = Vector2(247.5, 247.5)
-	var tr_pt = Vector2(352.5, 247.5)
-	var br = Vector2(352.5, 352.5)
-	var bl = Vector2(247.5, 352.5)
-	draw_colored_polygon(PackedVector2Array([tl, bl, center]), Color.RED)
-	draw_colored_polygon(PackedVector2Array([tl, tr_pt, center]), Color.BLUE)
-	draw_colored_polygon(PackedVector2Array([tr_pt, br, center]), Color.GREEN)
-	draw_colored_polygon(PackedVector2Array([bl, br, center]), Color.YELLOW)
-	draw_rect(Rect2(tl, Vector2(105, 105)), line_col, false, 2.5)
-	draw_line(tl, br, line_col, 2.0)
-	draw_line(tr_pt, bl, line_col, 2.0)
-	draw_circle(center, 16, Color(1.0, 0.96, 0.80))
-	draw_arc(center, 16, 0.0, TAU, 24, Color.GOLD.darkened(0.25), 2.5)
+	draw_circle(center, 38, Color(0.9, 0.9, 0.9))
+	draw_circle(center, 38, Color.GOLD, false, 3.0)
 
 func _update_status() -> void:
 	if winner != -1:

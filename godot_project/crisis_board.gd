@@ -350,7 +350,14 @@ func _ready() -> void:
 	if bridge.has_signal("turn_changed"):
 		bridge.connect("turn_changed", _on_turn_changed)
 
-	bridge.start_local_match_crisis(42, [1, 2])
+	var is_ai_mode = (gm != null and gm.has_method("get_game_mode") and gm.get_game_mode() == "vs_ai")
+	if is_ai_mode:
+		var human_p = gm.get_human_player_id() if gm.has_method("get_human_player_id") else 1
+		var ai_p = 2 if human_p == 1 else 1
+		var diff = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
+		bridge.start_local_match_crisis_vs_ai(42, human_p, ai_p, diff)
+	else:
+		bridge.start_local_match_crisis(42, [1, 2])
 	current_player_id = bridge.current_player()
 
 	_sync_all_from_bridge()
@@ -368,6 +375,29 @@ func _on_quit_to_menu() -> void:
 	else:
 		if is_inside_tree():
 			get_tree().change_scene_to_file("res://main.tscn")
+
+func _on_mode_selected(index: int) -> void:
+	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	winner = -1
+	selected_from = -1
+	selected_to = -1
+	valid_targets.clear()
+	if index == 0:
+		if gm != null and gm.has_method("set_game_mode"):
+			gm.set_game_mode("local")
+		bridge.start_local_match_crisis(42, [1, 2])
+	else:
+		var human_p = 1 if index == 1 else 2
+		var ai_p = 2 if human_p == 1 else 1
+		var diff = gm.get_ai_difficulty() if (gm != null and gm.has_method("get_ai_difficulty")) else 1
+		if gm != null and gm.has_method("set_game_mode"):
+			gm.set_game_mode("vs_ai")
+		if gm != null and gm.has_method("set_human_player_id"):
+			gm.set_human_player_id(human_p)
+		bridge.start_local_match_crisis_vs_ai(42, human_p, ai_p, diff)
+	current_player_id = bridge.current_player()
+	_sync_all_from_bridge()
+	_update_ui_state()
 
 func _process(delta: float) -> void:
 	pulse_time += delta * 4.0
@@ -510,6 +540,20 @@ func _setup_ui() -> void:
 	btn_rules.custom_minimum_size = Vector2(85, 32)
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("crisis"))
 	header_hbox.add_child(btn_rules)
+
+	var mode_opt := OptionButton.new()
+	mode_opt.name = "ModeOptionButton"
+	mode_opt.add_item("👥 Hotseat", 0)
+	mode_opt.add_item("🤖 vs IA (J1)", 1)
+	mode_opt.add_item("🤖 vs IA (J2)", 2)
+	var gm_ref = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	if gm_ref != null and gm_ref.has_method("get_game_mode") and gm_ref.get_game_mode() == "vs_ai":
+		var hp = gm_ref.get_human_player_id() if gm_ref.has_method("get_human_player_id") else 1
+		mode_opt.selected = 1 if hp == 1 else 2
+	else:
+		mode_opt.selected = 0
+	mode_opt.item_selected.connect(_on_mode_selected)
+	header_hbox.add_child(mode_opt)
 
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"

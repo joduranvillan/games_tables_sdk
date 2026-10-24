@@ -1,7 +1,9 @@
 extends Node2D
 
 const BOARD_SIZE = 9
-const CELL_SIZE = 68.0
+const CELL_SIZE = 66.0
+const BOARD_ORIGIN_X = 40.0
+const BOARD_ORIGIN_Y = 40.0
 const P_SENTE = 1 # Player 1 (Sente / Black / Points UP)
 const P_GOTE = 2  # Player 2 (Gote / White / Points DOWN)
 
@@ -92,9 +94,12 @@ func _ready() -> void:
 	bridge.connect("event_json", _on_event_json)
 
 	if gm != null and gm.get_game_mode() == "vs_ai":
-		bridge.start_local_match_shogi_vs_ai(P_SENTE, P_GOTE, 1)
+		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P_SENTE
+		var ai_p: int = P_GOTE if human_p == P_SENTE else P_SENTE
+		var diff: int = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
+		bridge.start_local_match_shogi_vs_ai(human_p, ai_p, diff)
 		if mode_option_button != null:
-			mode_option_button.selected = 1
+			mode_option_button.selected = 1 if human_p == P_SENTE else 2
 	else:
 		bridge.start_local_match_shogi(P_SENTE, P_GOTE)
 		if mode_option_button != null:
@@ -110,8 +115,8 @@ func _ready() -> void:
 	var btn_rules := Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
-	btn_rules.position = Vector2(650, 10)
-	btn_rules.custom_minimum_size = Vector2(90, 36)
+	btn_rules.position = Vector2(820, 230)
+	btn_rules.custom_minimum_size = Vector2(120, 36)
 	btn_rules.pressed.connect(func(): _rules_popup.show_for_game("shogi"))
 	add_child(btn_rules)
 
@@ -150,11 +155,23 @@ func _on_layout_changed(_layout: int) -> void:
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 func _setup_ui() -> void:
+	var side_x := 660.0
+	if status == null:
+		status = get_node_or_null("Status")
+	if status == null:
+		status = Label.new()
+		status.name = "Status"
+		add_child(status)
+	status.position = Vector2(side_x, 180)
+	status.custom_minimum_size = Vector2(560, 36)
+
 	# 9x9 GridContainer for the board
 	grid_container = GridContainer.new()
 	grid_container.name = "GridContainer"
 	grid_container.columns = BOARD_SIZE
-	grid_container.position = Vector2(120, 20)
+	grid_container.position = Vector2(BOARD_ORIGIN_X, BOARD_ORIGIN_Y)
+	grid_container.add_theme_constant_override("h_separation", 0)
+	grid_container.add_theme_constant_override("v_separation", 0)
 	add_child(grid_container)
 	
 	var bg_col = current_theme.board_color if current_theme != null else COL_BOARD
@@ -174,50 +191,51 @@ func _setup_ui() -> void:
 			
 			grid_container.add_child(cell)
 			
-	# Left Side Panel for Gote Hand (P2)
+	# Right Side Panel for Gote Hand (P2)
 	var gote_label = Label.new()
-	gote_label.text = "Gote (P2) Mano:"
-	gote_label.position = Vector2(10, 20)
+	gote_label.text = "Gote (P2) Mano (Komadai):"
+	gote_label.position = Vector2(side_x, 285)
 	add_child(gote_label)
 	
 	gote_hand_panel = VBoxContainer.new()
-	gote_hand_panel.position = Vector2(10, 50)
-	gote_hand_panel.custom_minimum_size = Vector2(95, 250)
+	gote_hand_panel.position = Vector2(side_x, 315)
+	gote_hand_panel.custom_minimum_size = Vector2(240, 180)
 	add_child(gote_hand_panel)
 	
 	# Right Side Panel for Sente Hand (P1)
 	var sente_label = Label.new()
-	sente_label.text = "Sente (P1) Mano:"
-	sente_label.position = Vector2(750, 20)
+	sente_label.text = "Sente (P1) Mano (Komadai):"
+	sente_label.position = Vector2(side_x + 280, 285)
 	add_child(sente_label)
 	
 	sente_hand_panel = VBoxContainer.new()
-	sente_hand_panel.position = Vector2(750, 50)
-	sente_hand_panel.custom_minimum_size = Vector2(95, 250)
+	sente_hand_panel.position = Vector2(side_x + 280, 315)
+	sente_hand_panel.custom_minimum_size = Vector2(240, 180)
 	add_child(sente_hand_panel)
 
 	# Mode Option Button
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
-	mode_option_button.position = Vector2(120, BOARD_SIZE * CELL_SIZE + 35)
-	mode_option_button.custom_minimum_size = Vector2(180, 32)
+	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.custom_minimum_size = Vector2(360, 36)
 	mode_option_button.add_item("Hotseat (2 jugadores)")
-	mode_option_button.add_item("vs IA (Gote)")
+	mode_option_button.add_item("vs IA (Humano Sente - J1)")
+	mode_option_button.add_item("vs IA (Humano Gote - J2, IA inicia)")
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	add_child(mode_option_button)
 
 	# Turn Indicator Widget
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(320, BOARD_SIZE * CELL_SIZE + 35)
+	turn_indicator.position = Vector2(side_x, 80)
 	add_child(turn_indicator)
 
 	# Botón Tutorial Interactivo de Shogi (5 pasos)
 	var tutorial_btn := Button.new()
 	tutorial_btn.name = "ShogiTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(540, BOARD_SIZE * CELL_SIZE + 35)
-	tutorial_btn.custom_minimum_size = Vector2(140, 32)
+	tutorial_btn.position = Vector2(side_x, 230)
+	tutorial_btn.custom_minimum_size = Vector2(145, 36)
 	tutorial_btn.pressed.connect(start_shogi_tutorial)
 	add_child(tutorial_btn)
 
@@ -226,14 +244,14 @@ func _setup_ui() -> void:
 func _setup_hand_panels() -> void:
 	_hand_p1 = VBoxContainer.new()
 	_hand_p1.name = "HandP1"
-	_hand_p1.position = Vector2(750, 45)
-	_hand_p1.custom_minimum_size = Vector2(100, 160)
+	_hand_p1.position = Vector2(940, 500)
+	_hand_p1.custom_minimum_size = Vector2(120, 140)
 	add_child(_hand_p1)
 
 	_hand_p2 = VBoxContainer.new()
 	_hand_p2.name = "HandP2"
-	_hand_p2.position = Vector2(750, 245)
-	_hand_p2.custom_minimum_size = Vector2(100, 160)
+	_hand_p2.position = Vector2(660, 500)
+	_hand_p2.custom_minimum_size = Vector2(120, 140)
 	add_child(_hand_p2)
 
 func _update_hand_display(player: int, pieces: Array) -> void:
@@ -254,17 +272,22 @@ func _on_mode_selected(index: int) -> void:
 	valid_moves.clear()
 	for r in range(BOARD_SIZE):
 		for c in range(BOARD_SIZE):
-			if piece_nodes[r][c] != null and is_instance_valid(piece_nodes[r][c]):
-				piece_nodes[r][c].queue_free()
-				piece_nodes[r][c] = null
-
-	if bridge != null:
-		if index == 1:
-			bridge.start_local_match_shogi_vs_ai(P_SENTE, P_GOTE, 1)
-		else:
-			bridge.start_local_match_shogi(P_SENTE, P_GOTE)
+			if piece_nodes.size() > r and piece_nodes[r].size() > c:
+				if piece_nodes[r][c] != null and is_instance_valid(piece_nodes[r][c]):
+					piece_nodes[r][c].queue_free()
+					piece_nodes[r][c] = null
 
 	_init_board_state()
+
+	if bridge != null:
+		match index:
+			1:
+				bridge.start_local_match_shogi_vs_ai(P_SENTE, P_GOTE, 1)
+			2:
+				bridge.start_local_match_shogi_vs_ai(P_GOTE, P_SENTE, 1)
+			_:
+				bridge.start_local_match_shogi(P_SENTE, P_GOTE)
+
 	current = bridge.current_player() if bridge else P_SENTE
 	_update_hand_panels()
 	_update_status()
@@ -398,7 +421,7 @@ func _place_piece_on_board(row: int, col: int, player: int, kind: String) -> voi
 	board[row][col] = {"player": player, "kind": kind}
 	
 	var piece_ctrl = _create_pentagon_piece_node(player, kind)
-	piece_ctrl.position = Vector2(120 + col * CELL_SIZE + 3, 20 + row * CELL_SIZE + 3)
+	piece_ctrl.position = Vector2(BOARD_ORIGIN_X + col * CELL_SIZE + 3, BOARD_ORIGIN_Y + row * CELL_SIZE + 3)
 	add_child(piece_ctrl)
 	piece_nodes[row][col] = piece_ctrl
 
@@ -416,8 +439,8 @@ func _input(event: InputEvent) -> void:
 		handled = true
 		
 	if handled:
-		var board_x = click_pos.x - 120
-		var board_y = click_pos.y - 20
+		var board_x = click_pos.x - BOARD_ORIGIN_X
+		var board_y = click_pos.y - BOARD_ORIGIN_Y
 		
 		if board_x >= 0 and board_x < BOARD_SIZE * CELL_SIZE and board_y >= 0 and board_y < BOARD_SIZE * CELL_SIZE:
 			var col = int(board_x / CELL_SIZE)
@@ -428,11 +451,23 @@ func _calculate_valid_shogi_moves(r: int, c: int) -> Array:
 	var moves: Array = []
 	var piece = board[r][c]
 	if piece == null: return moves
-	
+
+	if bridge != null and bridge.has_method("get_legal_moves"):
+		var legal = bridge.get_legal_moves(current)
+		for m in legal:
+			if m is Dictionary and m.has("from") and m.has("to"):
+				var f = m["from"]
+				var t = m["to"]
+				if f is Array and f.size() >= 2 and t is Array and t.size() >= 2:
+					# En Rust shogi_game, from/to son [col, row]
+					if int(f[0]) == c and int(f[1]) == r:
+						var dest := Vector2i(int(t[1]), int(t[0]))
+						if not dest in moves:
+							moves.append(dest)
+		if not moves.is_empty():
+			return moves
+
 	var player = piece.get("player")
-	var dir = -1 if player == P_SENTE else 1
-	
-	# Basic direction offsets for Shogi
 	for dr in [-1, 0, 1]:
 		for dc in [-1, 0, 1]:
 			if dr == 0 and dc == 0: continue
@@ -453,7 +488,7 @@ func _calculate_valid_drops() -> Array:
 	return drops
 
 func cell_to_pixel(cell: Vector2i) -> Vector2:
-	return Vector2(120.0 + cell.x * CELL_SIZE, 20.0 + cell.y * CELL_SIZE)
+	return Vector2(BOARD_ORIGIN_X + cell.x * CELL_SIZE, BOARD_ORIGIN_Y + cell.y * CELL_SIZE)
 
 func start_shogi_tutorial() -> void:
 	var ShogiTut = load("res://scripts/tutorials/shogi_tutorial.gd")
@@ -474,10 +509,10 @@ func _handle_board_click(row: int, col: int) -> void:
 		queue_redraw()
 		
 		var cmd = {
-			"command_type": "DropPieceCommand",
+			"command_type": "shogi_game::DropPieceCommand",
 			"player": current,
 			"piece": drop_kind,
-			"to": [row, col]
+			"to": [col, row]
 		}
 		bridge.send_command_json(current, JSON.stringify(cmd))
 		return
@@ -495,18 +530,35 @@ func _handle_board_click(row: int, col: int) -> void:
 			valid_moves.clear()
 			queue_redraw()
 			return
+
+		var target_cell = board[row][col]
+		if target_cell != null and target_cell.get("player") == current:
+			selected_board_pos = Vector2i(row, col)
+			valid_moves = _calculate_valid_shogi_moves(row, col)
+			queue_redraw()
+			return
 			
 		var from_pos = selected_board_pos
 		selected_board_pos = null
 		valid_moves.clear()
 		queue_redraw()
 		
+		var moving_piece = board[from_pos.x][from_pos.y]
+		var should_promote := false
+		if moving_piece != null:
+			var p_kind: String = str(moving_piece.get("kind", ""))
+			if p_kind in ["Pawn", "Lance", "Knight", "Silver", "Bishop", "Rook"]:
+				if current == P_SENTE and (row <= 2 or from_pos.x <= 2):
+					should_promote = true
+				elif current == P_GOTE and (row >= 6 or from_pos.x >= 6):
+					should_promote = true
+
 		var cmd = {
-			"command_type": "MovePieceCommand",
+			"command_type": "shogi_game::MovePieceCommand",
 			"player": current,
-			"from": [from_pos.x, from_pos.y],
-			"to": [row, col],
-			"promote": false
+			"from": [from_pos.y, from_pos.x],
+			"to": [col, row],
+			"promote": should_promote
 		}
 		bridge.send_command_json(current, JSON.stringify(cmd))
 
@@ -589,14 +641,17 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var event_type = event.get("command_type", event.get("event_type", ""))
+			var raw_type := str(event.get("command_type", event.get("event_type", "")))
+			var event_type := raw_type.split("::")[-1]
 			if event_type == "PieceMovedEvent":
 				var from = event.get("from", [0, 0])
 				var to = event.get("to", [0, 0])
-				var from_r = int(from[0])
-				var from_c = int(from[1])
-				var to_r = int(to[0])
-				var to_c = int(to[1])
+				# Coordenadas en shogi_game (Rust): [col, row]
+				var from_c = int(from[0])
+				var from_r = int(from[1])
+				var to_c = int(to[0])
+				var to_r = int(to[1])
+				var promoted_flag: bool = event.get("promoted", false) == true
 				
 				var piece_data = board[from_r][from_c]
 				var cap_evt = event.get("captured", null)
@@ -622,20 +677,35 @@ func _on_event_json(json_str: String) -> void:
 						p_hand[cap_kind] = p_hand.get(cap_kind, 0) + 1
 						if piece_nodes[to_r][to_c] != null:
 							piece_nodes[to_r][to_c].queue_free()
+							piece_nodes[to_r][to_c] = null
 						if (is_inside_tree() and has_node("/root/AudioManager")):
 							get_node("/root/AudioManager").play_piece_place(2.0)
 					else:
 						if (is_inside_tree() and has_node("/root/AudioManager")):
 							get_node("/root/AudioManager").play_piece_place()
-							
+
+					if promoted_flag:
+						var base_k: String = str(piece_data.get("kind", ""))
+						match base_k:
+							"Pawn": piece_data["kind"] = "PromotedPawn"
+							"Lance": piece_data["kind"] = "PromotedLance"
+							"Knight": piece_data["kind"] = "PromotedKnight"
+							"Silver": piece_data["kind"] = "PromotedSilver"
+							"Bishop": piece_data["kind"] = "Horse"
+							"Rook": piece_data["kind"] = "Dragon"
+
 					board[from_r][from_c] = null
 					board[to_r][to_c] = piece_data
 					
 					var node = piece_nodes[from_r][from_c]
 					piece_nodes[from_r][from_c] = null
-					piece_nodes[to_r][to_c] = node
-					if node != null:
-						node.position = Vector2(120 + to_c * CELL_SIZE + 3, 20 + to_r * CELL_SIZE + 3)
+					if promoted_flag and node != null:
+						node.queue_free()
+						_place_piece_on_board(to_r, to_c, piece_data.player, piece_data.kind)
+					else:
+						piece_nodes[to_r][to_c] = node
+						if node != null:
+							node.position = Vector2(BOARD_ORIGIN_X + to_c * CELL_SIZE + 3, BOARD_ORIGIN_Y + to_r * CELL_SIZE + 3)
 
 				if is_cap:
 					_refresh_hand_displays_from_event_or_state(event)
@@ -644,8 +714,8 @@ func _on_event_json(json_str: String) -> void:
 				var to = event.get("to", [0, 0])
 				var kind = str(event.get("piece", "Pawn"))
 				var p = int(event.get("player", current))
-				var to_r = int(to[0])
-				var to_c = int(to[1])
+				var to_c = int(to[0])
+				var to_r = int(to[1])
 				
 				_place_piece_on_board(to_r, to_c, p, kind)
 				if hands.has(p) and hands[p].has(kind):
@@ -681,20 +751,20 @@ func _on_move_rejected(reason: String) -> void:
 
 func _draw() -> void:
 	# Marco exterior del Shogiban y puntos estelares de zona de promoción (Hoshi)
-	var b_rect := Rect2(120, 20, BOARD_SIZE * CELL_SIZE, BOARD_SIZE * CELL_SIZE)
-	draw_rect(Rect2(116, 16, BOARD_SIZE * CELL_SIZE + 8, BOARD_SIZE * CELL_SIZE + 8), Color(0.28, 0.18, 0.10), false, 4.0)
+	var b_rect := Rect2(BOARD_ORIGIN_X, BOARD_ORIGIN_Y, BOARD_SIZE * CELL_SIZE, BOARD_SIZE * CELL_SIZE)
+	draw_rect(Rect2(BOARD_ORIGIN_X - 4, BOARD_ORIGIN_Y - 4, BOARD_SIZE * CELL_SIZE + 8, BOARD_SIZE * CELL_SIZE + 8), Color(0.28, 0.18, 0.10), false, 4.0)
 	draw_rect(b_rect, COL_LINE, false, 2.0)
 	for r_idx in [3, 6]:
 		for c_idx in [3, 6]:
-			draw_circle(Vector2(120 + c_idx * CELL_SIZE, 20 + r_idx * CELL_SIZE), 4.0, COL_LINE)
+			draw_circle(Vector2(BOARD_ORIGIN_X + c_idx * CELL_SIZE, BOARD_ORIGIN_Y + r_idx * CELL_SIZE), 4.0, COL_LINE)
 
 	if selected_board_pos != null:
-		var rect = Rect2(120 + selected_board_pos.y * CELL_SIZE, 20 + selected_board_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		var rect = Rect2(BOARD_ORIGIN_X + selected_board_pos.y * CELL_SIZE, BOARD_ORIGIN_Y + selected_board_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
 		draw_rect(rect, COL_SELECT)
 
 	# Draw valid move / drop destinations with green circles
 	for pos in valid_moves:
-		var center = Vector2(120 + pos.y * CELL_SIZE + CELL_SIZE / 2.0, 20 + pos.x * CELL_SIZE + CELL_SIZE / 2.0)
+		var center = Vector2(BOARD_ORIGIN_X + pos.y * CELL_SIZE + CELL_SIZE / 2.0, BOARD_ORIGIN_Y + pos.x * CELL_SIZE + CELL_SIZE / 2.0)
 		draw_circle(center, CELL_SIZE * 0.25, COL_VALID_MOVE)
 
 func _update_status() -> void:

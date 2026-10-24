@@ -15,7 +15,7 @@ extends Node2D
 
 const BOARD_ROWS = 10
 const BOARD_COLS = 9
-const CELL_SIZE = 64.0
+const CELL_SIZE = 62.0
 
 const P_RED = 1    # Jugador 1 (Rojo / Inferior / filas 6..9)
 const P_BLACK = 2  # Jugador 2 (Negro / Superior / filas 0..3)
@@ -66,8 +66,8 @@ const COL_BLACK_TOKEN = Color(0.14, 0.14, 0.16)
 const COL_TOKEN_BODY_LIGHT = Color(0.98, 0.95, 0.88)
 const COL_TOKEN_BODY_DARK = Color(0.92, 0.87, 0.78)
 
-var offset_x: float = 140.0
-var offset_y: float = 45.0
+var offset_x: float = 76.0
+var offset_y: float = 64.0
 
 var bridge
 var board: Array = [] # 10x9 array: {"player": int, "kind": String} o null
@@ -138,9 +138,11 @@ func _ready() -> void:
 	bridge.connect("event_json", _on_event_json)
 
 	if gm != null and gm.get_game_mode() == "vs_ai":
-		bridge.start_local_match_xiangqi_vs_ai(P_RED, P_BLACK)
+		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P_RED
+		var ai_p: int = P_BLACK if human_p == P_RED else P_RED
+		bridge.start_local_match_xiangqi_vs_ai(human_p, ai_p)
 		if mode_option_button != null:
-			mode_option_button.selected = 1
+			mode_option_button.selected = 1 if human_p == P_RED else 2
 	else:
 		bridge.start_local_match_xiangqi(P_RED, P_BLACK)
 		if mode_option_button != null:
@@ -168,28 +170,31 @@ func _on_theme_changed(theme: BoardTheme) -> void:
 	queue_redraw()
 
 func _setup_ui_layout() -> void:
-	# Panel de base para el tapete del tablero
+	var side_x := 640.0
+	# Panel de base para el tapete del tablero (z_index negativo para NO tapar _draw())
 	table_mat_panel = Panel.new()
 	table_mat_panel.name = "TableMatPanel"
-	table_mat_panel.position = Vector2(20, 10)
-	table_mat_panel.size = Vector2(760, 720)
+	table_mat_panel.z_index = -2
+	table_mat_panel.position = Vector2(32, 20)
+	table_mat_panel.size = Vector2(584, 650)
 	table_mat_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(table_mat_panel)
 
-	# Barra superior de controles
+	# Barra de controles en el panel lateral derecho
 	top_bar = HBoxContainer.new()
 	top_bar.name = "TopBar"
-	top_bar.position = Vector2(40, 15)
-	top_bar.size = Vector2(720, 36)
-	top_bar.add_theme_constant_override("separation", 12)
+	top_bar.position = Vector2(side_x, 24)
+	top_bar.size = Vector2(600, 38)
+	top_bar.add_theme_constant_override("separation", 10)
 	add_child(top_bar)
 
 	# Selector de modo
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
-	mode_option_button.custom_minimum_size = Vector2(170, 32)
+	mode_option_button.custom_minimum_size = Vector2(280, 34)
 	mode_option_button.add_item("Hotseat (2 jugadores)")
-	mode_option_button.add_item("vs IA (Negro)")
+	mode_option_button.add_item("vs IA (Humano Rojo - J1)")
+	mode_option_button.add_item("vs IA (Humano Negro - J2, IA inicia)")
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	top_bar.add_child(mode_option_button)
 
@@ -197,7 +202,7 @@ func _setup_ui_layout() -> void:
 	rules_button = Button.new()
 	rules_button.name = "RulesButton"
 	rules_button.text = "📖 Reglas"
-	rules_button.custom_minimum_size = Vector2(100, 32)
+	rules_button.custom_minimum_size = Vector2(105, 34)
 	rules_button.pressed.connect(_on_rules_pressed)
 	top_bar.add_child(rules_button)
 
@@ -205,26 +210,22 @@ func _setup_ui_layout() -> void:
 	reset_button = Button.new()
 	reset_button.name = "ResetButton"
 	reset_button.text = "🔄 Reiniciar"
-	reset_button.custom_minimum_size = Vector2(105, 32)
+	reset_button.custom_minimum_size = Vector2(110, 34)
 	reset_button.pressed.connect(_on_reset_pressed)
 	top_bar.add_child(reset_button)
 
-	# Espaciador
-	var spacer = Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_bar.add_child(spacer)
-
-	# Indicador de Turno
+	# Indicador de Turno en el panel lateral derecho
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.custom_minimum_size = Vector2(210, 34)
-	top_bar.add_child(turn_indicator)
+	turn_indicator.position = Vector2(side_x, 80)
+	turn_indicator.custom_minimum_size = Vector2(260, 40)
+	add_child(turn_indicator)
 
-	# Banner de eventos / anuncios
+	# Banner de eventos / anuncios en el panel lateral derecho
 	event_banner = PanelContainer.new()
 	event_banner.name = "EventBanner"
-	event_banner.position = Vector2(40, 685)
-	event_banner.size = Vector2(720, 36)
+	event_banner.position = Vector2(side_x, 160)
+	event_banner.size = Vector2(580, 44)
 	var ev_style = StyleBoxFlat.new()
 	ev_style.bg_color = Color(0.12, 0.14, 0.18, 0.88)
 	ev_style.border_width_left = 1
@@ -249,29 +250,29 @@ func _setup_ui_layout() -> void:
 	# Bandeja lateral para capturas Negras (capturadas por Rojo)
 	var black_tray_lbl = Label.new()
 	black_tray_lbl.text = "Capturas Negras:"
-	black_tray_lbl.position = Vector2(10, 60)
-	black_tray_lbl.add_theme_font_size_override("font_size", 12)
-	black_tray_lbl.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75))
+	black_tray_lbl.position = Vector2(side_x, 225)
+	black_tray_lbl.add_theme_font_size_override("font_size", 13)
+	black_tray_lbl.add_theme_color_override("font_color", Color(0.82, 0.82, 0.82))
 	add_child(black_tray_lbl)
 
 	captured_black_box = HBoxContainer.new()
-	captured_black_box.position = Vector2(10, 80)
-	captured_black_box.size = Vector2(115, 240)
-	captured_black_box.add_theme_constant_override("separation", 4)
+	captured_black_box.position = Vector2(side_x, 250)
+	captured_black_box.size = Vector2(580, 90)
+	captured_black_box.add_theme_constant_override("separation", 6)
 	add_child(captured_black_box)
 
 	# Bandeja lateral para capturas Rojas (capturadas por Negro)
 	var red_tray_lbl = Label.new()
 	red_tray_lbl.text = "Capturas Rojas:"
-	red_tray_lbl.position = Vector2(10, 360)
-	red_tray_lbl.add_theme_font_size_override("font_size", 12)
-	red_tray_lbl.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75))
+	red_tray_lbl.position = Vector2(side_x, 360)
+	red_tray_lbl.add_theme_font_size_override("font_size", 13)
+	red_tray_lbl.add_theme_color_override("font_color", Color(0.82, 0.82, 0.82))
 	add_child(red_tray_lbl)
 
 	captured_red_box = HBoxContainer.new()
-	captured_red_box.position = Vector2(10, 380)
-	captured_red_box.size = Vector2(115, 240)
-	captured_red_box.add_theme_constant_override("separation", 4)
+	captured_red_box.position = Vector2(side_x, 385)
+	captured_red_box.size = Vector2(580, 90)
+	captured_red_box.add_theme_constant_override("separation", 6)
 	add_child(captured_red_box)
 
 	if status != null:
@@ -752,8 +753,9 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var event_type = event.get("command_type", event.get("event_type", ""))
-			if event_type == "PieceMovedEvent" or event_type == "xiangqi_game::PieceMovedEvent":
+			var raw_type := str(event.get("command_type", event.get("event_type", "")))
+			var event_type := raw_type.split("::")[-1]
+			if event_type == "PieceMovedEvent":
 				var from = event.get("from", [0, 0])
 				var to = event.get("to", [0, 0])
 				# Coordenadas Rust: [col, row]
@@ -762,7 +764,7 @@ func _on_event_json(json_str: String) -> void:
 				var to_c = int(to[0])
 				var to_r = int(to[1])
 				_move_piece_node(from_r, from_c, to_r, to_c)
-			elif event_type == "GameOverEvent" or event_type == "xiangqi_game::GameOverEvent":
+			elif event_type == "GameOverEvent":
 				var w = event.get("winner", -1)
 				if w == null: w = 0
 				_on_game_over(int(w))
@@ -795,15 +797,19 @@ func _on_mode_selected(index: int) -> void:
 	last_move_from = null
 	last_move_to = null
 
-	if bridge != null:
-		if index == 1:
-			bridge.start_local_match_xiangqi_vs_ai(P_RED, P_BLACK)
-		else:
-			bridge.start_local_match_xiangqi(P_RED, P_BLACK)
-
 	_init_board_state()
+
+	if bridge != null:
+		match index:
+			1:
+				bridge.start_local_match_xiangqi_vs_ai(P_RED, P_BLACK)
+			2:
+				bridge.start_local_match_xiangqi_vs_ai(P_BLACK, P_RED)
+			_:
+				bridge.start_local_match_xiangqi(P_RED, P_BLACK)
+
 	current = bridge.current_player() if bridge else P_RED
-	event_label.text = "Nueva partida iniciada (%s)" % ("vs IA" if index == 1 else "Hotseat")
+	event_label.text = "Nueva partida iniciada (%s)" % ("vs IA" if index >= 1 else "Hotseat")
 	_update_status()
 	queue_redraw()
 
@@ -816,28 +822,15 @@ func _on_rules_pressed() -> void:
 func _on_reset_pressed() -> void:
 	_on_mode_selected(mode_option_button.selected if mode_option_button else 0)
 
-func _on_layout_changed(layout: int) -> void:
+func _on_layout_changed(_layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
-	if layout == 2: # PHONE
-		offset_x = 85.0
-		offset_y = 65.0
-		table_mat_panel.position = Vector2(5, 5)
-		table_mat_panel.size = Vector2(365, 710)
-		top_bar.position = Vector2(10, 10)
-		top_bar.size = Vector2(355, 36)
-		event_banner.position = Vector2(10, 670)
-		event_banner.size = Vector2(355, 36)
-	else: # DESKTOP & TABLET
-		offset_x = 140.0
-		offset_y = 55.0
-		table_mat_panel.position = Vector2(20, 10)
-		table_mat_panel.size = Vector2(760, 720)
-		top_bar.position = Vector2(40, 15)
-		top_bar.size = Vector2(720, 36)
-		event_banner.position = Vector2(40, 685)
-		event_banner.size = Vector2(720, 36)
+	offset_x = 76.0
+	offset_y = 64.0
+	if table_mat_panel != null:
+		table_mat_panel.position = Vector2(32, 20)
+		table_mat_panel.size = Vector2(584, 650)
 
 	_update_piece_node_positions()
 	queue_redraw()

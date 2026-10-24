@@ -484,9 +484,10 @@ func _show_mode_popup(game: Dictionary) -> void:
 	var tr_key = "GAME_" + game["id"].to_upper()
 	var display_name = tr(tr_key) if tr(tr_key) != tr_key else game["name"]
 	var game_color: Color = game.get("color", Color(0.35, 0.45, 0.65))
-	var saved_settings = _load_settings_json()
-	var default_mode = saved_settings.get("default_mode", "hotseat")
-	var saved_depth = int(saved_settings.get("chess_ai_depth", 2))
+	var saved_settings: Dictionary = _load_settings_json()
+	var default_mode: String = str(saved_settings.get("default_mode", "hotseat"))
+	var saved_depth: int = int(saved_settings.get("chess_ai_depth", 2))
+	var saved_human_side: int = int(saved_settings.get("human_player_id", 1))
 
 	var overlay = Control.new()
 	overlay.name = "ModePopupOverlay"
@@ -505,7 +506,7 @@ func _show_mode_popup(game: Dictionary) -> void:
 	overlay.add_child(backdrop)
 
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(420, 290)
+	panel.custom_minimum_size = Vector2(440, 340)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
@@ -529,7 +530,7 @@ func _show_mode_popup(game: Dictionary) -> void:
 	panel.add_child(margin)
 
 	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 14)
+	vbox.add_theme_constant_override("separation", 12)
 	margin.add_child(vbox)
 
 	# Header with Title and Close Button
@@ -564,19 +565,22 @@ func _show_mode_popup(game: Dictionary) -> void:
 	# Button 2 Players Hotseat
 	var hotseat_btn = Button.new()
 	hotseat_btn.text = "👥 2 Jugadores (Hotseat)"
-	hotseat_btn.custom_minimum_size = Vector2(0, 48)
+	hotseat_btn.custom_minimum_size = Vector2(0, 46)
 	hotseat_btn.add_theme_font_size_override("font_size", 16)
 	_apply_button_theme(hotseat_btn, Color(0.25, 0.45, 0.70))
 	hotseat_btn.pressed.connect(func():
 		_save_settings_json({"default_mode": "hotseat"})
-		_launch_game(game, "hotseat")
+		_launch_game(game, "hotseat", 1, 1)
 	)
 	vbox.add_child(hotseat_btn)
 
-	# Button vs AI & Selector de Dificultad (Fácil | Normal | Difícil | Experto)
+	# Button vs AI & Selector de Dificultad y Bando
 	var has_ai: bool = (game.get("ai_method", "") != "")
 	var diff_option: OptionButton = null
-	var saved_diff_level: int = _load_ai_difficulty_cfg()
+	var side_option: OptionButton = null
+	var saved_diff_level: int = clampi(int(saved_settings.get("ai_difficulty", saved_depth - 1)), 0, 3)
+	if saved_settings.is_empty():
+		saved_diff_level = _load_ai_difficulty_cfg()
 
 	if has_ai:
 		var game_hbox = HBoxContainer.new()
@@ -592,7 +596,7 @@ func _show_mode_popup(game: Dictionary) -> void:
 
 		var game_option = OptionButton.new()
 		game_option.name = "AiGameOptionButton"
-		game_option.custom_minimum_size = Vector2(190, 32)
+		game_option.custom_minimum_size = Vector2(210, 32)
 		var selected_game_idx := 0
 		var ai_idx := 0
 		for g in GAMES:
@@ -603,6 +607,25 @@ func _show_mode_popup(game: Dictionary) -> void:
 				ai_idx += 1
 		game_option.selected = selected_game_idx
 		game_hbox.add_child(game_option)
+
+		var side_hbox = HBoxContainer.new()
+		side_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		side_hbox.add_theme_constant_override("separation", 10)
+		vbox.add_child(side_hbox)
+
+		var side_lbl = Label.new()
+		side_lbl.text = "Tu bando:"
+		side_lbl.add_theme_font_size_override("font_size", 14)
+		side_lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
+		side_hbox.add_child(side_lbl)
+
+		side_option = OptionButton.new()
+		side_option.name = "AiSideOptionButton"
+		side_option.custom_minimum_size = Vector2(210, 32)
+		side_option.add_item("Jugador 1 (Tú inicias)", 0)
+		side_option.add_item("Jugador 2 (IA inicia)", 1)
+		side_option.selected = 1 if saved_human_side == 2 else 0
+		side_hbox.add_child(side_option)
 
 		var diff_hbox = HBoxContainer.new()
 		diff_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -616,7 +639,7 @@ func _show_mode_popup(game: Dictionary) -> void:
 		diff_hbox.add_child(diff_lbl)
 
 		diff_option = OptionButton.new()
-		diff_option.custom_minimum_size = Vector2(190, 32)
+		diff_option.custom_minimum_size = Vector2(210, 32)
 		diff_option.add_item("Fácil", 0)
 		diff_option.add_item("Normal", 1)
 		diff_option.add_item("Difícil", 2)
@@ -625,19 +648,27 @@ func _show_mode_popup(game: Dictionary) -> void:
 		diff_hbox.add_child(diff_option)
 
 	var ai_btn = Button.new()
-	ai_btn.custom_minimum_size = Vector2(0, 48)
+	ai_btn.custom_minimum_size = Vector2(0, 46)
 	ai_btn.add_theme_font_size_override("font_size", 16)
 
 	if has_ai:
-		ai_btn.text = "🤖 vs IA"
+		ai_btn.text = "🤖 Jugar vs IA"
 		_apply_button_theme(ai_btn, Color(0.70, 0.35, 0.35))
 		ai_btn.pressed.connect(func():
 			var difficulty_level := 1
 			if diff_option != null:
 				difficulty_level = clampi(diff_option.selected, 0, 3)
+			var human_side := 1
+			if side_option != null and side_option.selected == 1:
+				human_side = 2
 			_save_ai_difficulty_cfg(difficulty_level)
-			_save_settings_json({"default_mode": "vs_ai", "chess_ai_depth": difficulty_level + 1, "ai_difficulty": difficulty_level})
-			_launch_game(game, "vs_ai", difficulty_level)
+			_save_settings_json({
+				"default_mode": "vs_ai",
+				"chess_ai_depth": difficulty_level + 1,
+				"ai_difficulty": difficulty_level,
+				"human_player_id": human_side
+			})
+			_launch_game(game, "vs_ai", difficulty_level, human_side)
 		)
 	else:
 		ai_btn.text = "🤖 vs IA (No disponible)"
@@ -673,37 +704,43 @@ func _close_mode_popup() -> void:
 	if has_node("Title"):
 		get_node("Title").modulate.a = 1.0
 
-func _launch_game(game: Dictionary, mode: String, difficulty_level: int = 1) -> void:
+func _launch_game(game: Dictionary, mode: String, difficulty_level: int = 1, human_player: int = 1) -> void:
 	_close_mode_popup()
+	var human_p: int = 2 if human_player == 2 else 1
+	var ai_p: int = 1 if human_p == 2 else 2
+
 	if is_inside_tree() and has_node("/root/GameManager"):
-		get_node("/root/GameManager").set_active_game(game["id"])
-	if is_inside_tree() and has_node("/root/GameManager"):
-		get_node("/root/GameManager").set_game_mode(mode)
+		var gm = get_node("/root/GameManager")
+		gm.set_active_game(game["id"])
+		gm.set_game_mode(mode)
+		if gm.has_method("set_human_player_id"):
+			gm.set_human_player_id(human_p)
+		if gm.has_method("set_ai_difficulty"):
+			gm.set_ai_difficulty(difficulty_level)
+		gm.set_chess_ai_depth(difficulty_level + 1)
 
 	if mode == "vs_ai":
 		var board_size: int = 9
-		if is_inside_tree() and has_node("/root/GameManager"):
-			get_node("/root/GameManager").set_chess_ai_depth(difficulty_level + 1)
 		if bridge.has_method("set_ai_difficulty"):
 			bridge.call("set_ai_difficulty", difficulty_level)
 		if game["id"] == "chess":
 			if bridge.has_method("start_local_match_chess_vs_ai"):
-				bridge.call("start_local_match_chess_vs_ai", 1, 2, difficulty_level)
+				bridge.call("start_local_match_chess_vs_ai", human_p, ai_p, difficulty_level)
 		elif game.get("ai_method", "") != "":
 			var ai_method: String = game["ai_method"]
 			if game["id"] == "checkers":
 				if bridge.has_method(ai_method):
-					bridge.call(ai_method, 42, 1, 2)
+					bridge.call(ai_method, 42, human_p, ai_p)
 			elif game["id"] == "go":
 				if bridge.has_method("start_local_match_go_vs_ai_ext"):
-					bridge.call(ai_method, 1, 2, board_size, difficulty_level)
+					bridge.call(ai_method, human_p, ai_p, board_size, difficulty_level)
 				elif bridge.has_method(ai_method):
-					bridge.call(ai_method, 1, 2, difficulty_level)
+					bridge.call(ai_method, human_p, ai_p, difficulty_level)
 			elif game["id"] in ["shogi", "uno", "crisis", "chinese_checkers", "mille_bornes", "monopoly", "battleship"]:
 				if bridge.has_method(ai_method):
-					bridge.call(ai_method, 1, 2, difficulty_level)
+					bridge.call(ai_method, human_p, ai_p, difficulty_level)
 			elif bridge.has_method(ai_method):
-				bridge.call(ai_method, 1, 2)
+				bridge.call(ai_method, human_p, ai_p)
 	else:
 		var method_name: String = game["method"]
 		if game["id"] == "crisis":

@@ -553,7 +553,10 @@ impl OpenTableBridge {
     #[func]
     fn start_local_match_shogi(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "shogi".to_string();
-        let session = new_shogi_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        let s_id = PlayerId(p1 as u32);
+        let g_id = PlayerId(p2 as u32);
+        let mut session = new_shogi_session(SessionId(1), 1, s_id, g_id);
+        Self::populate_full_shogi_board(&mut session, s_id, g_id);
         self.mode = BridgeMode::Local {
             session,
             ai_player: None,
@@ -588,7 +591,8 @@ impl OpenTableBridge {
             (p_ai, p_human)
         };
 
-        let session = new_shogi_session(SessionId(1), 1, p1, p2);
+        let mut session = new_shogi_session(SessionId(1), 1, p1, p2);
+        Self::populate_full_shogi_board(&mut session, p1, p2);
         let current_p = session.current_player().0 as i64;
         self.mode = BridgeMode::Local {
             session,
@@ -606,8 +610,10 @@ impl OpenTableBridge {
     #[func]
     fn start_local_match_xiangqi(&mut self, p1: i64, p2: i64) {
         self.current_game_type = "xiangqi".to_string();
-        let session =
-            new_xiangqi_session(SessionId(1), 1, PlayerId(p1 as u32), PlayerId(p2 as u32));
+        let r_id = PlayerId(p1 as u32);
+        let b_id = PlayerId(p2 as u32);
+        let mut session = new_xiangqi_session(SessionId(1), 1, r_id, b_id);
+        Self::populate_full_xiangqi_board(&mut session, r_id, b_id);
         self.mode = BridgeMode::Local {
             session,
             ai_player: None,
@@ -630,7 +636,8 @@ impl OpenTableBridge {
             (p_ai, p_human)
         };
 
-        let session = new_xiangqi_session(SessionId(1), 1, p1, p2);
+        let mut session = new_xiangqi_session(SessionId(1), 1, p1, p2);
+        Self::populate_full_xiangqi_board(&mut session, p1, p2);
         let current_p = session.current_player().0 as i64;
         self.mode = BridgeMode::Local {
             session,
@@ -4032,12 +4039,149 @@ impl OpenTableBridge {
         }
     }
 
+    #[func]
+    pub fn trigger_ai_turn(&mut self) -> bool {
+        let before_tick = self.current_tick();
+        self.process_ai_turn_if_needed();
+        self.current_tick() > before_tick
+    }
+
+    fn populate_full_shogi_board(session: &mut Session, sente: PlayerId, gote: PlayerId) {
+        use shogi_game::{BoardResource, Piece, PieceKind, ShogiHistoryResource};
+        let mut board = BoardResource::new(sente, gote);
+        board.hands.insert(sente, Vec::new());
+        board.hands.insert(gote, Vec::new());
+
+        let back_rank = [
+            PieceKind::Lance,
+            PieceKind::Knight,
+            PieceKind::Silver,
+            PieceKind::Gold,
+            PieceKind::King,
+            PieceKind::Gold,
+            PieceKind::Silver,
+            PieceKind::Knight,
+            PieceKind::Lance,
+        ];
+        for (col, &kind) in back_rank.iter().enumerate() {
+            board.squares.insert((col, 0), Piece { kind, owner: gote });
+            board.squares.insert((col, 8), Piece { kind, owner: sente });
+        }
+        board.squares.insert(
+            (1, 1),
+            Piece {
+                kind: PieceKind::Rook,
+                owner: gote,
+            },
+        );
+        board.squares.insert(
+            (7, 1),
+            Piece {
+                kind: PieceKind::Bishop,
+                owner: gote,
+            },
+        );
+        board.squares.insert(
+            (1, 7),
+            Piece {
+                kind: PieceKind::Bishop,
+                owner: sente,
+            },
+        );
+        board.squares.insert(
+            (7, 7),
+            Piece {
+                kind: PieceKind::Rook,
+                owner: sente,
+            },
+        );
+        for col in 0..9 {
+            board.squares.insert(
+                (col, 2),
+                Piece {
+                    kind: PieceKind::Pawn,
+                    owner: gote,
+                },
+            );
+            board.squares.insert(
+                (col, 6),
+                Piece {
+                    kind: PieceKind::Pawn,
+                    owner: sente,
+                },
+            );
+        }
+
+        let mut history = ShogiHistoryResource::new();
+        history.record(&board, sente);
+        session.world_mut().insert_resource(board);
+        session.world_mut().insert_resource(history);
+    }
+
+    fn populate_full_xiangqi_board(session: &mut Session, red: PlayerId, black: PlayerId) {
+        use xiangqi_game::{BoardResource, Piece, PieceKind, XiangqiHistoryResource};
+        let mut board = BoardResource::new(red, black);
+
+        let back_rank = [
+            PieceKind::Chariot,
+            PieceKind::Horse,
+            PieceKind::Elephant,
+            PieceKind::Advisor,
+            PieceKind::General,
+            PieceKind::Advisor,
+            PieceKind::Elephant,
+            PieceKind::Horse,
+            PieceKind::Chariot,
+        ];
+        for (col, &kind) in back_rank.iter().enumerate() {
+            board.squares.insert((col, 0), Piece { kind, owner: black });
+            board.squares.insert((col, 9), Piece { kind, owner: red });
+        }
+        for &col in &[1usize, 7usize] {
+            board.squares.insert(
+                (col, 2),
+                Piece {
+                    kind: PieceKind::Cannon,
+                    owner: black,
+                },
+            );
+            board.squares.insert(
+                (col, 7),
+                Piece {
+                    kind: PieceKind::Cannon,
+                    owner: red,
+                },
+            );
+        }
+        for &col in &[0usize, 2, 4, 6, 8] {
+            board.squares.insert(
+                (col, 3),
+                Piece {
+                    kind: PieceKind::Soldier,
+                    owner: black,
+                },
+            );
+            board.squares.insert(
+                (col, 6),
+                Piece {
+                    kind: PieceKind::Soldier,
+                    owner: red,
+                },
+            );
+        }
+
+        session.world_mut().insert_resource(board);
+        session
+            .world_mut()
+            .insert_resource(XiangqiHistoryResource::default());
+    }
+
     fn process_ai_turn_if_needed(&mut self) {
         let mut steps = 0;
         let max_steps = if self.current_game_type == "crisis" {
-            16
+            20
         } else {
-            2
+            12
         };
         loop {
             if steps >= max_steps {
@@ -4050,11 +4194,13 @@ impl OpenTableBridge {
                 } => {
                     let curr_p = session.current_player();
                     let is_ai_turn = curr_p == *ai_p;
-                    let auto_play_initial = (self.current_game_type == "shogi"
-                        || self.current_game_type == "xiangqi")
-                        && session.current_tick().0 < 4;
-                    if is_ai_turn || auto_play_initial || self.current_game_type == "monopoly" {
-                        let acting = if self.current_game_type == "monopoly" {
+                    let go_dead_confirm = self.current_game_type == "go"
+                        && session
+                            .world()
+                            .get_resource::<go_game::board::DeadMarkingResource>()
+                            .is_some_and(|dm| dm.active && !dm.confirmed_players.contains(ai_p));
+                    if is_ai_turn || go_dead_confirm || self.current_game_type == "monopoly" {
+                        let acting = if self.current_game_type == "monopoly" || go_dead_confirm {
                             *ai_p
                         } else {
                             curr_p
@@ -4064,32 +4210,34 @@ impl OpenTableBridge {
                                 chess_game::ai::best_move(session, *ai_p, self.ai_difficulty)
                                     .map(|c| Box::new(c) as Box<dyn Command>)
                             }
-                            "shogi" => {
-                                shogi_game::ai::best_move(session, curr_p, self.ai_difficulty)
+                            "shogi" if is_ai_turn => {
+                                shogi_game::ai::best_move(session, *ai_p, self.ai_difficulty)
                             }
-                            "xiangqi" => {
-                                xiangqi_game::ai::best_move(session, curr_p, self.ai_difficulty)
+                            "xiangqi" if is_ai_turn => {
+                                xiangqi_game::ai::best_move(session, *ai_p, self.ai_difficulty)
                                     .map(|c| Box::new(c) as Box<dyn Command>)
                             }
                             "go" => {
                                 let confirm_dead = session
                                     .world()
                                     .get_resource::<go_game::board::DeadMarkingResource>()
-                                    .filter(|dm| {
-                                        dm.active && !dm.confirmed_players.contains(&curr_p)
-                                    })
+                                    .filter(|dm| dm.active && !dm.confirmed_players.contains(ai_p))
                                     .map(|_| {
-                                        Box::new(go_game::ConfirmDeadCommand { player: curr_p })
+                                        Box::new(go_game::ConfirmDeadCommand { player: *ai_p })
                                             as Box<dyn Command>
                                     });
-                                confirm_dead.or_else(|| {
-                                    go_game::ai::best_move(session, curr_p, self.ai_difficulty)
+                                if confirm_dead.is_some() {
+                                    confirm_dead
+                                } else if is_ai_turn {
+                                    go_game::ai::best_move(session, *ai_p, self.ai_difficulty)
                                         .map(|c| Box::new(c) as Box<dyn Command>)
                                         .or_else(|| {
-                                            Some(Box::new(go_game::PassCommand { player: curr_p })
+                                            Some(Box::new(go_game::PassCommand { player: *ai_p })
                                                 as Box<dyn Command>)
                                         })
-                                })
+                                } else {
+                                    None
+                                }
                             }
                             "backgammon" if is_ai_turn => {
                                 let cube_response = session

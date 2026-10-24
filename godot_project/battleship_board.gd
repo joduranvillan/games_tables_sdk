@@ -40,6 +40,7 @@ var ships_container: Control
 var ship_sprites_container: Node2D
 
 var turn_indicator: TurnIndicator
+var mode_option_button: OptionButton
 var network_hud: NetworkStatusHUD
 var current_theme: BoardTheme
 var _rules_popup: RulesPopup
@@ -80,7 +81,18 @@ func _ready() -> void:
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
 
-	bridge.start_local_match_battleship(P1, P2)
+	if gm != null and gm.get_game_mode() == "vs_ai":
+		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P1
+		var ai_p: int = P2 if human_p == P1 else P1
+		var diff: int = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
+		bridge.start_local_match_battleship_vs_ai(human_p, ai_p, diff)
+		phase = Phase.PLACEMENT_P1 if human_p == P1 else Phase.PLACEMENT_P2
+		if mode_option_button != null:
+			mode_option_button.selected = 1 if human_p == P1 else 2
+	else:
+		bridge.start_local_match_battleship(P1, P2)
+		if mode_option_button != null:
+			mode_option_button.selected = 0
 	current = bridge.current_player()
 
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
@@ -92,8 +104,8 @@ func _ready() -> void:
 	var btn_rules := Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
-	btn_rules.position = Vector2(get_viewport_rect().size.x - 105, 10)
-	btn_rules.custom_minimum_size = Vector2(90, 36)
+	btn_rules.position = Vector2(1140, 12)
+	btn_rules.custom_minimum_size = Vector2(110, 36)
 	btn_rules.pressed.connect(func(): _rules_popup.show_for_game("battleship"))
 	add_child(btn_rules)
 
@@ -161,6 +173,15 @@ func _setup_ui() -> void:
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header_hbox.add_child(status_label)
 
+	mode_option_button = OptionButton.new()
+	mode_option_button.name = "ModeOptionButton"
+	mode_option_button.custom_minimum_size = Vector2(280, 36)
+	mode_option_button.add_item("Hotseat (2 jugadores)")
+	mode_option_button.add_item("vs IA (Humano J1)")
+	mode_option_button.add_item("vs IA (Humano J2, IA coloca primero)")
+	mode_option_button.item_selected.connect(_on_mode_selected)
+	header_hbox.add_child(mode_option_button)
+
 	rotate_btn = Button.new()
 	rotate_btn.text = "🔄 Orientación: Horizontal"
 	rotate_btn.custom_minimum_size = Vector2(200, 36)
@@ -190,6 +211,8 @@ func _setup_ui() -> void:
 
 	var own_grid_container = GridContainer.new()
 	own_grid_container.columns = BOARD_SIZE
+	own_grid_container.add_theme_constant_override("h_separation", 0)
+	own_grid_container.add_theme_constant_override("v_separation", 0)
 	own_margin.add_child(own_grid_container)
 
 	own_grid_buttons = []
@@ -221,6 +244,8 @@ func _setup_ui() -> void:
 
 	var opp_grid_container = GridContainer.new()
 	opp_grid_container.columns = BOARD_SIZE
+	opp_grid_container.add_theme_constant_override("h_separation", 0)
+	opp_grid_container.add_theme_constant_override("v_separation", 0)
 	opp_margin.add_child(opp_grid_container)
 
 	opp_grid_buttons = []
@@ -240,8 +265,31 @@ func _setup_ui() -> void:
 	add_child(ship_sprites_container)
 
 	turn_indicator = TurnIndicator.new()
-	turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 120)
+	turn_indicator.position = Vector2(960, 560)
 	add_child(turn_indicator)
+
+func _on_mode_selected(index: int) -> void:
+	winner = -1
+	p1_ships.clear()
+	p2_ships.clear()
+	sunken_cells.clear()
+	current_ship_index = 0
+	_init_grids()
+	if bridge != null:
+		match index:
+			1:
+				phase = Phase.PLACEMENT_P1
+				bridge.start_local_match_battleship_vs_ai(P1, P2, 1)
+			2:
+				phase = Phase.PLACEMENT_P2
+				bridge.start_local_match_battleship_vs_ai(P2, P1, 1)
+			_:
+				phase = Phase.PLACEMENT_P1
+				bridge.start_local_match_battleship(P1, P2)
+	current = bridge.current_player() if bridge else P1
+	_update_status()
+	_update_grid_ui()
+	queue_redraw()
 
 func _draw() -> void:
 	var font: Font = null
@@ -464,7 +512,8 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var ev_type: String = event.get("event_type", event.get("command_type", ""))
+			var raw_type: String = str(event.get("event_type", event.get("command_type", "")))
+			var ev_type: String = raw_type.split("::")[-1]
 			if ev_type == "FleetPlacedEvent":
 				var player_id = int(event.get("player", 1))
 				if player_id == P1:

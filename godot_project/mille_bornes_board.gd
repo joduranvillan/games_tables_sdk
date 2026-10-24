@@ -118,8 +118,18 @@ func _ready() -> void:
 	if bridge.has_signal("turn_changed"):
 		bridge.connect("turn_changed", _on_turn_changed)
 
-	bridge.start_local_match_mille_bornes(P1, P2)
-	bridge.send_command_json(P1, JSON.stringify({"command_type": "SetupDeckCommand"}))
+	var is_ai_mode = (gm != null and gm.has_method("get_game_mode") and gm.get_game_mode() == "vs_ai")
+	if is_ai_mode:
+		var human_p = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P1
+		var ai_p = P2 if human_p == P1 else P1
+		var diff = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
+		bridge.start_local_match_mille_bornes_vs_ai(human_p, ai_p, diff)
+		bridge.send_command_json(P1, JSON.stringify({"command_type": "SetupDeckCommand"}))
+		if ai_p == P1 and bridge.has_method("trigger_ai_turn"):
+			bridge.trigger_ai_turn()
+	else:
+		bridge.start_local_match_mille_bornes(P1, P2)
+		bridge.send_command_json(P1, JSON.stringify({"command_type": "SetupDeckCommand"}))
 	current = bridge.current_player()
 
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
@@ -138,6 +148,34 @@ func _on_quit_to_menu() -> void:
 	else:
 		if is_inside_tree():
 			get_tree().change_scene_to_file("res://main.tscn")
+
+func _on_mode_selected(index: int) -> void:
+	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	winner = -1
+	distance = {P1: 0, P2: 0}
+	hazards = {P1: "Luz Verde (Siga)", P2: "Luz Verde (Siga)"}
+	safeties = {P1: [], P2: []}
+	if index == 0:
+		if gm != null and gm.has_method("set_game_mode"):
+			gm.set_game_mode("local")
+		bridge.start_local_match_mille_bornes(P1, P2)
+		bridge.send_command_json(P1, JSON.stringify({"command_type": "SetupDeckCommand"}))
+	else:
+		var human_p = P1 if index == 1 else P2
+		var ai_p = P2 if human_p == P1 else P1
+		var diff = gm.get_ai_difficulty() if (gm != null and gm.has_method("get_ai_difficulty")) else 1
+		if gm != null and gm.has_method("set_game_mode"):
+			gm.set_game_mode("vs_ai")
+		if gm != null and gm.has_method("set_human_player_id"):
+			gm.set_human_player_id(human_p)
+		bridge.start_local_match_mille_bornes_vs_ai(human_p, ai_p, diff)
+		bridge.send_command_json(P1, JSON.stringify({"command_type": "SetupDeckCommand"}))
+		if ai_p == P1 and bridge.has_method("trigger_ai_turn"):
+			bridge.trigger_ai_turn()
+	current = bridge.current_player()
+	_update_hand_ui()
+	_update_tableaus()
+	_update_status()
 
 func _create_default_theme() -> void:
 	current_theme = BoardTheme.new()
@@ -213,6 +251,20 @@ func _setup_ui() -> void:
 	btn_rules.custom_minimum_size = Vector2(90, 36)
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("mille_bornes"))
 	top_bar.add_child(btn_rules)
+
+	var mode_opt := OptionButton.new()
+	mode_opt.name = "ModeOptionButton"
+	mode_opt.add_item("👥 Hotseat", 0)
+	mode_opt.add_item("🤖 vs IA (J1)", 1)
+	mode_opt.add_item("🤖 vs IA (J2)", 2)
+	var gm_ref = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	if gm_ref != null and gm_ref.has_method("get_game_mode") and gm_ref.get_game_mode() == "vs_ai":
+		var hp = gm_ref.get_human_player_id() if gm_ref.has_method("get_human_player_id") else P1
+		mode_opt.selected = 1 if hp == P1 else 2
+	else:
+		mode_opt.selected = 0
+	mode_opt.item_selected.connect(_on_mode_selected)
+	top_bar.add_child(mode_opt)
 
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
@@ -751,7 +803,8 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var event_type = event.get("command_type", event.get("event_type", ""))
+			var raw_type = str(event.get("command_type", event.get("event_type", "")))
+			var event_type = raw_type.split("::")[-1]
 			if event_type == "CardDrawnEvent":
 				var card = event.get("card", "Carta")
 				if event.get("player", current) == P1:

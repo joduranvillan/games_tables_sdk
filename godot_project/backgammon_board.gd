@@ -86,9 +86,11 @@ func _ready() -> void:
 				add_child(hud)
 
 	if gm != null and gm.get_game_mode() == "vs_ai":
-		bridge.start_local_match_backgammon_vs_ai(P1, P2)
+		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P1
+		var ai_p: int = P2 if human_p == P1 else P1
+		bridge.start_local_match_backgammon_vs_ai(human_p, ai_p)
 		if mode_option_button != null:
-			mode_option_button.selected = 1
+			mode_option_button.selected = 1 if human_p == P1 else 2
 	else:
 		bridge.start_local_match_backgammon(P1, P2)
 		if mode_option_button != null:
@@ -139,13 +141,22 @@ func _init_board_state() -> void:
 	borne_off_checkers = {1: 0, 2: 0}
 
 func _setup_ui() -> void:
+	if status == null:
+		status = get_node_or_null("Status")
+	if status == null:
+		status = Label.new()
+		status.name = "Status"
+		add_child(status)
+	status.position = Vector2(780, 160)
+
 	# Mode Option Button
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
-	mode_option_button.position = Vector2(610, 215)
-	mode_option_button.custom_minimum_size = Vector2(140, 34)
-	mode_option_button.add_item("Hotseat")
-	mode_option_button.add_item("vs IA")
+	mode_option_button.position = Vector2(780, 40)
+	mode_option_button.custom_minimum_size = Vector2(360, 34)
+	mode_option_button.add_item("Hotseat (2 jugadores)")
+	mode_option_button.add_item("vs IA (Humano Rojo - J1)")
+	mode_option_button.add_item("vs IA (Humano Azul - J2, IA inicia)")
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	add_child(mode_option_button)
 
@@ -231,16 +242,16 @@ func _setup_ui() -> void:
 	var rules_btn = Button.new()
 	rules_btn.name = "RulesButton"
 	rules_btn.text = "📖 Reglas"
-	rules_btn.position = Vector2(620, 10)
-	rules_btn.custom_minimum_size = Vector2(90, 36)
+	rules_btn.position = Vector2(900, 210)
+	rules_btn.custom_minimum_size = Vector2(110, 36)
 	rules_btn.pressed.connect(func(): rules_popup.show_for_game("backgammon"))
 	add_child(rules_btn)
 
 	var tutorial_btn := Button.new()
 	tutorial_btn.name = "BackgammonTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(510, 10)
-	tutorial_btn.custom_minimum_size = Vector2(105, 36)
+	tutorial_btn.position = Vector2(780, 210)
+	tutorial_btn.custom_minimum_size = Vector2(110, 36)
 	tutorial_btn.pressed.connect(start_backgammon_tutorial)
 	add_child(tutorial_btn)
 
@@ -252,7 +263,7 @@ func _setup_ui() -> void:
 	# Turn Indicator Widget
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(40, 535)
+	turn_indicator.position = Vector2(780, 90)
 	add_child(turn_indicator)
 
 func start_backgammon_tutorial() -> void:
@@ -275,19 +286,23 @@ func _get_point_base_pos(pt_idx: int) -> Vector2:
 		return Vector2(left_start + (23 - pt_idx) * col_width + col_width / 2.0, 60)
 
 func _on_mode_selected(index: int) -> void:
-	if bridge != null:
-		if index == 1:
-			bridge.start_local_match_backgammon_vs_ai(P1, P2)
-		else:
-			bridge.start_local_match_backgammon(P1, P2)
-
 	_init_board_state()
-	current = bridge.current_player() if bridge else P1
 	selected_from = -2
 	rolled_dice.clear()
 	if dice_label != null:
 		dice_label.text = "Dados: -"
 	winner = -1
+
+	if bridge != null:
+		match index:
+			1:
+				bridge.start_local_match_backgammon_vs_ai(P1, P2)
+			2:
+				bridge.start_local_match_backgammon_vs_ai(P2, P1)
+			_:
+				bridge.start_local_match_backgammon(P1, P2)
+
+	current = bridge.current_player() if bridge else P1
 	_update_checker_positions()
 	_update_status()
 	queue_redraw()
@@ -466,7 +481,8 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var event_type = event.get("command_type", event.get("event_type", ""))
+			var raw_type := str(event.get("command_type", event.get("event_type", "")))
+			var event_type := raw_type.split("::")[-1]
 			if event_type == "DiceRolledEvent":
 				rolled_dice = event.get("values", [])
 				dice_label.text = "Dados: %s" % str(rolled_dice)

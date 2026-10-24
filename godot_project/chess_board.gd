@@ -6,7 +6,7 @@ signal animation_finished
 @export var fallback_to_unicode: bool = true
 
 const BOARD_SIZE = 8
-const CELL_SIZE = 80.0
+const CELL_SIZE = 76.0
 const P1 = 1
 const P2 = 2
 
@@ -92,10 +92,15 @@ func _ready() -> void:
 	bridge.connect("piece_moved", _on_piece_moved_signal)
 	
 	if gm != null and gm.get_game_mode() == "vs_ai":
-		var depth = gm.get_chess_ai_depth() if gm != null else 2
-		bridge.start_local_match_chess_vs_ai(P1, P2, depth)
+		var depth: int = gm.get_chess_ai_depth() if gm != null else 2
+		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P1
+		var ai_p: int = P2 if human_p == P1 else P1
+		bridge.start_local_match_chess_vs_ai(human_p, ai_p, depth)
 		if mode_option_button != null:
-			mode_option_button.selected = 1
+			if human_p == P2:
+				mode_option_button.selected = 4
+			else:
+				mode_option_button.selected = clampi(depth, 1, 3)
 	else:
 		bridge.start_local_match_chess(P1, P2)
 		if mode_option_button != null:
@@ -110,8 +115,8 @@ func _ready() -> void:
 	var btn_rules := Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
-	btn_rules.position = Vector2(BOARD_SIZE * CELL_SIZE - 95, BOARD_SIZE * CELL_SIZE + 45)
-	btn_rules.custom_minimum_size = Vector2(90, 36)
+	btn_rules.position = Vector2(990, 270)
+	btn_rules.custom_minimum_size = Vector2(120, 36)
 	btn_rules.pressed.connect(func(): _rules_popup.show_for_game("chess"))
 	add_child(btn_rules)
 
@@ -132,42 +137,47 @@ func _on_quit_to_menu() -> void:
 		if is_inside_tree():
 			get_tree().change_scene_to_file("res://main.tscn")
 
-func _on_layout_changed(layout: int) -> void:
+func _on_layout_changed(_layout: int) -> void:
 	if is_inside_tree() and has_node("/root/ThemeManager"):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
-	if layout == 2: # PHONE
-		if mode_option_button != null:
-			mode_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
-		if opening_option_button != null:
-			opening_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 50)
-		if turn_indicator != null:
-			turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 90)
-		if status != null:
-			status.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 130)
-	else: # DESKTOP / TABLET
-		if mode_option_button != null:
-			mode_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
-		if opening_option_button != null:
-			opening_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 50)
-		if turn_indicator != null:
-			turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 90)
-		if status != null:
-			status.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 135)
+	var side_x := 640.0
+	if mode_option_button != null:
+		mode_option_button.position = Vector2(side_x, 24)
+	if opening_option_button != null:
+		opening_option_button.position = Vector2(side_x, 72)
+	if turn_indicator != null:
+		turn_indicator.position = Vector2(side_x, 125)
+	if status != null:
+		status.position = Vector2(side_x, 210)
+	if export_game_button != null:
+		export_game_button.position = Vector2(side_x, 270)
+	var tut_btn = get_node_or_null("ChessTutorialButton")
+	if tut_btn != null:
+		tut_btn.position = Vector2(side_x + 175, 270)
+	var rules_btn = get_node_or_null("RulesButton")
+	if rules_btn != null:
+		rules_btn.position = Vector2(side_x + 350, 270)
+	if export_toast_label != null:
+		export_toast_label.position = Vector2(side_x, 315)
 
 func _setup_ui() -> void:
+	var side_x := 640.0
 	if status == null:
 		status = get_node_or_null("Status")
 	if status == null:
 		status = Label.new()
 		status.name = "Status"
-		status.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 135)
 		add_child(status)
+	status.position = Vector2(side_x, 210)
+	status.custom_minimum_size = Vector2(580, 40)
 
 	grid_container = GridContainer.new()
 	grid_container.name = "GridContainer"
 	grid_container.columns = BOARD_SIZE
 	grid_container.position = Vector2.ZERO
+	grid_container.add_theme_constant_override("h_separation", 0)
+	grid_container.add_theme_constant_override("v_separation", 0)
 	add_child(grid_container)
 	
 	var col_l = current_theme.light_color if current_theme else COL_LIGHT
@@ -201,26 +211,27 @@ func _setup_ui() -> void:
 	# Turn Indicator Widget
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 90)
+	turn_indicator.position = Vector2(side_x, 125)
 	add_child(turn_indicator)
 
 	# Game Mode Selector
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
-	mode_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 10)
-	mode_option_button.custom_minimum_size = Vector2(300, 32)
+	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.custom_minimum_size = Vector2(380, 36)
 	mode_option_button.add_item("Hotseat (2 jugadores)")
-	mode_option_button.add_item("vs IA (fácil)")
-	mode_option_button.add_item("vs IA (medio)")
-	mode_option_button.add_item("vs IA (difícil)")
+	mode_option_button.add_item("vs IA (Blancas J1 - Fácil)")
+	mode_option_button.add_item("vs IA (Blancas J1 - Medio)")
+	mode_option_button.add_item("vs IA (Blancas J1 - Difícil)")
+	mode_option_button.add_item("vs IA (Negras J2 - IA mueve primero)")
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	add_child(mode_option_button)
 
 	# Opening Practice Selector
 	opening_option_button = OptionButton.new()
 	opening_option_button.name = "OpeningOptionButton"
-	opening_option_button.position = Vector2(10, BOARD_SIZE * CELL_SIZE + 50)
-	opening_option_button.custom_minimum_size = Vector2(300, 32)
+	opening_option_button.position = Vector2(side_x, 72)
+	opening_option_button.custom_minimum_size = Vector2(380, 36)
 	opening_option_button.add_item("Partida libre (Sin apertura)")
 	opening_option_button.add_item("Ruy López (e4 e5 Nf3 Nc6 Bb5)")
 	opening_option_button.add_item("Gambito de Dama (d4 d5 c4)")
@@ -235,8 +246,8 @@ func _setup_ui() -> void:
 	export_game_button = Button.new()
 	export_game_button.name = "ExportGameButton"
 	export_game_button.text = "Exportar Partida"
-	export_game_button.position = Vector2(325, BOARD_SIZE * CELL_SIZE + 10)
-	export_game_button.custom_minimum_size = Vector2(160, 32)
+	export_game_button.position = Vector2(side_x, 270)
+	export_game_button.custom_minimum_size = Vector2(160, 36)
 	export_game_button.pressed.connect(_on_export_game_pressed)
 	add_child(export_game_button)
 
@@ -244,8 +255,8 @@ func _setup_ui() -> void:
 	var tutorial_btn := Button.new()
 	tutorial_btn.name = "ChessTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(325, BOARD_SIZE * CELL_SIZE + 50)
-	tutorial_btn.custom_minimum_size = Vector2(160, 32)
+	tutorial_btn.position = Vector2(side_x + 175, 270)
+	tutorial_btn.custom_minimum_size = Vector2(160, 36)
 	tutorial_btn.pressed.connect(start_chess_tutorial)
 	add_child(tutorial_btn)
 
@@ -253,7 +264,7 @@ func _setup_ui() -> void:
 	export_toast_label.name = "ExportToastLabel"
 	export_toast_label.text = ""
 	export_toast_label.visible = false
-	export_toast_label.position = Vector2(325, BOARD_SIZE * CELL_SIZE + 48)
+	export_toast_label.position = Vector2(side_x, 315)
 	export_toast_label.add_theme_font_size_override("font_size", 14)
 	export_toast_label.add_theme_color_override("font_color", Color(0.45, 0.95, 0.55))
 	add_child(export_toast_label)
@@ -295,6 +306,11 @@ func _on_mode_selected(index: int) -> void:
 	if opening_option_button != null:
 		opening_option_button.selected = 0
 
+	selected_pos = null
+	valid_moves.clear()
+	winner = -1
+	_init_board_state()
+
 	if bridge != null:
 		match index:
 			0:
@@ -305,12 +321,10 @@ func _on_mode_selected(index: int) -> void:
 				bridge.start_local_match_chess_vs_ai(P1, P2, 2)
 			3:
 				bridge.start_local_match_chess_vs_ai(P1, P2, 3)
+			4:
+				bridge.start_local_match_chess_vs_ai(P2, P1, 2)
 
-	_init_board_state()
 	current = bridge.current_player() if bridge else P1
-	selected_pos = null
-	valid_moves.clear()
-	winner = -1
 	_update_status()
 	queue_redraw()
 
@@ -405,12 +419,22 @@ func _on_piece_dropped(to_cell: Vector2i) -> void:
 	valid_moves.clear()
 	queue_redraw()
 	
+	_send_chess_move(from_r, from_c, to_r, to_c)
+
+func _send_chess_move(from_r: int, from_c: int, to_r: int, to_c: int) -> void:
+	var eng_from_r := (BOARD_SIZE - 1) - from_r
+	var eng_to_r := (BOARD_SIZE - 1) - to_r
+	var promo = null
+	var moving_piece = piece_sprites[from_r][from_c]
+	if moving_piece != null and moving_piece.has_meta("kind") and moving_piece.get_meta("kind") == "Pawn":
+		if to_r == 0 or to_r == BOARD_SIZE - 1:
+			promo = "Queen"
 	var cmd = {
-		"command_type": "MovePieceCommand",
+		"command_type": "chess_game::MovePieceCommand",
 		"player": current,
-		"from": {"row": from_r, "col": from_c},
-		"to": {"row": to_r, "col": to_c},
-		"promotion": null
+		"from": {"row": eng_from_r, "col": from_c},
+		"to": {"row": eng_to_r, "col": to_c},
+		"promote_to": promo
 	}
 	bridge.send_command_json(current, JSON.stringify(cmd))
 
@@ -432,6 +456,9 @@ func _init_board_state() -> void:
 	last_move_from = Vector2i(-1, -1)
 	last_move_to = Vector2i(-1, -1)
 	check_king_pos = null
+	if pieces_container != null:
+		for child in pieces_container.get_children():
+			child.queue_free()
 	piece_sprites.clear()
 	for r in range(BOARD_SIZE):
 		var row_arr = []
@@ -567,45 +594,12 @@ func _get_moves_for_hover_cell(cell: Vector2i) -> Array[Vector2i]:
 	if not _is_in_bounds(cell.x, cell.y):
 		return moves
 
-	if bridge != null and bridge.has_method("get_legal_moves_for_cell"):
-		var raw = bridge.get_legal_moves_for_cell(cell.x, cell.y)
-		if raw is PackedInt32Array:
-			if raw.size() % 2 == 0 and raw.size() > 0:
-				for i in range(0, raw.size(), 2):
-					var tr = raw[i]
-					var tc = raw[i + 1]
-					if _is_in_bounds(tr, tc):
-						moves.append(Vector2i(tr, tc))
-			else:
-				for idx in raw:
-					var tr = int(idx) / BOARD_SIZE
-					var tc = int(idx) % BOARD_SIZE
-					if _is_in_bounds(tr, tc):
-						moves.append(Vector2i(tr, tc))
-		elif raw is Array:
-			for item in raw:
-				if item is Vector2i:
-					moves.append(item)
-				elif item is Vector2:
-					moves.append(Vector2i(int(item.x), int(item.y)))
-				elif item is Dictionary:
-					var t_row = item.get("to_row", item.get("to", {}).get("row", -1) if item.get("to") is Dictionary else -1)
-					var t_col = item.get("to_col", item.get("to", {}).get("col", -1) if item.get("to") is Dictionary else -1)
-					if _is_in_bounds(t_row, t_col):
-						moves.append(Vector2i(t_row, t_col))
-				elif item is int:
-					var tr = int(item) / BOARD_SIZE
-					var tc = int(item) % BOARD_SIZE
-					if _is_in_bounds(tr, tc):
-						moves.append(Vector2i(tr, tc))
-
-	if moves.is_empty():
-		var calc = _calculate_valid_moves(cell.x, cell.y)
-		for m in calc:
-			if m is Vector2i:
-				moves.append(m)
-			elif m is Vector2:
-				moves.append(Vector2i(int(m.x), int(m.y)))
+	var calc = _calculate_valid_moves(cell.x, cell.y)
+	for m in calc:
+		if m is Vector2i:
+			moves.append(m)
+		elif m is Vector2:
+			moves.append(Vector2i(int(m.x), int(m.y)))
 	return moves
 
 func _gui_input(event: InputEvent) -> void:
@@ -724,19 +718,13 @@ func _handle_cell_click(row: int, col: int) -> void:
 		valid_moves.clear()
 		queue_redraw()
 		
-		var cmd = {
-			"command_type": "MovePieceCommand",
-			"player": current,
-			"from": {"row": from_pos.x, "col": from_pos.y},
-			"to": {"row": row, "col": col},
-			"promotion": null
-		}
-		bridge.send_command_json(current, JSON.stringify(cmd))
+		_send_chess_move(from_pos.x, from_pos.y, row, col)
 
 func _calculate_valid_moves(r: int, c: int) -> Array:
 	var moves: Array = []
 	if bridge == null or not bridge.has_method("get_legal_moves"):
 		return moves
+	var eng_r := (BOARD_SIZE - 1) - r
 	var legal_moves = bridge.get_legal_moves(current)
 	for m in legal_moves:
 		var f_row := -1
@@ -745,21 +733,22 @@ func _calculate_valid_moves(r: int, c: int) -> Array:
 		var t_col := -1
 
 		if m.has("from") and m.from is Dictionary:
-			f_row = m.from.get("row", -1)
-			f_col = m.from.get("col", -1)
+			f_row = int(m.from.get("row", -1))
+			f_col = int(m.from.get("col", -1))
 		elif m.has("from_row"):
-			f_row = m.get("from_row", -1)
-			f_col = m.get("from_col", -1)
+			f_row = int(m.get("from_row", -1))
+			f_col = int(m.get("from_col", -1))
 
 		if m.has("to") and m.to is Dictionary:
-			t_row = m.to.get("row", -1)
-			t_col = m.to.get("col", -1)
+			t_row = int(m.to.get("row", -1))
+			t_col = int(m.to.get("col", -1))
 		elif m.has("to_row"):
-			t_row = m.get("to_row", -1)
-			t_col = m.get("to_col", -1)
+			t_row = int(m.get("to_row", -1))
+			t_col = int(m.get("to_col", -1))
 
-		if f_row == r and f_col == c:
-			var dest = Vector2i(t_row, t_col)
+		if f_row == eng_r and f_col == c and t_row >= 0 and t_col >= 0:
+			var vis_to_r := (BOARD_SIZE - 1) - t_row
+			var dest = Vector2i(vis_to_r, t_col)
 			if not dest in moves:
 				moves.append(dest)
 	return moves
@@ -767,7 +756,7 @@ func _calculate_valid_moves(r: int, c: int) -> Array:
 func _is_in_bounds(r: int, c: int) -> bool:
 	return r >= 0 and r < BOARD_SIZE and c >= 0 and c < BOARD_SIZE
 
-func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promotion: bool = false) -> void:
+func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promotion: bool = false, promoted_kind: String = "Queen") -> void:
 	last_move_from = Vector2i(from_r, from_c)
 	last_move_to = Vector2i(to_r, to_c)
 	var piece = piece_sprites[from_r][from_c]
@@ -778,6 +767,16 @@ func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promo
 	_reset_all_piece_scales()
 	active_animations += 1
 
+	var piece_kind: String = str(piece.get_meta("kind")) if piece.has_meta("kind") else ""
+	var piece_player: int = int(piece.get_meta("player")) if piece.has_meta("player") else P1
+
+	# En passant visual cleanup: pawn moved diagonally into empty target square
+	if piece_kind == "Pawn" and from_c != to_c and piece_sprites[to_r][to_c] == null:
+		var ep_target = piece_sprites[from_r][to_c]
+		if ep_target != null and is_instance_valid(ep_target):
+			ep_target.queue_free()
+			piece_sprites[from_r][to_c] = null
+
 	var target_piece = piece_sprites[to_r][to_c]
 	if target_piece != null:
 		target_piece.queue_free()
@@ -785,18 +784,28 @@ func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promo
 		
 	piece_sprites[from_r][from_c] = null
 	piece_sprites[to_r][to_c] = piece
+
+	# Castling rook movement: King moved 2 columns
+	if piece_kind == "King" and abs(to_c - from_c) == 2:
+		var rook_from_c := 7 if to_c > from_c else 0
+		var rook_to_c := 5 if to_c > from_c else 3
+		var rook_sprite = piece_sprites[to_r][rook_from_c]
+		if rook_sprite != null and is_instance_valid(rook_sprite):
+			piece_sprites[to_r][rook_from_c] = null
+			piece_sprites[to_r][rook_to_c] = rook_sprite
+			var rook_pos := Vector2(rook_to_c * CELL_SIZE + CELL_SIZE / 2.0, to_r * CELL_SIZE + CELL_SIZE / 2.0)
+			var r_tw := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+			r_tw.tween_property(rook_sprite, "position", rook_pos, 0.22)
 	
 	var target_pos = Vector2(to_c * CELL_SIZE + CELL_SIZE / 2.0, to_r * CELL_SIZE + CELL_SIZE / 2.0)
 	var tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(piece, "position", target_pos, 0.25)
-
-	if is_promotion:
-		tween.chain().tween_property(piece, "modulate:a", 0.0, 0.1)
-		tween.tween_property(piece, "modulate:a", 1.0, 0.15)
-		tween.tween_property(piece, "modulate:a", 0.5, 0.1)
-		tween.tween_property(piece, "modulate:a", 1.0, 0.1)
+	tween.tween_property(piece, "position", target_pos, 0.22)
 
 	tween.finished.connect(func():
+		if is_promotion and is_instance_valid(piece):
+			piece.queue_free()
+			piece_sprites[to_r][to_c] = null
+			_create_piece_sprite(to_r, to_c, piece_player, promoted_kind)
 		active_animations -= 1
 		if active_animations <= 0:
 			active_animations = 0
@@ -804,46 +813,47 @@ func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promo
 			animation_finished.emit()
 	)
 
-func _on_piece_moved_signal(player: int, from_r: int, from_c: int, to_r: int, to_c: int, cap_r: int, cap_c: int, prom: bool) -> void:
-	if in_opening_practice and opening_step_index < opening_moves.size():
-		var expected = opening_moves[opening_step_index]
-		if from_r == expected.from.x and from_c == expected.from.y and to_r == expected.to.x and to_c == expected.to.y:
-			opening_step_index += 1
-			if opening_step_index >= opening_moves.size():
-				in_opening_practice = false
-		else:
-			in_opening_practice = false
-
-	var is_capture = (cap_r >= 0 and cap_c >= 0) or (piece_sprites[to_r][to_c] != null)
-	if is_capture:
-		if (is_inside_tree() and has_node("/root/AudioManager")):
-			get_node("/root/AudioManager").play_piece_place(2.0)
-	else:
-		if (is_inside_tree() and has_node("/root/AudioManager")):
-			get_node("/root/AudioManager").play_piece_place()
-
-	_move_piece_sprite(from_r, from_c, to_r, to_c, prom)
-	current = bridge.current_player()
-	selected_pos = null
-	valid_moves.clear()
-	_update_status()
-	queue_redraw()
+func _on_piece_moved_signal(_player: int, _from_r: int, _from_c: int, _to_r: int, _to_c: int, _cap_r: int, _cap_c: int, _prom: bool) -> void:
+	# Chess events are handled in _on_event_json with visual row conversion.
+	pass
 
 func _on_event_json(json_str: String) -> void:
 	var parser = JSON.new()
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var event_type = event.get("command_type", event.get("event_type", ""))
+			var raw_type := str(event.get("command_type", event.get("event_type", "")))
+			var event_type := raw_type.split("::")[-1]
 			if event_type == "PieceMovedEvent":
 				var from_dict = event.get("from", {})
 				var to_dict = event.get("to", {})
-				var from_r = int(from_dict.get("row", 0))
+				var from_r = (BOARD_SIZE - 1) - int(from_dict.get("row", 0))
 				var from_c = int(from_dict.get("col", 0))
-				var to_r = int(to_dict.get("row", 0))
+				var to_r = (BOARD_SIZE - 1) - int(to_dict.get("row", 0))
 				var to_c = int(to_dict.get("col", 0))
-				var is_prom = event.get("promotion") != null or event.get("promoted", false)
-				_move_piece_sprite(from_r, from_c, to_r, to_c, is_prom)
+				var is_prom: bool = event.get("promotion") != null or event.get("promoted", false) == true
+				var prom_kind := str(event.get("promoted_to", "Queen"))
+				if prom_kind == "" or prom_kind == "<null>" or prom_kind == "null":
+					prom_kind = "Queen"
+
+				if in_opening_practice and opening_step_index < opening_moves.size():
+					var expected = opening_moves[opening_step_index]
+					if from_r == expected.from.x and from_c == expected.from.y and to_r == expected.to.x and to_c == expected.to.y:
+						opening_step_index += 1
+						if opening_step_index >= opening_moves.size():
+							in_opening_practice = false
+					else:
+						in_opening_practice = false
+
+				var is_capture: bool = (event.get("captured") != null) or (_is_in_bounds(to_r, to_c) and piece_sprites[to_r][to_c] != null)
+				if is_capture:
+					if is_inside_tree() and has_node("/root/AudioManager"):
+						get_node("/root/AudioManager").play_piece_place(2.0)
+				else:
+					if is_inside_tree() and has_node("/root/AudioManager"):
+						get_node("/root/AudioManager").play_piece_place()
+
+				_move_piece_sprite(from_r, from_c, to_r, to_c, is_prom, prom_kind)
 			elif event_type == "GameOverEvent":
 				var w = event.get("winner", -1)
 				if w == null:
@@ -851,7 +861,7 @@ func _on_event_json(json_str: String) -> void:
 				_on_game_over(int(w))
 
 			current = bridge.current_player()
-			var is_check = (event.get("event_type") == "CheckEvent") or (event.get("in_check") == true)
+			var is_check: bool = (event_type == "CheckEvent") or (event.get("in_check") == true) or (event.get("opponent_in_check") == true)
 			if is_check:
 				check_king_pos = _find_king_pos(current)
 				if check_king_pos != null:
