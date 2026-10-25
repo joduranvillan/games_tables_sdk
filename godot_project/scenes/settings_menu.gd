@@ -553,16 +553,16 @@ func _load_current_settings() -> void:
 	font_size_label.text = "Tamaño de fuente: %s" % FONT_TIER_NAMES[tier_val]
 	if font_scale_option != null:
 		var saved_scale: float = float(settings.get("ui_font_scale", 1.0))
-		for i in range(FONT_SCALE_OPTIONS.size()):
-			if is_equal_approx(float(FONT_SCALE_OPTIONS[i]["scale"]), saved_scale):
-				font_scale_option.selected = i
+		for scale_idx in range(FONT_SCALE_OPTIONS.size()):
+			if is_equal_approx(float(FONT_SCALE_OPTIONS[scale_idx]["scale"]), saved_scale):
+				font_scale_option.selected = scale_idx
 				break
 
 	var saved_cb_mode: String = String(settings.get("colorblind_mode", "none"))
 	if colorblind_mode_option != null:
-		for i in range(COLORBLIND_MODE_OPTIONS.size()):
-			if COLORBLIND_MODE_OPTIONS[i]["mode"] == saved_cb_mode:
-				colorblind_mode_option.selected = i
+		for cb_idx in range(COLORBLIND_MODE_OPTIONS.size()):
+			if COLORBLIND_MODE_OPTIONS[cb_idx]["mode"] == saved_cb_mode:
+				colorblind_mode_option.selected = cb_idx
 				break
 	if colorblind_checkbox != null:
 		colorblind_checkbox.set_block_signals(true)

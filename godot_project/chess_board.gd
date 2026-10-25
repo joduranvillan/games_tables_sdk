@@ -465,7 +465,7 @@ func _init_board_state() -> void:
 	piece_sprites.clear()
 	for r in range(BOARD_SIZE):
 		var row_arr = []
-		for c in range(BOARD_SIZE):
+		for col_idx in range(BOARD_SIZE):
 			row_arr.append(null)
 		piece_sprites.append(row_arr)
 		

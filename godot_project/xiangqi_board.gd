@@ -312,9 +312,9 @@ func _apply_theme_to_ui() -> void:
 func _init_board_state() -> void:
 	board.clear()
 	for r in range(BOARD_ROWS):
-		for c in range(BOARD_COLS):
-			if piece_nodes.size() > r and piece_nodes[r].size() > c:
-				var old_node = piece_nodes[r][c]
+		for col_idx in range(BOARD_COLS):
+			if piece_nodes.size() > r and piece_nodes[r].size() > col_idx:
+				var old_node = piece_nodes[r][col_idx]
 				if old_node != null and is_instance_valid(old_node):
 					old_node.queue_free()
 
@@ -326,7 +326,7 @@ func _init_board_state() -> void:
 	for r in range(BOARD_ROWS):
 		var row_arr = []
 		var node_arr = []
-		for c in range(BOARD_COLS):
+		for col_idx in range(BOARD_COLS):
 			row_arr.append(null)
 			node_arr.append(null)
 		board.append(row_arr)

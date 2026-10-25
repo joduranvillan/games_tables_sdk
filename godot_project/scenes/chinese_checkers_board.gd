@@ -147,8 +147,8 @@ func _init_board_positions(player_count: int) -> void:
 		_:
 			# Fallback for 5 or any other value
 			corner_map = []
-			for i in range(player_count):
-				corner_map.append(i % 6)
+			for p_idx in range(player_count):
+				corner_map.append(p_idx % 6)
 
 	for i in range(player_count):
 		var p_id = i + 1

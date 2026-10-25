@@ -57,10 +57,10 @@ func _load_multilingual_csv(csv_path: String) -> void:
 		var key := row[0].strip_edges()
 		if key.is_empty():
 			continue
-		for col_idx in translations_by_col.keys():
-			if col_idx < row.size():
-				var tr_obj: Translation = translations_by_col[col_idx]
-				tr_obj.add_message(key, row[col_idx].strip_edges())
+		for c_idx in translations_by_col.keys():
+			if c_idx < row.size():
+				var tr_obj: Translation = translations_by_col[c_idx]
+				tr_obj.add_message(key, row[c_idx].strip_edges())
 	file.close()
 
 	for col_idx in translations_by_col.keys():
