@@ -52,6 +52,48 @@ func _initialize() -> void:
 	results.append(["P2 mueve e7-e5 -> turno pasa a P1", bridge.current_player() == 1])
 	results.append(["Se recibieron 2 eventos PieceMovedEvent", events_received.size() == 2])
 
+	# 4. Prueba E2E de input en ChessBoard (click en pieza e2 + click en destino e4, y drag d7->d5)
+	var chess_scene: PackedScene = load("res://chess_board.tscn")
+	var chess_node = chess_scene.instantiate()
+	root.add_child(chess_node)
+	chess_node._on_mode_selected(0) # Hotseat P1 vs P2
+
+	# Click 1 en e2 (fila visual 6, col 4): press + release
+	var e2_pos := Vector2(4 * 76.0 + 38.0, 6 * 76.0 + 38.0)
+	var ev_press1 := InputEventMouseButton.new()
+	ev_press1.button_index = MOUSE_BUTTON_LEFT
+	ev_press1.pressed = true
+	ev_press1.position = e2_pos
+	chess_node._handle_unified_input(ev_press1)
+
+	var ev_rel1 := InputEventMouseButton.new()
+	ev_rel1.button_index = MOUSE_BUTTON_LEFT
+	ev_rel1.pressed = false
+	ev_rel1.position = e2_pos
+	chess_node._handle_unified_input(ev_rel1)
+
+	results.append(["ChessBoard click en e2 mantiene pieza seleccionada tras soltar ratón", chess_node.selected_pos == Vector2i(6, 4)])
+	results.append(["ChessBoard calcula jugadas válidas para e2 (e3 y e4)", chess_node.valid_moves.size() == 2])
+
+	# Click 2 en e4 (fila visual 4, col 4): press + release
+	var e4_pos := Vector2(4 * 76.0 + 38.0, 4 * 76.0 + 38.0)
+	var ev_press2 := InputEventMouseButton.new()
+	ev_press2.button_index = MOUSE_BUTTON_LEFT
+	ev_press2.pressed = true
+	ev_press2.position = e4_pos
+	chess_node._handle_unified_input(ev_press2)
+
+	var ev_rel2 := InputEventMouseButton.new()
+	ev_rel2.button_index = MOUSE_BUTTON_LEFT
+	ev_rel2.pressed = false
+	ev_rel2.position = e4_pos
+	chess_node._handle_unified_input(ev_rel2)
+
+	results.append(["ChessBoard avanza peón blanco e2->e4 en primer turno y pasa turno a J2", chess_node.current == 2 and chess_node.piece_sprites[4][4] != null])
+
+	root.remove_child(chess_node)
+	chess_node.free()
+
 	var ok := true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])

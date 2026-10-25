@@ -155,9 +155,10 @@ func _setup_ui_layers() -> void:
 	drag_layer.name = "DragDropLayer"
 	drag_layer.cell_size = CELL
 	drag_layer.board_bounds = Vector2i(BOARD, BOARD)
-	drag_layer.piece_drag_started.connect(_on_drag_started)
-	drag_layer.piece_dropped.connect(_on_piece_dropped)
+	drag_layer.enabled = false
+	drag_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(drag_layer)
+	drag_layer.set_process_input(false)
 	drag_layer.set_process_unhandled_input(false)
 
 	mode_option_button = OptionButton.new()
@@ -433,7 +434,15 @@ func _create_piece_sprite(p_owner: int, is_king: bool, row: int, col: int) -> Pi
 var touch_down_pos: Vector2 = Vector2.ZERO
 var touch_start_cell: Vector2i = Vector2i(-1, -1)
 var is_touch_dragging: bool = false
+var _selected_on_current_press: bool = false
 const DEAD_ZONE: float = 8.0
+
+func _event_to_board_pos(event_pos: Vector2, is_mouse: bool = true) -> Vector2:
+	if is_inside_tree() and not OS.has_feature("headless"):
+		if is_mouse:
+			return get_local_mouse_position()
+		return make_canvas_position_local(event_pos)
+	return event_pos
 
 func _gui_input(_event: InputEvent) -> void:
 	pass
@@ -445,6 +454,8 @@ func _input(event: InputEvent) -> void:
 func _handle_unified_input(event: InputEvent) -> void:
 	if winner != -1 or animating:
 		return
+	if rules_popup != null and rules_popup.visible:
+		return
 
 	var event_pos := Vector2.ZERO
 	var is_press := false
@@ -453,51 +464,71 @@ func _handle_unified_input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			event_pos = event.position
+			event_pos = _event_to_board_pos(event.position, true)
 			is_press = event.pressed
 			is_release = not event.pressed
 	elif event is InputEventScreenTouch:
-		event_pos = event.position
+		event_pos = _event_to_board_pos(event.position, false)
 		is_press = event.pressed
 		is_release = not event.pressed
 	elif event is InputEventMouseMotion:
 		if event.button_mask & MOUSE_BUTTON_MASK_LEFT:
-			event_pos = event.position
+			event_pos = _event_to_board_pos(event.position, true)
 			is_drag = true
 	elif event is InputEventScreenDrag:
-		event_pos = event.position
+		event_pos = _event_to_board_pos(event.position, false)
 		is_drag = true
+	else:
+		return
 
 	if is_press:
 		touch_down_pos = event_pos
-		touch_start_cell = Vector2i(int(event_pos.y / CELL), int(event_pos.x / CELL))
+		var press_col := int(floor(event_pos.x / CELL))
+		var press_row := int(floor(event_pos.y / CELL))
+		touch_start_cell = Vector2i(press_row, press_col)
 		is_touch_dragging = false
+		_selected_on_current_press = false
+		if press_row >= 0 and press_row < BOARD and press_col >= 0 and press_col < BOARD:
+			var p_cell = board[press_row][press_col]
+			if p_cell != null and p_cell.owner == current:
+				var already_sel: bool = (selected != null and int(selected.get("row", -1)) == press_row and int(selected.get("col", -1)) == press_col)
+				if not already_sel:
+					_sfx_piece_slide()
+					_reset_all_piece_scales()
+					selected = {"row": press_row, "col": press_col}
+					valid_moves = _calculate_valid_moves(press_row, press_col)
+					_bounce_piece(press_row, press_col)
+					queue_redraw()
+					_selected_on_current_press = true
 	elif is_drag:
 		if touch_down_pos.distance_to(event_pos) > DEAD_ZONE:
 			is_touch_dragging = true
 	elif is_release:
-		var dist = touch_down_pos.distance_to(event_pos)
-		if dist <= DEAD_ZONE:
-			_handle_click(event_pos)
+		var release_col := int(floor(event_pos.x / CELL))
+		var release_row := int(floor(event_pos.y / CELL))
+		var release_cell := Vector2i(release_row, release_col)
+		if release_cell == touch_start_cell:
+			if not _selected_on_current_press:
+				_handle_click(event_pos)
 		else:
-			var release_cell = Vector2i(int(event_pos.y / CELL), int(event_pos.x / CELL))
-			if touch_start_cell != release_cell and touch_start_cell.x >= 0 and touch_start_cell.x < BOARD and touch_start_cell.y >= 0 and touch_start_cell.y < BOARD:
-				var cell = board[touch_start_cell.x][touch_start_cell.y]
-				if cell != null and cell.owner == current:
+			if selected == null and touch_start_cell.x >= 0 and touch_start_cell.x < BOARD and touch_start_cell.y >= 0 and touch_start_cell.y < BOARD:
+				var start_cell = board[touch_start_cell.x][touch_start_cell.y]
+				if start_cell != null and start_cell.owner == current:
 					_reset_all_piece_scales()
 					selected = {"row": touch_start_cell.x, "col": touch_start_cell.y}
 					valid_moves = _calculate_valid_moves(touch_start_cell.x, touch_start_cell.y)
 					_bounce_piece(touch_start_cell.x, touch_start_cell.y)
-					_handle_click(event_pos)
+			_handle_click(event_pos)
 		touch_start_cell = Vector2i(-1, -1)
 		is_touch_dragging = false
+		_selected_on_current_press = false
 
 func _handle_click(pos: Vector2) -> void:
 	if animating:
 		return
 
-	var col := int(pos.x / CELL)
-	var row := int(pos.y / CELL)
+	var col := int(floor(pos.x / CELL))
+	var row := int(floor(pos.y / CELL))
 
 	if row < 0 or row >= BOARD or col < 0 or col >= BOARD:
 		_reset_all_piece_scales()

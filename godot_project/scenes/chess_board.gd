@@ -33,6 +33,7 @@ var active_animations: int = 0
 
 var grid_container: GridContainer
 var pieces_container: Node2D
+var board_overlay: Node2D
 var cell_nodes: Array = [] # 8x8 array of Control/ColorRect nodes
 var piece_sprites: Array = [] # 8x8 array of Node2D/Sprite
 
@@ -198,15 +199,22 @@ func _setup_ui() -> void:
 	pieces_container = Node2D.new()
 	pieces_container.name = "PiecesContainer"
 	add_child(pieces_container)
+
+	board_overlay = Node2D.new()
+	board_overlay.name = "BoardOverlay"
+	board_overlay.z_index = 2
+	board_overlay.draw.connect(_draw_board_overlay)
+	add_child(board_overlay)
 	
-	# Drag & Drop Layer
+	# Drag & Drop Layer (pasivo para evitar conflicto de doble input con _handle_unified_input)
 	drag_layer = DragDropLayer.new()
 	drag_layer.name = "DragDropLayer"
 	drag_layer.cell_size = CELL_SIZE
 	drag_layer.board_bounds = Vector2i(BOARD_SIZE, BOARD_SIZE)
-	drag_layer.piece_drag_started.connect(_on_drag_started)
-	drag_layer.piece_dropped.connect(_on_piece_dropped)
+	drag_layer.enabled = false
+	drag_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(drag_layer)
+	drag_layer.set_process_input(false)
 	drag_layer.set_process_unhandled_input(false)
 	
 	# Turn Indicator Widget
@@ -565,11 +573,19 @@ func _get_piece_symbol(kind: String, player: int) -> String:
 var touch_down_pos: Vector2 = Vector2.ZERO
 var touch_start_cell: Vector2i = Vector2i(-1, -1)
 var is_touch_dragging: bool = false
+var _selected_on_current_press: bool = false
 const DEAD_ZONE: float = 8.0
 
+func _event_to_board_pos(event_pos: Vector2, is_mouse: bool = true) -> Vector2:
+	if is_inside_tree() and not OS.has_feature("headless"):
+		if is_mouse:
+			return get_local_mouse_position()
+		return make_canvas_position_local(event_pos)
+	return event_pos
+
 func _pixel_to_cell(pos: Vector2) -> Vector2i:
-	var r = int(pos.y / CELL_SIZE)
-	var c = int(pos.x / CELL_SIZE)
+	var r = int(floor(pos.y / CELL_SIZE))
+	var c = int(floor(pos.x / CELL_SIZE))
 	if _is_in_bounds(r, c):
 		return Vector2i(r, c)
 	return Vector2i(-1, -1)
@@ -609,18 +625,28 @@ func _gui_input(event: InputEvent) -> void:
 	if OS.has_feature("headless"):
 		return
 	if event is InputEventMouseMotion:
-		_handle_mouse_hover(event.position)
+		_handle_mouse_hover(_event_to_board_pos(event.position, true))
 
 func _input(event: InputEvent) -> void:
 	_handle_gamepad_input(event)
 	if OS.has_feature("headless"):
 		return
 	if event is InputEventMouseMotion:
-		_handle_mouse_hover(event.position)
+		_handle_mouse_hover(_event_to_board_pos(event.position, true))
 	_handle_unified_input(event)
+
+func _select_piece_at(row: int, col: int) -> void:
+	_sfx_piece_slide()
+	_reset_all_piece_scales()
+	selected_pos = Vector2i(row, col)
+	valid_moves = _calculate_valid_moves(row, col)
+	_bounce_piece(row, col)
+	queue_redraw()
 
 func _handle_unified_input(event: InputEvent) -> void:
 	if winner != -1 or animating:
+		return
+	if _rules_popup != null and _rules_popup.visible:
 		return
 
 	var event_pos := Vector2.ZERO
@@ -630,47 +656,57 @@ func _handle_unified_input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			event_pos = event.position
+			event_pos = _event_to_board_pos(event.position, true)
 			is_press = event.pressed
 			is_release = not event.pressed
 	elif event is InputEventScreenTouch:
-		event_pos = event.position
+		event_pos = _event_to_board_pos(event.position, false)
 		is_press = event.pressed
 		is_release = not event.pressed
 	elif event is InputEventMouseMotion:
 		if event.button_mask & MOUSE_BUTTON_MASK_LEFT:
-			event_pos = event.position
+			event_pos = _event_to_board_pos(event.position, true)
 			is_drag = true
 	elif event is InputEventScreenDrag:
-		event_pos = event.position
+		event_pos = _event_to_board_pos(event.position, false)
 		is_drag = true
+	else:
+		return
 
 	if is_press:
 		touch_down_pos = event_pos
-		touch_start_cell = Vector2i(int(event_pos.y / CELL_SIZE), int(event_pos.x / CELL_SIZE))
+		var press_col := int(floor(event_pos.x / CELL_SIZE))
+		var press_row := int(floor(event_pos.y / CELL_SIZE))
+		touch_start_cell = Vector2i(press_row, press_col)
 		is_touch_dragging = false
+		_selected_on_current_press = false
+		if _is_in_bounds(press_row, press_col):
+			var piece = piece_sprites[press_row][press_col]
+			if piece != null and piece.get_meta("player") == current:
+				if selected_pos != Vector2i(press_row, press_col):
+					_select_piece_at(press_row, press_col)
+					_selected_on_current_press = true
 	elif is_drag:
 		if touch_down_pos.distance_to(event_pos) > DEAD_ZONE:
 			is_touch_dragging = true
 	elif is_release:
-		var dist = touch_down_pos.distance_to(event_pos)
-		var col = int(event_pos.x / CELL_SIZE)
-		var row = int(event_pos.y / CELL_SIZE)
-		if dist <= DEAD_ZONE:
-			if row >= 0 and row < BOARD_SIZE and col >= 0 and col < BOARD_SIZE:
-				_handle_cell_click(row, col)
-		else:
-			var release_cell = Vector2i(row, col)
-			if touch_start_cell != release_cell and touch_start_cell.x >= 0 and touch_start_cell.x < BOARD_SIZE and touch_start_cell.y >= 0 and touch_start_cell.y < BOARD_SIZE:
-				var piece = piece_sprites[touch_start_cell.x][touch_start_cell.y]
-				if piece != null and piece.get_meta("player") == current:
-					_reset_all_piece_scales()
-					selected_pos = touch_start_cell
-					valid_moves = _calculate_valid_moves(touch_start_cell.x, touch_start_cell.y)
-					_bounce_piece(touch_start_cell.x, touch_start_cell.y)
+		var col := int(floor(event_pos.x / CELL_SIZE))
+		var row := int(floor(event_pos.y / CELL_SIZE))
+		var release_cell := Vector2i(row, col)
+		if _is_in_bounds(row, col):
+			if release_cell == touch_start_cell:
+				if not _selected_on_current_press:
+					_handle_cell_click(row, col)
+			else:
+				if selected_pos == null and _is_in_bounds(touch_start_cell.x, touch_start_cell.y):
+					var piece = piece_sprites[touch_start_cell.x][touch_start_cell.y]
+					if piece != null and piece.get_meta("player") == current:
+						_select_piece_at(touch_start_cell.x, touch_start_cell.y)
+				if selected_pos != null:
 					_handle_cell_click(row, col)
 		touch_start_cell = Vector2i(-1, -1)
 		is_touch_dragging = false
+		_selected_on_current_press = false
 
 func cell_to_pixel(cell: Vector2i) -> Vector2:
 	return Vector2(cell.x * CELL_SIZE, cell.y * CELL_SIZE)
@@ -683,8 +719,10 @@ func start_chess_tutorial() -> void:
 func _handle_cell_click(row: int, col: int) -> void:
 	if (is_inside_tree() and has_node("/root/TutorialManager")):
 		var tm = get_node("/root/TutorialManager")
-		if tm.get("is_running") == true:
-			if not tm.call("notify_cell_action", Vector2i(col, row)):
+		if tm.get("is_running") == true and tm.get("current_board") == self:
+			var vis_cell := Vector2i(col, row)
+			var eng_cell := Vector2i(col, (BOARD_SIZE - 1) - row)
+			if not (tm.call("is_cell_allowed", vis_cell) or tm.call("is_cell_allowed", eng_cell)):
 				return
 	if animating:
 		return
@@ -692,11 +730,7 @@ func _handle_cell_click(row: int, col: int) -> void:
 	if selected_pos == null:
 		var piece = piece_sprites[row][col]
 		if piece != null and piece.get_meta("player") == current:
-			_reset_all_piece_scales()
-			selected_pos = Vector2i(row, col)
-			valid_moves = _calculate_valid_moves(row, col)
-			_bounce_piece(row, col)
-			queue_redraw()
+			_select_piece_at(row, col)
 	else:
 		if selected_pos.x == row and selected_pos.y == col:
 			_reset_all_piece_scales()
@@ -707,11 +741,7 @@ func _handle_cell_click(row: int, col: int) -> void:
 			
 		var piece_at_target = piece_sprites[row][col]
 		if piece_at_target != null and piece_at_target.get_meta("player") == current:
-			_reset_all_piece_scales()
-			selected_pos = Vector2i(row, col)
-			valid_moves = _calculate_valid_moves(row, col)
-			_bounce_piece(row, col)
-			queue_redraw()
+			_select_piece_at(row, col)
 			return
 			
 		var from_pos = selected_pos
@@ -719,6 +749,16 @@ func _handle_cell_click(row: int, col: int) -> void:
 		selected_pos = null
 		valid_moves.clear()
 		queue_redraw()
+
+		if (is_inside_tree() and has_node("/root/TutorialManager")):
+			var tm = get_node("/root/TutorialManager")
+			if tm.get("is_running") == true and tm.get("current_board") == self:
+				var vis_cell := Vector2i(col, row)
+				var eng_cell := Vector2i(col, (BOARD_SIZE - 1) - row)
+				if tm.call("is_cell_allowed", eng_cell):
+					tm.call("notify_cell_action", eng_cell)
+				else:
+					tm.call("notify_cell_action", vis_cell)
 		
 		_send_chess_move(from_pos.x, from_pos.y, row, col)
 
@@ -780,12 +820,14 @@ func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promo
 			piece_sprites[from_r][to_c] = null
 
 	var target_piece = piece_sprites[to_r][to_c]
-	if target_piece != null:
-		target_piece.queue_free()
+	if target_piece != null and target_piece != piece:
+		target_piece.visible = false
 		piece_sprites[to_r][to_c] = null
 		
 	piece_sprites[from_r][from_c] = null
 	piece_sprites[to_r][to_c] = piece
+	if is_promotion:
+		piece.set_meta("kind", promoted_kind)
 
 	# Castling rook movement: King moved 2 columns
 	if piece_kind == "King" and abs(to_c - from_c) == 2:
@@ -801,11 +843,15 @@ func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promo
 	
 	var target_pos = Vector2(to_c * CELL_SIZE + CELL_SIZE / 2.0, to_r * CELL_SIZE + CELL_SIZE / 2.0)
 	if not is_inside_tree():
+		if target_piece != null and is_instance_valid(target_piece) and target_piece != piece:
+			target_piece.queue_free()
 		piece.position = target_pos
 		if is_promotion and is_instance_valid(piece):
+			var still_here: bool = (piece_sprites[to_r][to_c] == piece)
 			piece.queue_free()
-			piece_sprites[to_r][to_c] = null
-			_create_piece_sprite(to_r, to_c, piece_player, promoted_kind)
+			if still_here:
+				piece_sprites[to_r][to_c] = null
+				_create_piece_sprite(to_r, to_c, piece_player, promoted_kind)
 		active_animations = max(0, active_animations - 1)
 		if active_animations <= 0:
 			animating = false
@@ -816,10 +862,14 @@ func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promo
 	tween.tween_property(piece, "position", target_pos, 0.22)
 
 	tween.finished.connect(func():
+		if target_piece != null and is_instance_valid(target_piece) and target_piece != piece:
+			target_piece.queue_free()
 		if is_promotion and is_instance_valid(piece):
+			var still_here: bool = (piece_sprites[to_r][to_c] == piece)
 			piece.queue_free()
-			piece_sprites[to_r][to_c] = null
-			_create_piece_sprite(to_r, to_c, piece_player, promoted_kind)
+			if still_here:
+				piece_sprites[to_r][to_c] = null
+				_create_piece_sprite(to_r, to_c, piece_player, promoted_kind)
 		active_animations -= 1
 		if active_animations <= 0:
 			active_animations = 0
@@ -929,7 +979,60 @@ func _on_move_rejected(reason: String) -> void:
 		queue_redraw()
 	)
 
+func _draw_board_overlay() -> void:
+	if board_overlay == null or not is_instance_valid(board_overlay):
+		return
+	# Halo rojo pulsante sobre la casilla del rey en jaque
+	if check_king_pos != null and _is_in_bounds(check_king_pos.x, check_king_pos.y):
+		var king_rect = Rect2(check_king_pos.y * CELL_SIZE, check_king_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		var alpha = 0.3 + 0.2 * sin(Time.get_ticks_msec() * 0.005)
+		board_overlay.draw_rect(king_rect, Color(1.0, 0.0, 0.0, alpha))
+
+	# Highlight del último movimiento
+	if last_move_from != Vector2i(-1, -1) and _is_in_bounds(last_move_from.x, last_move_from.y):
+		var lm_from_rect = Rect2(last_move_from.y * CELL_SIZE, last_move_from.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		board_overlay.draw_rect(lm_from_rect, Color(0.9, 0.85, 0.3, 0.35))
+	if last_move_to != Vector2i(-1, -1) and _is_in_bounds(last_move_to.x, last_move_to.y):
+		var lm_to_rect = Rect2(last_move_to.y * CELL_SIZE, last_move_to.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		board_overlay.draw_rect(lm_to_rect, Color(0.9, 0.85, 0.3, 0.35))
+
+	if in_opening_practice and opening_step_index < opening_moves.size():
+		var exp_move = opening_moves[opening_step_index]
+		var from_pos = exp_move.from
+		var to_pos = exp_move.to
+		var from_rect = Rect2(from_pos.y * CELL_SIZE, from_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		var to_rect = Rect2(to_pos.y * CELL_SIZE, to_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		board_overlay.draw_rect(from_rect, Color(0.0, 0.7, 1.0, 0.45))
+		board_overlay.draw_rect(from_rect, Color(0.0, 0.5, 1.0, 0.9), false, 3.0)
+		board_overlay.draw_rect(to_rect, Color(0.2, 0.9, 0.3, 0.45))
+		board_overlay.draw_rect(to_rect, Color(0.1, 0.8, 0.2, 0.9), false, 3.0)
+
+	if selected_pos != null:
+		var sel_rect = Rect2(selected_pos.y * CELL_SIZE, selected_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		board_overlay.draw_rect(sel_rect, COL_SELECT)
+		board_overlay.draw_rect(sel_rect, Color(1.0, 0.84, 0.0, 0.9), false, 3.0)
+		
+	if rejected_cell != null:
+		var rej_rect = Rect2(rejected_cell.y * CELL_SIZE, rejected_cell.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+		board_overlay.draw_rect(rej_rect, Color(1.0, 0.2, 0.2, 0.6))
+
+	if highlight_moves_enabled and selected_pos == null and _hover_cell != Vector2i(-1, -1):
+		for move_pos in _hover_moves:
+			var center = Vector2(move_pos.y * CELL_SIZE + CELL_SIZE / 2.0, move_pos.x * CELL_SIZE + CELL_SIZE / 2.0)
+			board_overlay.draw_circle(center, CELL_SIZE * 0.15, Color(0.5, 0.9, 0.5, 0.35))
+
+	if highlight_moves_enabled and selected_pos != null:
+		for move_pos in valid_moves:
+			var center = Vector2(move_pos.y * CELL_SIZE + CELL_SIZE / 2.0, move_pos.x * CELL_SIZE + CELL_SIZE / 2.0)
+			board_overlay.draw_circle(center, CELL_SIZE * 0.22, COL_VALID_MOVE)
+
+	if gamepad_cursor_active and _is_in_bounds(gamepad_cursor.x, gamepad_cursor.y):
+		var cur_rect := Rect2(gamepad_cursor.y * CELL_SIZE + 3.0, gamepad_cursor.x * CELL_SIZE + 3.0, CELL_SIZE - 6.0, CELL_SIZE - 6.0)
+		board_overlay.draw_rect(cur_rect, Color(0.2, 0.95, 1.0, 0.95), false, 3.0)
+
 func _draw() -> void:
+	if board_overlay != null and is_instance_valid(board_overlay):
+		board_overlay.queue_redraw()
 	# Halo rojo pulsante sobre la casilla del rey en jaque
 	if check_king_pos != null and _is_in_bounds(check_king_pos.x, check_king_pos.y):
 		var king_rect = Rect2(check_king_pos.y * CELL_SIZE, check_king_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)

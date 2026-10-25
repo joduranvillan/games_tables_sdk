@@ -91,6 +91,9 @@ func advance_step() -> void:
 func is_cell_allowed(cell: Vector2i) -> bool:
 	if not is_running or current_step_index < 0 or current_step_index >= active_steps.size():
 		return true
+	if current_board == null or not is_instance_valid(current_board):
+		stop_overlay()
+		return true
 	var step: Variant = active_steps[current_step_index]
 	var target: Vector2i = Vector2i(-1, -1)
 	var dest: Vector2i = Vector2i(-1, -1)

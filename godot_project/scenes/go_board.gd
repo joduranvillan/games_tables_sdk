@@ -174,13 +174,15 @@ func _setup_ui() -> void:
 	captures_label_n.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
 	captures_container.add_child(captures_label_n)
 
-	# Drag & Drop / Input Layer
+	# Drag & Drop / Input Layer (pasivo para evitar doble envío con _input)
 	drag_layer = DragDropLayer.new()
 	drag_layer.name = "DragDropLayer"
 	drag_layer.cell_size = CELL_SIZE
 	drag_layer.board_bounds = Vector2i(BOARD_SIZE, BOARD_SIZE)
-	drag_layer.cell_clicked.connect(_on_cell_clicked)
+	drag_layer.enabled = false
+	drag_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(drag_layer)
+	drag_layer.set_process_input(false)
 	drag_layer.set_process_unhandled_input(false)
 
 	# Turn Indicator Widget
@@ -362,26 +364,16 @@ func _input(event: InputEvent) -> void:
 	var click_pos = Vector2.ZERO
 	var handled = false
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		click_pos = event.position
+		click_pos = get_local_mouse_position() if (is_inside_tree() and not OS.has_feature("headless")) else event.position
 		handled = true
 	elif event is InputEventScreenTouch and event.pressed:
-		click_pos = event.position
+		click_pos = make_canvas_position_local(event.position) if (is_inside_tree() and not OS.has_feature("headless")) else event.position
 		handled = true
 		
 	if handled:
 		var cell = _find_nearest_intersection(click_pos)
-		var row = cell.x
-		var col = cell.y
-		
-		if row >= 0 and row < BOARD_SIZE and col >= 0 and col < BOARD_SIZE:
-			if board[row][col] == null:
-				var cmd = {
-					"command_type": "PlaceStoneCommand",
-					"player": current,
-					"x": col,
-					"y": row
-				}
-				bridge.send_command_json(current, JSON.stringify(cmd))
+		if cell.x >= 0 and cell.x < BOARD_SIZE and cell.y >= 0 and cell.y < BOARD_SIZE:
+			_on_cell_clicked(cell)
 
 func _place_stone(row: int, col: int, player: int) -> void:
 	board[row][col] = player
