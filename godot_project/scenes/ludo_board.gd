@@ -434,6 +434,8 @@ func get_path_from_to(from_cell: int, to_cell: int, player: int = 1, token_idx: 
 func _update_token_positions() -> void:
 	var occupancy: Dictionary = {}
 	for p in range(1, 5):
+		if not token_buttons.has(p) or token_buttons[p].size() < TOKENS_PER_PLAYER:
+			continue
 		for t in range(TOKENS_PER_PLAYER):
 			var btn = token_buttons[p][t]
 			var steps = token_steps[p][t]
@@ -601,13 +603,15 @@ func _draw() -> void:
 
 func _update_status() -> void:
 	if winner != -1:
-		status.text = "¡Todas las fichas completas! Ganó el jugador %s (Ludo)" % winner
+		if status != null:
+			status.text = "¡Todas las fichas completas! Ganó el jugador %s (Ludo)" % winner
 		if turn_indicator != null:
 			turn_indicator.stop_timer()
 	else:
 		var name = "Jugador %s" % current_p
 		var col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current_p) - 1, 6)] as Color)
-		status.text = "Turno: Jugador %s (Ludo)" % current_p
+		if status != null:
+			status.text = "Turno: Jugador %s (Ludo)" % current_p
 		if turn_indicator != null:
 			turn_indicator.set_turn(current_p, name, col)
 

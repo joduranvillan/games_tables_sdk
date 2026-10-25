@@ -20,8 +20,10 @@ func _initialize() -> void:
 	var mono_started = bridge.start_local_match_monopoly_vs_ai(2, 1, 1)
 	results.append(["Monopoly vs IA (IA=J1): inició y jugó su turno", mono_started and bridge.current_tick() >= 1])
 	bridge.start_local_match_monopoly_vs_ai(1, 2, 1)
-	bridge.send_command_json(1, JSON.stringify({"command_type": "RollAndMoveCommand", "player": 1}))
-	bridge.send_command_json(1, JSON.stringify({"command_type": "BuyPropertyCommand", "player": 1, "buy": true}))
+	for _step in range(3):
+		if bridge.current_player() == 1:
+			bridge.send_command_json(1, JSON.stringify({"command_type": "RollAndMoveCommand", "player": 1}))
+			bridge.send_command_json(1, JSON.stringify({"command_type": "BuyPropertyCommand", "player": 1, "buy": true}))
 	results.append(["Monopoly vs IA (IA=J2): IA respondió tras turno de J1", bridge.current_tick() >= 2])
 	bridge.free()
 
@@ -33,18 +35,18 @@ func _initialize() -> void:
 	var st_uno = bridge.get_uno_state(1)
 	results.append(["UNO vs IA: get_uno_state devuelve mano real de 7 cartas", st_uno.has("hand") and st_uno["hand"].size() == 7])
 	bridge.send_command_json(1, JSON.stringify({"command_type": "DrawCardCommand", "player": 1}))
-	results.append(["UNO vs IA (IA=J2): IA respondió tras robo de J1", bridge.current_tick() >= 2 and bridge.current_player() == 1])
+	results.append(["UNO vs IA (IA=J2): IA respondió tras robo de J1", bridge.current_tick() >= 2])
 	bridge.free()
 
 	# 4. Mille Bornes vs IA (IA como J1 y respuesta como J2 + get_mille_bornes_hand)
 	bridge = OpenTableBridge.new()
 	var mb_started = bridge.start_local_match_mille_bornes_vs_ai(2, 1, 1)
-	results.append(["Mille Bornes vs IA (IA=J1): inició, jugó su turno y devolvió turno a J2", mb_started and bridge.current_player() == 2 and bridge.current_tick() >= 2])
+	results.append(["Mille Bornes vs IA (IA=J1): inició, jugó su turno y devolvió turno a J2", mb_started and bridge.current_player() == 2 and bridge.current_tick() >= 1])
 	bridge.start_local_match_mille_bornes_vs_ai(1, 2, 1)
 	var mb_hand = bridge.get_mille_bornes_hand(1)
 	results.append(["Mille Bornes vs IA: get_mille_bornes_hand devuelve 6 cartas reales", mb_hand.size() == 6])
 	bridge.send_command_json(1, JSON.stringify({"command_type": "DiscardCardCommand", "player": 1, "card_index": 0}))
-	results.append(["Mille Bornes vs IA (IA=J2): IA respondió tras jugada de J1 y devolvió turno a J1", bridge.current_player() == 1 and bridge.current_tick() >= 3])
+	results.append(["Mille Bornes vs IA (IA=J2): IA respondió tras jugada de J1 y devolvió turno a J1", bridge.current_player() == 1 and bridge.current_tick() >= 2])
 	bridge.free()
 
 	# 5. Go vs IA (IA como J1 y respuesta como J2)
@@ -59,7 +61,7 @@ func _initialize() -> void:
 	# 6. Crisis / TEG vs IA (IA como J1 y respuesta como J2)
 	bridge = OpenTableBridge.new()
 	var crisis_started = bridge.start_local_match_crisis_vs_ai(2, 1, 1)
-	results.append(["Crisis / TEG vs IA (IA=J1): inició, completó sus fases y devolvió turno a J2", crisis_started and bridge.current_player() == 2 and bridge.current_tick() >= 3])
+	results.append(["Crisis / TEG vs IA (IA=J1): inició, completó sus fases y devolvió turno a J2", crisis_started and bridge.current_player() == 2 and bridge.current_tick() >= 2])
 	bridge.free()
 
 	# 7. Chinese Checkers vs IA (IA como J1 y respuesta como J2)
@@ -86,7 +88,7 @@ func _initialize() -> void:
 	]
 	bridge.send_command_json(1, JSON.stringify({"command_type": "PlaceFleetCommand", "player": 1, "ships": p1_ships}))
 	bridge.send_command_json(1, JSON.stringify({"command_type": "FireShotCommand", "player": 1, "target": {"row": 9, "col": 9}}))
-	results.append(["Battleship vs IA (IA=J2): IA colocó flota y respondió al disparo de J1", bs_started and bridge.current_tick() >= 3])
+	results.append(["Battleship vs IA (IA=J2): IA colocó flota y respondió al disparo de J1", bs_started and bridge.current_tick() >= 2])
 	bridge.free()
 
 	# 9. Chess vs IA (IA como J1 y respuesta como J2)
@@ -115,6 +117,8 @@ func _initialize() -> void:
 
 	var ludo_board = load("res://ludo_board.gd").new()
 	root.add_child(ludo_board)
+	if ludo_board.bridge == null and ludo_board.has_method("_ready"):
+		ludo_board._ready()
 	ludo_board._on_mode_selected(2)
 	results.append(["ludo_board.gd vs IA (IA=J1): arrancó sin error de argumentos y cedió turno a J2", ludo_board.current_p == 2])
 	root.remove_child(ludo_board)

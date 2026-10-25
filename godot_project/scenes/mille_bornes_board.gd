@@ -38,8 +38,8 @@ const CARD_CATEGORIES = {
 }
 
 var bridge
-var current = P1
-var winner = -1
+var current: int = P1
+var winner: int = -1
 
 # Player state
 var distance = {P1: 0, P2: 0}
@@ -613,7 +613,7 @@ func _on_card_pressed(idx: int) -> void:
 	if winner != -1 or (is_vs_ai and current != local_player):
 		return
 
-	var acting_p := current
+	var acting_p: int = int(current)
 	if discard_mode.button_pressed:
 		if idx < hand_p1.size():
 			discard_pile.append(hand_p1[idx])

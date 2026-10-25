@@ -55,8 +55,8 @@ const CARD_SYMBOLS = {
 }
 
 var bridge
-var current = P1
-var winner = -1
+var current: int = P1
+var winner: int = -1
 var is_clockwise: bool = true
 
 # Game State
@@ -1265,7 +1265,7 @@ func _on_wild_color_chosen(chosen_col: String) -> void:
 
 func _execute_play_card(idx: int, start_pos: Vector2, chosen_col: String) -> void:
 	var played_card = player_hand[idx] if (idx >= 0 and idx < player_hand.size()) else null
-	var acting_p := current
+	var acting_p: int = int(current)
 	var cmd = {
 		"command_type": "PlayCardCommand",
 		"player": acting_p,
@@ -1293,7 +1293,7 @@ func _on_draw_pile_pressed() -> void:
 	if winner != -1 or wild_picker_modal.visible:
 		return
 
-	var acting_p := current
+	var acting_p: int = int(current)
 	var cmd = {
 		"command_type": "DrawCardCommand",
 		"player": acting_p

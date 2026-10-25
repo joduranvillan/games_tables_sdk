@@ -616,16 +616,6 @@ func _on_piece_moved(player: int, from_row: int, from_col: int, to_row: int, to_
 			captured_sprite.queue_free()
 		animating = false
 		animation_finished.emit()
-	else:
-		if moving_sprite != null and is_instance_valid(moving_sprite):
-			moving_sprite.position = Vector2(to_col * CELL + CELL / 2.0, to_row * CELL + CELL / 2.0)
-			if promoted:
-				moving_sprite.king = true
-				moving_sprite.queue_redraw()
-		if captured_sprite != null and is_instance_valid(captured_sprite):
-			captured_sprite.queue_free()
-		animating = false
-		animation_finished.emit()
 
 func _on_game_over(w: int) -> void:
 	winner = w
