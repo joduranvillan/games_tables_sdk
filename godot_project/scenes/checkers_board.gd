@@ -507,8 +507,8 @@ func _handle_click(pos: Vector2) -> void:
 		return
 
 	if selected == null:
-		var cell = board[row][col]
-		if cell != null and cell.owner == current:
+		var clicked_cell = board[row][col]
+		if clicked_cell != null and clicked_cell.owner == current:
 			_reset_all_piece_scales()
 			selected = {"row": row, "col": col}
 			valid_moves = _calculate_valid_moves(row, col)
