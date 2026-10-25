@@ -54,7 +54,7 @@ func _initialize() -> void:
 	var go_started = bridge.start_local_match_go_vs_ai(2, 1, 9)
 	results.append(["Go vs IA (IA=J1): inició, colocó piedra y devolvió turno a J2", go_started and bridge.current_player() == 2 and bridge.current_tick() >= 1])
 	bridge.start_local_match_go_vs_ai(1, 2, 9)
-	bridge.send_command_json(1, JSON.stringify({"command_type": "go_game::PlaceStoneCommand", "player": 1, "pos": {"row": 4, "col": 4}}))
+	bridge.send_command_json(1, JSON.stringify({"command_type": "go_game::PlaceStoneCommand", "player": 1, "x": 4, "y": 4}))
 	results.append(["Go vs IA (IA=J2): IA respondió tras jugada de J1 y devolvió turno a J1", bridge.current_player() == 1 and bridge.current_tick() >= 2])
 	bridge.free()
 
@@ -108,7 +108,7 @@ func _initialize() -> void:
 	var checkers_started = bridge.start_local_match_checkers_vs_ai(42, 2, 1)
 	results.append(["Checkers vs IA (IA=J1): inició, movió ficha y devolvió turno a J2", checkers_started and bridge.current_player() == 2 and bridge.current_tick() >= 1])
 	bridge.start_local_match_checkers_vs_ai(42, 1, 2)
-	bridge.send_move(1, 2, 1, 3, 0)
+	bridge.send_move(1, 2, 1, 3, 2)
 	results.append(["Checkers vs IA (IA=J2): IA respondió tras jugada de J1 y devolvió turno a J1", bridge.current_player() == 1 and bridge.current_tick() >= 2])
 	bridge.free()
 
@@ -132,7 +132,7 @@ func _initialize() -> void:
 	var shogi_started = bridge.start_local_match_shogi_vs_ai(2, 1, 1)
 	results.append(["Shogi vs IA (IA=J1): inició, movió pieza y devolvió turno a J2", shogi_started and bridge.current_player() == 2 and bridge.current_tick() >= 1])
 	bridge.start_local_match_shogi_vs_ai(1, 2, 1)
-	bridge.send_command_json(1, JSON.stringify({"command_type": "MovePieceCommand", "player": 1, "from": {"row": 6, "col": 6}, "to": {"row": 5, "col": 6}, "promote": false}))
+	bridge.send_command_json(1, JSON.stringify({"command_type": "shogi_game::MovePieceCommand", "player": 1, "from": [4, 6], "to": [4, 5], "promote": false}))
 	results.append(["Shogi vs IA (IA=J2): IA respondió tras jugada de J1 y devolvió turno a J1", bridge.current_player() == 1 and bridge.current_tick() >= 2])
 	bridge.free()
 
@@ -141,7 +141,7 @@ func _initialize() -> void:
 	var xiangqi_started = bridge.start_local_match_xiangqi_vs_ai(2, 1)
 	results.append(["Xiangqi vs IA (IA=J1): inició, movió pieza y devolvió turno a J2", xiangqi_started and bridge.current_player() == 2 and bridge.current_tick() >= 1])
 	bridge.start_local_match_xiangqi_vs_ai(1, 2)
-	bridge.send_command_json(1, JSON.stringify({"command_type": "MovePieceCommand", "player": 1, "from": [0, 6], "to": [0, 5]}))
+	bridge.send_command_json(1, JSON.stringify({"command_type": "xiangqi_game::MovePieceCommand", "player": 1, "from": [4, 6], "to": [4, 5]}))
 	results.append(["Xiangqi vs IA (IA=J2): IA respondió tras jugada de J1 y devolvió turno a J1", bridge.current_player() == 1 and bridge.current_tick() >= 2])
 	bridge.free()
 
