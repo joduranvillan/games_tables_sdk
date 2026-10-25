@@ -69,10 +69,13 @@ func _initialize() -> void:
 	var cc_started = bridge.start_local_match_chinese_checkers_vs_ai(2, 1, 1)
 	results.append(["Chinese Checkers vs IA (IA=J1): inició, movió ficha y devolvió turno a J2", cc_started and bridge.current_player() == 2 and bridge.current_tick() >= 1])
 	bridge.start_local_match_chinese_checkers_vs_ai(1, 2, 1)
-	var cc_moves = bridge.get_legal_moves(1)
-	if cc_moves.size() > 0:
-		var m = cc_moves[0]
-		bridge.send_command_json(1, JSON.stringify({"command_type": "MovePieceCommand", "player": 1, "from": m["from"], "to": m["to"]}))
+	bridge.send_command_json(1, JSON.stringify({
+		"command_type": "MovePegCommand",
+		"player": 1,
+		"from": {"q": -5, "r": 1},
+		"to": {"q": -4, "r": 1},
+		"path": []
+	}))
 	results.append(["Chinese Checkers vs IA (IA=J2): IA respondió tras jugada de J1 y devolvió turno a J1", bridge.current_player() == 1 and bridge.current_tick() >= 2])
 	bridge.free()
 

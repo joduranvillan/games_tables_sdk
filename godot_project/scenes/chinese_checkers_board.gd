@@ -34,6 +34,7 @@ var current: int = 1
 var winner: int = -1
 var selected_pos = null # Vector2i(q, r)
 var valid_dests: Array = [] # Array of Vector2i(q, r)
+var valid_paths: Dictionary = {} # Vector2i(q, r) -> Array of {"q": int, "r": int}
 
 # Grid of positions: Vector2i(q, r) -> player_id (0 = empty, 1..6 = player)
 var board_pegs: Dictionary = {}
@@ -395,8 +396,10 @@ func _on_peg_clicked(pos: Vector2i) -> void:
 			return
 
 		var from_pos = selected_pos
+		var move_path: Array = valid_paths.get(pos, [])
 		selected_pos = null
 		valid_dests.clear()
+		valid_paths.clear()
 		queue_redraw()
 
 		var cmd = {
@@ -404,20 +407,23 @@ func _on_peg_clicked(pos: Vector2i) -> void:
 			"player": current,
 			"from": {"q": from_pos.x, "r": from_pos.y},
 			"to": {"q": pos.x, "r": pos.y},
-			"path": []
+			"path": move_path
 		}
 		bridge.send_command_json(current, JSON.stringify(cmd))
 
 func _calculate_valid_destinations(start: Vector2i) -> Array:
 	var dests: Array = []
+	valid_paths.clear()
 	# 1. Single steps
 	for dir in DIRECTIONS:
 		var target = start + dir
 		if board_pegs.has(target) and board_pegs[target] == 0:
 			dests.append(target)
+			valid_paths[target] = []
 
 	# 2. Jumps & jump chains
 	var visited = {}
+	var parent_map = {}
 	var queue = [start]
 	visited[start] = true
 
@@ -430,8 +436,15 @@ func _calculate_valid_destinations(start: Vector2i) -> Array:
 				if board_pegs.has(landing) and board_pegs[landing] == 0:
 					if not visited.has(landing):
 						visited[landing] = true
+						parent_map[landing] = curr
 						if landing != start and not dests.has(landing):
 							dests.append(landing)
+							var chain: Array = []
+							var step_node = landing
+							while parent_map.has(step_node):
+								chain.push_front({"q": step_node.x, "r": step_node.y})
+								step_node = parent_map[step_node]
+							valid_paths[landing] = chain
 						queue.append(landing)
 	return dests
 
