@@ -292,6 +292,7 @@ var dice_popup: PopupPanel
 var dice_label: Label
 var dice_widget: DiceWidget
 var _pause_menu: CanvasLayer
+var mode_option_button: OptionButton
 
 # Pulse animation timer
 var pulse_time: float = 0.0
@@ -547,6 +548,7 @@ func _setup_ui() -> void:
 
 	var mode_opt := OptionButton.new()
 	mode_opt.name = "ModeOptionButton"
+	mode_option_button = mode_opt
 	mode_opt.add_item("👥 Hotseat", 0)
 	mode_opt.add_item("🤖 vs IA (J1)", 1)
 	mode_opt.add_item("🤖 vs IA (J2)", 2)
