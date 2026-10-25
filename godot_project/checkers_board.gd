@@ -452,7 +452,7 @@ func _input(event: InputEvent) -> void:
 	_handle_unified_input(event)
 
 func _handle_unified_input(event: InputEvent) -> void:
-	if winner != -1 or animating:
+	if winner != -1:
 		return
 	if rules_popup != null and rules_popup.visible:
 		return
@@ -500,6 +500,9 @@ func _handle_unified_input(event: InputEvent) -> void:
 					_bounce_piece(press_row, press_col)
 					queue_redraw()
 					_selected_on_current_press = true
+			elif selected != null:
+				_handle_click(event_pos)
+				_selected_on_current_press = true
 	elif is_drag:
 		if touch_down_pos.distance_to(event_pos) > DEAD_ZONE:
 			is_touch_dragging = true
@@ -524,8 +527,6 @@ func _handle_unified_input(event: InputEvent) -> void:
 		_selected_on_current_press = false
 
 func _handle_click(pos: Vector2) -> void:
-	if animating:
-		return
 
 	var col := int(floor(pos.x / CELL))
 	var row := int(floor(pos.y / CELL))

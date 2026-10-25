@@ -93,15 +93,15 @@ func _ready() -> void:
 	bridge.connect("piece_moved", _on_piece_moved_signal)
 	
 	if gm != null and gm.get_game_mode() == "vs_ai":
-		var depth: int = gm.get_chess_ai_depth() if gm != null else 2
+		var diff: int = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else clampi(gm.get_chess_ai_depth() - 1, 0, 3)
 		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P1
 		var ai_p: int = P2 if human_p == P1 else P1
-		bridge.start_local_match_chess_vs_ai(human_p, ai_p, depth)
+		bridge.start_local_match_chess_vs_ai(human_p, ai_p, diff)
 		if mode_option_button != null:
 			if human_p == P2:
 				mode_option_button.selected = 4
 			else:
-				mode_option_button.selected = clampi(depth, 1, 3)
+				mode_option_button.selected = clampi(diff + 1, 1, 3)
 	else:
 		bridge.start_local_match_chess(P1, P2)
 		if mode_option_button != null:
@@ -329,13 +329,13 @@ func _on_mode_selected(index: int) -> void:
 			0:
 				bridge.start_local_match_chess(P1, P2)
 			1:
-				bridge.start_local_match_chess_vs_ai(P1, P2, 1)
+				bridge.start_local_match_chess_vs_ai(P1, P2, 0)
 			2:
-				bridge.start_local_match_chess_vs_ai(P1, P2, 2)
+				bridge.start_local_match_chess_vs_ai(P1, P2, 1)
 			3:
-				bridge.start_local_match_chess_vs_ai(P1, P2, 3)
+				bridge.start_local_match_chess_vs_ai(P1, P2, 2)
 			4:
-				bridge.start_local_match_chess_vs_ai(P2, P1, 2)
+				bridge.start_local_match_chess_vs_ai(P2, P1, 1)
 
 	current = bridge.current_player() if bridge else P1
 	_update_status()
@@ -389,8 +389,6 @@ func _reset_all_piece_scales() -> void:
 				sprite.scale = Vector2(1.0, 1.0)
 
 func _bounce_piece(r: int, c: int) -> void:
-	if animating:
-		return
 	if r < 0 or r >= BOARD_SIZE or c < 0 or c >= BOARD_SIZE:
 		return
 	var sprite = piece_sprites[r][c]
@@ -402,7 +400,7 @@ func _bounce_piece(r: int, c: int) -> void:
 
 func _on_drag_started(from_cell: Vector2i) -> void:
 	_sfx_piece_slide()
-	if winner != -1 or animating: return
+	if winner != -1: return
 	var r = from_cell.x
 	var c = from_cell.y
 	var piece = piece_sprites[r][c]
@@ -420,7 +418,7 @@ func _on_drag_started(from_cell: Vector2i) -> void:
 		queue_redraw()
 
 func _on_piece_dropped(to_cell: Vector2i) -> void:
-	if winner != -1 or selected_pos == null or animating: return
+	if winner != -1 or selected_pos == null: return
 	
 	var from_r = selected_pos.x
 	var from_c = selected_pos.y
@@ -597,7 +595,7 @@ func _pixel_to_cell(pos: Vector2) -> Vector2i:
 	return Vector2i(-1, -1)
 
 func _handle_mouse_hover(pos: Vector2) -> void:
-	if winner != -1 or animating:
+	if winner != -1:
 		if _hover_cell != Vector2i(-1, -1):
 			_hover_cell = Vector2i(-1, -1)
 			_hover_moves.clear()
@@ -650,7 +648,7 @@ func _select_piece_at(row: int, col: int) -> void:
 	queue_redraw()
 
 func _handle_unified_input(event: InputEvent) -> void:
-	if winner != -1 or animating:
+	if winner != -1:
 		return
 	if _rules_popup != null and _rules_popup.visible:
 		return
@@ -692,6 +690,9 @@ func _handle_unified_input(event: InputEvent) -> void:
 				if selected_pos != Vector2i(press_row, press_col):
 					_select_piece_at(press_row, press_col)
 					_selected_on_current_press = true
+			elif selected_pos != null:
+				_handle_cell_click(press_row, press_col)
+				_selected_on_current_press = true
 	elif is_drag:
 		if touch_down_pos.distance_to(event_pos) > DEAD_ZONE:
 			is_touch_dragging = true
@@ -730,8 +731,6 @@ func _handle_cell_click(row: int, col: int) -> void:
 			var eng_cell := Vector2i(col, (BOARD_SIZE - 1) - row)
 			if not (tm.call("is_cell_allowed", vis_cell) or tm.call("is_cell_allowed", eng_cell)):
 				return
-	if animating:
-		return
 
 	if selected_pos == null:
 		var piece = piece_sprites[row][col]
@@ -865,7 +864,7 @@ func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promo
 		return
 
 	var tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(piece, "position", target_pos, 0.22)
+	tween.tween_property(piece, "position", target_pos, 0.14)
 
 	tween.finished.connect(func():
 		if target_piece != null and is_instance_valid(target_piece) and target_piece != piece:
@@ -876,7 +875,7 @@ func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promo
 			if still_here:
 				piece_sprites[to_r][to_c] = null
 				_create_piece_sprite(to_r, to_c, piece_player, promoted_kind)
-		active_animations -= 1
+		active_animations = max(0, active_animations - 1)
 		if active_animations <= 0:
 			active_animations = 0
 			animating = false

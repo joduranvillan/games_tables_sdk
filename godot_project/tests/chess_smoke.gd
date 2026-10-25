@@ -93,6 +93,37 @@ func _initialize() -> void:
 
 	results.append(["ChessBoard avanza peón blanco e2->e4 en primer turno y pasa turno a J2", chess_node.current == 2 and chess_node.piece_sprites[4][4] != null])
 
+	# 5. Prueba multi-turno vs IA (Medio, index 2): 1. e2->e4, 2. d2->d3, 3. Caballo g1->f3
+	chess_node._on_mode_selected(2) # vs IA (Blancas J1 - Medio)
+	var click_square := func(r: int, c: int):
+		var pos := Vector2(c * 76.0 + 38.0, r * 76.0 + 38.0)
+		var p := InputEventMouseButton.new()
+		p.button_index = MOUSE_BUTTON_LEFT
+		p.pressed = true
+		p.position = pos
+		chess_node._handle_unified_input(p)
+		var rel := InputEventMouseButton.new()
+		rel.button_index = MOUSE_BUTTON_LEFT
+		rel.pressed = false
+		rel.position = pos
+		chess_node._handle_unified_input(rel)
+
+	# Turno 1: e2 (6,4) -> e4 (4,4)
+	click_square.call(6, 4)
+	click_square.call(4, 4)
+	results.append(["ChessBoard vs IA Turno 1 (e2->e4): IA responde y devuelve turno a J1", chess_node.current == 1])
+
+	# Turno 2: d2 (6,3) -> d3 (5,3)
+	click_square.call(6, 3)
+	click_square.call(5, 3)
+	results.append(["ChessBoard vs IA Turno 2 (d2->d3): IA responde y devuelve turno a J1", chess_node.current == 1])
+
+	# Turno 3: Caballo g1 (7,6) -> f3 (5,5)
+	click_square.call(7, 6)
+	results.append(["ChessBoard vs IA Turno 3: click en caballo g1 selecciona (7,6) y muestra f3 (5,5) como válida", chess_node.selected_pos == Vector2i(7, 6) and Vector2i(5, 5) in chess_node.valid_moves])
+	click_square.call(5, 5)
+	results.append(["ChessBoard vs IA Turno 3 (Ng1->f3): caballo avanza a f3 y la IA responde devolviendo turno a J1", chess_node.current == 1 and chess_node.piece_sprites[7][6] == null])
+
 	root.remove_child(chess_node)
 	chess_node.free()
 

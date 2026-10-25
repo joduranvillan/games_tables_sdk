@@ -1,7 +1,7 @@
 use open_table_engine::prelude::*;
 
 use crate::board::{
-    is_in_check, BoardResource, DrawOfferedResource, HalfMoveClockResource,
+    is_in_check, piece_moves, BoardResource, DrawOfferedResource, HalfMoveClockResource,
     PositionHistoryResource, Sides,
 };
 use crate::commands::MovePieceCommand;
@@ -17,7 +17,7 @@ pub fn generate_candidates(session: &Session, player: PlayerId) -> Vec<MovePiece
 ///
 /// Componentes:
 /// - Material: Peón=1, Caballo/Alfil=3, Torre=5, Dama=9, Rey=1000 (+ para `player`, - para oponente).
-/// - Movilidad: +0.1 * num_movimientos_legales_del_jugador.
+/// - Movilidad: +0.1 * num_movimientos_del_jugador.
 /// - Control del centro: +0.15 por pieza en las 4 casillas centrales (d4, e4, d5, e5).
 pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
     if let Some(game_over) = session.world().get_resource::<GameOverResource>() {
@@ -47,9 +47,10 @@ pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
 
     let opponent = sides.opponent_of(player);
     let mut score = 0.0f32;
+    let mut player_moves = 0usize;
 
-    // 1. Material
-    for piece in board.pieces.values() {
+    // 1. Material + 2. Movilidad rápida sin clonar el tablero en nodos hoja
+    for (&pos, piece) in &board.pieces {
         let val = match piece.kind {
             PieceKind::Pawn => 1.0,
             PieceKind::Knight => 3.0,
@@ -60,14 +61,13 @@ pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
         };
         if piece.owner == player {
             score += val;
+            player_moves += piece_moves(board, sides, pos, *piece).len();
         } else if piece.owner == opponent {
             score -= val;
         }
     }
 
-    // 2. Bonus de movilidad: +0.1 * movimientos legales de player
-    let player_moves = generate_candidates(session, player).len() as f32;
-    score += 0.1 * player_moves;
+    score += 0.1 * (player_moves as f32);
 
     // 3. Control del centro: +0.15 por pieza en las 4 casillas centrales (d4, e4, d5, e5)
     // d4: (row 3, col 3), e4: (row 3, col 4), d5: (row 4, col 3), e5: (row 4, col 4)
@@ -157,7 +157,7 @@ pub fn minimax(
     }
 
     let current = session.current_player();
-    let candidates = generate_candidates(session, current);
+    let mut candidates = generate_candidates(session, current);
 
     if candidates.is_empty() {
         let board = session.world().get_resource::<BoardResource>();
@@ -175,6 +175,10 @@ pub fn minimax(
         } else {
             0.0
         };
+    }
+
+    if let Some(board) = session.world().get_resource::<BoardResource>() {
+        candidates.sort_by_key(|cmd| if board.get(cmd.to).is_some() { 0 } else { 1 });
     }
 
     if maximizing {
