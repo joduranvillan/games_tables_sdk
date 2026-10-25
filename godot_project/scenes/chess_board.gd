@@ -308,6 +308,8 @@ func _show_clipboard_notification(msg: String = "Copiado al portapapeles") -> vo
 		)
 
 func _on_mode_selected(index: int) -> void:
+	if bridge == null:
+		_ready()
 	in_opening_practice = false
 	current_opening_key = ""
 	opening_step_index = 0
@@ -467,7 +469,11 @@ func _init_board_state() -> void:
 	last_move_from = Vector2i(-1, -1)
 	last_move_to = Vector2i(-1, -1)
 	check_king_pos = null
-	if pieces_container != null:
+	if pieces_container == null:
+		pieces_container = Node2D.new()
+		pieces_container.name = "PiecesContainer"
+		add_child(pieces_container)
+	else:
 		for child in pieces_container.get_children():
 			child.queue_free()
 	piece_sprites.clear()
@@ -842,7 +848,7 @@ func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promo
 			r_tw.tween_property(rook_sprite, "position", rook_pos, 0.22)
 	
 	var target_pos = Vector2(to_c * CELL_SIZE + CELL_SIZE / 2.0, to_r * CELL_SIZE + CELL_SIZE / 2.0)
-	if not is_inside_tree():
+	if not is_inside_tree() or OS.has_feature("headless"):
 		if target_piece != null and is_instance_valid(target_piece) and target_piece != piece:
 			target_piece.queue_free()
 		piece.position = target_pos
@@ -965,7 +971,10 @@ func _on_game_over(w: int) -> void:
 	overlay.show_winner(w)
 
 func _on_move_rejected(reason: String) -> void:
-	status.text = "Movimiento inválido: %s" % reason
+	if status == null:
+		status = get_node_or_null("Status")
+	if status != null:
+		status.text = "Movimiento inválido: %s" % reason
 	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()
 		
@@ -1173,25 +1182,31 @@ func _handle_gamepad_input(event: InputEvent) -> void:
 			JOY_BUTTON_START: gamepad_open_pause_menu()
 
 func _update_status() -> void:
+	if status == null:
+		status = get_node_or_null("Status")
 	if winner != -1:
-		status.text = "¡Jaque mate! Ganó el jugador %s" % winner
+		if status != null:
+			status.text = "¡Jaque mate! Ganó el jugador %s" % winner
 		if turn_indicator != null:
 			turn_indicator.stop_timer()
 			turn_indicator.set_active(false)
 	else:
 		var p_name = "Jugador %s" % current
 		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)] as Color)
+		var msg := ""
 		if in_opening_practice and opening_step_index < opening_moves.size():
 			var expected = opening_moves[opening_step_index]
 			var op_data = ChessOpenings.get_opening(current_opening_key)
-			status.text = "Práctica: %s | Esperado: %s" % [op_data.get("name", "Apertura"), expected.get("notation", "")]
+			msg = "Práctica: %s | Esperado: %s" % [op_data.get("name", "Apertura"), expected.get("notation", "")]
 		else:
 			if opening_moves.size() > 0 and opening_step_index >= opening_moves.size():
-				status.text = "¡Apertura completada! Continúa en partida libre (Turno: P%s)" % current
+				msg = "¡Apertura completada! Continúa en partida libre (Turno: P%s)" % current
 			elif opening_moves.size() > 0:
-				status.text = "Desviado de apertura. Partida libre (Turno: P%s)" % current
+				msg = "Desviado de apertura. Partida libre (Turno: P%s)" % current
 			else:
-				status.text = "Turno: Jugador %s (Ajedrez)" % current
+				msg = "Turno: Jugador %s (Ajedrez)" % current
+		if status != null:
+			status.text = msg
 
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, p_name, p_col)

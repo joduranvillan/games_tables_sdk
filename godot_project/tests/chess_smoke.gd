@@ -56,6 +56,8 @@ func _initialize() -> void:
 	var chess_scene: PackedScene = load("res://chess_board.tscn")
 	var chess_node = chess_scene.instantiate()
 	root.add_child(chess_node)
+	if chess_node.bridge == null and chess_node.has_method("_ready"):
+		chess_node._ready()
 	chess_node._on_mode_selected(0) # Hotseat P1 vs P2
 
 	# Click 1 en e2 (fila visual 6, col 4): press + release
