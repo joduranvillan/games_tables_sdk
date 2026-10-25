@@ -112,7 +112,7 @@ func _handle_press(pos: Vector2) -> void:
 		drag_cancelled.emit()
 	else:
 		# Second tap on destination cell
-		var from_cell = selected_from
+		var _from_cell = selected_from
 		clear_selection()
 		piece_dropped.emit(cell)
 
@@ -131,7 +131,7 @@ func _handle_release(pos: Vector2) -> void:
 	
 	if drag_dist > drag_threshold and is_in_bounds(release_cell) and release_cell != selected_from:
 		# Drag & Drop release over target cell
-		var from_cell = selected_from
+		var _from_cell = selected_from
 		clear_selection()
 		piece_dropped.emit(release_cell)
 	else:

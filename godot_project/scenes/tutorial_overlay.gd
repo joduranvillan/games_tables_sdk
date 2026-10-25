@@ -170,5 +170,5 @@ func _on_next_pressed() -> void:
 		show_step()
 
 func _on_skip_pressed() -> void:
-	skip_requested.emit()
 	hide()
+	skip_requested.emit()

@@ -71,7 +71,7 @@ static func format_mm_ss(seconds: float) -> String:
 	if seconds <= 0.0:
 		return "00:00"
 	var total_sec := maxi(0, int(ceil(seconds)))
-	var mins := total_sec / 60
+	var mins := int(floor(float(total_sec) / 60.0))
 	var secs := total_sec % 60
 	return "%02d:%02d" % [mins, secs]
 
