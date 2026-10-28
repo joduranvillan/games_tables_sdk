@@ -1376,6 +1376,9 @@ func _update_discard_display() -> void:
 	var card_visual = _create_card_visual(display_card, false, true)
 	card_visual.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	card_visual.position = Vector2(0, 0)
+	var card_sb = card_visual.get_theme_stylebox("panel")
+	if card_sb != null:
+		discard_card_node.add_theme_stylebox_override("panel", card_sb)
 	discard_card_node.add_child(card_visual)
 
 func _update_active_color_indicator() -> void:

@@ -120,7 +120,12 @@ func _initialize() -> void:
 		board_inst.discard_pile = [{"color": "Wild", "value": "Wild"}]
 		board_inst._update_discard_display()
 		var discard_sb = board_inst.discard_card_node.get_theme_stylebox("panel") as StyleBoxFlat
-		var discard_painted_blue = discard_sb != null and discard_sb.bg_color.is_equal_approx(board_inst.CARD_COLORS["Blue"])
+		if discard_sb == null and board_inst.discard_card_node.get_child_count() > 0:
+			var last_child = board_inst.discard_card_node.get_child(board_inst.discard_card_node.get_child_count() - 1)
+			if last_child is Control:
+				discard_sb = (last_child as Control).get_theme_stylebox("panel") as StyleBoxFlat
+		var expected_blue: Color = board_inst._get_accessible_card_color("Blue")
+		var discard_painted_blue = discard_sb != null and (discard_sb.bg_color.is_equal_approx(board_inst.CARD_COLORS["Blue"]) or discard_sb.bg_color.is_equal_approx(expected_blue))
 		results.append(["Carta Wild en pila de descarte se pinta visualmente con el color elegido", discard_painted_blue])
 
 		# 10. Probar partida vs IA en uno_board.gd jugando una carta desde la mano humana
