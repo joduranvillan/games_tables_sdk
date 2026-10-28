@@ -516,7 +516,11 @@ pub fn build_go_rules() -> RuleEngine {
                     reason: "Invalid player".into(),
                 });
             }
-            (board.black_player, board.white_player, board.komi_half_points)
+            (
+                board.black_player,
+                board.white_player,
+                board.komi_half_points,
+            )
         };
         let new_board = BoardResource::new(cmd.size, black_p, white_p).with_komi(komi);
         let mut history = BoardHistoryResource::new();

@@ -67,4 +67,3 @@ pub struct WildDrawFourChallengedEvent {
 pub struct ColorChangedEvent {
     pub color: CardColor,
 }
-

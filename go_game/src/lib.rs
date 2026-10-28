@@ -66,4 +66,3 @@ pub fn new_go_session_with_komi(
         .insert_resource(DeadMarkingResource::default());
     session
 }
-

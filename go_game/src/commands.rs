@@ -55,4 +55,3 @@ pub struct SetBoardSizeCommand {
     pub player: PlayerId,
     pub size: usize,
 }
-

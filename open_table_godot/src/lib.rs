@@ -695,7 +695,6 @@ impl OpenTableBridge {
         }
     }
 
-
     #[func]
     fn start_local_match_go_vs_ai(
         &mut self,

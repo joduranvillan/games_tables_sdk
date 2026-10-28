@@ -49,4 +49,3 @@ pub struct ChooseWildColorCommand {
     pub player: PlayerId,
     pub chosen_color: CardColor,
 }
-
