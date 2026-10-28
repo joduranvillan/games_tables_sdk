@@ -112,7 +112,18 @@ func _initialize() -> void:
 		results.append(["_create_card_visual usa Panel para no deformar el óvalo interior", is_plain_panel])
 		results.append(["TableMatPanel tiene diseño amplio centrado (1200x692)", board_inst.table_mat_panel != null and board_inst.table_mat_panel.size.x >= 1100])
 
-		# 9. Probar partida vs IA en uno_board.gd jugando una carta normal desde la mano humana
+		# 9. Verificar que comodín / +4 en descarte se pinta con el color activo elegido
+		board_inst.active_color = "Blue"
+		var wild_display_card: Dictionary = board_inst._get_discard_display_card({"color": "Wild", "value": "WildDrawFour"})
+		results.append(["Comodín +4 en descarte adopta el color elegido (Blue)", str(wild_display_card.get("color", "")) == "Blue"])
+
+		board_inst.discard_pile = [{"color": "Wild", "value": "Wild"}]
+		board_inst._update_discard_display()
+		var discard_sb = board_inst.discard_card_node.get_theme_stylebox("panel") as StyleBoxFlat
+		var discard_painted_blue = discard_sb != null and discard_sb.bg_color.is_equal_approx(board_inst.CARD_COLORS["Blue"])
+		results.append(["Carta Wild en pila de descarte se pinta visualmente con el color elegido", discard_painted_blue])
+
+		# 10. Probar partida vs IA en uno_board.gd jugando una carta desde la mano humana
 		board_inst._on_mode_selected(1) # vs IA (Humano = J1, IA = J2)
 		var tick_before: int = board_inst.bridge.current_tick()
 		var played_non_wild := false
@@ -128,6 +139,7 @@ func _initialize() -> void:
 			board_inst._on_draw_pile_pressed()
 		var tick_after: int = board_inst.bridge.current_tick()
 		results.append(["En modo vs IA, jugada de J1 es aceptada y la IA responde automáticamente (ticks >= +2)", not board_inst._last_move_rejected and tick_after >= tick_before + 2 and board_inst.current == 1])
+		results.append(["Penalización de robo (+2/+4) queda en 0 tras aplicarse automáticamente", board_inst.draw_penalty == 0])
 
 		root.remove_child(board_inst)
 		board_inst.free()

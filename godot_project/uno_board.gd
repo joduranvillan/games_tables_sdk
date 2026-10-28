@@ -85,7 +85,6 @@ var discard_zone_box: VBoxContainer
 var center_info_vbox: VBoxContainer
 var deck_zone_box: VBoxContainer
 var discard_card_node: Control
-var discard_inner_panel: PanelContainer
 var active_color_badge: PanelContainer
 var active_color_rect: ColorRect
 var active_color_label: Label
@@ -101,7 +100,6 @@ var wild_picker_modal: PanelContainer
 
 # Navigation & HUD
 var turn_indicator: TurnIndicator
-var network_hud: NetworkStatusHUD
 var rules_popup: RulesPopup
 var current_theme: BoardTheme
 var _pause_menu: CanvasLayer
@@ -117,7 +115,7 @@ var _ai_visual_queue: Array = []
 var _is_playing_ai_sequence: bool = false
 var _last_move_rejected: bool = false
 var _human_action_origin: Vector2 = Vector2.ZERO
-var _suppress_auto_sync: bool = false
+var _pending_drawn_wild_pick: bool = false
 
 # Action buttons bar & special buttons
 var action_buttons_bar: HBoxContainer
@@ -126,11 +124,16 @@ var catch_uno_btn: Button
 var challenge_wild_four_btn: Button
 var jump_in_btn: Button
 
-@onready var status: Label = get_node_or_null("Status") if has_node("Status") else null
+var status: Label = null
 
 func _ready() -> void:
+	if has_node("Status"):
+		status = get_node_or_null("Status") as Label
+
 	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
-		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
+		var tm: Node = null
+		if is_inside_tree():
+			tm = get_node_or_null("/root/ThemeManager")
 		if tm != null:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
@@ -140,7 +143,9 @@ func _ready() -> void:
 	_setup_ui()
 	_init_default_game_state()
 
-	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
+	var gm: Node = null
+	if is_inside_tree():
+		gm = get_node_or_null("/root/GameManager")
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
 
@@ -168,12 +173,12 @@ func _ready() -> void:
 
 	# En ejecución interactiva, si GameManager no especificó modo explícito o está en vs_ai,
 	# arrancamos contra la IA (J1 humano vs J2 IA) para que el oponente juegue desde el inicio.
-	var gm_mode: String = gm.get_game_mode() if (gm != null and gm.has_method("get_game_mode")) else "vs_ai"
+	var gm_mode: String = str(gm.get_game_mode()) if (gm != null and gm.has_method("get_game_mode")) else "vs_ai"
 	var start_vs_ai: bool = (gm_mode == "vs_ai") or (not OS.has_feature("headless") and gm_mode == "hotseat")
 	if start_vs_ai:
-		var human_p: int = gm.get_human_player_id() if (gm != null and gm.has_method("get_human_player_id")) else P1
+		var human_p: int = int(gm.get_human_player_id()) if (gm != null and gm.has_method("get_human_player_id")) else P1
 		var ai_p: int = P2 if human_p == P1 else P1
-		var diff: int = gm.get_ai_difficulty() if (gm != null and gm.has_method("get_ai_difficulty")) else 1
+		var diff: int = int(gm.get_ai_difficulty()) if (gm != null and gm.has_method("get_ai_difficulty")) else 1
 		is_vs_ai = true
 		local_player = human_p
 		if mode_option_button != null:
@@ -190,7 +195,8 @@ func _ready() -> void:
 	if not _is_playing_ai_sequence:
 		_sync_uno_state_from_bridge()
 
-	_on_layout_changed(gm.get_layout() if gm != null else 0)
+	var initial_layout: int = int(gm.get_layout()) if (gm != null and gm.has_method("get_layout")) else 0
+	_on_layout_changed(initial_layout)
 	_update_ui()
 	_update_status()
 
@@ -207,10 +213,13 @@ func _on_quit_to_menu() -> void:
 			get_tree().change_scene_to_file("res://main.tscn")
 
 func _on_mode_selected(index: int) -> void:
-	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	var gm: Node = null
+	if is_inside_tree():
+		gm = get_node_or_null("/root/GameManager")
 	winner = -1
 	_ai_visual_queue.clear()
 	_is_playing_ai_sequence = false
+	_pending_drawn_wild_pick = false
 	_init_default_game_state()
 	if index == 0:
 		if gm != null and gm.has_method("set_game_mode"):
@@ -222,7 +231,7 @@ func _on_mode_selected(index: int) -> void:
 	else:
 		var human_p: int = P1 if index == 1 else P2
 		var ai_p: int = P2 if human_p == P1 else P1
-		var diff: int = gm.get_ai_difficulty() if (gm != null and gm.has_method("get_ai_difficulty")) else 1
+		var diff: int = int(gm.get_ai_difficulty()) if (gm != null and gm.has_method("get_ai_difficulty")) else 1
 		if gm != null and gm.has_method("set_game_mode"):
 			gm.set_game_mode("vs_ai")
 		if gm != null and gm.has_method("set_human_player_id"):
@@ -844,7 +853,7 @@ func _normalize_card_dict(raw_card: Dictionary) -> Dictionary:
 		val_str = str(raw_val)
 	return {"color": col_str, "value": val_str}
 
-func _sync_uno_state_from_bridge() -> void:
+func _sync_uno_state_from_bridge(preserve_active_color: bool = false) -> void:
 	if bridge == null or not bridge.has_method("get_uno_state"):
 		return
 	var target_p: int = local_player if is_vs_ai else current
@@ -862,7 +871,7 @@ func _sync_uno_state_from_bridge() -> void:
 			discard_pile.append(formatted_tc)
 		else:
 			discard_pile[discard_pile.size() - 1] = formatted_tc
-	if st.has("active_color"):
+	if st.has("active_color") and not preserve_active_color:
 		var ac = str(st["active_color"])
 		active_color = "Wild" if ac == "WildColor" else ac
 	if st.has("deck_count"):
@@ -929,8 +938,12 @@ func _create_card_visual(card: Dictionary, is_playable: bool = true, is_large: b
 	var oval_style = StyleBoxFlat.new()
 	if is_wild_card:
 		oval_style.bg_color = Color(0.14, 0.15, 0.20)
-		oval_style.border_color = Color(1.0, 0.88, 0.25)
-		oval_style.set_border_width_all(2)
+		if c_color in ["Red", "Blue", "Green", "Yellow"]:
+			oval_style.border_color = base_col.lightened(0.35)
+			oval_style.set_border_width_all(3)
+		else:
+			oval_style.border_color = Color(1.0, 0.88, 0.25)
+			oval_style.set_border_width_all(2)
 	else:
 		oval_style.bg_color = Color(0.98, 0.98, 0.99)
 		oval_style.border_color = base_col.darkened(0.2)
@@ -1285,14 +1298,16 @@ func _update_ui(animate_drawn_index: int = -1) -> void:
 				card_node.z_index = 0
 			)
 
-			var card_idx: int = i
-			card_node.gui_input.connect(func(event: InputEvent):
-				if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-					if is_interceptable:
-						_execute_intercept_card(card_idx, card_node.global_position)
-					elif is_playable:
-						_on_card_pressed(card_idx, card_node)
-			)
+		var card_idx: int = i
+		card_node.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				if is_interceptable:
+					_execute_intercept_card(card_idx, card_node.global_position)
+				elif is_playable:
+					_on_card_pressed(card_idx, card_node)
+				elif is_local_turn:
+					_on_unplayable_card_clicked(card)
+		)
 
 		hand_container.add_child(card_node)
 
@@ -1329,27 +1344,35 @@ func _update_ui(animate_drawn_index: int = -1) -> void:
 
 	_restore_fixed_fonts(self)
 
+func _get_discard_display_card(card: Dictionary) -> Dictionary:
+	var norm := _normalize_card_dict(card)
+	if (norm["color"] in ["Wild", "WildColor"] or norm["value"] in ["Wild", "WildDrawFour"]) and active_color in ["Red", "Blue", "Green", "Yellow"]:
+		return {"color": active_color, "value": norm["value"]}
+	return norm
+
 func _update_discard_display() -> void:
 	for child in discard_card_node.get_children():
 		child.queue_free()
 
-	var top_card: Dictionary = _normalize_card_dict(discard_pile.back()) if not discard_pile.is_empty() else {"color": "Red", "value": "1"}
-	var card_visual = _create_card_visual(top_card, false, true)
+	var raw_top: Dictionary = discard_pile.back() if not discard_pile.is_empty() else {"color": "Red", "value": "1"}
+	var display_card: Dictionary = _get_discard_display_card(raw_top)
+	var card_visual = _create_card_visual(display_card, false, true)
 	card_visual.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	card_visual.position = Vector2(0, 0)
 	discard_card_node.add_child(card_visual)
 
 func _update_active_color_indicator() -> void:
-	var col: Color = CARD_COLORS.get(active_color, CARD_COLORS["Red"])
+	var col: Color = _get_accessible_card_color(active_color) if active_color in ["Red", "Blue", "Green", "Yellow"] else CARD_COLORS.get(active_color, CARD_COLORS["Red"])
 	if active_color_rect != null:
 		active_color_rect.color = col
 	if active_color_label != null:
 		active_color_label.text = COLOR_NAMES_ES.get(active_color, active_color).to_upper()
-		active_color_label.add_theme_color_override("font_color", col if active_color != "Yellow" else Color(1.0, 0.9, 0.25))
+		active_color_label.add_theme_color_override("font_color", Color("#1A1A1A") if active_color == "Yellow" else Color.WHITE)
 	if active_color_badge != null:
 		var sb = active_color_badge.get_theme_stylebox("panel").duplicate() as StyleBoxFlat
 		if sb != null:
-			sb.border_color = col
+			sb.bg_color = col.darkened(0.08) if active_color != "Yellow" else col
+			sb.border_color = Color.WHITE if active_color != "Yellow" else Color("#1A1A1A")
 			active_color_badge.add_theme_stylebox_override("panel", sb)
 
 # =========================================================================
@@ -1366,7 +1389,7 @@ func _animate_card_to_discard(card_dict: Dictionary, start_global_pos: Vector2) 
 		_update_active_color_indicator()
 		return
 
-	var flying_card = _create_card_visual(_normalize_card_dict(card_dict), false, true)
+	var flying_card = _create_card_visual(_get_discard_display_card(card_dict), false, true)
 	flying_card.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	flying_card.z_index = 50
 	flying_card.global_position = start_global_pos
@@ -1411,6 +1434,15 @@ func _animate_card_draw_to_opponent() -> void:
 # =========================================================================
 # CARD INTERACTIONS & WILD FLOW
 # =========================================================================
+func _on_unplayable_card_clicked(card: Dictionary) -> void:
+	var norm_c := _normalize_card_dict(card)
+	var col_es: String = COLOR_NAMES_ES.get(active_color, active_color)
+	if norm_c["value"] == "WildDrawFour":
+		event_banner_label.text = "Regla oficial UNO: Solo puedes jugar +4 cuando no tengas ninguna carta de color %s en tu mano." % col_es
+	else:
+		event_banner_label.text = "Esa carta no coincide con el color activo (%s) ni con el símbolo actual." % col_es
+	_sfx_error_buzz()
+
 func _on_card_pressed(idx: int, card_btn: Control) -> void:
 	if winner != -1 or wild_picker_modal.visible or _is_playing_ai_sequence:
 		return
@@ -1424,6 +1456,7 @@ func _on_card_pressed(idx: int, card_btn: Control) -> void:
 
 	# If it's a Wild or Wild Draw 4 card, open color selector dialog
 	if c_color in ["Wild", "WildColor"] or c_val in ["Wild", "WildDrawFour"]:
+		_pending_drawn_wild_pick = false
 		pending_wild_card_idx = idx
 		_human_action_origin = card_btn.global_position
 		wild_picker_modal.visible = true
@@ -1434,6 +1467,21 @@ func _on_card_pressed(idx: int, card_btn: Control) -> void:
 
 func _on_wild_color_chosen(chosen_col: String) -> void:
 	wild_picker_modal.visible = false
+	if _pending_drawn_wild_pick:
+		_pending_drawn_wild_pick = false
+		active_color = chosen_col
+		_update_discard_display()
+		_update_active_color_indicator()
+		var col_es: String = COLOR_NAMES_ES.get(chosen_col, chosen_col)
+		event_banner_label.text = "¡Color del comodín establecido a %s!" % col_es.to_upper()
+		if not _is_playing_ai_sequence:
+			_auto_apply_pending_draw_penalty()
+			current = bridge.current_player()
+			_sync_uno_state_from_bridge(true)
+			_update_ui()
+			_update_status()
+		return
+
 	if pending_wild_card_idx >= 0 and pending_wild_card_idx < player_hand.size():
 		var origin_pos := _human_action_origin if _human_action_origin != Vector2.ZERO else (hand_container.global_position + Vector2(450, 40))
 		_execute_play_card(pending_wild_card_idx, origin_pos, chosen_col)
@@ -1452,8 +1500,10 @@ func _execute_play_card(idx: int, start_pos: Vector2, chosen_col: String = "") -
 		"command_type": "PlayCardCommand",
 		"player": acting_p,
 		"card_index": idx,
-		"chosen_color": chosen_col if (is_wild and not chosen_col.is_empty()) else null
+		"chosen_color": null
 	}
+	if is_wild and not chosen_col.is_empty():
+		cmd["chosen_color"] = chosen_col
 
 	_last_move_rejected = false
 	_human_action_origin = start_pos
@@ -1463,10 +1513,34 @@ func _execute_play_card(idx: int, start_pos: Vector2, chosen_col: String = "") -
 		return
 
 	if not _is_playing_ai_sequence:
+		_auto_apply_pending_draw_penalty()
 		current = bridge.current_player()
 		_sync_uno_state_from_bridge()
 		_update_ui()
 		_update_status()
+
+func _auto_apply_pending_draw_penalty() -> void:
+	var guard: int = 0
+	while draw_penalty > 0 and winner == -1 and bridge != null and guard < 8:
+		guard += 1
+		var target_p: int = int(bridge.current_player())
+		if target_p <= 0:
+			break
+		var penalty_amount: int = draw_penalty
+		var draw_cmd: Dictionary = {
+			"command_type": "DrawCardCommand",
+			"player": target_p
+		}
+		_last_move_rejected = false
+		bridge.send_command_json(target_p, JSON.stringify(draw_cmd))
+		if _last_move_rejected:
+			draw_penalty = 0
+			break
+		var target_name: String = _get_player_display_name(target_p)
+		var col_es: String = COLOR_NAMES_ES.get(active_color, active_color)
+		event_banner_label.text = "¡%s roba +%d cartas automáticamente y pierde el turno! Color activo: %s." % [target_name, penalty_amount, col_es]
+		if _is_playing_ai_sequence:
+			break
 
 func _on_draw_pile_pressed() -> void:
 	if winner != -1 or wild_picker_modal.visible or _is_playing_ai_sequence:
@@ -1475,6 +1549,7 @@ func _on_draw_pile_pressed() -> void:
 		return
 
 	_sfx_card_flip()
+	var prev_hand_size: int = player_hand.size()
 	var acting_p: int = int(current)
 	var cmd: Dictionary = {
 		"command_type": "DrawCardCommand",
@@ -1489,9 +1564,10 @@ func _on_draw_pile_pressed() -> void:
 		return
 
 	if not _is_playing_ai_sequence:
+		_auto_apply_pending_draw_penalty()
 		current = bridge.current_player()
-		_sync_uno_state_from_bridge()
-		var drawn_idx: int = max(-1, player_hand.size() - 1)
+		_sync_uno_state_from_bridge(_pending_drawn_wild_pick)
+		var drawn_idx: int = (player_hand.size() - 1) if player_hand.size() > prev_hand_size else -1
 		_update_ui(drawn_idx)
 		_update_status()
 
@@ -1556,6 +1632,7 @@ func _execute_intercept_card(idx: int, start_pos: Vector2) -> void:
 		return
 
 	if not _is_playing_ai_sequence:
+		_auto_apply_pending_draw_penalty()
 		current = bridge.current_player()
 		_sync_uno_state_from_bridge()
 		_update_ui()
@@ -1592,7 +1669,7 @@ func _on_event_json(json_str: String) -> void:
 	_apply_event_immediately(event)
 	if not _is_playing_ai_sequence:
 		current = bridge.current_player()
-		_sync_uno_state_from_bridge()
+		_sync_uno_state_from_bridge(_pending_drawn_wild_pick)
 		_update_ui()
 		_update_status()
 
@@ -1607,14 +1684,21 @@ func _start_ai_visual_sequence() -> void:
 	else:
 		_flush_ai_visual_queue_immediately()
 
+func _finish_ai_visual_sequence() -> void:
+	_is_playing_ai_sequence = false
+	if draw_penalty > 0 and winner == -1:
+		_auto_apply_pending_draw_penalty()
+		if _is_playing_ai_sequence:
+			return
+	if bridge != null:
+		current = bridge.current_player()
+		_sync_uno_state_from_bridge(_pending_drawn_wild_pick)
+	_update_ui()
+	_update_status()
+
 func _step_ai_visual_queue() -> void:
 	if _ai_visual_queue.is_empty():
-		_is_playing_ai_sequence = false
-		if bridge != null:
-			current = bridge.current_player()
-			_sync_uno_state_from_bridge()
-		_update_ui()
-		_update_status()
+		_finish_ai_visual_sequence()
 		return
 
 	var next_ev: Dictionary = _ai_visual_queue.pop_front()
@@ -1624,21 +1708,9 @@ func _step_ai_visual_queue() -> void:
 
 	if _ai_visual_queue.is_empty():
 		if is_inside_tree():
-			get_tree().create_timer(0.45).timeout.connect(func():
-				_is_playing_ai_sequence = false
-				if bridge != null:
-					current = bridge.current_player()
-					_sync_uno_state_from_bridge()
-				_update_ui()
-				_update_status()
-			)
+			get_tree().create_timer(0.45).timeout.connect(_finish_ai_visual_sequence)
 		else:
-			_is_playing_ai_sequence = false
-			if bridge != null:
-				current = bridge.current_player()
-				_sync_uno_state_from_bridge()
-			_update_ui()
-			_update_status()
+			_finish_ai_visual_sequence()
 	else:
 		var ev_type: String = str(next_ev.get("command_type", next_ev.get("event_type", "")))
 		var delay_sec: float = 0.25 if (ev_type.ends_with("PlayerSkippedEvent") or ev_type.ends_with("TurnReversedEvent") or ev_type.ends_with("UnoCalledEvent")) else 0.65
@@ -1651,12 +1723,7 @@ func _flush_ai_visual_queue_immediately() -> void:
 	while not _ai_visual_queue.is_empty():
 		var ev: Dictionary = _ai_visual_queue.pop_front()
 		_apply_event_immediately(ev)
-	_is_playing_ai_sequence = false
-	if bridge != null:
-		current = bridge.current_player()
-		_sync_uno_state_from_bridge()
-	_update_ui()
-	_update_status()
+	_finish_ai_visual_sequence()
 
 func _apply_event_immediately(event: Dictionary) -> void:
 	var event_type: String = str(event.get("command_type", event.get("event_type", "")))
@@ -1676,6 +1743,12 @@ func _apply_event_immediately(event: Dictionary) -> void:
 			else:
 				last_wild_draw_four_player = -1
 
+			if event.has("new_color"):
+				var nc := str(event["new_color"])
+				active_color = "Wild" if nc == "WildColor" else nc
+			elif c["color"] in ["Red", "Blue", "Green", "Yellow"]:
+				active_color = c["color"]
+
 			if p == local_player:
 				# Remove one matching card from local player's hand for immediate visual accuracy
 				for idx in range(player_hand.size()):
@@ -1689,14 +1762,12 @@ func _apply_event_immediately(event: Dictionary) -> void:
 				opponent_card_count = max(0, opponent_card_count - 1)
 				_animate_card_to_discard(c, _get_opponent_card_spawn_pos())
 
-			if event.has("new_color"):
-				var nc := str(event["new_color"])
-				active_color = "Wild" if nc == "WildColor" else nc
+			_update_discard_display()
 			_update_active_color_indicator()
 
 			var col_es: String = COLOR_NAMES_ES.get(active_color if c["color"] == "Wild" else c["color"], c["color"])
 			var sym_es: String = _get_card_display_symbol(val_str)
-			event_banner_label.text = "%s jugó %s %s" % [p_label, col_es, sym_es]
+			event_banner_label.text = "%s jugó %s %s (Color activo: %s)" % [p_label, col_es, sym_es, COLOR_NAMES_ES.get(active_color, active_color)]
 
 	elif event_type == "DrewAndPlayedEvent" or event_type == "uno_game::DrewAndPlayedEvent":
 		var p: int = int(event.get("player", current))
@@ -1714,23 +1785,33 @@ func _apply_event_immediately(event: Dictionary) -> void:
 			else:
 				last_wild_draw_four_player = -1
 
-			var spawn_p := draw_pile_button.global_position if draw_pile_button != null else _get_opponent_card_spawn_pos()
-			_animate_card_to_discard(c, spawn_p)
-
 			if event.has("new_color"):
 				var nc := str(event["new_color"])
 				active_color = "Wild" if nc == "WildColor" else nc
+			elif c["color"] in ["Red", "Blue", "Green", "Yellow"]:
+				active_color = c["color"]
+
+			var spawn_p := draw_pile_button.global_position if draw_pile_button != null else _get_opponent_card_spawn_pos()
+			_animate_card_to_discard(c, spawn_p)
+			_update_discard_display()
 			_update_active_color_indicator()
+
+			var is_drawn_wild: bool = (c["color"] in ["Wild", "WildColor"] or val_str in ["Wild", "WildDrawFour"])
+			if is_drawn_wild and p == local_player and not OS.has_feature("headless"):
+				_pending_drawn_wild_pick = true
+				pending_wild_card_idx = -1
+				wild_picker_modal.visible = true
 
 			var col_es: String = COLOR_NAMES_ES.get(active_color if c["color"] == "Wild" else c["color"], c["color"])
 			var sym_es: String = _get_card_display_symbol(val_str)
-			event_banner_label.text = "%s robó del mazo y jugó %s %s" % [p_label, col_es, sym_es]
+			event_banner_label.text = "%s robó del mazo y jugó %s %s (Color activo: %s)" % [p_label, col_es, sym_es, COLOR_NAMES_ES.get(active_color, active_color)]
 
 	elif event_type == "ColorChangedEvent" or event_type == "uno_game::ColorChangedEvent":
 		if event.has("color"):
 			active_color = str(event["color"])
 		elif event.has("new_color"):
 			active_color = str(event["new_color"])
+		_update_discard_display()
 		_update_active_color_indicator()
 		event_banner_label.text = "¡Color activo cambiado a %s!" % COLOR_NAMES_ES.get(active_color, active_color).to_upper()
 
@@ -1792,6 +1873,8 @@ func _apply_event_immediately(event: Dictionary) -> void:
 		if event.has("card") and event["card"] is Dictionary:
 			var c := _normalize_card_dict(event["card"])
 			discard_pile.append(c)
+			if c["color"] in ["Red", "Blue", "Green", "Yellow"]:
+				active_color = c["color"]
 			if c["value"] == "DrawTwo":
 				draw_penalty += 2
 			if p != local_player:
@@ -1799,13 +1882,15 @@ func _apply_event_immediately(event: Dictionary) -> void:
 				_animate_card_to_discard(c, _get_opponent_card_spawn_pos())
 			else:
 				_animate_card_to_discard(c, _human_action_origin)
+			_update_discard_display()
+			_update_active_color_indicator()
 		event_banner_label.text = "⚡ ¡JUMP-IN! %s interceptó con una carta idéntica" % _get_player_display_name(p)
 
 func _on_turn_changed(player_id: int) -> void:
 	if _is_playing_ai_sequence:
 		return
 	current = player_id
-	_sync_uno_state_from_bridge()
+	_sync_uno_state_from_bridge(_pending_drawn_wild_pick)
 	_update_ui()
 	_update_status()
 
