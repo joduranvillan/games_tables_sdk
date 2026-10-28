@@ -92,6 +92,31 @@ func _initialize() -> void:
 	results.append(["EndPhaseCommand en Fortify avanza turno a P2", bridge.current_player() == 2])
 	results.append(["Se emitió la señal turn_changed con P2", turns_changed.size() >= 1 and turns_changed[-1] == 2])
 
+	# 5. Verificar crisis_board.gd: carga sin error en TurnIndicator, mapa fullscreen (1280x720) y turno IA instantáneo
+	var board_script = load("res://crisis_board.gd")
+	if board_script != null:
+		var board_inst = board_script.new()
+		root.add_child(board_inst)
+		if board_inst.map_panel == null and board_inst.has_method("_ready"):
+			board_inst._ready()
+
+		results.append(["crisis_board carga con MapPanel a pantalla completa (1280x720)", board_inst.map_panel != null and board_inst.map_panel.size == Vector2(1280, 720)])
+		results.append(["crisis_board superpone TopBarPanel y SidebarPanel sobre el mapa", board_inst.top_bar_panel != null and board_inst.sidebar_panel != null])
+		results.append(["TurnIndicator soporta set_current_player y set_turn sin errores", board_inst.turn_indicator != null and board_inst.turn_indicator.has_method("set_current_player")])
+
+		# Probar modo vs IA (Humano = J1, IA = J2): completar turno de J1 y verificar que la IA juega al instante
+		board_inst._on_mode_selected(1)
+		var tick_before: int = board_inst.bridge.current_tick()
+		board_inst._place_armies(board_inst.armies_remaining_to_place)
+		board_inst._on_btn_end_phase_pressed() # Attack -> Fortify
+		board_inst._on_btn_end_phase_pressed() # Fortify -> Turno IA (instantáneo) -> vuelve a J1
+		var tick_after: int = board_inst.bridge.current_tick()
+		results.append(["En modo vs IA de TEG, la IA ejecuta su turno al instante y devuelve turno a J1", tick_after > tick_before + 3 and board_inst.current_player_id == 1])
+		results.append(["El turno de la IA no abre popups bloqueantes (dice_popup oculto)", not board_inst.dice_popup.visible])
+
+		root.remove_child(board_inst)
+		board_inst.free()
+
 	var ok := true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])

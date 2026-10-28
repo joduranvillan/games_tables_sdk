@@ -254,10 +254,17 @@ var selected_card_indices: Array[int] = []
 var exchange_count: int = 0
 var player_objectives: Dictionary = {}
 
+var is_vs_ai: bool = false
+var human_player_id: int = 1
+var ai_player_id: int = 2
+var _is_human_attacking: bool = false
+var current_layout: int = 0
+
 # UI Nodes
-@onready var status_label: Label = get_node_or_null("Status") if has_node("Status") else null
+var status_label: Label = null
 var map_panel: Panel
 var map_canvas: Control
+var top_bar_panel: Panel
 var sidebar_panel: Panel
 var tab_container: TabContainer
 
@@ -271,7 +278,6 @@ var cards_container: HBoxContainer
 var cards_info_label: Label
 var btn_exchange: Button
 
-var action_panel: VBoxContainer
 var action_title_label: Label
 var action_info_label: Label
 var btn_place: Button
@@ -286,7 +292,6 @@ var fortify_armies_spinbox: SpinBox
 var player_stats_label: Label
 var turn_indicator: TurnIndicator
 var current_theme: BoardTheme
-var network_hud: NetworkStatusHUD
 var rules_popup: RulesPopup
 var dice_popup: PopupPanel
 var dice_label: Label
@@ -298,8 +303,15 @@ var mode_option_button: OptionButton
 var pulse_time: float = 0.0
 
 func _ready() -> void:
+	if has_node("Status"):
+		status_label = get_node_or_null("Status")
+		if status_label != null:
+			status_label.visible = false
+
 	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
-		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
+		var tm: Node = null
+		if is_inside_tree():
+			tm = get_node_or_null("/root/ThemeManager")
 		if tm != null:
 			current_theme = tm.get_theme()
 			tm.theme_changed.connect(_on_theme_changed)
@@ -310,7 +322,9 @@ func _ready() -> void:
 	_setup_default_cards()
 	_setup_ui()
 
-	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
+	var gm: Node = null
+	if is_inside_tree():
+		gm = get_node_or_null("/root/GameManager")
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
 
@@ -351,22 +365,25 @@ func _ready() -> void:
 	if bridge.has_signal("turn_changed"):
 		bridge.connect("turn_changed", _on_turn_changed)
 
-	var is_ai_mode = (gm != null and gm.has_method("get_game_mode") and gm.get_game_mode() == "vs_ai")
-	if is_ai_mode:
-		var human_p = gm.get_human_player_id() if gm.has_method("get_human_player_id") else 1
-		var ai_p = 2 if human_p == 1 else 1
-		var diff = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else 1
-		bridge.start_local_match_crisis_vs_ai(human_p, ai_p, diff)
+	is_vs_ai = (gm != null and gm.has_method("get_game_mode") and str(gm.get_game_mode()) == "vs_ai")
+	if is_vs_ai:
+		human_player_id = int(gm.get_human_player_id()) if (gm != null and gm.has_method("get_human_player_id")) else 1
+		ai_player_id = 2 if human_player_id == 1 else 1
+		var diff: int = int(gm.get_ai_difficulty()) if (gm != null and gm.has_method("get_ai_difficulty")) else 1
+		bridge.start_local_match_crisis_vs_ai(human_player_id, ai_player_id, diff)
 		if mode_option_button != null:
-			mode_option_button.selected = 1 if human_p == 1 else 2
+			mode_option_button.selected = 1 if human_player_id == 1 else 2
 	else:
+		human_player_id = 1
+		ai_player_id = 2
 		bridge.start_local_match_crisis(42, [1, 2])
 		if mode_option_button != null:
 			mode_option_button.selected = 0
 	current_player_id = bridge.current_player()
 
 	_sync_all_from_bridge()
-	_on_layout_changed(gm.get_layout() if gm != null else 0)
+	var initial_layout: int = int(gm.get_layout()) if (gm != null and gm.has_method("get_layout")) else 0
+	_on_layout_changed(initial_layout)
 	_update_ui_state()
 
 	if not OS.has_feature("headless"):
@@ -382,24 +399,30 @@ func _on_quit_to_menu() -> void:
 			get_tree().change_scene_to_file("res://main.tscn")
 
 func _on_mode_selected(index: int) -> void:
-	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	var gm: Node = null
+	if is_inside_tree():
+		gm = get_node_or_null("/root/GameManager")
 	winner = -1
 	selected_from = -1
 	selected_to = -1
 	valid_targets.clear()
 	if index == 0:
+		is_vs_ai = false
+		human_player_id = 1
+		ai_player_id = 2
 		if gm != null and gm.has_method("set_game_mode"):
 			gm.set_game_mode("local")
 		bridge.start_local_match_crisis(42, [1, 2])
 	else:
-		var human_p = 1 if index == 1 else 2
-		var ai_p = 2 if human_p == 1 else 1
-		var diff = gm.get_ai_difficulty() if (gm != null and gm.has_method("get_ai_difficulty")) else 1
+		is_vs_ai = true
+		human_player_id = 1 if index == 1 else 2
+		ai_player_id = 2 if human_player_id == 1 else 1
+		var diff: int = int(gm.get_ai_difficulty()) if (gm != null and gm.has_method("get_ai_difficulty")) else 1
 		if gm != null and gm.has_method("set_game_mode"):
 			gm.set_game_mode("vs_ai")
 		if gm != null and gm.has_method("set_human_player_id"):
-			gm.set_human_player_id(human_p)
-		bridge.start_local_match_crisis_vs_ai(human_p, ai_p, diff)
+			gm.set_human_player_id(human_player_id)
+		bridge.start_local_match_crisis_vs_ai(human_player_id, ai_player_id, diff)
 	current_player_id = bridge.current_player()
 	_sync_all_from_bridge()
 	_update_ui_state()
@@ -464,41 +487,46 @@ func _on_theme_changed(theme: BoardTheme) -> void:
 func _apply_theme_styling() -> void:
 	if current_theme == null:
 		return
-	
+
 	if map_panel:
 		var map_style = StyleBoxFlat.new()
-		map_style.bg_color = current_theme.board_color.darkened(0.2)
-		map_style.border_color = current_theme.line_color.darkened(0.2)
-		map_style.set_border_width_all(2)
-		map_style.corner_radius_top_left = 10
-		map_style.corner_radius_top_right = 10
-		map_style.corner_radius_bottom_left = 10
-		map_style.corner_radius_bottom_right = 10
+		map_style.bg_color = current_theme.board_color.darkened(0.22)
+		map_style.border_color = current_theme.line_color.darkened(0.25)
+		map_style.set_border_width_all(0)
 		map_panel.add_theme_stylebox_override("panel", map_style)
+
+	if top_bar_panel:
+		var top_style = StyleBoxFlat.new()
+		var base_dark = current_theme.dark_color.darkened(0.18)
+		top_style.bg_color = Color(base_dark.r, base_dark.g, base_dark.b, 0.88)
+		top_style.border_color = Color(current_theme.line_color.r, current_theme.line_color.g, current_theme.line_color.b, 0.45)
+		top_style.set_border_width_all(1)
+		top_style.set_corner_radius_all(10)
+		top_bar_panel.add_theme_stylebox_override("panel", top_style)
 
 	if sidebar_panel:
 		var side_style = StyleBoxFlat.new()
-		side_style.bg_color = current_theme.dark_color.darkened(0.1)
-		side_style.border_color = current_theme.line_color.darkened(0.3)
-		side_style.set_border_width_all(2)
-		side_style.corner_radius_top_left = 10
-		side_style.corner_radius_top_right = 10
-		side_style.corner_radius_bottom_left = 10
-		side_style.corner_radius_bottom_right = 10
+		var base_side = current_theme.dark_color.darkened(0.15)
+		side_style.bg_color = Color(base_side.r, base_side.g, base_side.b, 0.88)
+		side_style.border_color = Color(current_theme.line_color.r, current_theme.line_color.g, current_theme.line_color.b, 0.45)
+		side_style.set_border_width_all(1)
+		side_style.set_corner_radius_all(12)
 		sidebar_panel.add_theme_stylebox_override("panel", side_style)
 
 func _setup_ui() -> void:
-	# Main Map Panel (Left side)
+	# 1. Fullscreen Map Panel (1280x720)
 	map_panel = Panel.new()
 	map_panel.name = "MapPanel"
-	map_panel.position = Vector2(20, 20)
-	map_panel.custom_minimum_size = Vector2(750, 680)
+	map_panel.position = Vector2(0, 0)
+	map_panel.custom_minimum_size = Vector2(1280, 720)
+	map_panel.size = Vector2(1280, 720)
 	add_child(map_panel)
 
 	# Interactive Canvas for rendering polygons, connection lines, badges, and highlights
 	map_canvas = Control.new()
 	map_canvas.name = "MapCanvas"
 	map_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
+	map_canvas.size = Vector2(1280, 720)
 	map_canvas.draw.connect(_on_map_canvas_draw)
 	map_canvas.gui_input.connect(_on_map_canvas_gui_input)
 	map_canvas.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -512,66 +540,84 @@ func _setup_ui() -> void:
 		add_child(lbl)
 		territory_labels[i] = lbl
 
-	# Sidebar Panel (Right side)
-	sidebar_panel = Panel.new()
-	sidebar_panel.name = "SidebarPanel"
-	sidebar_panel.position = Vector2(790, 20)
-	sidebar_panel.custom_minimum_size = Vector2(350, 680)
-	add_child(sidebar_panel)
+	# 2. Superimposed Top HUD Bar
+	top_bar_panel = Panel.new()
+	top_bar_panel.name = "TopBarPanel"
+	top_bar_panel.position = Vector2(16, 12)
+	top_bar_panel.custom_minimum_size = Vector2(1248, 54)
+	top_bar_panel.size = Vector2(1248, 54)
+	add_child(top_bar_panel)
 
-	var sidebar_vbox = VBoxContainer.new()
-	sidebar_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	sidebar_vbox.add_theme_constant_override("separation", 10)
-	sidebar_vbox.offset_left = 12
-	sidebar_vbox.offset_top = 12
-	sidebar_vbox.offset_right = -12
-	sidebar_vbox.offset_bottom = -12
-	sidebar_panel.add_child(sidebar_vbox)
-
-	# Header: Game Title & Top HUD
 	var header_hbox = HBoxContainer.new()
-	sidebar_vbox.add_child(header_hbox)
+	header_hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	header_hbox.offset_left = 16
+	header_hbox.offset_top = 7
+	header_hbox.offset_right = -16
+	header_hbox.offset_bottom = -7
+	header_hbox.add_theme_constant_override("separation", 14)
+	header_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_bar_panel.add_child(header_hbox)
 
 	var title_lbl = Label.new()
-	title_lbl.text = "CRISIS — TEG"
+	title_lbl.text = "🌍 CRISIS — TEG"
 	title_lbl.add_theme_font_size_override("font_size", 20)
 	title_lbl.add_theme_color_override("font_color", Color(0.95, 0.85, 0.3))
-	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header_hbox.add_child(title_lbl)
 
-	var btn_rules = Button.new()
-	btn_rules.name = "RulesButton"
-	btn_rules.text = "📖 Reglas"
-	btn_rules.custom_minimum_size = Vector2(85, 32)
-	btn_rules.pressed.connect(func(): rules_popup.show_for_game("crisis"))
-	header_hbox.add_child(btn_rules)
+	turn_indicator = TurnIndicator.new()
+	turn_indicator.name = "TurnIndicator"
+	turn_indicator.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header_hbox.add_child(turn_indicator)
 
 	var mode_opt := OptionButton.new()
 	mode_opt.name = "ModeOptionButton"
 	mode_option_button = mode_opt
+	mode_opt.custom_minimum_size = Vector2(150, 34)
 	mode_opt.add_item("👥 Hotseat", 0)
 	mode_opt.add_item("🤖 vs IA (J1)", 1)
 	mode_opt.add_item("🤖 vs IA (J2)", 2)
-	var gm_ref = get_node_or_null("/root/GameManager") if is_inside_tree() else null
-	if gm_ref != null and gm_ref.has_method("get_game_mode") and gm_ref.get_game_mode() == "vs_ai":
-		var hp = gm_ref.get_human_player_id() if gm_ref.has_method("get_human_player_id") else 1
+	var gm_ref: Node = null
+	if is_inside_tree():
+		gm_ref = get_node_or_null("/root/GameManager")
+	if gm_ref != null and gm_ref.has_method("get_game_mode") and str(gm_ref.get_game_mode()) == "vs_ai":
+		var hp: int = int(gm_ref.get_human_player_id()) if gm_ref.has_method("get_human_player_id") else 1
 		mode_opt.selected = 1 if hp == 1 else 2
 	else:
 		mode_opt.selected = 0
 	mode_opt.item_selected.connect(_on_mode_selected)
 	header_hbox.add_child(mode_opt)
 
-	turn_indicator = TurnIndicator.new()
-	turn_indicator.name = "TurnIndicator"
-	sidebar_vbox.add_child(turn_indicator)
+	var btn_rules = Button.new()
+	btn_rules.name = "RulesButton"
+	btn_rules.text = "📖 Reglas"
+	btn_rules.custom_minimum_size = Vector2(95, 34)
+	btn_rules.pressed.connect(func(): rules_popup.show_for_game("crisis"))
+	header_hbox.add_child(btn_rules)
+
+	# 3. Superimposed Floating Tactical Control Panel (Right Side)
+	sidebar_panel = Panel.new()
+	sidebar_panel.name = "SidebarPanel"
+	sidebar_panel.position = Vector2(906, 76)
+	sidebar_panel.custom_minimum_size = Vector2(358, 628)
+	sidebar_panel.size = Vector2(358, 628)
+	add_child(sidebar_panel)
+
+	var sidebar_vbox = VBoxContainer.new()
+	sidebar_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	sidebar_vbox.add_theme_constant_override("separation", 10)
+	sidebar_vbox.offset_left = 14
+	sidebar_vbox.offset_top = 12
+	sidebar_vbox.offset_right = -14
+	sidebar_vbox.offset_bottom = -12
+	sidebar_panel.add_child(sidebar_vbox)
 
 	# Player Statistics & Phase info
 	player_stats_label = Label.new()
-	player_stats_label.text = "Cargando estado..."
+	player_stats_label.text = "Turno: Rojo (1)"
 	player_stats_label.add_theme_font_size_override("font_size", 13)
 	sidebar_vbox.add_child(player_stats_label)
 
-	# Tab Container for Cards, Objectives, and Continents Summary
+	# Tab Container for Actions, Objectives, Cards, and Continents Summary
 	tab_container = TabContainer.new()
 	tab_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sidebar_vbox.add_child(tab_container)
@@ -823,33 +869,58 @@ func _setup_ui() -> void:
 	_apply_theme_styling()
 
 func _on_layout_changed(layout: int) -> void:
+	current_layout = layout
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
 	if layout == 2: # PHONE
-		map_panel.position = Vector2(10, 10)
-		map_panel.custom_minimum_size = Vector2(355, 330)
-		map_panel.size = Vector2(355, 330)
-		sidebar_panel.position = Vector2(10, 350)
-		sidebar_panel.custom_minimum_size = Vector2(355, 300)
-		sidebar_panel.size = Vector2(355, 300)
-	else: # DESKTOP or TABLET
-		map_panel.position = Vector2(20, 20)
-		map_panel.custom_minimum_size = Vector2(750, 680)
-		map_panel.size = Vector2(750, 680)
-		sidebar_panel.position = Vector2(790, 20)
-		sidebar_panel.custom_minimum_size = Vector2(350, 680)
-		sidebar_panel.size = Vector2(350, 680)
+		map_panel.position = Vector2(0, 0)
+		map_panel.custom_minimum_size = Vector2(375, 667)
+		map_panel.size = Vector2(375, 667)
+		if top_bar_panel:
+			top_bar_panel.position = Vector2(8, 8)
+			top_bar_panel.custom_minimum_size = Vector2(359, 48)
+			top_bar_panel.size = Vector2(359, 48)
+		sidebar_panel.position = Vector2(8, 360)
+		sidebar_panel.custom_minimum_size = Vector2(359, 298)
+		sidebar_panel.size = Vector2(359, 298)
+	else: # DESKTOP or TABLET — Fullscreen Map (1280x720) with superimposed HUD
+		map_panel.position = Vector2(0, 0)
+		map_panel.custom_minimum_size = Vector2(1280, 720)
+		map_panel.size = Vector2(1280, 720)
+		if top_bar_panel:
+			top_bar_panel.position = Vector2(16, 12)
+			top_bar_panel.custom_minimum_size = Vector2(1248, 54)
+			top_bar_panel.size = Vector2(1248, 54)
+		sidebar_panel.position = Vector2(906, 76)
+		sidebar_panel.custom_minimum_size = Vector2(358, 628)
+		sidebar_panel.size = Vector2(358, 628)
 
 	if map_canvas:
+		map_canvas.size = map_panel.size
 		map_canvas.queue_redraw()
 
 func _get_map_transform() -> Dictionary:
-	var canvas_size = map_canvas.size if map_canvas else Vector2(750, 680)
-	var scale_x = (canvas_size.x - 24.0) / 800.0
-	var scale_y = (canvas_size.y - 24.0) / 600.0
-	var s = min(scale_x, scale_y)
-	var offset = (canvas_size - Vector2(800, 600) * s) * 0.5
+	var canvas_size = map_canvas.size if map_canvas else Vector2(1280, 720)
+	if current_layout == 2:
+		var avail_w_m: float = maxf(canvas_size.x - 16.0, 200.0)
+		var avail_h_m: float = maxf(canvas_size.y - 360.0, 180.0)
+		var sm: float = minf(avail_w_m / 760.0, avail_h_m / 560.0)
+		var off_m := Vector2((canvas_size.x - 800.0 * sm) * 0.5, 56.0 + (avail_h_m - 600.0 * sm) * 0.5)
+		return { "scale": sm, "offset": off_m }
+
+	# Fullscreen canvas (1280x720) with territories centered in the visible map viewport (left of floating sidebar, below top bar)
+	var usable_left: float = 16.0
+	var usable_top: float = 72.0
+	var usable_w: float = maxf(canvas_size.x - 392.0, 720.0)
+	var usable_h: float = maxf(canvas_size.y - 84.0, 560.0)
+	var scale_x: float = usable_w / 740.0
+	var scale_y: float = usable_h / 540.0
+	var s: float = minf(scale_x, scale_y)
+	var offset := Vector2(
+		usable_left + (usable_w - 840.0 * s) * 0.5,
+		usable_top + (usable_h - 600.0 * s) * 0.5
+	)
 	return { "scale": s, "offset": offset }
 
 func _to_screen(map_pos: Vector2, trans: Dictionary) -> Vector2:
@@ -863,25 +934,20 @@ func _from_screen(screen_pos: Vector2, trans: Dictionary) -> Vector2:
 # -------------------------------------------------------------------------
 func _on_map_canvas_draw() -> void:
 	var trans = _get_map_transform()
-	var s = trans["scale"]
-	var offset = trans["offset"]
+	var s: float = float(trans["scale"])
 
-	# 1. Draw Ocean Background & Nautical Grid
+	# 1. Draw Fullscreen Ocean Background & Nautical Grid
 	var ocean_col = current_theme.board_color.darkened(0.1) if current_theme else Color("#121A24")
 	map_canvas.draw_rect(Rect2(Vector2.ZERO, map_canvas.size), ocean_col, true)
 
 	var grid_col = current_theme.line_color if current_theme else Color("#7C9BB8")
 	var faint_grid = Color(grid_col.r, grid_col.g, grid_col.b, 0.12)
-	
-	# Lat/Long lines
-	for y_val in [150.0, 300.0, 450.0]:
-		var p1 = _to_screen(Vector2(50, y_val), trans)
-		var p2 = _to_screen(Vector2(750, y_val), trans)
-		map_canvas.draw_line(p1, p2, faint_grid, 1.0)
-	for x_val in [200.0, 400.0, 600.0]:
-		var p1 = _to_screen(Vector2(x_val, 50), trans)
-		var p2 = _to_screen(Vector2(x_val, 550), trans)
-		map_canvas.draw_line(p1, p2, faint_grid, 1.0)
+
+	# Fullscreen Lat/Long lines across the entire map_canvas
+	for y_val in [120.0, 240.0, 360.0, 480.0, 600.0]:
+		map_canvas.draw_line(Vector2(0.0, y_val), Vector2(map_canvas.size.x, y_val), faint_grid, 1.0)
+	for x_val in [180.0, 360.0, 540.0, 720.0, 900.0, 1080.0]:
+		map_canvas.draw_line(Vector2(x_val, 0.0), Vector2(x_val, map_canvas.size.y), faint_grid, 1.0)
 
 	# 2. Draw Adjacencies & Borders (Land connections & Sea lanes)
 	for edge in ADJACENCIES:
@@ -1171,8 +1237,11 @@ func _place_armies(count: int) -> void:
 			"territory": target_t,
 			"count": place_count
 		}))
+		_sync_all_from_bridge()
+		_update_ui_state()
 
 func _on_btn_attack_pressed() -> void:
+	_is_human_attacking = true
 	if selected_from != -1 and selected_to != -1:
 		var dice_count = int(attack_dice_spinbox.value)
 		# 1. Declare Attack
@@ -1194,6 +1263,9 @@ func _on_btn_attack_pressed() -> void:
 			"command_type": "RollAttackCommand",
 			"player": current_player_id
 		}))
+	_is_human_attacking = false
+	_sync_all_from_bridge()
+	_update_ui_state()
 
 func _on_btn_fortify_pressed() -> void:
 	if selected_from != -1 and selected_to != -1:
@@ -1208,8 +1280,8 @@ func _on_btn_fortify_pressed() -> void:
 		selected_from = -1
 		selected_to = -1
 		valid_targets.clear()
-		if map_canvas:
-			map_canvas.queue_redraw()
+		_sync_all_from_bridge()
+		_update_ui_state()
 
 func _on_btn_end_phase_pressed() -> void:
 	selected_from = -1
@@ -1219,6 +1291,8 @@ func _on_btn_end_phase_pressed() -> void:
 		"command_type": "EndPhaseCommand",
 		"player": current_player_id
 	}))
+	_sync_all_from_bridge()
+	_update_ui_state()
 
 func _on_btn_exchange_pressed() -> void:
 	if selected_card_indices.size() == 3:
@@ -1236,15 +1310,17 @@ func _on_btn_exchange_pressed() -> void:
 			if idx < cards.size():
 				cards.remove_at(idx)
 		selected_card_indices.clear()
-		_render_cards_deck()
+		_sync_all_from_bridge()
 		_update_ui_state()
 
 # -------------------------------------------------------------------------
 # STATE SYNCHRONIZATION & BRIDGE SIGNALS
 # -------------------------------------------------------------------------
 func _sync_all_from_bridge() -> void:
+	if bridge == null:
+		return
 	current_player_id = bridge.current_player()
-	
+
 	if bridge.has_method("get_crisis_territory_owner"):
 		for i in range(30):
 			var o = bridge.call("get_crisis_territory_owner", i)
@@ -1254,10 +1330,10 @@ func _sync_all_from_bridge() -> void:
 			_update_territory_label(i)
 
 	if bridge.has_method("get_crisis_remaining_armies"):
-		armies_remaining_to_place = bridge.call("get_crisis_remaining_armies")
+		armies_remaining_to_place = int(bridge.call("get_crisis_remaining_armies"))
 
 	if bridge.has_method("get_crisis_turn_phase"):
-		var ph_str = bridge.call("get_crisis_turn_phase")
+		var ph_str = str(bridge.call("get_crisis_turn_phase"))
 		if ph_str != "":
 			current_phase = ph_str
 
@@ -1266,8 +1342,18 @@ func _sync_all_from_bridge() -> void:
 	if map_canvas:
 		map_canvas.queue_redraw()
 
+func _format_phase_es(phase_str: String) -> String:
+	if phase_str.begins_with("PlaceArmies") or phase_str == "Placement":
+		return "Colocación de Tropas"
+	elif phase_str == "Attack":
+		return "Ataque"
+	elif phase_str == "Fortify":
+		return "Fortificación"
+	return phase_str
+
 func _update_ui_state() -> void:
-	current_player_id = bridge.current_player()
+	if bridge != null:
+		current_player_id = bridge.current_player()
 	var is_active = (winner == -1)
 
 	var is_placement = current_phase == "PlaceArmies" or current_phase.begins_with("PlaceArmies") or current_phase == "Placement"
@@ -1282,6 +1368,9 @@ func _update_ui_state() -> void:
 	btn_end_phase.disabled = not is_active
 	btn_exchange.disabled = not (is_active and is_placement and selected_card_indices.size() == 3)
 
+	if action_title_label:
+		action_title_label.text = "Fase: %s" % _format_phase_es(current_phase)
+
 	var p1_count: int = 0
 	var p2_count: int = 0
 	for t_id in territory_owners:
@@ -1290,10 +1379,10 @@ func _update_ui_state() -> void:
 		elif territory_owners[t_id] == 2:
 			p2_count += 1
 
-	player_stats_label.text = "Turno: %s\nFase: %s %s\n\n🛡️ Tropas / Territorios:\n• P1 (Rojo): %d territorios\n• P2 (Azul): %d territorios" % [
+	player_stats_label.text = "Turno: %s  ·  Fase: %s %s\n🛡️ P1 (Rojo): %d terr.  |  P2 (Azul): %d terr." % [
 		PLAYER_NAMES.get(current_player_id, "Jugador " + str(current_player_id)),
-		current_phase,
-		("(%d tropas restantes)" % armies_remaining_to_place) if is_placement and armies_remaining_to_place > 0 else "",
+		_format_phase_es(current_phase),
+		("(%d tropas)" % armies_remaining_to_place) if is_placement and armies_remaining_to_place > 0 else "",
 		p1_count,
 		p2_count
 	]
@@ -1305,7 +1394,9 @@ func _update_ui_state() -> void:
 			status_label.text = "Turno %s — Fase %s" % [PLAYER_NAMES.get(current_player_id, "P" + str(current_player_id)), current_phase]
 
 	if turn_indicator:
-		turn_indicator.set_current_player(current_player_id)
+		var p_name: String = PLAYER_NAMES.get(current_player_id, "Jugador %d" % current_player_id)
+		var p_col: Color = PLAYER_COLORS.get(current_player_id, Color.WHITE)
+		turn_indicator.set_turn(current_player_id, p_name, p_col)
 
 	_update_objective_progress()
 	if map_canvas:
@@ -1330,12 +1421,15 @@ func _on_attack_resolved(from_id: int, to_id: int, attacker_rolls: Array, defend
 	var att_str = " ".join(attacker_rolls.map(func(r): return "🎲" + str(r)))
 	var def_str = " ".join(defender_rolls.map(func(r): return "🎲" + str(r)))
 
-	dice_label.text = "Ataque: %s ⚔️ %s\nAtacante: [%s] (-%d tropas)\nDefensor: [%s] (-%d tropas)" % [
+	var summary_txt = "Ataque: %s ⚔️ %s\nAtacante: [%s] (-%d tropas)\nDefensor: [%s] (-%d tropas)" % [
 		TERRITORY_NAMES[from_id], TERRITORY_NAMES[to_id], att_str, attacker_losses, def_str, defender_losses
 	]
+	dice_label.text = summary_txt
 	if dice_widget != null and attacker_rolls.size() > 0:
 		dice_widget.show_roll(attacker_rolls)
-	dice_popup.popup_centered()
+	if (not is_vs_ai or _is_human_attacking) and not OS.has_feature("headless"):
+		dice_popup.popup_centered()
+	_sync_all_from_bridge()
 	_update_ui_state()
 
 func _on_territory_conquered(player_id: int, territory_id: int, _from_armies: int, to_armies: int) -> void:
@@ -1348,12 +1442,12 @@ func _on_territory_conquered(player_id: int, territory_id: int, _from_armies: in
 	var cards = player_cards.get(player_id, [])
 	cards.append({ "territory": territory_id, "card_type": random_type })
 	player_cards[player_id] = cards
-	_render_cards_deck()
-
+	_sync_all_from_bridge()
 	_update_ui_state()
 
 func _on_player_eliminated(player_id: int, by_player_id: int) -> void:
 	action_info_label.text = "💀 ¡El Jugador %d fue eliminado por el Jugador %d!" % [player_id, by_player_id]
+	_sync_all_from_bridge()
 	_update_ui_state()
 
 func _on_phase_changed(player_id: int, new_phase: String) -> void:
@@ -1362,6 +1456,7 @@ func _on_phase_changed(player_id: int, new_phase: String) -> void:
 	selected_from = -1
 	selected_to = -1
 	valid_targets.clear()
+	_sync_all_from_bridge()
 	_update_ui_state()
 
 func _on_turn_changed(player_id: int) -> void:
@@ -1369,13 +1464,13 @@ func _on_turn_changed(player_id: int) -> void:
 	selected_from = -1
 	selected_to = -1
 	valid_targets.clear()
-	_render_cards_deck()
+	_sync_all_from_bridge()
 	_update_ui_state()
 
 func _on_cards_exchanged(player_id: int, armies_gained: int) -> void:
 	exchange_count += 1
 	action_info_label.text = "🎉 ¡Jugador %d canjeó tarjetas y obtuvo +%d ejércitos!" % [player_id, armies_gained]
-	_render_cards_deck()
+	_sync_all_from_bridge()
 	_update_ui_state()
 
 func _on_crisis_game_over(winner_id: int, _objective: String) -> void:

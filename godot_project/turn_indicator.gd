@@ -153,6 +153,9 @@ func get_configured_player_name(player_id: int, fallback_name: String = "") -> S
 		return fallback_name
 	return "Jugador %d" % player_id
 
+func set_current_player(player_id: int) -> void:
+	_on_turn_changed(player_id)
+
 func set_turn(player_id: int, player_name: String, player_color: Color) -> void:
 	if timer_bar == null:
 		_setup_nodes()
@@ -255,7 +258,9 @@ func _update_undo_redo_status() -> void:
 
 func _on_theme_pressed() -> void:
 	if Engine.has_singleton("ThemeManager") or (is_inside_tree() and has_node("/root/ThemeManager")):
-		var tm = (get_node_or_null("/root/ThemeManager") if is_inside_tree() else null)
+		var tm: Node = null
+		if is_inside_tree():
+			tm = get_node_or_null("/root/ThemeManager")
 		if tm != null:
 			var new_t = tm.toggle_theme()
 			theme_btn.text = "🎨 " + new_t.theme_name
