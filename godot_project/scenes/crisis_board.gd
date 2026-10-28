@@ -65,114 +65,255 @@ const CONTINENTS_DATA: Array = [
 
 var TERRITORY_POLYGONS: Array = [
 	# --- AMÉRICA DEL SUR (0..4) ---
-	# 0: Argentina
-	PackedVector2Array([Vector2(172, 425), Vector2(195, 425), Vector2(215, 455), Vector2(255, 452), Vector2(230, 525), Vector2(185, 540), Vector2(172, 520)]),
-	# 1: Brasil
-	PackedVector2Array([Vector2(215, 315), Vector2(285, 345), Vector2(300, 395), Vector2(275, 450), Vector2(215, 455), Vector2(195, 425), Vector2(195, 362), Vector2(230, 360)]),
-	# 2: Chile
-	PackedVector2Array([Vector2(132, 425), Vector2(172, 425), Vector2(172, 520), Vector2(150, 535), Vector2(130, 480)]),
-	# 3: Colombia
-	PackedVector2Array([Vector2(150, 315), Vector2(215, 315), Vector2(230, 360), Vector2(140, 365)]),
-	# 4: Perú
-	PackedVector2Array([Vector2(140, 365), Vector2(195, 362), Vector2(195, 425), Vector2(132, 425), Vector2(125, 395)]),
+	# 0: Argentina (Frontera andina compartida con Chile, frontera norte con Perú/Brasil, Río de la Plata, Costa Patagónica y Tierra del Fuego)
+	PackedVector2Array([
+		Vector2(170, 422), Vector2(184, 424), Vector2(195, 425), Vector2(204, 440), Vector2(215, 455),
+		Vector2(236, 454), Vector2(255, 452), Vector2(252, 464), Vector2(242, 474), Vector2(246, 484),
+		Vector2(236, 496), Vector2(232, 510), Vector2(222, 522), Vector2(216, 534), Vector2(224, 544),
+		Vector2(204, 548), Vector2(186, 542), Vector2(174, 530), Vector2(168, 518), Vector2(166, 498),
+		Vector2(170, 478), Vector2(168, 456), Vector2(172, 438)
+	]),
+	# 1: Brasil (Guayanas, Delta del Amazonas, Cabo de São Roque, Bahía, Costa Atlántica Sur y frontera amazónica)
+	PackedVector2Array([
+		Vector2(215, 315), Vector2(228, 318), Vector2(242, 326), Vector2(256, 334), Vector2(272, 338),
+		Vector2(290, 346), Vector2(304, 358), Vector2(308, 372), Vector2(302, 388), Vector2(296, 404),
+		Vector2(286, 418), Vector2(280, 434), Vector2(268, 446), Vector2(255, 452), Vector2(236, 454),
+		Vector2(215, 455), Vector2(204, 440), Vector2(195, 425), Vector2(192, 404), Vector2(196, 382),
+		Vector2(195, 362), Vector2(212, 361), Vector2(226, 356), Vector2(220, 336)
+	]),
+	# 2: Chile (Desierto de Atacama, Costa Pacífica central, Fiordos australes, Cabo de Hornos y Cordillera de los Andes)
+	PackedVector2Array([
+		Vector2(138, 424), Vector2(154, 423), Vector2(170, 422), Vector2(172, 438), Vector2(168, 456),
+		Vector2(170, 478), Vector2(166, 498), Vector2(168, 518), Vector2(174, 530), Vector2(186, 542),
+		Vector2(168, 544), Vector2(152, 534), Vector2(144, 518), Vector2(140, 498), Vector2(136, 478),
+		Vector2(138, 458), Vector2(134, 440)
+	]),
+	# 3: Colombia (Istmo de Darién, Costa Caribe, Golfo de Maracaibo, Orinoco y Pacífico Norte)
+	PackedVector2Array([
+		Vector2(152, 308), Vector2(166, 304), Vector2(182, 302), Vector2(198, 308), Vector2(215, 315),
+		Vector2(220, 336), Vector2(226, 356), Vector2(212, 361), Vector2(195, 362), Vector2(176, 364),
+		Vector2(158, 364), Vector2(140, 365), Vector2(138, 348), Vector2(144, 332), Vector2(146, 318)
+	]),
+	# 4: Perú (Golfo de Guayaquil, Punta Pariñas, Costa Pacífica peruana, Altiplano y Selva Amazónica)
+	PackedVector2Array([
+		Vector2(140, 365), Vector2(158, 364), Vector2(176, 364), Vector2(195, 362), Vector2(196, 382),
+		Vector2(192, 404), Vector2(195, 425), Vector2(184, 424), Vector2(170, 422), Vector2(154, 423),
+		Vector2(138, 424), Vector2(130, 410), Vector2(122, 394), Vector2(124, 380), Vector2(132, 372)
+	]),
 
 	# --- AMÉRICA DEL NORTE (5..8) ---
-	# 5: México
-	PackedVector2Array([Vector2(95, 215), Vector2(160, 215), Vector2(185, 265), Vector2(165, 300), Vector2(125, 285), Vector2(98, 250)]),
-	# 6: California
-	PackedVector2Array([Vector2(75, 130), Vector2(165, 130), Vector2(160, 215), Vector2(95, 215), Vector2(65, 175)]),
-	# 7: Nueva York
-	PackedVector2Array([Vector2(165, 130), Vector2(250, 115), Vector2(265, 165), Vector2(230, 215), Vector2(160, 215)]),
-	# 8: Canadá
-	PackedVector2Array([Vector2(55, 55), Vector2(140, 45), Vector2(235, 55), Vector2(250, 115), Vector2(165, 130), Vector2(75, 130), Vector2(45, 95)]),
+	# 5: México (Baja California, Pacífico Mexicano, Istmo de Tehuantepec, Centroamérica, Yucatán y Golfo de México)
+	PackedVector2Array([
+		Vector2(88, 214), Vector2(114, 216), Vector2(138, 214), Vector2(160, 215), Vector2(156, 228),
+		Vector2(158, 242), Vector2(168, 248), Vector2(182, 242), Vector2(188, 252), Vector2(180, 266),
+		Vector2(188, 276), Vector2(182, 290), Vector2(166, 304), Vector2(152, 308), Vector2(144, 296),
+		Vector2(130, 286), Vector2(116, 274), Vector2(104, 258), Vector2(96, 244), Vector2(86, 232)
+	]),
+	# 6: California (Costa Oeste de EE.UU., Puget Sound, Cabo Mendocino, Rocosas y Río Bravo)
+	PackedVector2Array([
+		Vector2(72, 128), Vector2(104, 130), Vector2(136, 130), Vector2(165, 130), Vector2(166, 152),
+		Vector2(162, 174), Vector2(164, 196), Vector2(160, 215), Vector2(138, 214), Vector2(114, 216),
+		Vector2(88, 214), Vector2(76, 198), Vector2(66, 182), Vector2(62, 164), Vector2(66, 146)
+	]),
+	# 7: Nueva York (Grandes Lagos, Nueva Escocia, Cabo Cod, Bahía de Chesapeake, Península de Florida y Costa del Golfo)
+	PackedVector2Array([
+		Vector2(165, 130), Vector2(188, 126), Vector2(212, 122), Vector2(234, 118), Vector2(252, 114),
+		Vector2(266, 124), Vector2(272, 138), Vector2(260, 150), Vector2(264, 162), Vector2(252, 176),
+		Vector2(242, 190), Vector2(236, 204), Vector2(232, 222), Vector2(222, 224), Vector2(216, 208),
+		Vector2(202, 206), Vector2(184, 208), Vector2(160, 215), Vector2(164, 196), Vector2(162, 174),
+		Vector2(166, 152)
+	]),
+	# 8: Canadá (Península de Alaska, Islas Aleutianas, Ártico Canadiense, Bahía de Hudson, Labrador y Terranova)
+	PackedVector2Array([
+		Vector2(34, 82), Vector2(44, 64), Vector2(64, 52), Vector2(92, 48), Vector2(120, 44),
+		Vector2(148, 48), Vector2(166, 62), Vector2(178, 76), Vector2(194, 72), Vector2(206, 56),
+		Vector2(226, 52), Vector2(246, 64), Vector2(258, 82), Vector2(264, 98), Vector2(252, 114),
+		Vector2(234, 118), Vector2(212, 122), Vector2(188, 126), Vector2(165, 130), Vector2(136, 130),
+		Vector2(104, 130), Vector2(72, 128), Vector2(56, 116), Vector2(42, 108), Vector2(26, 98)
+	]),
 
 	# --- EUROPA (9..13) ---
-	# 9: Gran Bretaña
-	PackedVector2Array([Vector2(315, 78), Vector2(375, 72), Vector2(382, 122), Vector2(322, 128)]),
-	# 10: España
-	PackedVector2Array([Vector2(310, 175), Vector2(372, 175), Vector2(372, 235), Vector2(315, 240), Vector2(302, 208)]),
-	# 11: Francia
-	PackedVector2Array([Vector2(372, 142), Vector2(432, 142), Vector2(432, 212), Vector2(372, 215)]),
-	# 12: Alemania
-	PackedVector2Array([Vector2(432, 112), Vector2(492, 112), Vector2(492, 195), Vector2(432, 198)]),
-	# 13: Rusia
-	PackedVector2Array([Vector2(492, 68), Vector2(572, 68), Vector2(572, 178), Vector2(492, 182)]),
+	# 9: Gran Bretaña (Escocia, Mar de Irlanda, Gales, Cornualles y Canal de la Mancha)
+	PackedVector2Array([
+		Vector2(326, 72), Vector2(344, 66), Vector2(362, 70), Vector2(372, 82), Vector2(368, 96),
+		Vector2(378, 108), Vector2(374, 122), Vector2(356, 126), Vector2(336, 128), Vector2(318, 124),
+		Vector2(314, 110), Vector2(322, 98), Vector2(316, 84)
+	]),
+	# 10: España (Galicia, Portugal, Estrecho de Gibraltar, Costa Mediterránea y Pirineos)
+	PackedVector2Array([
+		Vector2(306, 174), Vector2(326, 172), Vector2(348, 174), Vector2(372, 178), Vector2(368, 194),
+		Vector2(362, 210), Vector2(354, 226), Vector2(338, 238), Vector2(320, 240), Vector2(306, 232),
+		Vector2(300, 216), Vector2(298, 198), Vector2(300, 184)
+	]),
+	# 11: Francia (Península de Bretaña, Normandía, Golfo de Vizcaya, Pirineos, Provenza, Alpes y Rin)
+	PackedVector2Array([
+		Vector2(372, 140), Vector2(392, 136), Vector2(414, 138), Vector2(432, 140), Vector2(430, 160),
+		Vector2(434, 178), Vector2(432, 198), Vector2(418, 210), Vector2(400, 214), Vector2(384, 208),
+		Vector2(372, 178), Vector2(348, 174), Vector2(356, 162), Vector2(346, 152), Vector2(358, 144)
+	]),
+	# 12: Alemania (Península de Jutlandia, Costa Báltica, Europa Central, Alpes e Italia Norte)
+	PackedVector2Array([
+		Vector2(432, 140), Vector2(436, 122), Vector2(444, 106), Vector2(458, 104), Vector2(464, 116),
+		Vector2(478, 114), Vector2(492, 112), Vector2(494, 136), Vector2(490, 160), Vector2(492, 182),
+		Vector2(480, 196), Vector2(468, 210), Vector2(456, 204), Vector2(444, 198), Vector2(432, 198),
+		Vector2(434, 178), Vector2(430, 160)
+	]),
+	# 13: Rusia (Península Escandinava, Península de Kola, Báltico, Europa Oriental, Mar Negro y Montes Urales)
+	PackedVector2Array([
+		Vector2(478, 66), Vector2(496, 54), Vector2(520, 52), Vector2(546, 58), Vector2(564, 68),
+		Vector2(572, 82), Vector2(572, 95), Vector2(570, 122), Vector2(574, 150), Vector2(572, 178),
+		Vector2(552, 180), Vector2(530, 178), Vector2(516, 184), Vector2(502, 184), Vector2(492, 182),
+		Vector2(490, 160), Vector2(494, 136), Vector2(492, 112), Vector2(484, 96), Vector2(474, 82)
+	]),
 
 	# --- ÁFRICA (14..17) ---
-	# 14: Sahara
-	PackedVector2Array([Vector2(335, 270), Vector2(428, 270), Vector2(428, 365), Vector2(355, 365), Vector2(325, 320)]),
-	# 15: Egipto
-	PackedVector2Array([Vector2(428, 265), Vector2(505, 265), Vector2(520, 315), Vector2(495, 355), Vector2(428, 355)]),
-	# 16: Congo
-	PackedVector2Array([Vector2(375, 365), Vector2(428, 355), Vector2(485, 355), Vector2(478, 438), Vector2(388, 438)]),
-	# 17: Sudáfrica
-	PackedVector2Array([Vector2(388, 438), Vector2(478, 438), Vector2(465, 525), Vector2(405, 525)]),
+	# 14: Sahara (Marruecos, Atlas, Cabo Verde, Costa de Marfil, Golfo de Guinea y Desierto del Sahara)
+	PackedVector2Array([
+		Vector2(342, 262), Vector2(366, 258), Vector2(392, 262), Vector2(412, 266), Vector2(428, 265),
+		Vector2(426, 294), Vector2(430, 324), Vector2(428, 355), Vector2(404, 360), Vector2(382, 364),
+		Vector2(362, 360), Vector2(342, 348), Vector2(326, 332), Vector2(318, 312), Vector2(322, 292),
+		Vector2(330, 276)
+	]),
+	# 15: Egipto (Delta del Nilo, Canal de Suez, Mar Rojo, Cuerno de África / Somalia y Valle del Rift)
+	PackedVector2Array([
+		Vector2(428, 265), Vector2(452, 262), Vector2(476, 264), Vector2(492, 272), Vector2(504, 290),
+		Vector2(516, 304), Vector2(532, 312), Vector2(526, 328), Vector2(512, 344), Vector2(496, 356),
+		Vector2(485, 355), Vector2(456, 354), Vector2(428, 355), Vector2(430, 324), Vector2(426, 294)
+	]),
+	# 16: Congo (Cuenca del Congo, Costa de Gabón y Angola, Grandes Lagos Africanos y Tanzania)
+	PackedVector2Array([
+		Vector2(382, 364), Vector2(404, 360), Vector2(428, 355), Vector2(456, 354), Vector2(485, 355),
+		Vector2(496, 356), Vector2(492, 376), Vector2(486, 398), Vector2(482, 418), Vector2(478, 438),
+		Vector2(448, 440), Vector2(418, 438), Vector2(388, 438), Vector2(386, 416), Vector2(382, 396),
+		Vector2(378, 378)
+	]),
+	# 17: Sudáfrica (Costa de Namibia, Cabo de Buena Esperanza, Cabo Agujas, Natal y Canal de Mozambique)
+	PackedVector2Array([
+		Vector2(388, 438), Vector2(418, 438), Vector2(448, 440), Vector2(478, 438), Vector2(482, 456),
+		Vector2(474, 476), Vector2(468, 496), Vector2(458, 514), Vector2(442, 528), Vector2(422, 530),
+		Vector2(406, 520), Vector2(398, 500), Vector2(394, 478), Vector2(390, 458)
+	]),
 
 	# --- ASIA (18..25) ---
-	# 18: Aral
-	PackedVector2Array([Vector2(530, 178), Vector2(640, 178), Vector2(640, 245), Vector2(530, 245)]),
-	# 19: Tartaria
-	PackedVector2Array([Vector2(572, 95), Vector2(625, 95), Vector2(625, 108), Vector2(675, 108), Vector2(675, 178), Vector2(572, 178)]),
-	# 20: Taymir
-	PackedVector2Array([Vector2(625, 48), Vector2(735, 48), Vector2(735, 108), Vector2(625, 108)]),
-	# 21: Siberia
-	PackedVector2Array([Vector2(675, 108), Vector2(735, 108), Vector2(775, 108), Vector2(775, 182), Vector2(675, 182)]),
-	# 22: Kamchatka
-	PackedVector2Array([Vector2(775, 68), Vector2(875, 68), Vector2(885, 135), Vector2(845, 170), Vector2(775, 165)]),
-	# 23: China
-	PackedVector2Array([Vector2(640, 182), Vector2(775, 182), Vector2(785, 230), Vector2(755, 272), Vector2(640, 268)]),
-	# 24: India
-	PackedVector2Array([Vector2(545, 245), Vector2(640, 245), Vector2(640, 295), Vector2(600, 345), Vector2(555, 310)]),
-	# 25: Japón
-	PackedVector2Array([Vector2(810, 192), Vector2(880, 192), Vector2(872, 262), Vector2(805, 258)]),
+	# 18: Aral (Cáucaso, Mar Caspio, Meseta Iraní, Estepa Kazaja y Pamir)
+	PackedVector2Array([
+		Vector2(530, 178), Vector2(552, 180), Vector2(572, 178), Vector2(598, 180), Vector2(620, 178),
+		Vector2(640, 178), Vector2(642, 200), Vector2(638, 222), Vector2(640, 245), Vector2(612, 244),
+		Vector2(584, 246), Vector2(556, 245), Vector2(540, 240), Vector2(528, 226), Vector2(524, 208),
+		Vector2(526, 192)
+	]),
+	# 19: Tartaria (Montes Urales, Golfo del Obi, Llanura de Siberia Occidental y Río Yeniséi)
+	PackedVector2Array([
+		Vector2(572, 95), Vector2(588, 86), Vector2(606, 88), Vector2(625, 95), Vector2(625, 108),
+		Vector2(650, 110), Vector2(675, 108), Vector2(673, 132), Vector2(677, 156), Vector2(675, 178),
+		Vector2(640, 178), Vector2(620, 178), Vector2(598, 180), Vector2(572, 178), Vector2(574, 150),
+		Vector2(570, 122)
+	]),
+	# 20: Taymir (Península de Taymir, Cabo Cheliuskin, Costa Ártica y Delta del Lena)
+	PackedVector2Array([
+		Vector2(625, 95), Vector2(628, 74), Vector2(642, 56), Vector2(664, 44), Vector2(688, 42),
+		Vector2(712, 48), Vector2(732, 58), Vector2(742, 74), Vector2(738, 92), Vector2(735, 108),
+		Vector2(704, 106), Vector2(675, 108), Vector2(650, 110), Vector2(625, 108)
+	]),
+	# 21: Siberia (Meseta Central Siberiana, Lago Baikal, Yakutia y Montes Stanovói)
+	PackedVector2Array([
+		Vector2(675, 108), Vector2(704, 106), Vector2(735, 108), Vector2(756, 106), Vector2(775, 108),
+		Vector2(778, 132), Vector2(772, 156), Vector2(775, 182), Vector2(744, 184), Vector2(710, 180),
+		Vector2(675, 178), Vector2(677, 156), Vector2(673, 132)
+	]),
+	# 22: Kamchatka (Chukotka, Estrecho de Bering, Península de Kamchatka, Mar de Ojotsk y Sajalín)
+	PackedVector2Array([
+		Vector2(775, 108), Vector2(782, 86), Vector2(798, 70), Vector2(822, 64), Vector2(848, 66),
+		Vector2(872, 74), Vector2(888, 90), Vector2(884, 108), Vector2(868, 120), Vector2(862, 138),
+		Vector2(852, 158), Vector2(840, 168), Vector2(832, 152), Vector2(824, 136), Vector2(806, 146),
+		Vector2(792, 164), Vector2(775, 168), Vector2(772, 156), Vector2(778, 132)
+	]),
+	# 23: China (Mongolia, Manchuria, Península de Corea, Mar Amarillo, Costa Sur de China e Indochina)
+	PackedVector2Array([
+		Vector2(640, 178), Vector2(675, 178), Vector2(710, 180), Vector2(744, 184), Vector2(775, 182),
+		Vector2(788, 192), Vector2(792, 208), Vector2(780, 216), Vector2(786, 232), Vector2(778, 248),
+		Vector2(762, 262), Vector2(742, 270), Vector2(726, 282), Vector2(712, 290), Vector2(698, 278),
+		Vector2(682, 270), Vector2(660, 268), Vector2(640, 268), Vector2(640, 245), Vector2(638, 222),
+		Vector2(642, 200)
+	]),
+	# 24: India (Himalaya, Mar Arábigo, Decán, Cabo Comorín, Golfo de Bengala y Birmania)
+	PackedVector2Array([
+		Vector2(556, 245), Vector2(584, 246), Vector2(612, 244), Vector2(640, 245), Vector2(640, 268),
+		Vector2(644, 286), Vector2(632, 298), Vector2(618, 314), Vector2(606, 334), Vector2(594, 346),
+		Vector2(582, 332), Vector2(570, 312), Vector2(558, 294), Vector2(548, 276), Vector2(546, 258)
+	]),
+	# 25: Japón (Hokkaido, Arco de Honshu, Shikoku y Kyushu)
+	PackedVector2Array([
+		Vector2(826, 184), Vector2(848, 182), Vector2(868, 190), Vector2(876, 206), Vector2(872, 224),
+		Vector2(862, 242), Vector2(846, 256), Vector2(826, 262), Vector2(808, 256), Vector2(804, 240),
+		Vector2(814, 224), Vector2(822, 206)
+	]),
 
 	# --- OCEANÍA (26..29) ---
-	# 26: Australia
-	PackedVector2Array([Vector2(705, 462), Vector2(845, 458), Vector2(860, 515), Vector2(815, 542), Vector2(695, 538), Vector2(685, 495)]),
-	# 27: Java
-	PackedVector2Array([Vector2(695, 392), Vector2(785, 392), Vector2(780, 442), Vector2(690, 442)]),
-	# 28: Sumatra
-	PackedVector2Array([Vector2(635, 325), Vector2(710, 325), Vector2(702, 378), Vector2(628, 378)]),
-	# 29: Borneo
-	PackedVector2Array([Vector2(738, 305), Vector2(820, 305), Vector2(815, 362), Vector2(732, 362)])
+	# 26: Australia (Kimberley, Tierra de Arnhem, Golfo de Carpentaria, Cabo York, Gran Barrera y Gran Bahía Australiana)
+	PackedVector2Array([
+		Vector2(696, 474), Vector2(716, 462), Vector2(738, 456), Vector2(756, 464), Vector2(772, 474),
+		Vector2(786, 458), Vector2(798, 450), Vector2(812, 464), Vector2(830, 476), Vector2(848, 492),
+		Vector2(856, 510), Vector2(848, 528), Vector2(830, 540), Vector2(806, 544), Vector2(784, 536),
+		Vector2(760, 530), Vector2(734, 534), Vector2(710, 538), Vector2(692, 528), Vector2(686, 510),
+		Vector2(688, 490)
+	]),
+	# 27: Java (Arco de Java, Bali, Célebes y Nueva Guinea Occidental)
+	PackedVector2Array([
+		Vector2(692, 396), Vector2(714, 390), Vector2(738, 388), Vector2(764, 392), Vector2(786, 398),
+		Vector2(794, 412), Vector2(788, 428), Vector2(772, 438), Vector2(746, 442), Vector2(718, 440),
+		Vector2(696, 434), Vector2(686, 420), Vector2(686, 406)
+	]),
+	# 28: Sumatra (Aceh, Estrecho de Malaca, Costa del Océano Índico y Estrecho de la Sonda)
+	PackedVector2Array([
+		Vector2(628, 326), Vector2(648, 320), Vector2(672, 322), Vector2(696, 328), Vector2(712, 340),
+		Vector2(714, 356), Vector2(704, 372), Vector2(684, 378), Vector2(658, 378), Vector2(636, 372),
+		Vector2(624, 358), Vector2(622, 342)
+	]),
+	# 29: Borneo (Sabah, Sarawak, Kalimantan y Estrecho de Macasar)
+	PackedVector2Array([
+		Vector2(744, 304), Vector2(768, 298), Vector2(794, 302), Vector2(814, 312), Vector2(822, 328),
+		Vector2(818, 346), Vector2(804, 360), Vector2(780, 364), Vector2(754, 362), Vector2(736, 354),
+		Vector2(730, 338), Vector2(734, 320)
+	])
 ]
 
 const TERRITORY_CENTERS: Array = [
 	Vector2(208, 488), # 0: Argentina
-	Vector2(248, 398), # 1: Brasil
-	Vector2(150, 475), # 2: Chile
-	Vector2(182, 340), # 3: Colombia
+	Vector2(248, 396), # 1: Brasil
+	Vector2(150, 478), # 2: Chile
+	Vector2(180, 336), # 3: Colombia
 	Vector2(160, 395), # 4: Perú
 
-	Vector2(142, 255), # 5: México
+	Vector2(142, 256), # 5: México
 	Vector2(118, 172), # 6: California
 	Vector2(210, 168), # 7: Nueva York
-	Vector2(150, 90),  # 8: Canadá
+	Vector2(150, 92),  # 8: Canadá
 
 	Vector2(348, 100), # 9: Gran Bretaña
-	Vector2(340, 207), # 10: España
-	Vector2(402, 178), # 11: Francia
-	Vector2(462, 154), # 12: Alemania
+	Vector2(336, 206), # 10: España
+	Vector2(402, 176), # 11: Francia
+	Vector2(462, 156), # 12: Alemania
 	Vector2(532, 124), # 13: Rusia
 
-	Vector2(380, 318), # 14: Sahara
+	Vector2(380, 316), # 14: Sahara
 	Vector2(468, 310), # 15: Egipto
-	Vector2(432, 398), # 16: Congo
+	Vector2(434, 398), # 16: Congo
 	Vector2(434, 482), # 17: Sudáfrica
 
 	Vector2(585, 212), # 18: Aral
 	Vector2(622, 142), # 19: Tartaria
-	Vector2(680, 78),  # 20: Taymir
+	Vector2(682, 78),  # 20: Taymir
 	Vector2(725, 145), # 21: Siberia
-	Vector2(828, 118), # 22: Kamchatka
-	Vector2(710, 226), # 23: China
+	Vector2(828, 116), # 22: Kamchatka
+	Vector2(710, 228), # 23: China
 	Vector2(594, 288), # 24: India
-	Vector2(842, 226), # 25: Japón
+	Vector2(842, 224), # 25: Japón
 
-	Vector2(775, 502), # 26: Australia
-	Vector2(738, 417), # 27: Java
-	Vector2(670, 352), # 28: Sumatra
-	Vector2(778, 334)  # 29: Borneo
+	Vector2(772, 502), # 26: Australia
+	Vector2(740, 416), # 27: Java
+	Vector2(668, 350), # 28: Sumatra
+	Vector2(776, 332)  # 29: Borneo
 ]
 
 const ADJACENCIES: Array = [
@@ -542,9 +683,10 @@ func _setup_ui() -> void:
 	add_child(map_panel)
 
 	# Interactive Canvas for rendering polygons, connection lines, badges, and highlights
+	# Use explicit position + size instead of PRESET_FULL_RECT so setting map_canvas.size never triggers anchor warnings
 	map_canvas = Control.new()
 	map_canvas.name = "MapCanvas"
-	map_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
+	map_canvas.position = Vector2.ZERO
 	map_canvas.size = Vector2(1280, 720)
 	map_canvas.draw.connect(_on_map_canvas_draw)
 	map_canvas.gui_input.connect(_on_map_canvas_gui_input)
@@ -629,28 +771,44 @@ func _setup_ui() -> void:
 	sidebar_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	sidebar_vbox.add_theme_constant_override("separation", 8)
 	sidebar_vbox.offset_left = 12
-	sidebar_vbox.offset_top = 10
+	sidebar_vbox.offset_top = 8
 	sidebar_vbox.offset_right = -12
 	sidebar_vbox.offset_bottom = -10
 	sidebar_panel.add_child(sidebar_vbox)
 
-	# Top row of Sidebar: Player Statistics + Collapse/Expand Toggle Button
+	# Top row of Sidebar: Player Statistics + Small Sleek Corner Icon Button
 	var sidebar_header_hbox = HBoxContainer.new()
 	sidebar_header_hbox.add_theme_constant_override("separation", 6)
+	sidebar_header_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	sidebar_vbox.add_child(sidebar_header_hbox)
 
 	player_stats_label = Label.new()
 	player_stats_label.text = "Turno: Rojo (1)"
 	player_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	player_stats_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	player_stats_label.add_theme_font_size_override("font_size", 12)
+	player_stats_label.add_theme_font_size_override("font_size", 11)
 	sidebar_header_hbox.add_child(player_stats_label)
 
 	btn_toggle_panel = Button.new()
 	btn_toggle_panel.name = "TogglePanelButton"
-	btn_toggle_panel.text = "▼ Plegar"
-	btn_toggle_panel.custom_minimum_size = Vector2(78, 28)
-	btn_toggle_panel.add_theme_font_size_override("font_size", 11)
+	btn_toggle_panel.text = "▾"
+	btn_toggle_panel.tooltip_text = "Plegar / desplegar panel táctico"
+	btn_toggle_panel.custom_minimum_size = Vector2(24, 24)
+	btn_toggle_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	btn_toggle_panel.add_theme_font_size_override("font_size", 12)
+	var toggle_style := StyleBoxFlat.new()
+	toggle_style.bg_color = Color(0.14, 0.20, 0.28, 0.85)
+	toggle_style.border_color = Color(0.65, 0.78, 0.92, 0.45)
+	toggle_style.set_border_width_all(1)
+	toggle_style.set_corner_radius_all(6)
+	toggle_style.content_margin_left = 4
+	toggle_style.content_margin_right = 4
+	toggle_style.content_margin_top = 1
+	toggle_style.content_margin_bottom = 1
+	btn_toggle_panel.add_theme_stylebox_override("normal", toggle_style)
+	var toggle_hover := toggle_style.duplicate()
+	toggle_hover.bg_color = Color(0.22, 0.32, 0.44, 0.95)
+	btn_toggle_panel.add_theme_stylebox_override("hover", toggle_hover)
 	btn_toggle_panel.pressed.connect(_on_toggle_sidebar_pressed)
 	sidebar_header_hbox.add_child(btn_toggle_panel)
 
@@ -940,24 +1098,24 @@ func _apply_sidebar_layout() -> void:
 	tab_container.visible = not sidebar_collapsed
 	if btn_toggle_panel != null:
 		if sidebar_collapsed:
-			btn_toggle_panel.text = "▲ Panel"
+			btn_toggle_panel.text = "▴"
 		else:
-			btn_toggle_panel.text = "▼ Plegar"
+			btn_toggle_panel.text = "▾"
 
 	if current_layout == 2: # PHONE: Bottom foldable sheet
 		if sidebar_collapsed:
-			sidebar_panel.position = Vector2(6, 611)
-			sidebar_panel.custom_minimum_size = Vector2(363, 48)
-			sidebar_panel.size = Vector2(363, 48)
+			sidebar_panel.position = Vector2(6, 605)
+			sidebar_panel.custom_minimum_size = Vector2(363, 54)
+			sidebar_panel.size = Vector2(363, 54)
 		else:
 			sidebar_panel.position = Vector2(6, 375)
 			sidebar_panel.custom_minimum_size = Vector2(363, 284)
 			sidebar_panel.size = Vector2(363, 284)
 	else: # DESKTOP / TABLET: Floating right tactical panel
 		if sidebar_collapsed:
-			sidebar_panel.position = Vector2(912, 74)
-			sidebar_panel.custom_minimum_size = Vector2(352, 56)
-			sidebar_panel.size = Vector2(352, 56)
+			sidebar_panel.position = Vector2(1004, 74)
+			sidebar_panel.custom_minimum_size = Vector2(260, 56)
+			sidebar_panel.size = Vector2(260, 56)
 		else:
 			sidebar_panel.position = Vector2(912, 74)
 			sidebar_panel.custom_minimum_size = Vector2(352, 632)
@@ -1004,6 +1162,7 @@ func _on_layout_changed(layout: int) -> void:
 	_apply_sidebar_layout()
 
 	if map_canvas:
+		map_canvas.position = Vector2.ZERO
 		map_canvas.size = map_panel.size
 		map_canvas.queue_redraw()
 
@@ -1011,7 +1170,7 @@ func _get_map_transform() -> Dictionary:
 	var canvas_size = map_canvas.size if map_canvas else Vector2(1280, 720)
 	if current_layout == 2:
 		var top_reserved: float = 54.0
-		var bottom_reserved: float = 58.0 if sidebar_collapsed else 294.0
+		var bottom_reserved: float = 64.0 if sidebar_collapsed else 294.0
 		var avail_w_m: float = maxf(canvas_size.x - 12.0, 200.0)
 		var avail_h_m: float = maxf(canvas_size.y - top_reserved - bottom_reserved, 220.0)
 		var sm: float = minf(avail_w_m / 880.0, avail_h_m / 540.0)
@@ -1043,28 +1202,33 @@ func _from_screen(screen_pos: Vector2, trans: Dictionary) -> Vector2:
 	return (screen_pos - trans["offset"]) / trans["scale"]
 
 # -------------------------------------------------------------------------
-# MAP CANVAS DRAWING
+# MAP CANVAS DRAWING (Political World Map with Detailed Coastlines & Bathymetry)
 # -------------------------------------------------------------------------
 func _on_map_canvas_draw() -> void:
 	var trans = _get_map_transform()
 	var s: float = float(trans["scale"])
 	var font = ThemeDB.fallback_font
 
-	# 1. Draw Fullscreen Ocean Background & Nautical Grid
-	var ocean_col = current_theme.board_color.darkened(0.14) if current_theme else Color("#0E1722")
+	# 1. Political Atlas Ocean Backdrop & Cartographic Graticule
+	var ocean_col = current_theme.board_color.darkened(0.10) if current_theme else Color("#102234")
 	map_canvas.draw_rect(Rect2(Vector2.ZERO, map_canvas.size), ocean_col, true)
 
 	var grid_col = current_theme.line_color if current_theme else Color("#7C9BB8")
-	var faint_grid = Color(grid_col.r, grid_col.g, grid_col.b, 0.10)
+	var faint_grid = Color(grid_col.r, grid_col.g, grid_col.b, 0.11)
+	var equator_col = Color(grid_col.r, grid_col.g, grid_col.b, 0.22)
 
 	# Fullscreen Lat/Long lines across the entire map_canvas
 	for y_val in [120.0, 240.0, 360.0, 480.0, 600.0]:
-		map_canvas.draw_line(Vector2(0.0, y_val), Vector2(map_canvas.size.x, y_val), faint_grid, 1.0)
+		var line_c = equator_col if is_equal_approx(y_val, 360.0) else faint_grid
+		map_canvas.draw_line(Vector2(0.0, y_val), Vector2(map_canvas.size.x, y_val), line_c, 1.0)
 	for x_val in [180.0, 360.0, 540.0, 720.0, 900.0, 1080.0]:
 		map_canvas.draw_line(Vector2(x_val, 0.0), Vector2(x_val, map_canvas.size.y), faint_grid, 1.0)
 
-	# 2. Draw Coastal Relief & Continental Shelf Glow under all landmasses
-	var shadow_offset := Vector2(4.0 * s, 5.0 * s)
+	# Subtle Compass Rose in the South Pacific
+	_draw_compass_rose(_to_screen(Vector2(66.0, 492.0), trans), 22.0 * s, Color(grid_col.r, grid_col.g, grid_col.b, 0.32))
+
+	# 2. Dual-Ring Coastal Bathymetry (Shallow Continental Shelf Glow + Drop Shadow)
+	var shadow_offset := Vector2(3.5 * s, 4.5 * s)
 	for i in range(30):
 		var base_poly = TERRITORY_POLYGONS[i]
 		var shadow_poly = PackedVector2Array()
@@ -1074,10 +1238,9 @@ func _on_map_canvas_draw() -> void:
 			shadow_poly.append(sp + shadow_offset)
 			coast_poly.append(sp)
 		coast_poly.append(_to_screen(base_poly[0], trans))
-		map_canvas.draw_colored_polygon(shadow_poly, Color(0.02, 0.04, 0.08, 0.55))
-		var cont_id = _get_territory_continent(i)
-		var cont_c: Color = CONTINENTS_DATA[cont_id]["color"]
-		map_canvas.draw_polyline(coast_poly, Color(cont_c.r, cont_c.g, cont_c.b, 0.28), maxf(6.5 * s, 3.0), true)
+		map_canvas.draw_colored_polygon(shadow_poly, Color(0.01, 0.03, 0.07, 0.48))
+		map_canvas.draw_polyline(coast_poly, Color(0.28, 0.68, 0.86, 0.16), maxf(10.0 * s, 4.5), true)
+		map_canvas.draw_polyline(coast_poly, Color(0.55, 0.85, 0.96, 0.24), maxf(4.5 * s, 2.2), true)
 
 	# 3. Draw Adjacencies & Sea Lanes (with wrap-around ocean edges for Canada<->Kamchatka and Chile<->Australia)
 	for edge in ADJACENCIES:
@@ -1091,7 +1254,7 @@ func _on_map_canvas_draw() -> void:
 		var is_available_target = (selected_from == t1 and valid_targets.has(t2)) or (selected_from == t2 and valid_targets.has(t1))
 		var is_wrap_edge = (t1 == 8 and t2 == 22) or (t1 == 22 and t2 == 8) or (t1 == 2 and t2 == 26) or (t1 == 26 and t2 == 2)
 
-		var route_col := Color(0.38, 0.78, 0.94, 0.50)
+		var route_col := Color(0.32, 0.72, 0.92, 0.55)
 		var route_width := maxf(1.5 * s, 1.2)
 		if is_active_connection:
 			var pulse_val = 0.7 + 0.3 * sin(pulse_time * 2.0)
@@ -1103,24 +1266,20 @@ func _on_map_canvas_draw() -> void:
 			route_width = maxf(2.4 * s, 1.8)
 
 		if is_wrap_edge:
-			# Draw wrap-around naval routes to the left/right edges of the world map instead of crossing all continents
 			var left_t: int = 8 if (t1 == 8 or t2 == 8) else 2
 			var right_t: int = 22 if (t1 == 22 or t2 == 22) else 26
 			var c_left = _to_screen(TERRITORY_CENTERS[left_t], trans)
 			var c_right = _to_screen(TERRITORY_CENTERS[right_t], trans)
-			var edge_left = _to_screen(Vector2(18.0, TERRITORY_CENTERS[left_t].y), trans)
-			var edge_right = _to_screen(Vector2(902.0, TERRITORY_CENTERS[right_t].y), trans)
-			_draw_dashed_line(c_left, edge_left, route_col, route_width, maxf(7.0 * s, 4.0), maxf(4.0 * s, 2.5))
-			_draw_dashed_line(c_right, edge_right, route_col, route_width, maxf(7.0 * s, 4.0), maxf(4.0 * s, 2.5))
+			var edge_left = _to_screen(Vector2(14.0, TERRITORY_CENTERS[left_t].y), trans)
+			var edge_right = _to_screen(Vector2(906.0, TERRITORY_CENTERS[right_t].y), trans)
+			_draw_dashed_line(c_left, edge_left, route_col, route_width, maxf(6.5 * s, 4.0), maxf(4.0 * s, 2.5))
+			_draw_dashed_line(c_right, edge_right, route_col, route_width, maxf(6.5 * s, 4.0), maxf(4.0 * s, 2.5))
 		elif is_active_connection or is_available_target:
 			map_canvas.draw_line(c1, c2, route_col, route_width)
 		elif is_sea:
-			_draw_dashed_line(c1, c2, route_col, route_width, maxf(7.0 * s, 4.0), maxf(4.0 * s, 2.5))
-		else:
-			var land_c = Color(grid_col.r, grid_col.g, grid_col.b, 0.22)
-			map_canvas.draw_line(c1, c2, land_c, maxf(1.2 * s, 1.0))
+			_draw_dashed_line(c1, c2, route_col, route_width, maxf(6.5 * s, 4.0), maxf(4.0 * s, 2.5))
 
-	# 4. Draw Territory Polygons colored by Owner blended with Continent tone
+	# 4. Draw Political Territory Polygons with Organic Coastlines & Borders
 	for i in range(30):
 		var base_poly = TERRITORY_POLYGONS[i]
 		var screen_poly = PackedVector2Array()
@@ -1134,18 +1293,19 @@ func _on_map_canvas_draw() -> void:
 		var fill_color: Color
 		if t_owner > 0 and PLAYER_COLORS.has(t_owner):
 			var p_col: Color = PLAYER_COLORS[t_owner]
-			fill_color = p_col.lerp(cont_col, 0.22)
-			fill_color.a = 0.78
+			# Blend political player color with regional continent hue so each country has distinct political shading
+			fill_color = p_col.lerp(cont_col, 0.26)
+			fill_color.a = 0.86
 		else:
-			fill_color = Color(cont_col.r, cont_col.g, cont_col.b, 0.48)
+			fill_color = Color(cont_col.r, cont_col.g, cont_col.b, 0.62)
 
 		# State highlights
 		if selected_from == i:
-			var pulse_factor = 0.82 + 0.18 * sin(pulse_time)
-			fill_color = fill_color.lightened(0.32)
+			var pulse_factor = 0.85 + 0.15 * sin(pulse_time)
+			fill_color = fill_color.lightened(0.30)
 			fill_color.a = pulse_factor
 		elif selected_to == i:
-			fill_color = Color(0.2, 0.9, 0.4, 0.88)
+			fill_color = Color(0.2, 0.9, 0.4, 0.90)
 		elif valid_targets.has(i):
 			var pulse_val = 0.65 + 0.25 * sin(pulse_time * 1.5)
 			if current_phase == "Attack":
@@ -1153,26 +1313,26 @@ func _on_map_canvas_draw() -> void:
 			else:
 				fill_color = fill_color.blend(Color(0.2, 0.9, 0.4, pulse_val * 0.42))
 		elif hovered_territory == i:
-			fill_color = fill_color.lightened(0.20)
+			fill_color = fill_color.lightened(0.18)
 
 		map_canvas.draw_colored_polygon(screen_poly, fill_color)
 
-		# Polygon Border (Continent color rim + state border)
-		var stroke_color = cont_col.darkened(0.35)
-		var stroke_width = maxf(1.6 * s, 1.2)
+		# Political Map Border: Crisp dark ink border + inner continental highlight
+		var stroke_color = Color(0.08, 0.11, 0.16, 0.92)
+		var stroke_width = maxf(1.5 * s, 1.1)
 
 		if selected_from == i:
 			stroke_color = current_theme.select_color if current_theme else Color(1.0, 0.9, 0.2)
-			stroke_width = maxf(3.2 * s, 2.2)
+			stroke_width = maxf(3.0 * s, 2.2)
 		elif selected_to == i:
 			stroke_color = current_theme.valid_move_color if current_theme else Color(0.2, 0.9, 0.5)
-			stroke_width = maxf(3.2 * s, 2.2)
+			stroke_width = maxf(3.0 * s, 2.2)
 		elif valid_targets.has(i):
 			stroke_color = Color(0.3, 0.95, 0.45)
-			stroke_width = maxf(2.4 * s, 1.8)
+			stroke_width = maxf(2.3 * s, 1.8)
 		elif hovered_territory == i:
 			stroke_color = Color.WHITE
-			stroke_width = maxf(2.2 * s, 1.6)
+			stroke_width = maxf(2.1 * s, 1.6)
 
 		var poly_closed = Array(screen_poly)
 		poly_closed.append(screen_poly[0])
@@ -1183,15 +1343,15 @@ func _on_map_canvas_draw() -> void:
 		var center_pos = _to_screen(TERRITORY_CENTERS[i], trans)
 		var t_owner = territory_owners.get(i, 0)
 		var armies = territory_armies.get(i, 0)
-		var badge_radius = clampf(12.0 * s, 8.5, 15.0)
+		var badge_radius = clampf(11.5 * s, 8.5, 14.5)
 		var badge_color: Color = PLAYER_COLORS.get(t_owner, Color(0.25, 0.25, 0.30))
 		var is_focus = (i == selected_from or i == selected_to or i == hovered_territory)
 
 		# Outer metallic/dark shield rim
 		var rim_col = Color(1.0, 0.92, 0.35, 0.98) if is_focus else Color(0.06, 0.09, 0.14, 0.94)
-		map_canvas.draw_circle(center_pos, badge_radius + maxf(2.0 * s, 1.5), rim_col)
+		map_canvas.draw_circle(center_pos, badge_radius + maxf(1.8 * s, 1.4), rim_col)
 		map_canvas.draw_circle(center_pos, badge_radius, badge_color.darkened(0.12))
-		map_canvas.draw_circle(center_pos, badge_radius - maxf(1.8 * s, 1.2), badge_color.lightened(0.14))
+		map_canvas.draw_circle(center_pos, badge_radius - maxf(1.6 * s, 1.1), badge_color.lightened(0.14))
 
 		# Army count text inside shield
 		var count_str = str(armies)
@@ -1204,8 +1364,8 @@ func _on_map_canvas_draw() -> void:
 		var code_str: String = TERRITORY_CODES[i]
 		var code_font_size = int(clampf(8.5 * s, 7.0, 10.0))
 		var code_size = font.get_string_size(code_str, HORIZONTAL_ALIGNMENT_CENTER, -1, code_font_size)
-		var pad_x = maxf(3.0 * s, 2.0)
-		var pad_y = maxf(1.2 * s, 1.0)
+		var pad_x = maxf(2.8 * s, 2.0)
+		var pad_y = maxf(1.0 * s, 1.0)
 		var pill_rect = Rect2(
 			center_pos.x - code_size.x * 0.5 - pad_x,
 			center_pos.y + badge_radius + maxf(1.5 * s, 1.0),
@@ -1238,7 +1398,7 @@ func _on_map_canvas_draw() -> void:
 		var callout_txt = "%s (%d)" % [full_name, f_armies]
 		var callout_fs = int(clampf(11.0 * s, 10.0, 13.0))
 		var c_size = font.get_string_size(callout_txt, HORIZONTAL_ALIGNMENT_CENTER, -1, callout_fs)
-		var badge_r = clampf(12.0 * s, 8.5, 15.0)
+		var badge_r = clampf(11.5 * s, 8.5, 14.5)
 		var box_w = c_size.x + 14.0
 		var box_h = c_size.y + 6.0
 		var box_x = clampf(c_pos.x - box_w * 0.5, 8.0, map_canvas.size.x - box_w - 8.0)
@@ -1256,8 +1416,16 @@ func _on_map_canvas_draw() -> void:
 			Color(1.0, 0.95, 0.75)
 		)
 
-	# 7. Bottom-Left Tactical Info Banner (Full territory details or Continent Legend)
+	# 7. Bottom-Left Tactical Info Banner (Full territory details)
 	_draw_map_info_banner(font)
+
+func _draw_compass_rose(center: Vector2, radius: float, col: Color) -> void:
+	map_canvas.draw_arc(center, radius, 0.0, TAU, 32, col, 1.2)
+	map_canvas.draw_arc(center, radius * 0.65, 0.0, TAU, 24, col, 1.0)
+	map_canvas.draw_line(center + Vector2(0, -radius * 1.25), center + Vector2(0, radius * 1.25), col, 1.4)
+	map_canvas.draw_line(center + Vector2(-radius * 1.25, 0), center + Vector2(radius * 1.25, 0), col, 1.4)
+	map_canvas.draw_line(center + Vector2(-radius * 0.75, -radius * 0.75), center + Vector2(radius * 0.75, radius * 0.75), col, 1.0)
+	map_canvas.draw_line(center + Vector2(radius * 0.75, -radius * 0.75), center + Vector2(-radius * 0.75, radius * 0.75), col, 1.0)
 
 func _draw_map_info_banner(font: Font) -> void:
 	var inspect_id: int = hovered_territory if hovered_territory != -1 else (selected_to if selected_to != -1 else selected_from)

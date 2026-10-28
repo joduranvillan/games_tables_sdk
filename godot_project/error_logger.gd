@@ -69,8 +69,8 @@ func _setup_debug_overlay() -> void:
 	vbox.add_child(log_label)
 
 	overlay_canvas.add_child(overlay_panel)
-	# Visible en modo debug por defecto
-	overlay_panel.visible = OS.is_debug_build()
+	# Oculto por defecto en todas las escenas para no ocupar espacio en pantalla (activable solo manualmente con F12)
+	overlay_panel.visible = false
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:

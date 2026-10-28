@@ -117,14 +117,26 @@ func _initialize() -> void:
 		results.append(["Los 30 territorios tienen códigos cortos y centros dentro de sus siluetas continentales", all_inside and board_inst.TERRITORY_CODES.size() == 30])
 		results.append(["Ningún par de centros de territorios se solapa en el mapa (distancia mínima >= 55px)", min_dist >= 55.0])
 
-		# Probar distribución móvil (layout == 2) y panel inferior plegable
+		# Probar distribución móvil (layout == 2) y botón icono pequeño (24x24) del panel plegable
 		board_inst._on_layout_changed(2)
 		var mobile_expanded_h: float = board_inst.sidebar_panel.size.y
 		board_inst._on_toggle_sidebar_pressed()
 		var mobile_collapsed_h: float = board_inst.sidebar_panel.size.y
-		results.append(["En modo móvil (layout 2), el panel inferior es plegable y amplía el mapa", board_inst.sidebar_collapsed and mobile_collapsed_h < mobile_expanded_h])
+		var icon_compact: bool = board_inst.btn_toggle_panel != null and board_inst.btn_toggle_panel.custom_minimum_size.x <= 28.0
+		results.append(["En modo móvil (layout 2), el panel inferior es plegable con botón icono compacto y amplía el mapa", board_inst.sidebar_collapsed and mobile_collapsed_h < mobile_expanded_h and icon_compact])
 		board_inst._on_toggle_sidebar_pressed()
 		board_inst._on_layout_changed(0)
+
+		# Verificar que ErrorLogger mantiene su overlay visual oculto por defecto en todas las escenas
+		var err_logger_script = load("res://error_logger.gd")
+		if err_logger_script != null:
+			var err_inst = err_logger_script.new()
+			root.add_child(err_inst)
+			if err_inst.overlay_panel == null and err_inst.has_method("_ready"):
+				err_inst._ready()
+			results.append(["ErrorLogger inicia con el cartel visual oculto por defecto", err_inst.overlay_panel != null and err_inst.overlay_panel.visible == false])
+			root.remove_child(err_inst)
+			err_inst.free()
 
 		# Probar modo vs IA (Humano = J1, IA = J2): completar turno de J1 y verificar que la IA juega al instante
 		board_inst._on_mode_selected(1)
