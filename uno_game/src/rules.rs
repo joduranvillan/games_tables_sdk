@@ -1,11 +1,11 @@
 use crate::board::{Card, CardColor, CardValue, UnoState};
 use crate::commands::{
-    CallUnoCommand, CatchUnoFailureCommand, ChallengeWildDrawFourCommand, DrawCardCommand,
-    InterceptCommand, PlayCardCommand,
+    CallUnoCommand, CatchUnoFailureCommand, ChallengeWildDrawFourCommand, ChooseWildColorCommand,
+    DrawCardCommand, InterceptCommand, PlayCardCommand,
 };
 use crate::events::{
-    CardPlayedEvent, CardsDrawnEvent, DrewAndPlayedEvent, GameOverEvent, InterceptedEvent,
-    PlayerSkippedEvent, TurnReversedEvent, UnoCalledEvent, UnoPenaltyEvent,
+    CardPlayedEvent, CardsDrawnEvent, ColorChangedEvent, DrewAndPlayedEvent, GameOverEvent,
+    InterceptedEvent, PlayerSkippedEvent, TurnReversedEvent, UnoCalledEvent, UnoPenaltyEvent,
     WildDrawFourChallengedEvent,
 };
 use open_table_engine::prelude::*;
@@ -573,6 +573,22 @@ pub fn build_uno_rules() -> RuleEngine {
             world.resource_mut::<TurnResource>().0.advance();
         }
 
+        Ok(events)
+    });
+
+    rules.register::<ChooseWildColorCommand, _>(|cmd, world| {
+        if cmd.chosen_color == CardColor::WildColor {
+            return Err(EngineError::InvalidCommand {
+                reason: "Must choose a valid standard color for wild card".into(),
+            });
+        }
+        {
+            let mut state = world.resource_mut::<UnoState>();
+            state.active_color = cmd.chosen_color;
+        }
+        let events: Vec<Box<dyn Event>> = vec![Box::new(ColorChangedEvent {
+            color: cmd.chosen_color,
+        })];
         Ok(events)
     });
 

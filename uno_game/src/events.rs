@@ -62,3 +62,9 @@ pub struct WildDrawFourChallengedEvent {
     pub penalty_player: PlayerId,
     pub cards_drawn: usize,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameEvent)]
+pub struct ColorChangedEvent {
+    pub color: CardColor,
+}
+

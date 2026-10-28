@@ -42,3 +42,11 @@ pub struct ChallengeWildDrawFourCommand {
     #[issuer]
     pub challenger: PlayerId,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct ChooseWildColorCommand {
+    #[issuer]
+    pub player: PlayerId,
+    pub chosen_color: CardColor,
+}
+

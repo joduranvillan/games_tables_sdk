@@ -137,6 +137,10 @@ pub fn best_move<S: UnoStateAccess>(
     let uno = state.as_uno_state()?;
     let hand = uno.hands.get(&ai)?;
 
+    if uno.draw_penalty > 0 {
+        return Some(UnoCommand::DrawCard(DrawCardCommand { player: ai }));
+    }
+
     // Cuando el bot queda con 1 carta tras jugar (o si tiene 1 carta y no ha cantado UNO),
     // emite CallUnoCommand. En Easy tiene 30% de probabilidad de olvidarlo para permitir CatchUnoFailureCommand.
     if hand.len() == 1 && !uno.uno_called.contains(&ai) {

@@ -141,6 +141,14 @@ func _initialize() -> void:
 		results.append(["En modo vs IA, jugada de J1 es aceptada y la IA responde automáticamente (ticks >= +2)", not board_inst._last_move_rejected and tick_after >= tick_before + 2 and board_inst.current == 1])
 		results.append(["Penalización de robo (+2/+4) queda en 0 tras aplicarse automáticamente", board_inst.draw_penalty == 0])
 
+		# 11. Verificar que tras definir el color con Wild/+4/+2 y resolverse el salto, una carta normal de ese color es jugable sin obligar a robar
+		board_inst.active_color = "Blue"
+		board_inst.draw_penalty = 0
+		board_inst._rust_draw_penalty = 0
+		board_inst.discard_pile = [{"color": "Wild", "value": "WildDrawFour"}]
+		var blue_card_playable: bool = board_inst._is_card_playable({"color": "Blue", "value": "7"})
+		results.append(["Tras jugar comodín +4/+2 y saltar turno, carta del color elegido es jugable sin obligar a robar", blue_card_playable])
+
 		root.remove_child(board_inst)
 		board_inst.free()
 

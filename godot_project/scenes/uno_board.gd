@@ -107,6 +107,7 @@ var _pause_menu: CanvasLayer
 # Local Player & Official UNO Rule State
 var local_player: int = P1
 var is_vs_ai: bool = false
+var ai_difficulty: int = 1
 var uno_called_players: Array = []
 var last_wild_draw_four_player: int = -1
 
@@ -116,6 +117,11 @@ var _is_playing_ai_sequence: bool = false
 var _last_move_rejected: bool = false
 var _human_action_origin: Vector2 = Vector2.ZERO
 var _pending_drawn_wild_pick: bool = false
+var _applying_auto_penalty: bool = false
+var _executing_ai_turn: bool = false
+var _rust_draw_penalty: int = 0
+var _drawn_wild_override_color: String = ""
+var _drawn_wild_card_val: String = ""
 
 # Action buttons bar & special buttons
 var action_buttons_bar: HBoxContainer
@@ -177,13 +183,14 @@ func _ready() -> void:
 	var start_vs_ai: bool = (gm_mode == "vs_ai") or (not OS.has_feature("headless") and gm_mode == "hotseat")
 	if start_vs_ai:
 		var human_p: int = int(gm.get_human_player_id()) if (gm != null and gm.has_method("get_human_player_id")) else P1
-		var ai_p: int = P2 if human_p == P1 else P1
 		var diff: int = int(gm.get_ai_difficulty()) if (gm != null and gm.has_method("get_ai_difficulty")) else 1
 		is_vs_ai = true
 		local_player = human_p
+		ai_difficulty = diff
 		if mode_option_button != null:
 			mode_option_button.selected = 1 if human_p == P1 else 2
-		bridge.start_local_match_uno_vs_ai(human_p, ai_p, diff)
+		bridge.start_local_match_uno(P1, P2)
+		_run_uno_ai_turns_if_needed()
 	else:
 		is_vs_ai = false
 		local_player = P1
@@ -220,6 +227,11 @@ func _on_mode_selected(index: int) -> void:
 	_ai_visual_queue.clear()
 	_is_playing_ai_sequence = false
 	_pending_drawn_wild_pick = false
+	_applying_auto_penalty = false
+	_executing_ai_turn = false
+	_rust_draw_penalty = 0
+	_drawn_wild_override_color = ""
+	_drawn_wild_card_val = ""
 	_init_default_game_state()
 	if index == 0:
 		if gm != null and gm.has_method("set_game_mode"):
@@ -230,7 +242,6 @@ func _on_mode_selected(index: int) -> void:
 		event_banner_label.text = "Modo 2 Jugadores Local iniciado. Turno del Jugador 1."
 	else:
 		var human_p: int = P1 if index == 1 else P2
-		var ai_p: int = P2 if human_p == P1 else P1
 		var diff: int = int(gm.get_ai_difficulty()) if (gm != null and gm.has_method("get_ai_difficulty")) else 1
 		if gm != null and gm.has_method("set_game_mode"):
 			gm.set_game_mode("vs_ai")
@@ -238,8 +249,10 @@ func _on_mode_selected(index: int) -> void:
 			gm.set_human_player_id(human_p)
 		is_vs_ai = true
 		local_player = human_p
+		ai_difficulty = diff
 		event_banner_label.text = "Partida vs IA iniciada (Tú eres Jugador %d)." % human_p
-		bridge.start_local_match_uno_vs_ai(human_p, ai_p, diff)
+		bridge.start_local_match_uno(P1, P2)
+		_run_uno_ai_turns_if_needed()
 	current = bridge.current_player()
 	if not _is_playing_ai_sequence:
 		_sync_uno_state_from_bridge()
@@ -834,6 +847,7 @@ func _init_default_game_state() -> void:
 	discard_pile = [{"color": "Red", "value": "5"}]
 	active_color = "Red"
 	draw_penalty = 0
+	_rust_draw_penalty = 0
 	deck_count = 50
 	opponent_card_count = 7
 	is_clockwise = true
@@ -871,15 +885,25 @@ func _sync_uno_state_from_bridge(preserve_active_color: bool = false) -> void:
 			discard_pile.append(formatted_tc)
 		else:
 			discard_pile[discard_pile.size() - 1] = formatted_tc
+		var tc_col: String = str(formatted_tc.get("color", ""))
+		var tc_val: String = str(formatted_tc.get("value", ""))
+		if not (tc_col in ["Wild", "WildColor"] or tc_val in ["Wild", "WildDrawFour"]):
+			_drawn_wild_override_color = ""
 	if st.has("active_color") and not preserve_active_color:
-		var ac = str(st["active_color"])
-		active_color = "Wild" if ac == "WildColor" else ac
+		if not _drawn_wild_override_color.is_empty():
+			active_color = _drawn_wild_override_color
+		else:
+			var ac = str(st["active_color"])
+			active_color = "Wild" if ac == "WildColor" else ac
 	if st.has("deck_count"):
 		deck_count = int(st["deck_count"])
 	if st.has("opponent_card_count"):
 		opponent_card_count = int(st["opponent_card_count"])
 	if st.has("draw_penalty"):
 		draw_penalty = int(st["draw_penalty"])
+		_rust_draw_penalty = draw_penalty
+	elif not _is_playing_ai_sequence:
+		draw_penalty = _rust_draw_penalty
 
 # =========================================================================
 # CARD CREATION & RENDERING HELPER (Panel-based for exact UNO proportions)
@@ -1157,21 +1181,14 @@ func _is_card_playable(card: Dictionary) -> bool:
 	var top_card: Dictionary = _normalize_card_dict(discard_pile.back()) if not discard_pile.is_empty() else {"color": "Red", "value": "1"}
 	var top_val: String = top_card["value"]
 
-	# Regla oficial de acumulación de penalización (+2 / +4) en UnoState::is_playable
-	if draw_penalty > 0:
-		if top_val == "DrawTwo":
-			return c_val == "DrawTwo" or c_val == "WildDrawFour"
-		elif top_val == "WildDrawFour":
-			return c_val == "WildDrawFour"
-		return false
-
 	# Restricción oficial de WildDrawFour: solo jugable si no se tiene ninguna carta del color activo
 	if c_val == "WildDrawFour":
-		for h_card in player_hand:
-			if h_card is Dictionary:
-				var hc := _normalize_card_dict(h_card)
-				if hc["color"] == active_color:
-					return false
+		if active_color in ["Red", "Blue", "Green", "Yellow"]:
+			for h_card in player_hand:
+				if h_card is Dictionary:
+					var hc := _normalize_card_dict(h_card)
+					if hc["color"] == active_color:
+						return false
 		return true
 
 	if c_color in ["Wild", "WildColor"] or c_val == "Wild":
@@ -1469,15 +1486,46 @@ func _on_wild_color_chosen(chosen_col: String) -> void:
 	wild_picker_modal.visible = false
 	if _pending_drawn_wild_pick:
 		_pending_drawn_wild_pick = false
-		active_color = chosen_col
+		var choose_rejected: bool = false
+		if bridge != null:
+			var choose_cmd: Dictionary = {
+				"command_type": "ChooseWildColorCommand",
+				"player": local_player,
+				"chosen_color": chosen_col
+			}
+			_last_move_rejected = false
+			bridge.send_command_json(local_player, JSON.stringify(choose_cmd))
+			choose_rejected = _last_move_rejected
+			_last_move_rejected = false
+
+		if not choose_rejected:
+			_drawn_wild_override_color = chosen_col
+			active_color = chosen_col
+		else:
+			_drawn_wild_override_color = ""
+			if bridge != null and bridge.has_method("get_uno_state"):
+				var st_now = bridge.get_uno_state(local_player)
+				if st_now is Dictionary and st_now.has("active_color"):
+					var ac_str := str(st_now["active_color"])
+					active_color = chosen_col if ac_str in ["Wild", "WildColor"] else ac_str
+
 		_update_discard_display()
 		_update_active_color_indicator()
-		var col_es: String = COLOR_NAMES_ES.get(chosen_col, chosen_col)
-		event_banner_label.text = "¡Color del comodín establecido a %s!" % col_es.to_upper()
+		var col_es: String = COLOR_NAMES_ES.get(active_color, active_color)
+
+		if _drawn_wild_card_val == "WildDrawFour" or _rust_draw_penalty > 0 or draw_penalty > 0:
+			_drawn_wild_card_val = ""
+			_resolve_immediate_penalty_after_card(local_player, active_color, 4)
+			return
+
+		_drawn_wild_card_val = ""
+		event_banner_label.text = "¡Comodín jugado al instante! Color activo establecido a %s." % col_es.to_upper()
+		if is_vs_ai and winner == -1:
+			_run_uno_ai_turns_if_needed()
 		if not _is_playing_ai_sequence:
-			_auto_apply_pending_draw_penalty()
-			current = bridge.current_player()
-			_sync_uno_state_from_bridge(true)
+			if bridge != null:
+				current = int(bridge.current_player())
+			_sync_uno_state_from_bridge(not _drawn_wild_override_color.is_empty())
 			_update_ui()
 			_update_status()
 		return
@@ -1490,11 +1538,18 @@ func _on_wild_color_chosen(chosen_col: String) -> void:
 func _execute_play_card(idx: int, start_pos: Vector2, chosen_col: String = "") -> void:
 	if idx < 0 or idx >= player_hand.size():
 		return
+	if (_rust_draw_penalty > 0 or draw_penalty > 0) and winner == -1:
+		_auto_apply_pending_draw_penalty()
+		if idx >= player_hand.size():
+			return
+
 	var played_card := _normalize_card_dict(player_hand[idx])
 	var c_color: String = played_card["color"]
 	var c_val: String = played_card["value"]
 	var is_wild: bool = (c_color in ["Wild", "WildColor"] or c_val in ["Wild", "WildDrawFour"])
+	var target_color: String = chosen_col if (is_wild and not chosen_col.is_empty()) else c_color
 
+	_drawn_wild_override_color = ""
 	var acting_p: int = int(current)
 	var cmd: Dictionary = {
 		"command_type": "PlayCardCommand",
@@ -1512,35 +1567,232 @@ func _execute_play_card(idx: int, start_pos: Vector2, chosen_col: String = "") -
 	if _last_move_rejected:
 		return
 
+	if c_val in ["DrawTwo", "WildDrawFour"] and winner == -1:
+		var pen_cnt: int = 4 if c_val == "WildDrawFour" else 2
+		_resolve_immediate_penalty_after_card(acting_p, target_color, pen_cnt)
+		return
+
+	if is_vs_ai and winner == -1:
+		_run_uno_ai_turns_if_needed()
+
 	if not _is_playing_ai_sequence:
 		_auto_apply_pending_draw_penalty()
-		current = bridge.current_player()
+		current = int(bridge.current_player())
 		_sync_uno_state_from_bridge()
+		_update_ui()
+		_update_status()
+
+func _resolve_immediate_penalty_after_card(acting_p: int, expected_color: String, penalty_cards: int) -> void:
+	if bridge == null or winner != -1:
+		return
+
+	var guard: int = 0
+	while (_rust_draw_penalty > 0 or draw_penalty > 0) and winner == -1 and guard < 4:
+		guard += 1
+		var penalized_p: int = int(bridge.current_player())
+		if penalized_p <= 0:
+			break
+		_applying_auto_penalty = true
+		_last_move_rejected = false
+		bridge.send_command_json(penalized_p, JSON.stringify({
+			"command_type": "DrawCardCommand",
+			"player": penalized_p
+		}))
+		_applying_auto_penalty = false
+		if _last_move_rejected:
+			_last_move_rejected = false
+			break
+
+	draw_penalty = 0
+	_rust_draw_penalty = 0
+	if expected_color in ["Red", "Blue", "Green", "Yellow"]:
+		active_color = expected_color
+
+	if is_vs_ai and winner == -1 and int(bridge.current_player()) != local_player:
+		_run_uno_ai_turns_if_needed()
+
+	if not _is_playing_ai_sequence:
+		current = int(bridge.current_player())
+		_sync_uno_state_from_bridge(true)
+		draw_penalty = 0
+		_rust_draw_penalty = 0
+		var skipped_id: int = P2 if acting_p == P1 else P1
+		var skipped_name: String = _get_player_display_name(skipped_id)
+		var col_es: String = COLOR_NAMES_ES.get(active_color, active_color)
+		event_banner_label.text = "¡%s roba +%d cartas y pierde su turno! Color activo: %s — ¡Juegas de nuevo!" % [skipped_name, penalty_cards, col_es]
 		_update_ui()
 		_update_status()
 
 func _auto_apply_pending_draw_penalty() -> void:
 	var guard: int = 0
-	while draw_penalty > 0 and winner == -1 and bridge != null and guard < 8:
+	while (_rust_draw_penalty > 0 or draw_penalty > 0) and winner == -1 and bridge != null and guard < 8:
 		guard += 1
 		var target_p: int = int(bridge.current_player())
 		if target_p <= 0:
 			break
-		var penalty_amount: int = draw_penalty
+		var penalty_amount: int = _rust_draw_penalty if _rust_draw_penalty > 0 else draw_penalty
 		var draw_cmd: Dictionary = {
 			"command_type": "DrawCardCommand",
 			"player": target_p
 		}
 		_last_move_rejected = false
+		_applying_auto_penalty = true
 		bridge.send_command_json(target_p, JSON.stringify(draw_cmd))
+		_applying_auto_penalty = false
 		if _last_move_rejected:
+			_last_move_rejected = false
 			draw_penalty = 0
+			_rust_draw_penalty = 0
 			break
+		draw_penalty = 0
+		_rust_draw_penalty = 0
 		var target_name: String = _get_player_display_name(target_p)
 		var col_es: String = COLOR_NAMES_ES.get(active_color, active_color)
 		event_banner_label.text = "¡%s roba +%d cartas automáticamente y pierde el turno! Color activo: %s." % [target_name, penalty_amount, col_es]
-		if _is_playing_ai_sequence:
+
+func _run_uno_ai_turns_if_needed() -> void:
+	if not is_vs_ai or bridge == null or winner != -1 or _pending_drawn_wild_pick or _executing_ai_turn:
+		return
+	var ai_id: int = P2 if local_player == P1 else P1
+	_executing_ai_turn = true
+	var step_guard: int = 0
+	while winner == -1 and not _pending_drawn_wild_pick and step_guard < 16:
+		step_guard += 1
+		var curr_p: int = int(bridge.current_player())
+		if curr_p != ai_id:
+			if _rust_draw_penalty > 0 and curr_p == local_player:
+				_auto_apply_pending_draw_penalty()
+				continue
 			break
+
+		if _rust_draw_penalty > 0:
+			_applying_auto_penalty = true
+			_last_move_rejected = false
+			bridge.send_command_json(ai_id, JSON.stringify({
+				"command_type": "DrawCardCommand",
+				"player": ai_id
+			}))
+			_applying_auto_penalty = false
+			draw_penalty = 0
+			_rust_draw_penalty = 0
+			if _last_move_rejected:
+				_last_move_rejected = false
+				break
+			continue
+
+		var ai_st: Dictionary = bridge.get_uno_state(ai_id)
+		var raw_hand: Array = ai_st.get("hand", []) if (ai_st.has("hand") and ai_st["hand"] is Array) else []
+		var ai_hand: Array = []
+		for rc in raw_hand:
+			if rc is Dictionary:
+				ai_hand.append(_normalize_card_dict(rc))
+
+		var ai_active_col: String = str(ai_st.get("active_color", active_color))
+		if ai_active_col == "WildColor":
+			ai_active_col = "Wild"
+		var ai_top_card: Dictionary = _normalize_card_dict(ai_st.get("top_card", {"color": "Red", "value": "1"})) if (ai_st.has("top_card") and ai_st["top_card"] is Dictionary) else {"color": active_color, "value": "1"}
+		var ai_top_val: String = str(ai_top_card.get("value", "1"))
+
+		if ai_hand.size() == 1 and not uno_called_players.has(ai_id):
+			_last_move_rejected = false
+			bridge.send_command_json(ai_id, JSON.stringify({
+				"type": "CallUnoCommand",
+				"command_type": "CallUnoCommand",
+				"player": ai_id
+			}))
+			_last_move_rejected = false
+
+		var has_active_color_card: bool = false
+		for c in ai_hand:
+			if str(c.get("color", "")) == ai_active_col:
+				has_active_color_card = true
+				break
+
+		var playable_indices: Array = []
+		for idx in range(ai_hand.size()):
+			var c: Dictionary = ai_hand[idx]
+			var c_col: String = str(c.get("color", ""))
+			var c_val: String = str(c.get("value", ""))
+			if c_val == "WildDrawFour":
+				if not has_active_color_card:
+					playable_indices.append(idx)
+			elif c_col in ["Wild", "WildColor"] or c_val == "Wild":
+				playable_indices.append(idx)
+			elif c_col == ai_active_col or c_val == ai_top_val:
+				playable_indices.append(idx)
+
+		if playable_indices.is_empty():
+			_last_move_rejected = false
+			bridge.send_command_json(ai_id, JSON.stringify({
+				"command_type": "DrawCardCommand",
+				"player": ai_id
+			}))
+			if _last_move_rejected:
+				_last_move_rejected = false
+				break
+			if _rust_draw_penalty > 0 and winner == -1:
+				_auto_apply_pending_draw_penalty()
+			continue
+
+		var chosen_idx: int = int(playable_indices[0])
+		for p_idx in playable_indices:
+			var pc: Dictionary = ai_hand[p_idx]
+			if not (str(pc.get("color", "")) in ["Wild", "WildColor"] or str(pc.get("value", "")) in ["Wild", "WildDrawFour"]):
+				chosen_idx = int(p_idx)
+				break
+
+		var chosen_card: Dictionary = ai_hand[chosen_idx]
+		var cc_col: String = str(chosen_card.get("color", ""))
+		var cc_val: String = str(chosen_card.get("value", ""))
+		var cc_is_wild: bool = (cc_col in ["Wild", "WildColor"] or cc_val in ["Wild", "WildDrawFour"])
+
+		var ai_chosen_color = null
+		if cc_is_wild:
+			var color_counts := {"Red": 0, "Blue": 0, "Green": 0, "Yellow": 0}
+			for h_idx in range(ai_hand.size()):
+				if h_idx == chosen_idx:
+					continue
+				var hc_col: String = str(ai_hand[h_idx].get("color", ""))
+				if color_counts.has(hc_col):
+					color_counts[hc_col] += 1
+			var best_col: String = "Red"
+			var best_cnt: int = -1
+			for col_k in ["Red", "Blue", "Green", "Yellow"]:
+				if int(color_counts[col_k]) > best_cnt:
+					best_cnt = int(color_counts[col_k])
+					best_col = col_k
+			ai_chosen_color = best_col
+
+		var play_cmd: Dictionary = {
+			"command_type": "PlayCardCommand",
+			"player": ai_id,
+			"card_index": chosen_idx,
+			"chosen_color": ai_chosen_color
+		}
+		_last_move_rejected = false
+		bridge.send_command_json(ai_id, JSON.stringify(play_cmd))
+		if _last_move_rejected:
+			_last_move_rejected = false
+			bridge.send_command_json(ai_id, JSON.stringify({
+				"command_type": "DrawCardCommand",
+				"player": ai_id
+			}))
+			if _last_move_rejected:
+				_last_move_rejected = false
+				break
+
+		if ai_hand.size() == 2 and winner == -1 and not uno_called_players.has(ai_id):
+			bridge.send_command_json(ai_id, JSON.stringify({
+				"type": "CallUnoCommand",
+				"command_type": "CallUnoCommand",
+				"player": ai_id
+			}))
+			_last_move_rejected = false
+
+		if _rust_draw_penalty > 0 and winner == -1:
+			_auto_apply_pending_draw_penalty()
+
+	_executing_ai_turn = false
 
 func _on_draw_pile_pressed() -> void:
 	if winner != -1 or wild_picker_modal.visible or _is_playing_ai_sequence:
@@ -1563,9 +1815,22 @@ func _on_draw_pile_pressed() -> void:
 	if _last_move_rejected:
 		return
 
+	if _pending_drawn_wild_pick:
+		_update_ui()
+		_update_status()
+		return
+
+	if (_rust_draw_penalty > 0 or draw_penalty > 0) and winner == -1:
+		var pen_val: int = _rust_draw_penalty if _rust_draw_penalty > 0 else draw_penalty
+		_resolve_immediate_penalty_after_card(acting_p, active_color, pen_val)
+		return
+
+	if is_vs_ai and winner == -1:
+		_run_uno_ai_turns_if_needed()
+
 	if not _is_playing_ai_sequence:
 		_auto_apply_pending_draw_penalty()
-		current = bridge.current_player()
+		current = int(bridge.current_player())
 		_sync_uno_state_from_bridge(_pending_drawn_wild_pick)
 		var drawn_idx: int = (player_hand.size() - 1) if player_hand.size() > prev_hand_size else -1
 		_update_ui(drawn_idx)
@@ -1618,6 +1883,9 @@ func _on_jump_in_pressed() -> void:
 func _execute_intercept_card(idx: int, start_pos: Vector2) -> void:
 	if idx < 0 or idx >= player_hand.size():
 		return
+	var intercepted_card := _normalize_card_dict(player_hand[idx])
+	var c_val: String = intercepted_card["value"]
+	var c_color: String = intercepted_card["color"]
 	var cmd = {
 		"type": "InterceptCommand",
 		"command_type": "InterceptCommand",
@@ -1630,6 +1898,13 @@ func _execute_intercept_card(idx: int, start_pos: Vector2) -> void:
 
 	if _last_move_rejected:
 		return
+
+	if c_val == "DrawTwo" and winner == -1:
+		_resolve_immediate_penalty_after_card(local_player, c_color, 2)
+		return
+
+	if is_vs_ai and winner == -1:
+		_run_uno_ai_turns_if_needed()
 
 	if not _is_playing_ai_sequence:
 		_auto_apply_pending_draw_penalty()
@@ -1659,8 +1934,21 @@ func _on_event_json(json_str: String) -> void:
 	if not (event is Dictionary):
 		return
 
+	var ev_type: String = str(event.get("command_type", event.get("event_type", "")))
+	if ev_type.ends_with("CardPlayedEvent") or ev_type.ends_with("DrewAndPlayedEvent") or ev_type.ends_with("InterceptedEvent"):
+		if event.has("card") and event["card"] is Dictionary:
+			var ev_c := _normalize_card_dict(event["card"])
+			if ev_c["value"] == "DrawTwo":
+				_rust_draw_penalty += 2
+			elif ev_c["value"] == "WildDrawFour":
+				_rust_draw_penalty += 4
+	elif ev_type.ends_with("CardsDrawnEvent") or ev_type.ends_with("WildDrawFourChallengedEvent"):
+		_rust_draw_penalty = 0
+
+	var is_immediate_penalty_draw: bool = _ai_visual_queue.is_empty() and not _is_playing_ai_sequence and (_applying_auto_penalty and ev_type.ends_with("CardsDrawnEvent"))
+
 	# Queue AI opponent events for smooth paced visual playback in interactive mode
-	if not OS.has_feature("headless") and is_inside_tree() and (_is_ai_event(event) or not _ai_visual_queue.is_empty()):
+	if not is_immediate_penalty_draw and not OS.has_feature("headless") and is_inside_tree() and (_is_ai_event(event) or not _ai_visual_queue.is_empty()):
 		_ai_visual_queue.append(event)
 		if not _is_playing_ai_sequence:
 			_start_ai_visual_sequence()
@@ -1686,10 +1974,11 @@ func _start_ai_visual_sequence() -> void:
 
 func _finish_ai_visual_sequence() -> void:
 	_is_playing_ai_sequence = false
-	if draw_penalty > 0 and winner == -1:
+	if (_rust_draw_penalty > 0 or draw_penalty > 0) and winner == -1:
 		_auto_apply_pending_draw_penalty()
 		if _is_playing_ai_sequence:
 			return
+	draw_penalty = _rust_draw_penalty
 	if bridge != null:
 		current = bridge.current_player()
 		_sync_uno_state_from_bridge(_pending_drawn_wild_pick)
@@ -1797,10 +2086,12 @@ func _apply_event_immediately(event: Dictionary) -> void:
 			_update_active_color_indicator()
 
 			var is_drawn_wild: bool = (c["color"] in ["Wild", "WildColor"] or val_str in ["Wild", "WildDrawFour"])
-			if is_drawn_wild and p == local_player and not OS.has_feature("headless"):
-				_pending_drawn_wild_pick = true
-				pending_wild_card_idx = -1
-				wild_picker_modal.visible = true
+			if is_drawn_wild and p == local_player:
+				_drawn_wild_card_val = val_str
+				if not OS.has_feature("headless"):
+					_pending_drawn_wild_pick = true
+					pending_wild_card_idx = -1
+					wild_picker_modal.visible = true
 
 			var col_es: String = COLOR_NAMES_ES.get(active_color if c["color"] == "Wild" else c["color"], c["color"])
 			var sym_es: String = _get_card_display_symbol(val_str)

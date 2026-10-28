@@ -3046,6 +3046,7 @@ impl OpenTableBridge {
                 dict.set("deck_count", state.deck.len() as i64);
                 let opp_cnt = state.hands.get(&opp_id).map(Vec::len).unwrap_or(0) as i64;
                 dict.set("opponent_card_count", opp_cnt);
+                dict.set("draw_penalty", state.draw_penalty as i64);
             }
         }
 
@@ -4532,8 +4533,17 @@ impl OpenTableBridge {
                                 }
                             }
                             "uno" if is_ai_turn => {
-                                uno_game::ai::best_move(session, *ai_p, self.ai_difficulty)
-                                    .map(|c| c.into_command())
+                                let has_penalty = session
+                                    .world()
+                                    .get_resource::<uno_game::UnoState>()
+                                    .is_some_and(|s| s.draw_penalty > 0);
+                                if has_penalty {
+                                    Some(Box::new(uno_game::DrawCardCommand { player: *ai_p })
+                                        as Box<dyn Command>)
+                                } else {
+                                    uno_game::ai::best_move(session, *ai_p, self.ai_difficulty)
+                                        .map(|c| c.into_command())
+                                }
                             }
                             "monopoly" => {
                                 monopoly_game::ai::best_move(session, *ai_p, self.ai_difficulty)
