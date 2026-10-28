@@ -104,6 +104,28 @@ func _initialize() -> void:
 		results.append(["crisis_board superpone TopBarPanel y SidebarPanel sobre el mapa", board_inst.top_bar_panel != null and board_inst.sidebar_panel != null])
 		results.append(["TurnIndicator soporta set_current_player y set_turn sin errores", board_inst.turn_indicator != null and board_inst.turn_indicator.has_method("set_current_player")])
 
+		# Probar que los 30 centros están dentro de su polígono y tienen separación mínima sin solapamiento (>= 55px)
+		var all_inside := true
+		var min_dist: float = 99999.0
+		for i in range(30):
+			if not Geometry2D.is_point_in_polygon(board_inst.TERRITORY_CENTERS[i], board_inst.TERRITORY_POLYGONS[i]):
+				all_inside = false
+			for j in range(i + 1, 30):
+				var d: float = board_inst.TERRITORY_CENTERS[i].distance_to(board_inst.TERRITORY_CENTERS[j])
+				if d < min_dist:
+					min_dist = d
+		results.append(["Los 30 territorios tienen códigos cortos y centros dentro de sus siluetas continentales", all_inside and board_inst.TERRITORY_CODES.size() == 30])
+		results.append(["Ningún par de centros de territorios se solapa en el mapa (distancia mínima >= 55px)", min_dist >= 55.0])
+
+		# Probar distribución móvil (layout == 2) y panel inferior plegable
+		board_inst._on_layout_changed(2)
+		var mobile_expanded_h: float = board_inst.sidebar_panel.size.y
+		board_inst._on_toggle_sidebar_pressed()
+		var mobile_collapsed_h: float = board_inst.sidebar_panel.size.y
+		results.append(["En modo móvil (layout 2), el panel inferior es plegable y amplía el mapa", board_inst.sidebar_collapsed and mobile_collapsed_h < mobile_expanded_h])
+		board_inst._on_toggle_sidebar_pressed()
+		board_inst._on_layout_changed(0)
+
 		# Probar modo vs IA (Humano = J1, IA = J2): completar turno de J1 y verificar que la IA juega al instante
 		board_inst._on_mode_selected(1)
 		var tick_before: int = board_inst.bridge.current_tick()

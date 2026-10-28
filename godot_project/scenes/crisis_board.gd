@@ -9,6 +9,15 @@ const TERRITORY_NAMES: Array = [
 	"Australia", "Java", "Sumatra", "Borneo"
 ]
 
+const TERRITORY_CODES: Array = [
+	"ARG", "BRA", "CHL", "COL", "PER",
+	"MEX", "CAL", "NYK", "CAN",
+	"GBR", "ESP", "FRA", "ALE", "RUS",
+	"SAH", "EGP", "CON", "SUD",
+	"ARA", "TAR", "TAY", "SIB", "KAM", "CHN", "IND", "JAP",
+	"AUS", "JAV", "SUM", "BOR"
+]
+
 const CONTINENTS_DATA: Array = [
 	{
 		"id": 0,
@@ -55,109 +64,115 @@ const CONTINENTS_DATA: Array = [
 ]
 
 var TERRITORY_POLYGONS: Array = [
+	# --- AMÉRICA DEL SUR (0..4) ---
 	# 0: Argentina
-	PackedVector2Array([Vector2(140, 480), Vector2(220, 480), Vector2(200, 560), Vector2(150, 560)]),
+	PackedVector2Array([Vector2(172, 425), Vector2(195, 425), Vector2(215, 455), Vector2(255, 452), Vector2(230, 525), Vector2(185, 540), Vector2(172, 520)]),
 	# 1: Brasil
-	PackedVector2Array([Vector2(200, 400), Vector2(280, 400), Vector2(270, 470), Vector2(190, 470)]),
+	PackedVector2Array([Vector2(215, 315), Vector2(285, 345), Vector2(300, 395), Vector2(275, 450), Vector2(215, 455), Vector2(195, 425), Vector2(195, 362), Vector2(230, 360)]),
 	# 2: Chile
-	PackedVector2Array([Vector2(130, 460), Vector2(160, 460), Vector2(150, 540), Vector2(120, 500)]),
+	PackedVector2Array([Vector2(132, 425), Vector2(172, 425), Vector2(172, 520), Vector2(150, 535), Vector2(130, 480)]),
 	# 3: Colombia
-	PackedVector2Array([Vector2(130, 360), Vector2(210, 360), Vector2(200, 410), Vector2(140, 410)]),
+	PackedVector2Array([Vector2(150, 315), Vector2(215, 315), Vector2(230, 360), Vector2(140, 365)]),
 	# 4: Perú
-	PackedVector2Array([Vector2(130, 410), Vector2(200, 410), Vector2(190, 460), Vector2(130, 460)]),
+	PackedVector2Array([Vector2(140, 365), Vector2(195, 362), Vector2(195, 425), Vector2(132, 425), Vector2(125, 395)]),
 
+	# --- AMÉRICA DEL NORTE (5..8) ---
 	# 5: México
-	PackedVector2Array([Vector2(100, 250), Vector2(180, 250), Vector2(170, 320), Vector2(110, 320)]),
+	PackedVector2Array([Vector2(95, 215), Vector2(160, 215), Vector2(185, 265), Vector2(165, 300), Vector2(125, 285), Vector2(98, 250)]),
 	# 6: California
-	PackedVector2Array([Vector2(80, 160), Vector2(160, 160), Vector2(150, 240), Vector2(90, 240)]),
+	PackedVector2Array([Vector2(75, 130), Vector2(165, 130), Vector2(160, 215), Vector2(95, 215), Vector2(65, 175)]),
 	# 7: Nueva York
-	PackedVector2Array([Vector2(160, 150), Vector2(240, 150), Vector2(230, 230), Vector2(160, 230)]),
+	PackedVector2Array([Vector2(165, 130), Vector2(250, 115), Vector2(265, 165), Vector2(230, 215), Vector2(160, 215)]),
 	# 8: Canadá
-	PackedVector2Array([Vector2(100, 70), Vector2(220, 70), Vector2(210, 140), Vector2(110, 140)]),
+	PackedVector2Array([Vector2(55, 55), Vector2(140, 45), Vector2(235, 55), Vector2(250, 115), Vector2(165, 130), Vector2(75, 130), Vector2(45, 95)]),
 
+	# --- EUROPA (9..13) ---
 	# 9: Gran Bretaña
-	PackedVector2Array([Vector2(320, 90), Vector2(400, 90), Vector2(390, 150), Vector2(320, 150)]),
+	PackedVector2Array([Vector2(315, 78), Vector2(375, 72), Vector2(382, 122), Vector2(322, 128)]),
 	# 10: España
-	PackedVector2Array([Vector2(310, 180), Vector2(380, 180), Vector2(370, 250), Vector2(310, 250)]),
+	PackedVector2Array([Vector2(310, 175), Vector2(372, 175), Vector2(372, 235), Vector2(315, 240), Vector2(302, 208)]),
 	# 11: Francia
-	PackedVector2Array([Vector2(370, 160), Vector2(430, 160), Vector2(420, 220), Vector2(370, 220)]),
+	PackedVector2Array([Vector2(372, 142), Vector2(432, 142), Vector2(432, 212), Vector2(372, 215)]),
 	# 12: Alemania
-	PackedVector2Array([Vector2(420, 130), Vector2(480, 130), Vector2(470, 200), Vector2(420, 200)]),
+	PackedVector2Array([Vector2(432, 112), Vector2(492, 112), Vector2(492, 195), Vector2(432, 198)]),
 	# 13: Rusia
-	PackedVector2Array([Vector2(470, 90), Vector2(560, 90), Vector2(550, 180), Vector2(470, 180)]),
+	PackedVector2Array([Vector2(492, 68), Vector2(572, 68), Vector2(572, 178), Vector2(492, 182)]),
 
+	# --- ÁFRICA (14..17) ---
 	# 14: Sahara
-	PackedVector2Array([Vector2(330, 280), Vector2(420, 280), Vector2(410, 360), Vector2(330, 360)]),
+	PackedVector2Array([Vector2(335, 270), Vector2(428, 270), Vector2(428, 365), Vector2(355, 365), Vector2(325, 320)]),
 	# 15: Egipto
-	PackedVector2Array([Vector2(410, 270), Vector2(490, 270), Vector2(480, 340), Vector2(410, 340)]),
+	PackedVector2Array([Vector2(428, 265), Vector2(505, 265), Vector2(520, 315), Vector2(495, 355), Vector2(428, 355)]),
 	# 16: Congo
-	PackedVector2Array([Vector2(380, 360), Vector2(470, 360), Vector2(460, 440), Vector2(380, 440)]),
+	PackedVector2Array([Vector2(375, 365), Vector2(428, 355), Vector2(485, 355), Vector2(478, 438), Vector2(388, 438)]),
 	# 17: Sudáfrica
-	PackedVector2Array([Vector2(390, 450), Vector2(480, 450), Vector2(460, 530), Vector2(390, 530)]),
+	PackedVector2Array([Vector2(388, 438), Vector2(478, 438), Vector2(465, 525), Vector2(405, 525)]),
 
+	# --- ASIA (18..25) ---
 	# 18: Aral
-	PackedVector2Array([Vector2(500, 180), Vector2(580, 180), Vector2(570, 240), Vector2(500, 240)]),
+	PackedVector2Array([Vector2(530, 178), Vector2(640, 178), Vector2(640, 245), Vector2(530, 245)]),
 	# 19: Tartaria
-	PackedVector2Array([Vector2(560, 120), Vector2(640, 120), Vector2(630, 180), Vector2(560, 180)]),
+	PackedVector2Array([Vector2(572, 95), Vector2(625, 95), Vector2(625, 108), Vector2(675, 108), Vector2(675, 178), Vector2(572, 178)]),
 	# 20: Taymir
-	PackedVector2Array([Vector2(610, 70), Vector2(690, 70), Vector2(680, 120), Vector2(610, 120)]),
+	PackedVector2Array([Vector2(625, 48), Vector2(735, 48), Vector2(735, 108), Vector2(625, 108)]),
 	# 21: Siberia
-	PackedVector2Array([Vector2(650, 110), Vector2(730, 110), Vector2(720, 170), Vector2(650, 170)]),
+	PackedVector2Array([Vector2(675, 108), Vector2(735, 108), Vector2(775, 108), Vector2(775, 182), Vector2(675, 182)]),
 	# 22: Kamchatka
-	PackedVector2Array([Vector2(690, 80), Vector2(770, 80), Vector2(760, 150), Vector2(690, 150)]),
+	PackedVector2Array([Vector2(775, 68), Vector2(875, 68), Vector2(885, 135), Vector2(845, 170), Vector2(775, 165)]),
 	# 23: China
-	PackedVector2Array([Vector2(570, 200), Vector2(670, 200), Vector2(660, 270), Vector2(570, 270)]),
+	PackedVector2Array([Vector2(640, 182), Vector2(775, 182), Vector2(785, 230), Vector2(755, 272), Vector2(640, 268)]),
 	# 24: India
-	PackedVector2Array([Vector2(510, 250), Vector2(600, 250), Vector2(590, 320), Vector2(510, 320)]),
+	PackedVector2Array([Vector2(545, 245), Vector2(640, 245), Vector2(640, 295), Vector2(600, 345), Vector2(555, 310)]),
 	# 25: Japón
-	PackedVector2Array([Vector2(690, 180), Vector2(760, 180), Vector2(750, 250), Vector2(690, 250)]),
+	PackedVector2Array([Vector2(810, 192), Vector2(880, 192), Vector2(872, 262), Vector2(805, 258)]),
 
+	# --- OCEANÍA (26..29) ---
 	# 26: Australia
-	PackedVector2Array([Vector2(650, 440), Vector2(750, 440), Vector2(730, 530), Vector2(640, 530)]),
+	PackedVector2Array([Vector2(705, 462), Vector2(845, 458), Vector2(860, 515), Vector2(815, 542), Vector2(695, 538), Vector2(685, 495)]),
 	# 27: Java
-	PackedVector2Array([Vector2(610, 360), Vector2(680, 360), Vector2(670, 410), Vector2(610, 410)]),
+	PackedVector2Array([Vector2(695, 392), Vector2(785, 392), Vector2(780, 442), Vector2(690, 442)]),
 	# 28: Sumatra
-	PackedVector2Array([Vector2(560, 330), Vector2(630, 330), Vector2(620, 370), Vector2(560, 370)]),
+	PackedVector2Array([Vector2(635, 325), Vector2(710, 325), Vector2(702, 378), Vector2(628, 378)]),
 	# 29: Borneo
-	PackedVector2Array([Vector2(630, 310), Vector2(700, 310), Vector2(690, 360), Vector2(630, 360)])
+	PackedVector2Array([Vector2(738, 305), Vector2(820, 305), Vector2(815, 362), Vector2(732, 362)])
 ]
 
 const TERRITORY_CENTERS: Array = [
-	Vector2(180, 520), # 0: Argentina
-	Vector2(240, 440), # 1: Brasil
-	Vector2(150, 480), # 2: Chile
-	Vector2(170, 390), # 3: Colombia
-	Vector2(160, 430), # 4: Perú
+	Vector2(208, 488), # 0: Argentina
+	Vector2(248, 398), # 1: Brasil
+	Vector2(150, 475), # 2: Chile
+	Vector2(182, 340), # 3: Colombia
+	Vector2(160, 395), # 4: Perú
 
-	Vector2(140, 280), # 5: México
-	Vector2(120, 200), # 6: California
-	Vector2(200, 190), # 7: Nueva York
-	Vector2(160, 110), # 8: Canadá
+	Vector2(142, 255), # 5: México
+	Vector2(118, 172), # 6: California
+	Vector2(210, 168), # 7: Nueva York
+	Vector2(150, 90),  # 8: Canadá
 
-	Vector2(360, 130), # 9: Gran Bretaña
-	Vector2(350, 220), # 10: España
-	Vector2(400, 190), # 11: Francia
-	Vector2(450, 170), # 12: Alemania
-	Vector2(520, 140), # 13: Rusia
+	Vector2(348, 100), # 9: Gran Bretaña
+	Vector2(340, 207), # 10: España
+	Vector2(402, 178), # 11: Francia
+	Vector2(462, 154), # 12: Alemania
+	Vector2(532, 124), # 13: Rusia
 
-	Vector2(380, 320), # 14: Sahara
-	Vector2(450, 310), # 15: Egipto
-	Vector2(430, 400), # 16: Congo
-	Vector2(440, 490), # 17: Sudáfrica
+	Vector2(380, 318), # 14: Sahara
+	Vector2(468, 310), # 15: Egipto
+	Vector2(432, 398), # 16: Congo
+	Vector2(434, 482), # 17: Sudáfrica
 
-	Vector2(540, 210), # 18: Aral
-	Vector2(600, 150), # 19: Tartaria
-	Vector2(650, 100), # 20: Taymir
-	Vector2(690, 140), # 21: Siberia
-	Vector2(730, 120), # 22: Kamchatka
-	Vector2(620, 240), # 23: China
-	Vector2(560, 290), # 24: India
-	Vector2(730, 220), # 25: Japón
+	Vector2(585, 212), # 18: Aral
+	Vector2(622, 142), # 19: Tartaria
+	Vector2(680, 78),  # 20: Taymir
+	Vector2(725, 145), # 21: Siberia
+	Vector2(828, 118), # 22: Kamchatka
+	Vector2(710, 226), # 23: China
+	Vector2(594, 288), # 24: India
+	Vector2(842, 226), # 25: Japón
 
-	Vector2(700, 480), # 26: Australia
-	Vector2(650, 380), # 27: Java
-	Vector2(600, 350), # 28: Sumatra
-	Vector2(660, 340)  # 29: Borneo
+	Vector2(775, 502), # 26: Australia
+	Vector2(738, 417), # 27: Java
+	Vector2(670, 352), # 28: Sumatra
+	Vector2(778, 334)  # 29: Borneo
 ]
 
 const ADJACENCIES: Array = [
@@ -259,6 +274,7 @@ var human_player_id: int = 1
 var ai_player_id: int = 2
 var _is_human_attacking: bool = false
 var current_layout: int = 0
+var sidebar_collapsed: bool = false
 
 # UI Nodes
 var status_label: Label = null
@@ -267,6 +283,9 @@ var map_canvas: Control
 var top_bar_panel: Panel
 var sidebar_panel: Panel
 var tab_container: TabContainer
+var btn_toggle_panel: Button
+var title_label_node: Label
+var btn_rules_node: Button
 
 var objective_card_panel: PanelContainer
 var objective_title_label: Label
@@ -498,7 +517,7 @@ func _apply_theme_styling() -> void:
 	if top_bar_panel:
 		var top_style = StyleBoxFlat.new()
 		var base_dark = current_theme.dark_color.darkened(0.18)
-		top_style.bg_color = Color(base_dark.r, base_dark.g, base_dark.b, 0.88)
+		top_style.bg_color = Color(base_dark.r, base_dark.g, base_dark.b, 0.90)
 		top_style.border_color = Color(current_theme.line_color.r, current_theme.line_color.g, current_theme.line_color.b, 0.45)
 		top_style.set_border_width_all(1)
 		top_style.set_corner_radius_all(10)
@@ -507,8 +526,8 @@ func _apply_theme_styling() -> void:
 	if sidebar_panel:
 		var side_style = StyleBoxFlat.new()
 		var base_side = current_theme.dark_color.darkened(0.15)
-		side_style.bg_color = Color(base_side.r, base_side.g, base_side.b, 0.88)
-		side_style.border_color = Color(current_theme.line_color.r, current_theme.line_color.g, current_theme.line_color.b, 0.45)
+		side_style.bg_color = Color(base_side.r, base_side.g, base_side.b, 0.92)
+		side_style.border_color = Color(current_theme.line_color.r, current_theme.line_color.g, current_theme.line_color.b, 0.50)
 		side_style.set_border_width_all(1)
 		side_style.set_corner_radius_all(12)
 		sidebar_panel.add_theme_stylebox_override("panel", side_style)
@@ -544,24 +563,26 @@ func _setup_ui() -> void:
 	top_bar_panel = Panel.new()
 	top_bar_panel.name = "TopBarPanel"
 	top_bar_panel.position = Vector2(16, 12)
-	top_bar_panel.custom_minimum_size = Vector2(1248, 54)
-	top_bar_panel.size = Vector2(1248, 54)
+	top_bar_panel.custom_minimum_size = Vector2(1248, 52)
+	top_bar_panel.size = Vector2(1248, 52)
 	add_child(top_bar_panel)
 
 	var header_hbox = HBoxContainer.new()
 	header_hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	header_hbox.offset_left = 16
-	header_hbox.offset_top = 7
-	header_hbox.offset_right = -16
-	header_hbox.offset_bottom = -7
-	header_hbox.add_theme_constant_override("separation", 14)
+	header_hbox.offset_left = 12
+	header_hbox.offset_top = 6
+	header_hbox.offset_right = -12
+	header_hbox.offset_bottom = -6
+	header_hbox.add_theme_constant_override("separation", 10)
 	header_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	top_bar_panel.add_child(header_hbox)
 
 	var title_lbl = Label.new()
+	title_lbl.name = "TitleLabel"
 	title_lbl.text = "🌍 CRISIS — TEG"
-	title_lbl.add_theme_font_size_override("font_size", 20)
+	title_lbl.add_theme_font_size_override("font_size", 18)
 	title_lbl.add_theme_color_override("font_color", Color(0.95, 0.85, 0.3))
+	title_label_node = title_lbl
 	header_hbox.add_child(title_lbl)
 
 	turn_indicator = TurnIndicator.new()
@@ -572,7 +593,7 @@ func _setup_ui() -> void:
 	var mode_opt := OptionButton.new()
 	mode_opt.name = "ModeOptionButton"
 	mode_option_button = mode_opt
-	mode_opt.custom_minimum_size = Vector2(150, 34)
+	mode_opt.custom_minimum_size = Vector2(128, 32)
 	mode_opt.add_item("👥 Hotseat", 0)
 	mode_opt.add_item("🤖 vs IA (J1)", 1)
 	mode_opt.add_item("🤖 vs IA (J2)", 2)
@@ -590,82 +611,108 @@ func _setup_ui() -> void:
 	var btn_rules = Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
-	btn_rules.custom_minimum_size = Vector2(95, 34)
+	btn_rules.custom_minimum_size = Vector2(86, 32)
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("crisis"))
+	btn_rules_node = btn_rules
 	header_hbox.add_child(btn_rules)
 
-	# 3. Superimposed Floating Tactical Control Panel (Right Side)
+	# 3. Superimposed Floating Tactical Control Panel (Right Side on Desktop, Collapsible Bottom Drawer on Mobile)
 	sidebar_panel = Panel.new()
 	sidebar_panel.name = "SidebarPanel"
-	sidebar_panel.position = Vector2(906, 76)
-	sidebar_panel.custom_minimum_size = Vector2(358, 628)
-	sidebar_panel.size = Vector2(358, 628)
+	sidebar_panel.clip_contents = true
+	sidebar_panel.position = Vector2(912, 74)
+	sidebar_panel.custom_minimum_size = Vector2(352, 632)
+	sidebar_panel.size = Vector2(352, 632)
 	add_child(sidebar_panel)
 
 	var sidebar_vbox = VBoxContainer.new()
 	sidebar_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	sidebar_vbox.add_theme_constant_override("separation", 10)
-	sidebar_vbox.offset_left = 14
-	sidebar_vbox.offset_top = 12
-	sidebar_vbox.offset_right = -14
-	sidebar_vbox.offset_bottom = -12
+	sidebar_vbox.add_theme_constant_override("separation", 8)
+	sidebar_vbox.offset_left = 12
+	sidebar_vbox.offset_top = 10
+	sidebar_vbox.offset_right = -12
+	sidebar_vbox.offset_bottom = -10
 	sidebar_panel.add_child(sidebar_vbox)
 
-	# Player Statistics & Phase info
+	# Top row of Sidebar: Player Statistics + Collapse/Expand Toggle Button
+	var sidebar_header_hbox = HBoxContainer.new()
+	sidebar_header_hbox.add_theme_constant_override("separation", 6)
+	sidebar_vbox.add_child(sidebar_header_hbox)
+
 	player_stats_label = Label.new()
 	player_stats_label.text = "Turno: Rojo (1)"
-	player_stats_label.add_theme_font_size_override("font_size", 13)
-	sidebar_vbox.add_child(player_stats_label)
+	player_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	player_stats_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	player_stats_label.add_theme_font_size_override("font_size", 12)
+	sidebar_header_hbox.add_child(player_stats_label)
+
+	btn_toggle_panel = Button.new()
+	btn_toggle_panel.name = "TogglePanelButton"
+	btn_toggle_panel.text = "▼ Plegar"
+	btn_toggle_panel.custom_minimum_size = Vector2(78, 28)
+	btn_toggle_panel.add_theme_font_size_override("font_size", 11)
+	btn_toggle_panel.pressed.connect(_on_toggle_sidebar_pressed)
+	sidebar_header_hbox.add_child(btn_toggle_panel)
 
 	# Tab Container for Actions, Objectives, Cards, and Continents Summary
 	tab_container = TabContainer.new()
 	tab_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tab_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tab_container.add_theme_font_size_override("font_size", 12)
 	sidebar_vbox.add_child(tab_container)
 
 	# --- Tab 1: Acciones de Turno ---
 	var actions_tab = VBoxContainer.new()
 	actions_tab.name = "Acciones"
-	actions_tab.add_theme_constant_override("separation", 8)
+	actions_tab.add_theme_constant_override("separation", 7)
 	tab_container.add_child(actions_tab)
+	tab_container.set_tab_title(0, "Acción")
 
 	action_title_label = Label.new()
 	action_title_label.text = "Fase: Colocación de Tropas"
-	action_title_label.add_theme_font_size_override("font_size", 14)
+	action_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	action_title_label.add_theme_font_size_override("font_size", 13)
 	action_title_label.add_theme_color_override("font_color", Color(0.95, 0.85, 0.4))
 	actions_tab.add_child(action_title_label)
 
 	action_info_label = Label.new()
-	action_info_label.text = "Haz click en tus territorios en el mapa para colocar ejércitos."
-	action_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	action_info_label.text = "Toca uno de tus territorios en el mapa para colocar ejércitos."
+	action_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	action_info_label.add_theme_font_size_override("font_size", 12)
 	actions_tab.add_child(action_info_label)
 
 	var place_hbox = HBoxContainer.new()
 	place_hbox.add_theme_constant_override("separation", 6)
+	place_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	actions_tab.add_child(place_hbox)
 
 	btn_place = Button.new()
 	btn_place.text = "+1 Tropa"
 	btn_place.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn_place.custom_minimum_size = Vector2(0, 36)
+	btn_place.custom_minimum_size = Vector2(0, 34)
+	btn_place.add_theme_font_size_override("font_size", 12)
 	btn_place.pressed.connect(_on_btn_place_pressed)
 	place_hbox.add_child(btn_place)
 
 	btn_place_5 = Button.new()
 	btn_place_5.text = "+5 Tropas"
 	btn_place_5.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn_place_5.custom_minimum_size = Vector2(0, 36)
+	btn_place_5.custom_minimum_size = Vector2(0, 34)
+	btn_place_5.add_theme_font_size_override("font_size", 12)
 	btn_place_5.pressed.connect(func(): _place_armies(5))
 	place_hbox.add_child(btn_place_5)
 
 	btn_place_all = Button.new()
 	btn_place_all.text = "Todas"
 	btn_place_all.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn_place_all.custom_minimum_size = Vector2(0, 36)
+	btn_place_all.custom_minimum_size = Vector2(0, 34)
+	btn_place_all.add_theme_font_size_override("font_size", 12)
 	btn_place_all.pressed.connect(func(): _place_armies(armies_remaining_to_place))
 	place_hbox.add_child(btn_place_all)
 
 	var attack_hbox = HBoxContainer.new()
+	attack_hbox.add_theme_constant_override("separation", 6)
+	attack_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	actions_tab.add_child(attack_hbox)
 
 	var dice_lbl = Label.new()
@@ -677,16 +724,20 @@ func _setup_ui() -> void:
 	attack_dice_spinbox.min_value = 1
 	attack_dice_spinbox.max_value = 3
 	attack_dice_spinbox.value = 3
+	attack_dice_spinbox.custom_minimum_size = Vector2(68, 32)
 	attack_hbox.add_child(attack_dice_spinbox)
 
 	btn_attack = Button.new()
 	btn_attack.text = "⚔️ Atacar"
 	btn_attack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn_attack.custom_minimum_size = Vector2(0, 36)
+	btn_attack.custom_minimum_size = Vector2(0, 34)
+	btn_attack.add_theme_font_size_override("font_size", 12)
 	btn_attack.pressed.connect(_on_btn_attack_pressed)
 	attack_hbox.add_child(btn_attack)
 
 	var fortify_hbox = HBoxContainer.new()
+	fortify_hbox.add_theme_constant_override("separation", 6)
+	fortify_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	actions_tab.add_child(fortify_hbox)
 
 	var fort_lbl = Label.new()
@@ -698,26 +749,30 @@ func _setup_ui() -> void:
 	fortify_armies_spinbox.min_value = 1
 	fortify_armies_spinbox.max_value = 10
 	fortify_armies_spinbox.value = 1
+	fortify_armies_spinbox.custom_minimum_size = Vector2(68, 32)
 	fortify_hbox.add_child(fortify_armies_spinbox)
 
 	btn_fortify = Button.new()
 	btn_fortify.text = "🛡️ Fortificar"
 	btn_fortify.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn_fortify.custom_minimum_size = Vector2(0, 36)
+	btn_fortify.custom_minimum_size = Vector2(0, 34)
+	btn_fortify.add_theme_font_size_override("font_size", 12)
 	btn_fortify.pressed.connect(_on_btn_fortify_pressed)
 	fortify_hbox.add_child(btn_fortify)
 
 	btn_end_phase = Button.new()
 	btn_end_phase.text = "Fin de Fase ➡️"
-	btn_end_phase.custom_minimum_size = Vector2(0, 40)
+	btn_end_phase.custom_minimum_size = Vector2(0, 36)
+	btn_end_phase.add_theme_font_size_override("font_size", 12)
 	btn_end_phase.pressed.connect(_on_btn_end_phase_pressed)
 	actions_tab.add_child(btn_end_phase)
 
 	# --- Tab 2: Objetivo Secreto (ObjectiveCard UI) ---
 	var obj_tab = VBoxContainer.new()
 	obj_tab.name = "Objetivo"
-	obj_tab.add_theme_constant_override("separation", 10)
+	obj_tab.add_theme_constant_override("separation", 8)
 	tab_container.add_child(obj_tab)
+	tab_container.set_tab_title(1, "Misión")
 
 	objective_card_panel = PanelContainer.new()
 	var obj_style = StyleBoxFlat.new()
@@ -728,31 +783,32 @@ func _setup_ui() -> void:
 	obj_style.corner_radius_top_right = 8
 	obj_style.corner_radius_bottom_left = 8
 	obj_style.corner_radius_bottom_right = 8
-	obj_style.content_margin_left = 12
-	obj_style.content_margin_right = 12
-	obj_style.content_margin_top = 10
-	obj_style.content_margin_bottom = 10
+	obj_style.content_margin_left = 10
+	obj_style.content_margin_right = 10
+	obj_style.content_margin_top = 8
+	obj_style.content_margin_bottom = 8
 	objective_card_panel.add_theme_stylebox_override("panel", obj_style)
 	obj_tab.add_child(objective_card_panel)
 
 	var obj_vbox = VBoxContainer.new()
-	obj_vbox.add_theme_constant_override("separation", 6)
+	obj_vbox.add_theme_constant_override("separation", 5)
 	objective_card_panel.add_child(obj_vbox)
 
 	var badge_lbl = Label.new()
 	badge_lbl.text = "🎯 MISIÓN SECRETA"
-	badge_lbl.add_theme_font_size_override("font_size", 14)
+	badge_lbl.add_theme_font_size_override("font_size", 13)
 	badge_lbl.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
 	obj_vbox.add_child(badge_lbl)
 
 	objective_title_label = Label.new()
 	objective_title_label.text = "Conquistar 24 Territorios"
-	objective_title_label.add_theme_font_size_override("font_size", 15)
+	objective_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective_title_label.add_theme_font_size_override("font_size", 14)
 	obj_vbox.add_child(objective_title_label)
 
 	objective_desc_label = Label.new()
 	objective_desc_label.text = "Ocupar 24 territorios cualesquiera en el planeta con al menos 1 ejército."
-	objective_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	objective_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	objective_desc_label.add_theme_font_size_override("font_size", 12)
 	objective_desc_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.85))
 	obj_vbox.add_child(objective_desc_label)
@@ -763,7 +819,7 @@ func _setup_ui() -> void:
 	obj_vbox.add_child(prog_title)
 
 	objective_progress_bar = ProgressBar.new()
-	objective_progress_bar.custom_minimum_size = Vector2(0, 20)
+	objective_progress_bar.custom_minimum_size = Vector2(0, 18)
 	objective_progress_bar.max_value = 24
 	objective_progress_bar.value = 15
 	obj_vbox.add_child(objective_progress_bar)
@@ -777,36 +833,39 @@ func _setup_ui() -> void:
 	# --- Tab 3: Tarjetas de Canje (Territory Cards UI) ---
 	var cards_tab = VBoxContainer.new()
 	cards_tab.name = "Tarjetas"
-	cards_tab.add_theme_constant_override("separation", 8)
+	cards_tab.add_theme_constant_override("separation", 6)
 	tab_container.add_child(cards_tab)
+	tab_container.set_tab_title(2, "Cartas")
 
 	cards_info_label = Label.new()
 	cards_info_label.text = "Selecciona 3 tarjetas (3 iguales o 1 de cada tipo) para canjear por ejércitos."
-	cards_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	cards_info_label.add_theme_font_size_override("font_size", 12)
+	cards_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	cards_info_label.add_theme_font_size_override("font_size", 11)
 	cards_tab.add_child(cards_info_label)
 
 	var scroll_cards = ScrollContainer.new()
-	scroll_cards.custom_minimum_size = Vector2(0, 130)
+	scroll_cards.custom_minimum_size = Vector2(0, 118)
 	scroll_cards.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	scroll_cards.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	cards_tab.add_child(scroll_cards)
 
 	cards_container = HBoxContainer.new()
-	cards_container.add_theme_constant_override("separation", 8)
+	cards_container.add_theme_constant_override("separation", 6)
 	scroll_cards.add_child(cards_container)
 
 	btn_exchange = Button.new()
-	btn_exchange.text = "🔄 Canjear Tarjetas (+4 Ejércitos)"
-	btn_exchange.custom_minimum_size = Vector2(0, 38)
+	btn_exchange.text = "🔄 Canjear (+4 Tropas)"
+	btn_exchange.custom_minimum_size = Vector2(0, 34)
+	btn_exchange.add_theme_font_size_override("font_size", 12)
 	btn_exchange.pressed.connect(_on_btn_exchange_pressed)
 	cards_tab.add_child(btn_exchange)
 
 	# --- Tab 4: Continentes y Bonificaciones ---
 	var cont_tab = VBoxContainer.new()
 	cont_tab.name = "Continentes"
-	cont_tab.add_theme_constant_override("separation", 6)
+	cont_tab.add_theme_constant_override("separation", 5)
 	tab_container.add_child(cont_tab)
+	tab_container.set_tab_title(3, "Bonos")
 
 	for c in CONTINENTS_DATA:
 		var cont_panel = PanelContainer.new()
@@ -820,8 +879,8 @@ func _setup_ui() -> void:
 		cs.corner_radius_bottom_right = 6
 		cs.content_margin_left = 8
 		cs.content_margin_right = 8
-		cs.content_margin_top = 4
-		cs.content_margin_bottom = 4
+		cs.content_margin_top = 3
+		cs.content_margin_bottom = 3
 		cont_panel.add_theme_stylebox_override("panel", cs)
 		cont_tab.add_child(cont_panel)
 
@@ -829,14 +888,14 @@ func _setup_ui() -> void:
 		cont_panel.add_child(chbox)
 
 		var clbl = Label.new()
-		clbl.text = "%s (%d terr.)" % [c["name"], c["territories"].size()]
-		clbl.add_theme_font_size_override("font_size", 12)
+		clbl.text = "%s (%d)" % [c["name"], c["territories"].size()]
+		clbl.add_theme_font_size_override("font_size", 11)
 		clbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		chbox.add_child(clbl)
 
 		var cbonus = Label.new()
 		cbonus.text = "+%d Tropas" % c["bonus"]
-		cbonus.add_theme_font_size_override("font_size", 12)
+		cbonus.add_theme_font_size_override("font_size", 11)
 		cbonus.add_theme_color_override("font_color", Color(0.95, 0.85, 0.3))
 		chbox.add_child(cbonus)
 
@@ -868,33 +927,81 @@ func _setup_ui() -> void:
 
 	_apply_theme_styling()
 
+func _on_toggle_sidebar_pressed() -> void:
+	sidebar_collapsed = not sidebar_collapsed
+	_apply_sidebar_layout()
+	if map_canvas:
+		map_canvas.queue_redraw()
+
+func _apply_sidebar_layout() -> void:
+	if sidebar_panel == null or tab_container == null:
+		return
+
+	tab_container.visible = not sidebar_collapsed
+	if btn_toggle_panel != null:
+		if sidebar_collapsed:
+			btn_toggle_panel.text = "▲ Panel"
+		else:
+			btn_toggle_panel.text = "▼ Plegar"
+
+	if current_layout == 2: # PHONE: Bottom foldable sheet
+		if sidebar_collapsed:
+			sidebar_panel.position = Vector2(6, 611)
+			sidebar_panel.custom_minimum_size = Vector2(363, 48)
+			sidebar_panel.size = Vector2(363, 48)
+		else:
+			sidebar_panel.position = Vector2(6, 375)
+			sidebar_panel.custom_minimum_size = Vector2(363, 284)
+			sidebar_panel.size = Vector2(363, 284)
+	else: # DESKTOP / TABLET: Floating right tactical panel
+		if sidebar_collapsed:
+			sidebar_panel.position = Vector2(912, 74)
+			sidebar_panel.custom_minimum_size = Vector2(352, 56)
+			sidebar_panel.size = Vector2(352, 56)
+		else:
+			sidebar_panel.position = Vector2(912, 74)
+			sidebar_panel.custom_minimum_size = Vector2(352, 632)
+			sidebar_panel.size = Vector2(352, 632)
+
 func _on_layout_changed(layout: int) -> void:
 	current_layout = layout
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
-	if layout == 2: # PHONE
+	if layout == 2: # PHONE (375x667)
 		map_panel.position = Vector2(0, 0)
 		map_panel.custom_minimum_size = Vector2(375, 667)
 		map_panel.size = Vector2(375, 667)
 		if top_bar_panel:
-			top_bar_panel.position = Vector2(8, 8)
-			top_bar_panel.custom_minimum_size = Vector2(359, 48)
-			top_bar_panel.size = Vector2(359, 48)
-		sidebar_panel.position = Vector2(8, 360)
-		sidebar_panel.custom_minimum_size = Vector2(359, 298)
-		sidebar_panel.size = Vector2(359, 298)
+			top_bar_panel.position = Vector2(6, 6)
+			top_bar_panel.custom_minimum_size = Vector2(363, 44)
+			top_bar_panel.size = Vector2(363, 44)
+		if title_label_node:
+			title_label_node.text = "🌍 TEG"
+			title_label_node.add_theme_font_size_override("font_size", 14)
+		if mode_option_button:
+			mode_option_button.custom_minimum_size = Vector2(96, 28)
+		if btn_rules_node:
+			btn_rules_node.text = "📖"
+			btn_rules_node.custom_minimum_size = Vector2(36, 28)
 	else: # DESKTOP or TABLET — Fullscreen Map (1280x720) with superimposed HUD
 		map_panel.position = Vector2(0, 0)
 		map_panel.custom_minimum_size = Vector2(1280, 720)
 		map_panel.size = Vector2(1280, 720)
 		if top_bar_panel:
 			top_bar_panel.position = Vector2(16, 12)
-			top_bar_panel.custom_minimum_size = Vector2(1248, 54)
-			top_bar_panel.size = Vector2(1248, 54)
-		sidebar_panel.position = Vector2(906, 76)
-		sidebar_panel.custom_minimum_size = Vector2(358, 628)
-		sidebar_panel.size = Vector2(358, 628)
+			top_bar_panel.custom_minimum_size = Vector2(1248, 52)
+			top_bar_panel.size = Vector2(1248, 52)
+		if title_label_node:
+			title_label_node.text = "🌍 CRISIS — TEG"
+			title_label_node.add_theme_font_size_override("font_size", 18)
+		if mode_option_button:
+			mode_option_button.custom_minimum_size = Vector2(128, 32)
+		if btn_rules_node:
+			btn_rules_node.text = "📖 Reglas"
+			btn_rules_node.custom_minimum_size = Vector2(86, 32)
+
+	_apply_sidebar_layout()
 
 	if map_canvas:
 		map_canvas.size = map_panel.size
@@ -903,23 +1010,29 @@ func _on_layout_changed(layout: int) -> void:
 func _get_map_transform() -> Dictionary:
 	var canvas_size = map_canvas.size if map_canvas else Vector2(1280, 720)
 	if current_layout == 2:
-		var avail_w_m: float = maxf(canvas_size.x - 16.0, 200.0)
-		var avail_h_m: float = maxf(canvas_size.y - 360.0, 180.0)
-		var sm: float = minf(avail_w_m / 760.0, avail_h_m / 560.0)
-		var off_m := Vector2((canvas_size.x - 800.0 * sm) * 0.5, 56.0 + (avail_h_m - 600.0 * sm) * 0.5)
+		var top_reserved: float = 54.0
+		var bottom_reserved: float = 58.0 if sidebar_collapsed else 294.0
+		var avail_w_m: float = maxf(canvas_size.x - 12.0, 200.0)
+		var avail_h_m: float = maxf(canvas_size.y - top_reserved - bottom_reserved, 220.0)
+		var sm: float = minf(avail_w_m / 880.0, avail_h_m / 540.0)
+		var off_m := Vector2(
+			6.0 + (avail_w_m - 920.0 * sm) * 0.5,
+			top_reserved + (avail_h_m - 580.0 * sm) * 0.5
+		)
 		return { "scale": sm, "offset": off_m }
 
-	# Fullscreen canvas (1280x720) with territories centered in the visible map viewport (left of floating sidebar, below top bar)
-	var usable_left: float = 16.0
-	var usable_top: float = 72.0
-	var usable_w: float = maxf(canvas_size.x - 392.0, 720.0)
-	var usable_h: float = maxf(canvas_size.y - 84.0, 560.0)
-	var scale_x: float = usable_w / 740.0
-	var scale_y: float = usable_h / 540.0
+	# Fullscreen canvas (1280x720) with territories centered in the visible map viewport
+	var usable_left: float = 14.0
+	var usable_top: float = 68.0
+	var right_reserved: float = 24.0 if sidebar_collapsed else 372.0
+	var usable_w: float = maxf(canvas_size.x - usable_left - right_reserved, 720.0)
+	var usable_h: float = maxf(canvas_size.y - usable_top - 16.0, 560.0)
+	var scale_x: float = usable_w / 875.0
+	var scale_y: float = usable_h / 545.0
 	var s: float = minf(scale_x, scale_y)
 	var offset := Vector2(
-		usable_left + (usable_w - 840.0 * s) * 0.5,
-		usable_top + (usable_h - 600.0 * s) * 0.5
+		usable_left + (usable_w - 925.0 * s) * 0.5,
+		usable_top + (usable_h - 585.0 * s) * 0.5
 	)
 	return { "scale": s, "offset": offset }
 
@@ -930,18 +1043,19 @@ func _from_screen(screen_pos: Vector2, trans: Dictionary) -> Vector2:
 	return (screen_pos - trans["offset"]) / trans["scale"]
 
 # -------------------------------------------------------------------------
-# MAP CANVAS DRAWING (Points a, b, c)
+# MAP CANVAS DRAWING
 # -------------------------------------------------------------------------
 func _on_map_canvas_draw() -> void:
 	var trans = _get_map_transform()
 	var s: float = float(trans["scale"])
+	var font = ThemeDB.fallback_font
 
 	# 1. Draw Fullscreen Ocean Background & Nautical Grid
-	var ocean_col = current_theme.board_color.darkened(0.1) if current_theme else Color("#121A24")
+	var ocean_col = current_theme.board_color.darkened(0.14) if current_theme else Color("#0E1722")
 	map_canvas.draw_rect(Rect2(Vector2.ZERO, map_canvas.size), ocean_col, true)
 
 	var grid_col = current_theme.line_color if current_theme else Color("#7C9BB8")
-	var faint_grid = Color(grid_col.r, grid_col.g, grid_col.b, 0.12)
+	var faint_grid = Color(grid_col.r, grid_col.g, grid_col.b, 0.10)
 
 	# Fullscreen Lat/Long lines across the entire map_canvas
 	for y_val in [120.0, 240.0, 360.0, 480.0, 600.0]:
@@ -949,33 +1063,64 @@ func _on_map_canvas_draw() -> void:
 	for x_val in [180.0, 360.0, 540.0, 720.0, 900.0, 1080.0]:
 		map_canvas.draw_line(Vector2(x_val, 0.0), Vector2(x_val, map_canvas.size.y), faint_grid, 1.0)
 
-	# 2. Draw Adjacencies & Borders (Land connections & Sea lanes)
+	# 2. Draw Coastal Relief & Continental Shelf Glow under all landmasses
+	var shadow_offset := Vector2(4.0 * s, 5.0 * s)
+	for i in range(30):
+		var base_poly = TERRITORY_POLYGONS[i]
+		var shadow_poly = PackedVector2Array()
+		var coast_poly = PackedVector2Array()
+		for pt in base_poly:
+			var sp = _to_screen(pt, trans)
+			shadow_poly.append(sp + shadow_offset)
+			coast_poly.append(sp)
+		coast_poly.append(_to_screen(base_poly[0], trans))
+		map_canvas.draw_colored_polygon(shadow_poly, Color(0.02, 0.04, 0.08, 0.55))
+		var cont_id = _get_territory_continent(i)
+		var cont_c: Color = CONTINENTS_DATA[cont_id]["color"]
+		map_canvas.draw_polyline(coast_poly, Color(cont_c.r, cont_c.g, cont_c.b, 0.28), maxf(6.5 * s, 3.0), true)
+
+	# 3. Draw Adjacencies & Sea Lanes (with wrap-around ocean edges for Canada<->Kamchatka and Chile<->Australia)
 	for edge in ADJACENCIES:
-		var t1 = edge[0]
-		var t2 = edge[1]
+		var t1: int = edge[0]
+		var t2: int = edge[1]
 		var c1 = _to_screen(TERRITORY_CENTERS[t1], trans)
 		var c2 = _to_screen(TERRITORY_CENTERS[t2], trans)
 
 		var is_sea = SEA_LANES.has(edge) or SEA_LANES.has([t2, t1])
 		var is_active_connection = (selected_from == t1 and selected_to == t2) or (selected_from == t2 and selected_to == t1)
 		var is_available_target = (selected_from == t1 and valid_targets.has(t2)) or (selected_from == t2 and valid_targets.has(t1))
+		var is_wrap_edge = (t1 == 8 and t2 == 22) or (t1 == 22 and t2 == 8) or (t1 == 2 and t2 == 26) or (t1 == 26 and t2 == 2)
 
+		var route_col := Color(0.38, 0.78, 0.94, 0.50)
+		var route_width := maxf(1.5 * s, 1.2)
 		if is_active_connection:
 			var pulse_val = 0.7 + 0.3 * sin(pulse_time * 2.0)
-			var line_c = Color(1.0, 0.9, 0.2, pulse_val)
-			map_canvas.draw_line(c1, c2, line_c, 3.5 * s)
+			route_col = Color(1.0, 0.9, 0.2, pulse_val)
+			route_width = maxf(3.2 * s, 2.2)
 		elif is_available_target:
 			var pulse_val = 0.6 + 0.4 * sin(pulse_time * 2.5)
-			var target_c = Color(0.2, 0.95, 0.4, pulse_val)
-			map_canvas.draw_line(c1, c2, target_c, 2.5 * s)
-		elif is_sea:
-			# Dashed nautical line
-			_draw_dashed_line(c1, c2, Color(0.35, 0.75, 0.90, 0.45), 1.5 * s, 8.0 * s, 4.0 * s)
-		else:
-			var land_c = Color(grid_col.r, grid_col.g, grid_col.b, 0.25)
-			map_canvas.draw_line(c1, c2, land_c, 1.2 * s)
+			route_col = Color(0.2, 0.95, 0.4, pulse_val)
+			route_width = maxf(2.4 * s, 1.8)
 
-	# 3. Draw Territory Polygons colored by Owner with Continent base tint
+		if is_wrap_edge:
+			# Draw wrap-around naval routes to the left/right edges of the world map instead of crossing all continents
+			var left_t: int = 8 if (t1 == 8 or t2 == 8) else 2
+			var right_t: int = 22 if (t1 == 22 or t2 == 22) else 26
+			var c_left = _to_screen(TERRITORY_CENTERS[left_t], trans)
+			var c_right = _to_screen(TERRITORY_CENTERS[right_t], trans)
+			var edge_left = _to_screen(Vector2(18.0, TERRITORY_CENTERS[left_t].y), trans)
+			var edge_right = _to_screen(Vector2(902.0, TERRITORY_CENTERS[right_t].y), trans)
+			_draw_dashed_line(c_left, edge_left, route_col, route_width, maxf(7.0 * s, 4.0), maxf(4.0 * s, 2.5))
+			_draw_dashed_line(c_right, edge_right, route_col, route_width, maxf(7.0 * s, 4.0), maxf(4.0 * s, 2.5))
+		elif is_active_connection or is_available_target:
+			map_canvas.draw_line(c1, c2, route_col, route_width)
+		elif is_sea:
+			_draw_dashed_line(c1, c2, route_col, route_width, maxf(7.0 * s, 4.0), maxf(4.0 * s, 2.5))
+		else:
+			var land_c = Color(grid_col.r, grid_col.g, grid_col.b, 0.22)
+			map_canvas.draw_line(c1, c2, land_c, maxf(1.2 * s, 1.0))
+
+	# 4. Draw Territory Polygons colored by Owner blended with Continent tone
 	for i in range(30):
 		var base_poly = TERRITORY_POLYGONS[i]
 		var screen_poly = PackedVector2Array()
@@ -984,92 +1129,157 @@ func _on_map_canvas_draw() -> void:
 
 		var t_owner = territory_owners.get(i, 0)
 		var continent_id = _get_territory_continent(i)
-		var cont_col = CONTINENTS_DATA[continent_id]["color"]
+		var cont_col: Color = CONTINENTS_DATA[continent_id]["color"]
 
 		var fill_color: Color
 		if t_owner > 0 and PLAYER_COLORS.has(t_owner):
-			var p_col = PLAYER_COLORS[t_owner]
-			# Blend owner color with subtle continent tone
-			fill_color = Color(p_col.r, p_col.g, p_col.b, 0.72)
+			var p_col: Color = PLAYER_COLORS[t_owner]
+			fill_color = p_col.lerp(cont_col, 0.22)
+			fill_color.a = 0.78
 		else:
-			fill_color = Color(cont_col.r, cont_col.g, cont_col.b, 0.40)
+			fill_color = Color(cont_col.r, cont_col.g, cont_col.b, 0.48)
 
 		# State highlights
 		if selected_from == i:
-			var pulse_factor = 0.8 + 0.2 * sin(pulse_time)
-			fill_color = fill_color.lightened(0.35)
+			var pulse_factor = 0.82 + 0.18 * sin(pulse_time)
+			fill_color = fill_color.lightened(0.32)
 			fill_color.a = pulse_factor
 		elif selected_to == i:
-			fill_color = Color(0.2, 0.9, 0.4, 0.85)
+			fill_color = Color(0.2, 0.9, 0.4, 0.88)
 		elif valid_targets.has(i):
 			var pulse_val = 0.65 + 0.25 * sin(pulse_time * 1.5)
 			if current_phase == "Attack":
-				fill_color = fill_color.blend(Color(1.0, 0.2, 0.2, pulse_val * 0.4))
+				fill_color = fill_color.blend(Color(1.0, 0.22, 0.22, pulse_val * 0.42))
 			else:
-				fill_color = fill_color.blend(Color(0.2, 0.9, 0.4, pulse_val * 0.4))
+				fill_color = fill_color.blend(Color(0.2, 0.9, 0.4, pulse_val * 0.42))
 		elif hovered_territory == i:
 			fill_color = fill_color.lightened(0.20)
 
-		# Draw filled polygon
 		map_canvas.draw_colored_polygon(screen_poly, fill_color)
 
-		# Polygon Border
-		var stroke_color = grid_col.darkened(0.2)
-		var stroke_width = 1.5 * s
+		# Polygon Border (Continent color rim + state border)
+		var stroke_color = cont_col.darkened(0.35)
+		var stroke_width = maxf(1.6 * s, 1.2)
 
 		if selected_from == i:
 			stroke_color = current_theme.select_color if current_theme else Color(1.0, 0.9, 0.2)
-			stroke_width = 3.5 * s
+			stroke_width = maxf(3.2 * s, 2.2)
 		elif selected_to == i:
 			stroke_color = current_theme.valid_move_color if current_theme else Color(0.2, 0.9, 0.5)
-			stroke_width = 3.5 * s
+			stroke_width = maxf(3.2 * s, 2.2)
 		elif valid_targets.has(i):
 			stroke_color = Color(0.3, 0.95, 0.45)
-			stroke_width = 2.5 * s
+			stroke_width = maxf(2.4 * s, 1.8)
 		elif hovered_territory == i:
 			stroke_color = Color.WHITE
-			stroke_width = 2.0 * s
+			stroke_width = maxf(2.2 * s, 1.6)
 
 		var poly_closed = Array(screen_poly)
 		poly_closed.append(screen_poly[0])
 		map_canvas.draw_polyline(PackedVector2Array(poly_closed), stroke_color, stroke_width, true)
 
-	# 4. Draw Center Badges & Army counts & Territory Names
+	# 5. Draw Tactical Shields (Troop Count + Short 3-Letter Code — Zero Overlap)
 	for i in range(30):
 		var center_pos = _to_screen(TERRITORY_CENTERS[i], trans)
 		var t_owner = territory_owners.get(i, 0)
 		var armies = territory_armies.get(i, 0)
-		var badge_radius = clamp(13.0 * s, 9.0, 16.0)
+		var badge_radius = clampf(12.0 * s, 8.5, 15.0)
+		var badge_color: Color = PLAYER_COLORS.get(t_owner, Color(0.25, 0.25, 0.30))
+		var is_focus = (i == selected_from or i == selected_to or i == hovered_territory)
 
-		var badge_color = PLAYER_COLORS.get(t_owner, Color(0.25, 0.25, 0.30))
+		# Outer metallic/dark shield rim
+		var rim_col = Color(1.0, 0.92, 0.35, 0.98) if is_focus else Color(0.06, 0.09, 0.14, 0.94)
+		map_canvas.draw_circle(center_pos, badge_radius + maxf(2.0 * s, 1.5), rim_col)
+		map_canvas.draw_circle(center_pos, badge_radius, badge_color.darkened(0.12))
+		map_canvas.draw_circle(center_pos, badge_radius - maxf(1.8 * s, 1.2), badge_color.lightened(0.14))
 
-		# Outer shield/circle
-		map_canvas.draw_circle(center_pos, badge_radius + 2.0 * s, Color(0.08, 0.1, 0.14, 0.9))
-		map_canvas.draw_circle(center_pos, badge_radius, badge_color)
-		map_canvas.draw_circle(center_pos, badge_radius - 2.0 * s, badge_color.lightened(0.15))
-
-		# Army count text
+		# Army count text inside shield
 		var count_str = str(armies)
-		var font = ThemeDB.fallback_font
-		var font_size = int(clamp(11.0 * s, 9.0, 14.0))
+		var font_size = int(clampf(11.0 * s, 9.0, 14.0))
 		var str_size = font.get_string_size(count_str, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
-		var text_pos = center_pos + Vector2(-str_size.x * 0.5, str_size.y * 0.35)
+		var text_pos = center_pos + Vector2(-str_size.x * 0.5, str_size.y * 0.32)
 		map_canvas.draw_string(font, text_pos, count_str, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, Color.WHITE)
 
-		# Territory Name Pill (Rendered right below center badge)
-		var name_str = TERRITORY_NAMES[i]
-		var name_font_size = int(clamp(9.0 * s, 8.0, 11.0))
-		var name_size = font.get_string_size(name_str, HORIZONTAL_ALIGNMENT_CENTER, -1, name_font_size)
+		# Compact 3-letter Short Code Tag right below the shield
+		var code_str: String = TERRITORY_CODES[i]
+		var code_font_size = int(clampf(8.5 * s, 7.0, 10.0))
+		var code_size = font.get_string_size(code_str, HORIZONTAL_ALIGNMENT_CENTER, -1, code_font_size)
+		var pad_x = maxf(3.0 * s, 2.0)
+		var pad_y = maxf(1.2 * s, 1.0)
 		var pill_rect = Rect2(
-			center_pos.x - name_size.x * 0.5 - 4.0 * s,
-			center_pos.y + badge_radius + 2.0 * s,
-			name_size.x + 8.0 * s,
-			name_size.y + 2.0 * s
+			center_pos.x - code_size.x * 0.5 - pad_x,
+			center_pos.y + badge_radius + maxf(1.5 * s, 1.0),
+			code_size.x + pad_x * 2.0,
+			code_size.y + pad_y * 2.0
 		)
-		map_canvas.draw_rect(pill_rect, Color(0.05, 0.08, 0.12, 0.75), true)
-		map_canvas.draw_rect(pill_rect, Color(0.4, 0.5, 0.6, 0.4), false, 1.0)
-		var name_text_pos = Vector2(center_pos.x - name_size.x * 0.5, pill_rect.position.y + name_size.y - 1.0 * s)
-		map_canvas.draw_string(font, name_text_pos, name_str, HORIZONTAL_ALIGNMENT_CENTER, -1, name_font_size, Color(0.95, 0.95, 0.95))
+		var pill_bg = Color(0.12, 0.18, 0.26, 0.92) if is_focus else Color(0.05, 0.08, 0.13, 0.82)
+		var pill_border = Color(0.95, 0.85, 0.35, 0.85) if is_focus else Color(0.45, 0.58, 0.72, 0.45)
+		map_canvas.draw_rect(pill_rect, pill_bg, true)
+		map_canvas.draw_rect(pill_rect, pill_border, false, 1.0)
+		var code_text_pos = Vector2(
+			center_pos.x - code_size.x * 0.5,
+			pill_rect.position.y + code_size.y - pad_y * 0.5
+		)
+		map_canvas.draw_string(font, code_text_pos, code_str, HORIZONTAL_ALIGNMENT_CENTER, -1, code_font_size, Color(0.94, 0.96, 1.0))
+
+	# 6. Foreground Callout for Selected / Hovered Territory (Full Name + Troops)
+	var focus_ids: Array[int] = []
+	if selected_from != -1:
+		focus_ids.append(selected_from)
+	if selected_to != -1 and not focus_ids.has(selected_to):
+		focus_ids.append(selected_to)
+	if hovered_territory != -1 and not focus_ids.has(hovered_territory):
+		focus_ids.append(hovered_territory)
+
+	for fid in focus_ids:
+		var c_pos = _to_screen(TERRITORY_CENTERS[fid], trans)
+		var full_name: String = TERRITORY_NAMES[fid]
+		var f_armies: int = territory_armies.get(fid, 0)
+		var callout_txt = "%s (%d)" % [full_name, f_armies]
+		var callout_fs = int(clampf(11.0 * s, 10.0, 13.0))
+		var c_size = font.get_string_size(callout_txt, HORIZONTAL_ALIGNMENT_CENTER, -1, callout_fs)
+		var badge_r = clampf(12.0 * s, 8.5, 15.0)
+		var box_w = c_size.x + 14.0
+		var box_h = c_size.y + 6.0
+		var box_x = clampf(c_pos.x - box_w * 0.5, 8.0, map_canvas.size.x - box_w - 8.0)
+		var box_y = maxf(c_pos.y - badge_r - box_h - 5.0, 58.0)
+		var box_rect = Rect2(box_x, box_y, box_w, box_h)
+		map_canvas.draw_rect(box_rect, Color(0.06, 0.10, 0.16, 0.95), true)
+		map_canvas.draw_rect(box_rect, Color(0.98, 0.86, 0.32, 0.95), false, 1.5)
+		map_canvas.draw_string(
+			font,
+			Vector2(box_x + 7.0, box_y + c_size.y),
+			callout_txt,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			callout_fs,
+			Color(1.0, 0.95, 0.75)
+		)
+
+	# 7. Bottom-Left Tactical Info Banner (Full territory details or Continent Legend)
+	_draw_map_info_banner(font)
+
+func _draw_map_info_banner(font: Font) -> void:
+	var inspect_id: int = hovered_territory if hovered_territory != -1 else (selected_to if selected_to != -1 else selected_from)
+	var banner_y: float = map_canvas.size.y - 36.0
+	if current_layout == 2:
+		banner_y = (sidebar_panel.position.y - 32.0) if sidebar_panel != null else (map_canvas.size.y - 36.0)
+
+	if inspect_id != -1 and inspect_id >= 0 and inspect_id < 30:
+		var t_name: String = TERRITORY_NAMES[inspect_id]
+		var t_code: String = TERRITORY_CODES[inspect_id]
+		var t_owner: int = territory_owners.get(inspect_id, 0)
+		var t_armies: int = territory_armies.get(inspect_id, 0)
+		var cont_id: int = _get_territory_continent(inspect_id)
+		var cont_name: String = CONTINENTS_DATA[cont_id]["name"]
+		var owner_name: String = PLAYER_NAMES.get(t_owner, "Neutral")
+		var info_str = "📍 [%s] %s  ·  %s  ·  Dueño: %s  ·  %d tropas" % [t_code, t_name, cont_name, owner_name, t_armies]
+		var fs: int = 10 if current_layout == 2 else 12
+		var t_sz = font.get_string_size(info_str, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
+		var b_rect = Rect2(10.0, banner_y, minf(t_sz.x + 20.0, map_canvas.size.x - 20.0), 26.0)
+		map_canvas.draw_rect(b_rect, Color(0.06, 0.10, 0.16, 0.90), true)
+		map_canvas.draw_rect(b_rect, CONTINENTS_DATA[cont_id]["color"], false, 1.5)
+		map_canvas.draw_string(font, Vector2(b_rect.position.x + 10.0, b_rect.position.y + 18.0), info_str, HORIZONTAL_ALIGNMENT_LEFT, b_rect.size.x - 16.0, fs, Color.WHITE)
 
 func _draw_dashed_line(from: Vector2, to: Vector2, color: Color, width: float, dash_len: float, gap_len: float) -> void:
 	var dir = (to - from)
@@ -1099,7 +1309,7 @@ func _on_map_canvas_gui_input(event: InputEvent) -> void:
 			if Geometry2D.is_point_in_polygon(mouse_map, TERRITORY_POLYGONS[i]):
 				found_t = i
 				break
-			elif TERRITORY_CENTERS[i].distance_to(mouse_map) <= 25.0:
+			elif TERRITORY_CENTERS[i].distance_to(mouse_map) <= 24.0:
 				found_t = i
 				break
 		if found_t != hovered_territory:
@@ -1109,7 +1319,7 @@ func _on_map_canvas_gui_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var mouse_map = _from_screen(event.position, trans)
 		for i in range(30):
-			if Geometry2D.is_point_in_polygon(mouse_map, TERRITORY_POLYGONS[i]) or TERRITORY_CENTERS[i].distance_to(mouse_map) <= 25.0:
+			if Geometry2D.is_point_in_polygon(mouse_map, TERRITORY_POLYGONS[i]) or TERRITORY_CENTERS[i].distance_to(mouse_map) <= 24.0:
 				_on_territory_clicked(i)
 				break
 
@@ -1344,7 +1554,7 @@ func _sync_all_from_bridge() -> void:
 
 func _format_phase_es(phase_str: String) -> String:
 	if phase_str.begins_with("PlaceArmies") or phase_str == "Placement":
-		return "Colocación de Tropas"
+		return "Refuerzos"
 	elif phase_str == "Attack":
 		return "Ataque"
 	elif phase_str == "Fortify":
@@ -1369,7 +1579,10 @@ func _update_ui_state() -> void:
 	btn_exchange.disabled = not (is_active and is_placement and selected_card_indices.size() == 3)
 
 	if action_title_label:
-		action_title_label.text = "Fase: %s" % _format_phase_es(current_phase)
+		action_title_label.text = "Fase: %s%s" % [
+			_format_phase_es(current_phase),
+			(" (%d disponibles)" % armies_remaining_to_place) if is_placement and armies_remaining_to_place > 0 else ""
+		]
 
 	var p1_count: int = 0
 	var p2_count: int = 0
@@ -1379,10 +1592,10 @@ func _update_ui_state() -> void:
 		elif territory_owners[t_id] == 2:
 			p2_count += 1
 
-	player_stats_label.text = "Turno: %s  ·  Fase: %s %s\n🛡️ P1 (Rojo): %d terr.  |  P2 (Azul): %d terr." % [
-		PLAYER_NAMES.get(current_player_id, "Jugador " + str(current_player_id)),
+	player_stats_label.text = "Turno: %s · %s %s\n🛡️ Rojo: %d terr. | Azul: %d terr." % [
+		PLAYER_NAMES.get(current_player_id, "J" + str(current_player_id)),
 		_format_phase_es(current_phase),
-		("(%d tropas)" % armies_remaining_to_place) if is_placement and armies_remaining_to_place > 0 else "",
+		("(%d)" % armies_remaining_to_place) if is_placement and armies_remaining_to_place > 0 else "",
 		p1_count,
 		p2_count
 	]
@@ -1533,7 +1746,7 @@ func _render_cards_deck() -> void:
 		var type_info = CARD_TYPES.get(c_type, { "name": "Infantería", "icon": "🪖" })
 
 		var card_btn = Button.new()
-		card_btn.custom_minimum_size = Vector2(85, 110)
+		card_btn.custom_minimum_size = Vector2(82, 106)
 		card_btn.toggle_mode = true
 		card_btn.button_pressed = selected_card_indices.has(idx)
 
@@ -1544,7 +1757,7 @@ func _render_cards_deck() -> void:
 
 		var icon_lbl = Label.new()
 		icon_lbl.text = type_info["icon"]
-		icon_lbl.add_theme_font_size_override("font_size", 24)
+		icon_lbl.add_theme_font_size_override("font_size", 22)
 		icon_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card_vbox.add_child(icon_lbl)
 
@@ -1566,7 +1779,7 @@ func _render_cards_deck() -> void:
 		cards_container.add_child(card_btn)
 
 	var next_bonus = _get_next_exchange_bonus()
-	btn_exchange.text = "🔄 Canjear Tarjetas (+%d Tropas)" % next_bonus
+	btn_exchange.text = "🔄 Canjear (+%d Tropas)" % next_bonus
 
 func _on_card_toggled(idx: int, pressed: bool) -> void:
 	if pressed:
