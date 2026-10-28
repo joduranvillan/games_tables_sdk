@@ -663,6 +663,40 @@ impl OpenTableBridge {
     }
 
     #[func]
+    pub fn set_go_board_size(&mut self, size: i64) -> bool {
+        let sz = size as usize;
+        if !matches!(sz, 9 | 13 | 19) {
+            return false;
+        }
+        match &mut self.mode {
+            BridgeMode::Local { session, .. }
+            | BridgeMode::Host { session, .. }
+            | BridgeMode::NativeHost { session, .. }
+            | BridgeMode::MultipeerHost { session, .. }
+            | BridgeMode::RelayHost { session }
+            | BridgeMode::Tournament { session, .. } => {
+                let (black_p, white_p, komi) =
+                    if let Some(b) = session.world().get_resource::<go_game::BoardResource>() {
+                        (b.black_player, b.white_player, b.komi_half_points)
+                    } else {
+                        (PlayerId(1), PlayerId(2), 13)
+                    };
+                let new_board = go_game::BoardResource::new(sz, black_p, white_p).with_komi(komi);
+                let mut history = go_game::BoardHistoryResource::new();
+                history.history.insert(new_board.compute_hash());
+                session.world_mut().insert_resource(new_board);
+                session.world_mut().insert_resource(history);
+                session
+                    .world_mut()
+                    .insert_resource(go_game::DeadMarkingResource::default());
+                true
+            }
+            _ => false,
+        }
+    }
+
+
+    #[func]
     fn start_local_match_go_vs_ai(
         &mut self,
         human_player: i64,

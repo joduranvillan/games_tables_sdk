@@ -48,3 +48,11 @@ pub struct SetKomiCommand {
     pub player: PlayerId,
     pub komi_half_points: u32,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, GameCommand)]
+pub struct SetBoardSizeCommand {
+    #[issuer]
+    pub player: PlayerId,
+    pub size: usize,
+}
+

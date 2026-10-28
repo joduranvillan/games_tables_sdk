@@ -1,7 +1,7 @@
 use crate::board::{BoardHistoryResource, BoardResource, DeadMarkingResource, Stone};
 use crate::commands::{
     ConfirmDeadCommand, MarkDeadCommand, PassCommand, PlaceHandicapCommand, PlaceStoneCommand,
-    ResignCommand, SetKomiCommand,
+    ResignCommand, SetBoardSizeCommand, SetKomiCommand,
 };
 use crate::events::{GameOverEvent, PassedEvent, StonePlacedEvent, StonesCapturedEvent};
 use bevy_ecs::world::World as BevyWorld;
@@ -500,6 +500,30 @@ pub fn build_go_rules() -> RuleEngine {
             });
         }
         board.komi_half_points = cmd.komi_half_points;
+        Ok(vec![])
+    });
+
+    rules.register::<SetBoardSizeCommand, _>(|cmd, world| {
+        if !matches!(cmd.size, 9 | 13 | 19) {
+            return Err(EngineError::InvalidCommand {
+                reason: "Board size must be 9, 13, or 19".into(),
+            });
+        }
+        let (black_p, white_p, komi) = {
+            let board = world.resource::<BoardResource>();
+            if cmd.player != board.black_player && cmd.player != board.white_player {
+                return Err(EngineError::InvalidCommand {
+                    reason: "Invalid player".into(),
+                });
+            }
+            (board.black_player, board.white_player, board.komi_half_points)
+        };
+        let new_board = BoardResource::new(cmd.size, black_p, white_p).with_komi(komi);
+        let mut history = BoardHistoryResource::new();
+        history.history.insert(new_board.compute_hash());
+        world.insert_resource(new_board);
+        world.insert_resource(history);
+        world.insert_resource(DeadMarkingResource::default());
         Ok(vec![])
     });
 

@@ -93,13 +93,40 @@ func _initialize() -> void:
 	}))
 	results.append(["Dos pases consecutivos y confirmación gatillan la señal game_over", game_over_winners.size() >= 1])
 
-	# 8. Verificar inicialización de componentes UI en GoBoard
-	var go_script = load("res://go_board.gd")
-	if go_script != null:
-		var board = Node2D.new()
-		board.set_script(go_script)
-		results.append(["GoBoard se carga y tiene script válido", board != null])
-		board.free()
+	# 8. Verificar inicialización, captura visual, selector 9x9/13x13/19x19 y doble pase en GoBoard
+	var go_scene := load("res://go_board.tscn")
+	if go_scene != null:
+		var go_ui: Node2D = go_scene.instantiate()
+		go_ui._ready()
+		results.append(["GoBoard inicia con selector de tamaño en 9x9", go_ui.BOARD_SIZE == 9 and go_ui.size_option_button != null])
+
+		# Escenario de captura por rodeado:
+		# Negro en (fila 0, col 0), Blanco en (fila 0, col 1), Negro en (fila 0, col 2), Blanco en (fila 5, col 5), Negro en (fila 1, col 1)
+		go_ui._on_cell_clicked(Vector2i(0, 0)) # Negro A9
+		go_ui._on_cell_clicked(Vector2i(0, 1)) # Blanco B9
+		results.append(["Piedra blanca colocada en B9 (0,1)", go_ui.board[0][1] == 2 and go_ui.stone_nodes[0][1] != null])
+		go_ui._on_cell_clicked(Vector2i(0, 2)) # Negro C9
+		go_ui._on_cell_clicked(Vector2i(5, 5)) # Blanco F4
+		go_ui._on_cell_clicked(Vector2i(1, 1)) # Negro B8 -> rodea y captura B9 (0,1)
+		results.append([
+			"Piedra blanca rodeada en B9 (0,1) es capturada y retirada del tablero visual y lógico",
+			go_ui.board[0][1] == null and go_ui.stone_nodes[0][1] == null and go_ui.black_captured == 1
+		])
+
+		# Verificar cambio a 13x13 y 19x19
+		go_ui.set_board_size(13)
+		results.append(["Selector cambia el tablero a 13x13 correctamente", go_ui.BOARD_SIZE == 13 and go_ui.board.size() == 13])
+		go_ui.set_board_size(19)
+		results.append(["Selector cambia el tablero a 19x19 correctamente", go_ui.BOARD_SIZE == 19 and go_ui.board.size() == 19])
+
+		# Verificar doble pase con cierre automático
+		go_ui.set_board_size(9)
+		go_ui._on_cell_clicked(Vector2i(2, 2)) # Negro juega
+		go_ui._on_pass_pressed() # Blanco pasa
+		go_ui._on_pass_pressed() # Negro pasa -> doble pase cierra partida automáticamente
+		results.append(["Doble pase consecutivo en GoBoard calcula territorio y cierra la partida", go_ui.winner != -1])
+
+		go_ui.free()
 
 	var ok := true
 	for r in results:
@@ -110,3 +137,4 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+
