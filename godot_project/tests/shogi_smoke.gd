@@ -52,6 +52,55 @@ func _initialize() -> void:
 	results.append(["P2 mueve peón -> turno pasa a P1", bridge.current_player() == 1])
 	results.append(["Se recibieron 2 eventos PieceMovedEvent", events_received.size() == 2])
 
+	# 4. Prueba E2E de interfaz en ShogiBoard (tipografía nítida + clics multi-turno)
+	var board_scene := load("res://shogi_board.tscn")
+	var shogi_ui: Node2D = board_scene.instantiate()
+	shogi_ui._ready()
+
+	var king_node: Control = shogi_ui.piece_nodes[8][4]
+	var west_lbl: Label = king_node.get_node_or_null("WesternLabel") if king_node != null else null
+	var kanji_lbl: Label = king_node.get_node_or_null("KanjiLabel") if king_node != null else null
+	results.append([
+		"Pieza pentagonal muestra letra occidental grande (22px) y Kanji secundario (12px) sin solapamiento",
+		west_lbl != null and kanji_lbl != null
+			and west_lbl.get_theme_font_size("font_size") == 22
+			and kanji_lbl.get_theme_font_size("font_size") == 12
+			and west_lbl.position.y + west_lbl.size.y <= kanji_lbl.position.y
+	])
+
+	var make_click := func(row: int, col: int) -> void:
+		var press := InputEventMouseButton.new()
+		press.button_index = MOUSE_BUTTON_LEFT
+		press.pressed = true
+		press.position = Vector2(
+			shogi_ui.BOARD_ORIGIN_X + col * shogi_ui.CELL_SIZE + shogi_ui.CELL_SIZE * 0.5,
+			shogi_ui.BOARD_ORIGIN_Y + row * shogi_ui.CELL_SIZE + shogi_ui.CELL_SIZE * 0.5
+		)
+		shogi_ui._input(press)
+		var release := InputEventMouseButton.new()
+		release.button_index = MOUSE_BUTTON_LEFT
+		release.pressed = false
+		release.position = press.position
+		shogi_ui._input(release)
+
+	# Turno 1 UI: Sente selecciona peón en (fila 6, col 4) y avanza a (fila 5, col 4)
+	make_click.call(6, 4)
+	results.append(["Clic en peón Sente (6,4) selecciona casilla y calcula jugadas válidas", shogi_ui.selected_board_pos == Vector2i(6, 4) and Vector2i(5, 4) in shogi_ui.valid_moves])
+	make_click.call(5, 4)
+	results.append(["Clic en destino (5,4) mueve el peón Sente y pasa turno a Gote (P2)", shogi_ui.current == 2 and shogi_ui.board[5][4] != null and shogi_ui.board[6][4] == null])
+
+	# Turno 2 UI: Gote selecciona peón en (fila 2, col 4) y avanza a (fila 3, col 4)
+	make_click.call(2, 4)
+	make_click.call(3, 4)
+	results.append(["Clic en destino (3,4) mueve el peón Gote y pasa turno a Sente (P1)", shogi_ui.current == 1 and shogi_ui.board[3][4] != null and shogi_ui.board[2][4] == null])
+
+	# Turno 3 UI: Sente selecciona General de Plata en (fila 8, col 6) y avanza a (fila 7, col 5)
+	make_click.call(8, 6)
+	make_click.call(7, 5)
+	results.append(["Tercer turno UI: Plata Sente avanza de (8,6) a (7,5) con fluidez", shogi_ui.current == 2 and shogi_ui.board[7][5] != null and shogi_ui.board[8][6] == null])
+
+	shogi_ui.free()
+
 	var ok := true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
@@ -61,3 +110,4 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+

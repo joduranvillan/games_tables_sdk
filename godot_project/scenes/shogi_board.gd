@@ -22,16 +22,21 @@ const KANJI_MAP = {
 	"PromotedLance": "杏",
 	"PromotedKnight": "圭",
 	"PromotedSilver": "全",
+	"PromotedBishop": "馬",
+	"PromotedRook": "龍",
 	"Horse": "馬",
 	"Dragon": "龍"
 }
 
 # Colors
-const COL_BOARD = Color(0.92, 0.82, 0.62)
-const COL_LINE = Color(0.2, 0.15, 0.1)
-const COL_PIECE_BG = Color(0.96, 0.90, 0.75)
-const COL_SELECT = Color(1.0, 0.9, 0.2, 0.55)
-const COL_VALID_MOVE = Color(0.2, 0.8, 0.2, 0.55)
+const COL_BOARD = Color(0.86, 0.70, 0.47)
+const COL_BOARD_FRAME = Color(0.33, 0.20, 0.11)
+const COL_LINE = Color(0.18, 0.12, 0.07)
+const COL_PIECE_BG = Color(0.97, 0.92, 0.80)
+const COL_PIECE_BORDER = Color(0.22, 0.14, 0.08)
+const COL_SELECT = Color(1.0, 0.85, 0.20, 0.48)
+const COL_VALID_MOVE = Color(0.18, 0.78, 0.30, 0.62)
+const COL_LAST_MOVE = Color(0.95, 0.62, 0.15, 0.30)
 
 var bridge
 var board: Array = [] # 9x9 array of piece dictionaries or null
@@ -42,8 +47,12 @@ var winner: int = -1
 var selected_board_pos = null # Vector2i(row, col)
 var selected_hand_piece: String = "" # e.g. "Pawn"
 var valid_moves: Array = [] # Array of Vector2i
+var last_move_from = null # Vector2i(row, col)
+var last_move_to = null # Vector2i(row, col)
 
 var grid_container: GridContainer
+var pieces_container: Node2D
+var board_overlay: Node2D
 var sente_hand_panel: VBoxContainer
 var gote_hand_panel: VBoxContainer
 var _hand_p1: VBoxContainer
@@ -109,7 +118,7 @@ func _ready() -> void:
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
 	_update_hand_panels()
 	_update_status()
-	queue_redraw()
+	_request_board_redraw()
 
 	# --- Botón de reglas ---
 	var btn_rules := Button.new()
@@ -137,22 +146,46 @@ func _on_quit_to_menu() -> void:
 		if is_inside_tree():
 			get_tree().change_scene_to_file("res://main.tscn")
 
+func _restore_piece_label_fonts() -> void:
+	for r in range(piece_nodes.size()):
+		var row_nodes = piece_nodes[r]
+		if row_nodes is Array:
+			for c in range(row_nodes.size()):
+				var p_node = row_nodes[c]
+				if p_node != null and is_instance_valid(p_node):
+					for child in p_node.get_children():
+						if child is Label and child.has_meta("shogi_piece_font_size"):
+							child.add_theme_font_size_override("font_size", int(child.get_meta("shogi_piece_font_size")))
+
+func _request_board_redraw() -> void:
+	queue_redraw()
+	if board_overlay != null and is_instance_valid(board_overlay):
+		board_overlay.queue_redraw()
+
 func _on_theme_changed(theme: BoardTheme) -> void:
 	current_theme = theme
-	if grid_container:
-		for cell in grid_container.get_children():
-			if cell is ColorRect:
-				cell.color = theme.board_color
-				for ch in cell.get_children():
-					if ch is ReferenceRect:
-						ch.border_color = theme.line_color
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
-	queue_redraw()
+	_restore_piece_label_fonts()
+	_request_board_redraw()
 
 func _on_layout_changed(_layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
+	_restore_piece_label_fonts()
+
+func _ensure_board_containers() -> void:
+	if pieces_container == null or not is_instance_valid(pieces_container):
+		pieces_container = Node2D.new()
+		pieces_container.name = "PiecesContainer"
+		pieces_container.z_index = 1
+		add_child(pieces_container)
+	if board_overlay == null or not is_instance_valid(board_overlay):
+		board_overlay = Node2D.new()
+		board_overlay.name = "BoardOverlay"
+		board_overlay.z_index = 2
+		board_overlay.draw.connect(_draw_board_overlay)
+		add_child(board_overlay)
 
 func _setup_ui() -> void:
 	var side_x := 660.0
@@ -165,31 +198,25 @@ func _setup_ui() -> void:
 	status.position = Vector2(side_x, 180)
 	status.custom_minimum_size = Vector2(560, 36)
 
-	# 9x9 GridContainer for the board
+	# 9x9 GridContainer for structural compatibility; visual grid is drawn crisply via _draw()
 	grid_container = GridContainer.new()
 	grid_container.name = "GridContainer"
 	grid_container.columns = BOARD_SIZE
 	grid_container.position = Vector2(BOARD_ORIGIN_X, BOARD_ORIGIN_Y)
+	grid_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	grid_container.add_theme_constant_override("h_separation", 0)
 	grid_container.add_theme_constant_override("v_separation", 0)
 	add_child(grid_container)
 	
-	var bg_col = current_theme.board_color if current_theme != null else COL_BOARD
-	var line_col = current_theme.line_color if current_theme != null else COL_LINE
 	for r in range(BOARD_SIZE):
 		for c in range(BOARD_SIZE):
 			var cell = ColorRect.new()
 			cell.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
-			cell.color = bg_col
-			
-			var border = ReferenceRect.new()
-			border.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
-			border.border_color = line_col
-			border.border_width = 1.0
-			border.editor_only = false
-			cell.add_child(border)
-			
+			cell.color = Color(0, 0, 0, 0)
+			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			grid_container.add_child(cell)
+
+	_ensure_board_containers()
 			
 	# Right Side Panel for Gote Hand (P2)
 	var gote_label = Label.new()
@@ -270,6 +297,8 @@ func _on_mode_selected(index: int) -> void:
 	selected_board_pos = null
 	selected_hand_piece = ""
 	valid_moves.clear()
+	last_move_from = null
+	last_move_to = null
 	for r in range(BOARD_SIZE):
 		for c in range(BOARD_SIZE):
 			if piece_nodes.size() > r and piece_nodes[r].size() > c:
@@ -291,9 +320,10 @@ func _on_mode_selected(index: int) -> void:
 	current = bridge.current_player() if bridge else P_SENTE
 	_update_hand_panels()
 	_update_status()
-	queue_redraw()
+	_request_board_redraw()
 
 func _init_board_state() -> void:
+	_ensure_board_containers()
 	board.clear()
 	piece_nodes.clear()
 	
@@ -341,8 +371,8 @@ func _get_western_abbr(kind: String) -> String:
 		"Knight": return "N"
 		"Lance": return "L"
 		"Pawn": return "P"
-		"Dragon": return "+R"
-		"Horse": return "+B"
+		"Dragon", "PromotedRook": return "+R"
+		"Horse", "PromotedBishop": return "+B"
 		"PromotedSilver": return "+S"
 		"PromotedKnight": return "+N"
 		"PromotedLance": return "+L"
@@ -356,29 +386,30 @@ func _create_pentagon_piece_node(player: int, kind: String) -> Control:
 	var piece_ctrl = Control.new()
 	piece_ctrl.custom_minimum_size = Vector2(w, h)
 	piece_ctrl.size = Vector2(w, h)
+	piece_ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Pentagon points
+	# Pentagon points (traditional Koma wedge silhouette)
 	var pts = PackedVector2Array()
 	var sh_pts = PackedVector2Array()
 	if player == P_SENTE: # Pointing UP
 		pts.append(Vector2(w * 0.5, 2.0))
-		pts.append(Vector2(w - 3.0, h * 0.32))
-		pts.append(Vector2(w - 5.0, h - 2.0))
-		pts.append(Vector2(5.0, h - 2.0))
-		pts.append(Vector2(3.0, h * 0.32))
+		pts.append(Vector2(w - 4.0, h * 0.28))
+		pts.append(Vector2(w - 6.0, h - 3.0))
+		pts.append(Vector2(6.0, h - 3.0))
+		pts.append(Vector2(4.0, h * 0.28))
 	else: # Pointing DOWN for Gote
 		pts.append(Vector2(w * 0.5, h - 2.0))
-		pts.append(Vector2(w - 3.0, h * 0.68))
-		pts.append(Vector2(w - 5.0, 2.0))
-		pts.append(Vector2(5.0, 2.0))
-		pts.append(Vector2(3.0, h * 0.68))
+		pts.append(Vector2(w - 4.0, h * 0.72))
+		pts.append(Vector2(w - 6.0, 3.0))
+		pts.append(Vector2(6.0, 3.0))
+		pts.append(Vector2(4.0, h * 0.72))
 
 	for pt in pts:
-		sh_pts.append(pt + Vector2(2.0, 3.0))
+		sh_pts.append(pt + Vector2(1.5, 2.5))
 
 	var shadow_poly = Polygon2D.new()
 	shadow_poly.polygon = sh_pts
-	shadow_poly.color = Color(0, 0, 0, 0.30)
+	shadow_poly.color = Color(0, 0, 0, 0.28)
 	piece_ctrl.add_child(shadow_poly)
 
 	var bg_poly = Polygon2D.new()
@@ -388,69 +419,100 @@ func _create_pentagon_piece_node(player: int, kind: String) -> Control:
 
 	var border_line = Line2D.new()
 	border_line.width = 2.0
-	border_line.default_color = COL_LINE
-	for pt in pts: border_line.add_point(pt)
+	border_line.default_color = COL_PIECE_BORDER
+	for pt in pts:
+		border_line.add_point(pt)
 	border_line.add_point(pts[0])
 	piece_ctrl.add_child(border_line)
 
+	# Promoted pieces display traditional vermilion/red ink; standard pieces use deep sumi ink
+	var is_prom := _is_promoted(kind)
+	var primary_col := Color(0.76, 0.10, 0.08) if is_prom else Color(0.08, 0.06, 0.04)
+	var secondary_col := Color(0.76, 0.10, 0.08, 0.88) if is_prom else Color(0.20, 0.15, 0.10, 0.88)
+
+	# Primary glyph: Large Western letter (K, R, B, G, S, N, L, P, +R, +B, +S, +N, +L, +P)
+	var abbr = Label.new()
+	abbr.name = "WesternLabel"
+	abbr.text = _get_western_abbr(kind)
+	abbr.set_meta("shogi_piece_font_size", 22)
+	abbr.add_theme_font_size_override("font_size", 22)
+	abbr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	abbr.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	abbr.size = Vector2(w, 28.0)
+	abbr.position = Vector2(0, 10.0 if player == P_SENTE else 20.0)
+	abbr.add_theme_color_override("font_color", primary_col)
+	abbr.add_theme_color_override("font_outline_color", Color(1.0, 0.98, 0.92, 0.90))
+	abbr.add_theme_constant_override("outline_size", 2)
+	abbr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	piece_ctrl.add_child(abbr)
+
+	# Secondary glyph: Small Kanji cleanly separated from the Western letter
 	var kanji = Label.new()
+	kanji.name = "KanjiLabel"
 	kanji.text = KANJI_MAP.get(kind, "?")
-	kanji.add_theme_font_size_override("font_size", 26)
+	kanji.set_meta("shogi_piece_font_size", 12)
+	kanji.add_theme_font_size_override("font_size", 12)
 	kanji.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	kanji.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	kanji.size = Vector2(w, h - 10.0)
-	kanji.position = Vector2(0, 0 if player == P_SENTE else 6.0)
-
-	# Promoted pieces display RED text
-	var text_col = Color(0.82, 0.12, 0.12) if _is_promoted(kind) else Color(0.10, 0.08, 0.06)
-	kanji.add_theme_color_override("font_color", text_col)
+	kanji.size = Vector2(w, 18.0)
+	kanji.position = Vector2(0, 38.0 if player == P_SENTE else 4.0)
+	kanji.add_theme_color_override("font_color", secondary_col)
+	kanji.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	piece_ctrl.add_child(kanji)
-
-	var abbr = Label.new()
-	abbr.text = _get_western_abbr(kind)
-	abbr.add_theme_font_size_override("font_size", 10)
-	abbr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	abbr.size = Vector2(w, 14.0)
-	abbr.position = Vector2(0, h - 15.0 if player == P_SENTE else 2.0)
-	abbr.add_theme_color_override("font_color", Color(text_col.r, text_col.g, text_col.b, 0.72))
-	piece_ctrl.add_child(abbr)
 
 	return piece_ctrl
 
 func _place_piece_on_board(row: int, col: int, player: int, kind: String) -> void:
+	_ensure_board_containers()
 	board[row][col] = {"player": player, "kind": kind}
 	
 	var piece_ctrl = _create_pentagon_piece_node(player, kind)
 	piece_ctrl.position = Vector2(BOARD_ORIGIN_X + col * CELL_SIZE + 3, BOARD_ORIGIN_Y + row * CELL_SIZE + 3)
-	add_child(piece_ctrl)
+	pieces_container.add_child(piece_ctrl)
 	piece_nodes[row][col] = piece_ctrl
+
+func _event_to_board_pos(event_pos: Vector2, is_mouse: bool = true) -> Vector2:
+	if is_inside_tree() and not OS.has_feature("headless"):
+		if is_mouse:
+			return get_local_mouse_position()
+		return make_canvas_position_local(event_pos)
+	return event_pos - position
 
 func _input(event: InputEvent) -> void:
 	if winner != -1:
 		return
-		
-	var click_pos = Vector2.ZERO
-	var handled = false
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		click_pos = event.position
-		handled = true
-	elif event is InputEventScreenTouch and event.pressed:
-		click_pos = event.position
-		handled = true
-		
-	if handled:
-		var board_x = click_pos.x - BOARD_ORIGIN_X
-		var board_y = click_pos.y - BOARD_ORIGIN_Y
-		
-		if board_x >= 0 and board_x < BOARD_SIZE * CELL_SIZE and board_y >= 0 and board_y < BOARD_SIZE * CELL_SIZE:
-			var col = int(board_x / CELL_SIZE)
-			var row = int(board_y / CELL_SIZE)
-			_handle_board_click(row, col)
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		var local_pos := _event_to_board_pos(event.position, true)
+		_handle_unified_input(local_pos, event.pressed, not event.pressed)
+	elif event is InputEventScreenTouch:
+		var local_pos := _event_to_board_pos(event.position, false)
+		_handle_unified_input(local_pos, event.pressed, not event.pressed)
+
+func _handle_unified_input(pos: Vector2, is_press: bool, is_release: bool) -> void:
+	var board_x := pos.x - BOARD_ORIGIN_X
+	var board_y := pos.y - BOARD_ORIGIN_Y
+	if board_x < 0.0 or board_x >= BOARD_SIZE * CELL_SIZE or board_y < 0.0 or board_y >= BOARD_SIZE * CELL_SIZE:
+		return
+
+	var col := int(board_x / CELL_SIZE)
+	var row := int(board_y / CELL_SIZE)
+	if row < 0 or row >= BOARD_SIZE or col < 0 or col >= BOARD_SIZE:
+		return
+
+	if is_press:
+		_handle_board_click(row, col)
+	elif is_release:
+		# Support drag-and-drop: if a piece is already selected and user releases on a valid destination square
+		if selected_board_pos != null and (selected_board_pos.x != row or selected_board_pos.y != col):
+			var target_cell = board[row][col]
+			if target_cell == null or target_cell.get("player") != current:
+				_handle_board_click(row, col)
 
 func _calculate_valid_shogi_moves(r: int, c: int) -> Array:
 	var moves: Array = []
 	var piece = board[r][c]
-	if piece == null: return moves
+	if piece == null:
+		return moves
 
 	if bridge != null and bridge.has_method("get_legal_moves"):
 		var legal = bridge.get_legal_moves(current)
@@ -464,23 +526,36 @@ func _calculate_valid_shogi_moves(r: int, c: int) -> Array:
 						var dest := Vector2i(int(t[1]), int(t[0]))
 						if not dest in moves:
 							moves.append(dest)
-		if not moves.is_empty():
-			return moves
+		return moves
 
 	var player = piece.get("player")
 	for dr in [-1, 0, 1]:
 		for dc in [-1, 0, 1]:
-			if dr == 0 and dc == 0: continue
-			var tr = r + dr
-			var tc = c + dc
-			if tr >= 0 and tr < BOARD_SIZE and tc >= 0 and tc < BOARD_SIZE:
-				var target = board[tr][tc]
+			if dr == 0 and dc == 0:
+				continue
+			var target_r = r + dr
+			var target_c = c + dc
+			if target_r >= 0 and target_r < BOARD_SIZE and target_c >= 0 and target_c < BOARD_SIZE:
+				var target = board[target_r][target_c]
 				if target == null or target.get("player") != player:
-					moves.append(Vector2i(tr, tc))
+					moves.append(Vector2i(target_r, target_c))
 	return moves
 
 func _calculate_valid_drops() -> Array:
 	var drops: Array = []
+	if bridge != null and bridge.has_method("get_legal_moves") and selected_hand_piece != "":
+		var legal = bridge.get_legal_moves(current)
+		for m in legal:
+			if m is Dictionary and m.has("piece") and m.has("to") and not m.has("from"):
+				if str(m.get("piece", "")) == selected_hand_piece:
+					var t = m["to"]
+					if t is Array and t.size() >= 2:
+						var dest := Vector2i(int(t[1]), int(t[0]))
+						if not dest in drops:
+							drops.append(dest)
+		if not drops.is_empty():
+			return drops
+
 	for r in range(BOARD_SIZE):
 		for c in range(BOARD_SIZE):
 			if board[r][c] == null:
@@ -503,10 +578,21 @@ func _handle_board_click(row: int, col: int) -> void:
 				return
 	# 1. Drop piece from hand
 	if selected_hand_piece != "":
+		var target_cell = board[row][col]
+		if target_cell != null:
+			if target_cell.get("player") == current:
+				selected_hand_piece = ""
+				selected_board_pos = Vector2i(row, col)
+				valid_moves = _calculate_valid_shogi_moves(row, col)
+				_update_status()
+				_request_board_redraw()
+			return
+
 		var drop_kind = selected_hand_piece
 		selected_hand_piece = ""
 		valid_moves.clear()
-		queue_redraw()
+		_update_status()
+		_request_board_redraw()
 		
 		var cmd = {
 			"command_type": "shogi_game::DropPieceCommand",
@@ -514,7 +600,8 @@ func _handle_board_click(row: int, col: int) -> void:
 			"piece": drop_kind,
 			"to": [col, row]
 		}
-		bridge.send_command_json(current, JSON.stringify(cmd))
+		if bridge != null:
+			bridge.send_command_json(current, JSON.stringify(cmd))
 		return
 		
 	# 2. Board selection & movement
@@ -523,25 +610,30 @@ func _handle_board_click(row: int, col: int) -> void:
 		if cell != null and cell.get("player") == current:
 			selected_board_pos = Vector2i(row, col)
 			valid_moves = _calculate_valid_shogi_moves(row, col)
-			queue_redraw()
+			_request_board_redraw()
 	else:
 		if selected_board_pos.x == row and selected_board_pos.y == col:
 			selected_board_pos = null
 			valid_moves.clear()
-			queue_redraw()
+			_request_board_redraw()
 			return
 
 		var target_cell = board[row][col]
 		if target_cell != null and target_cell.get("player") == current:
 			selected_board_pos = Vector2i(row, col)
 			valid_moves = _calculate_valid_shogi_moves(row, col)
-			queue_redraw()
+			_request_board_redraw()
+			return
+
+		# If valid_moves is populated by the bridge, ignore clicks on squares that aren't legal destinations
+		var dest_vec := Vector2i(row, col)
+		if bridge != null and not valid_moves.is_empty() and not (dest_vec in valid_moves):
 			return
 			
 		var from_pos = selected_board_pos
 		selected_board_pos = null
 		valid_moves.clear()
-		queue_redraw()
+		_request_board_redraw()
 		
 		var moving_piece = board[from_pos.x][from_pos.y]
 		var should_promote := false
@@ -560,14 +652,18 @@ func _handle_board_click(row: int, col: int) -> void:
 			"to": [col, row],
 			"promote": should_promote
 		}
-		bridge.send_command_json(current, JSON.stringify(cmd))
+		if bridge != null:
+			bridge.send_command_json(current, JSON.stringify(cmd))
 
 func _update_hand_panels() -> void:
-	for child in sente_hand_panel.get_children(): child.queue_free()
-	for child in gote_hand_panel.get_children(): child.queue_free()
-	
-	_populate_hand_container(sente_hand_panel, P_SENTE)
-	_populate_hand_container(gote_hand_panel, P_GOTE)
+	if sente_hand_panel != null:
+		for child in sente_hand_panel.get_children():
+			child.queue_free()
+		_populate_hand_container(sente_hand_panel, P_SENTE)
+	if gote_hand_panel != null:
+		for child in gote_hand_panel.get_children():
+			child.queue_free()
+		_populate_hand_container(gote_hand_panel, P_GOTE)
 	_refresh_hand_displays_from_event_or_state({})
 
 func _refresh_hand_displays_from_event_or_state(event: Dictionary = {}) -> void:
@@ -622,17 +718,19 @@ func _populate_hand_container(panel: VBoxContainer, player: int) -> void:
 		var count = player_hand[kind]
 		if count > 0:
 			var btn = Button.new()
-			btn.custom_minimum_size = Vector2(85, 45)
+			btn.custom_minimum_size = Vector2(96, 42)
+			var abbr_symbol = _get_western_abbr(kind)
 			var kanji_symbol = KANJI_MAP.get(kind, kind)
-			btn.text = "%s x%d" % [kanji_symbol, count]
-			btn.add_theme_font_size_override("font_size", 18)
+			btn.text = "%s (%s) x%d" % [abbr_symbol, kanji_symbol, count]
+			btn.add_theme_font_size_override("font_size", 16)
 			
 			if player == current:
 				btn.pressed.connect(func():
 					selected_board_pos = null
 					selected_hand_piece = kind
 					valid_moves = _calculate_valid_drops()
-					queue_redraw()
+					_update_status()
+					_request_board_redraw()
 				)
 			panel.add_child(btn)
 
@@ -652,6 +750,8 @@ func _on_event_json(json_str: String) -> void:
 				var to_c = int(to[0])
 				var to_r = int(to[1])
 				var promoted_flag: bool = event.get("promoted", false) == true
+				last_move_from = Vector2i(from_r, from_c)
+				last_move_to = Vector2i(to_r, to_c)
 				
 				var piece_data = board[from_r][from_c]
 				var cap_evt = event.get("captured", null)
@@ -691,8 +791,8 @@ func _on_event_json(json_str: String) -> void:
 							"Lance": piece_data["kind"] = "PromotedLance"
 							"Knight": piece_data["kind"] = "PromotedKnight"
 							"Silver": piece_data["kind"] = "PromotedSilver"
-							"Bishop": piece_data["kind"] = "Horse"
-							"Rook": piece_data["kind"] = "Dragon"
+							"Bishop": piece_data["kind"] = "PromotedBishop"
+							"Rook": piece_data["kind"] = "PromotedRook"
 
 					board[from_r][from_c] = null
 					board[to_r][to_c] = piece_data
@@ -705,7 +805,12 @@ func _on_event_json(json_str: String) -> void:
 					else:
 						piece_nodes[to_r][to_c] = node
 						if node != null:
-							node.position = Vector2(BOARD_ORIGIN_X + to_c * CELL_SIZE + 3, BOARD_ORIGIN_Y + to_r * CELL_SIZE + 3)
+							var target_pos := Vector2(BOARD_ORIGIN_X + to_c * CELL_SIZE + 3, BOARD_ORIGIN_Y + to_r * CELL_SIZE + 3)
+							if is_inside_tree() and not OS.has_feature("headless"):
+								var tw := create_tween()
+								tw.tween_property(node, "position", target_pos, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+							else:
+								node.position = target_pos
 
 				if is_cap:
 					_refresh_hand_displays_from_event_or_state(event)
@@ -716,6 +821,8 @@ func _on_event_json(json_str: String) -> void:
 				var p = int(event.get("player", current))
 				var to_c = int(to[0])
 				var to_r = int(to[1])
+				last_move_from = null
+				last_move_to = Vector2i(to_r, to_c)
 				
 				_place_piece_on_board(to_r, to_c, p, kind)
 				if hands.has(p) and hands[p].has(kind):
@@ -730,10 +837,11 @@ func _on_event_json(json_str: String) -> void:
 				if w == null: w = 0
 				_on_game_over(int(w))
 				
-	current = bridge.current_player()
+	if bridge != null:
+		current = bridge.current_player()
 	_update_hand_panels()
 	_update_status()
-	queue_redraw()
+	_request_board_redraw()
 
 func _on_game_over(w: int) -> void:
 	winner = w
@@ -745,41 +853,81 @@ func _on_game_over(w: int) -> void:
 	overlay.show_winner(w)
 
 func _on_move_rejected(reason: String) -> void:
-	status.text = "Movimiento inválido: %s" % reason
+	if status != null:
+		status.text = "Movimiento inválido: %s" % reason
 	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()
 
 func _draw() -> void:
-	# Marco exterior del Shogiban y puntos estelares de zona de promoción (Hoshi)
-	var b_rect := Rect2(BOARD_ORIGIN_X, BOARD_ORIGIN_Y, BOARD_SIZE * CELL_SIZE, BOARD_SIZE * CELL_SIZE)
-	draw_rect(Rect2(BOARD_ORIGIN_X - 4, BOARD_ORIGIN_Y - 4, BOARD_SIZE * CELL_SIZE + 8, BOARD_SIZE * CELL_SIZE + 8), Color(0.28, 0.18, 0.10), false, 4.0)
-	draw_rect(b_rect, COL_LINE, false, 2.0)
+	var board_px := BOARD_SIZE * CELL_SIZE
+	var bg_col: Color = current_theme.board_color if current_theme != null else COL_BOARD
+	var line_col: Color = current_theme.line_color if current_theme != null else COL_LINE
+
+	# Outer wooden frame & warm Kaya Shogiban surface
+	var outer_rect := Rect2(BOARD_ORIGIN_X - 8.0, BOARD_ORIGIN_Y - 8.0, board_px + 16.0, board_px + 16.0)
+	draw_rect(outer_rect, COL_BOARD_FRAME, true)
+	draw_rect(outer_rect, Color(0.16, 0.09, 0.04), false, 2.0)
+
+	var b_rect := Rect2(BOARD_ORIGIN_X, BOARD_ORIGIN_Y, board_px, board_px)
+	draw_rect(b_rect, bg_col, true)
+
+	# Continuous 2.0px grid lines (never culled at scaled viewport resolutions)
+	for i in range(BOARD_SIZE + 1):
+		var offset := float(i) * CELL_SIZE
+		var x := BOARD_ORIGIN_X + offset
+		var y := BOARD_ORIGIN_Y + offset
+		var w_line := 2.5 if (i == 0 or i == BOARD_SIZE) else 2.0
+		draw_line(Vector2(x, BOARD_ORIGIN_Y), Vector2(x, BOARD_ORIGIN_Y + board_px), line_col, w_line)
+		draw_line(Vector2(BOARD_ORIGIN_X, y), Vector2(BOARD_ORIGIN_X + board_px, y), line_col, w_line)
+
+	# Traditional Hoshi promotion-zone star points
 	for r_idx in [3, 6]:
 		for c_idx in [3, 6]:
-			draw_circle(Vector2(BOARD_ORIGIN_X + c_idx * CELL_SIZE, BOARD_ORIGIN_Y + r_idx * CELL_SIZE), 4.0, COL_LINE)
+			draw_circle(Vector2(BOARD_ORIGIN_X + c_idx * CELL_SIZE, BOARD_ORIGIN_Y + r_idx * CELL_SIZE), 4.5, line_col)
+
+	if board_overlay != null and is_instance_valid(board_overlay):
+		board_overlay.queue_redraw()
+
+func _draw_board_overlay() -> void:
+	if board_overlay == null:
+		return
+	if last_move_from != null:
+		var from_rect := Rect2(BOARD_ORIGIN_X + last_move_from.y * CELL_SIZE + 1.0, BOARD_ORIGIN_Y + last_move_from.x * CELL_SIZE + 1.0, CELL_SIZE - 2.0, CELL_SIZE - 2.0)
+		board_overlay.draw_rect(from_rect, COL_LAST_MOVE, true)
+	if last_move_to != null:
+		var to_rect := Rect2(BOARD_ORIGIN_X + last_move_to.y * CELL_SIZE + 1.0, BOARD_ORIGIN_Y + last_move_to.x * CELL_SIZE + 1.0, CELL_SIZE - 2.0, CELL_SIZE - 2.0)
+		board_overlay.draw_rect(to_rect, COL_LAST_MOVE, true)
 
 	if selected_board_pos != null:
-		var rect = Rect2(BOARD_ORIGIN_X + selected_board_pos.y * CELL_SIZE, BOARD_ORIGIN_Y + selected_board_pos.x * CELL_SIZE, CELL_SIZE, CELL_SIZE)
-		draw_rect(rect, COL_SELECT)
+		var sel_rect := Rect2(BOARD_ORIGIN_X + selected_board_pos.y * CELL_SIZE + 1.0, BOARD_ORIGIN_Y + selected_board_pos.x * CELL_SIZE + 1.0, CELL_SIZE - 2.0, CELL_SIZE - 2.0)
+		board_overlay.draw_rect(sel_rect, COL_SELECT, true)
+		board_overlay.draw_rect(sel_rect, Color(1.0, 0.92, 0.35, 0.95), false, 2.5)
 
-	# Draw valid move / drop destinations with green circles
 	for pos in valid_moves:
-		var center = Vector2(BOARD_ORIGIN_X + pos.y * CELL_SIZE + CELL_SIZE / 2.0, BOARD_ORIGIN_Y + pos.x * CELL_SIZE + CELL_SIZE / 2.0)
-		draw_circle(center, CELL_SIZE * 0.25, COL_VALID_MOVE)
+		var center := Vector2(BOARD_ORIGIN_X + pos.y * CELL_SIZE + CELL_SIZE * 0.5, BOARD_ORIGIN_Y + pos.x * CELL_SIZE + CELL_SIZE * 0.5)
+		var target_cell = board[pos.x][pos.y] if (pos.x >= 0 and pos.x < board.size() and pos.y >= 0 and pos.y < board[pos.x].size()) else null
+		if target_cell != null:
+			# Capture target ring
+			board_overlay.draw_arc(center, CELL_SIZE * 0.38, 0.0, TAU, 32, Color(0.92, 0.22, 0.18, 0.85), 3.5)
+		else:
+			board_overlay.draw_circle(center, CELL_SIZE * 0.22, COL_VALID_MOVE)
+			board_overlay.draw_arc(center, CELL_SIZE * 0.22, 0.0, TAU, 24, Color(0.95, 1.0, 0.95, 0.80), 2.0)
 
 func _update_status() -> void:
+	if status == null:
+		return
 	if winner != -1:
 		status.text = "¡Jaque mate! Ganó el jugador %s" % winner
 		if turn_indicator != null:
 			turn_indicator.stop_timer()
 			turn_indicator.set_active(false)
 	else:
-		var name = "Sente (P1)" if current == P_SENTE else "Gote (P2)"
+		var p_name = "Sente (P1)" if current == P_SENTE else "Gote (P2)"
 		var col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)] as Color)
 		var hand_sel_text = " (Mano: %s)" % selected_hand_piece if selected_hand_piece != "" else ""
-		status.text = "Turno: Jugador %s (Shogi)%s" % [name, hand_sel_text]
+		status.text = "Turno: Jugador %s (Shogi)%s" % [p_name, hand_sel_text]
 		if turn_indicator != null:
-			turn_indicator.set_turn(current, name, col)
+			turn_indicator.set_turn(current, p_name, col)
 			turn_indicator.set_active(true)
 
 # --- Conexión de eventos sonoros procedurales (AudioManager) ---
@@ -831,3 +979,4 @@ func _sfx_victory_fanfare() -> void:
 func _sfx_error_buzz() -> void:
 	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()
+
