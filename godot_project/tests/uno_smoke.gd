@@ -50,7 +50,6 @@ func _initialize() -> void:
 		"command_type": "CallUnoCommand",
 		"player": 1
 	}))
-	# Con mano de 7 cartas debe ser rechazado por la regla de negocio (1 o 2 cartas requeridas)
 	var call_uno_processed = move_rejected_reasons.size() > 0 or events_received.any(func(e): return "UnoCalledEvent" in str(e))
 	results.append(["CallUnoCommand procesado por el engine de UNO", call_uno_processed])
 
@@ -86,7 +85,7 @@ func _initialize() -> void:
 	var intercept_processed = move_rejected_reasons.size() > 0 or events_received.any(func(e): return "InterceptedEvent" in str(e))
 	results.append(["InterceptCommand procesado por el engine de UNO", intercept_processed])
 
-	# 8. Verificar botones y métodos en uno_board.gd
+	# 8. Verificar botones, diseño visual (Panel vs PanelContainer) y turno de IA en uno_board.gd
 	var board_script = load("res://uno_board.gd")
 	if board_script != null:
 		var board_inst = board_script.new()
@@ -105,6 +104,30 @@ func _initialize() -> void:
 		results.append(["uno_board contiene botón ⚡ Desafiar +4 (ChallengeWildFourButton)", has_challenge_btn])
 		results.append(["uno_board contiene botón ⚡ Jump-In (JumpInButton)", has_jump_in_btn])
 		results.append(["uno_board implementa lógica Jump-In (_is_card_interceptable)", has_intercept_method])
+
+		# Verificar que _create_card_visual devuelve un Panel (no PanelContainer) y mesa amplia (1200x692)
+		var sample_card = board_inst._create_card_visual({"color": "Red", "value": "5"}, true, false)
+		var is_plain_panel = (sample_card is Panel) and not (sample_card is PanelContainer)
+		sample_card.free()
+		results.append(["_create_card_visual usa Panel para no deformar el óvalo interior", is_plain_panel])
+		results.append(["TableMatPanel tiene diseño amplio centrado (1200x692)", board_inst.table_mat_panel != null and board_inst.table_mat_panel.size.x >= 1100])
+
+		# 9. Probar partida vs IA en uno_board.gd jugando una carta normal desde la mano humana
+		board_inst._on_mode_selected(1) # vs IA (Humano = J1, IA = J2)
+		var tick_before: int = board_inst.bridge.current_tick()
+		var played_non_wild := false
+		for i in range(board_inst.player_hand.size()):
+			var c = board_inst.player_hand[i]
+			var c_col = str(c.get("color", ""))
+			var c_val = str(c.get("value", ""))
+			if board_inst._is_card_playable(c) and not (c_col in ["Wild", "WildColor"] or c_val in ["Wild", "WildDrawFour"]):
+				board_inst._execute_play_card(i, Vector2.ZERO, "")
+				played_non_wild = true
+				break
+		if not played_non_wild:
+			board_inst._on_draw_pile_pressed()
+		var tick_after: int = board_inst.bridge.current_tick()
+		results.append(["En modo vs IA, jugada de J1 es aceptada y la IA responde automáticamente (ticks >= +2)", not board_inst._last_move_rejected and tick_after >= tick_before + 2 and board_inst.current == 1])
 
 		root.remove_child(board_inst)
 		board_inst.free()
