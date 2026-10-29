@@ -487,6 +487,8 @@ func _ready() -> void:
 		gm = get_node_or_null("/root/GameManager")
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
+	if get_viewport() != null and not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
+		get_viewport().size_changed.connect(_on_viewport_size_changed)
 
 	bridge = OpenTableBridge.new()
 	bridge.name = "Bridge"
@@ -1165,6 +1167,26 @@ func _on_layout_changed(layout: int) -> void:
 		map_canvas.position = Vector2.ZERO
 		map_canvas.size = map_panel.size
 		map_canvas.queue_redraw()
+
+	var vp_size := Vector2(1280, 720)
+	if is_inside_tree() and get_viewport() != null:
+		var visible_sz = get_viewport().get_visible_rect().size
+		if visible_sz.x > 0 and visible_sz.y > 0:
+			vp_size = visible_sz
+
+	var design_sz: Vector2 = map_panel.size if map_panel != null else Vector2(1280, 720)
+	if vp_size.x < design_sz.x or vp_size.y < design_sz.y:
+		var scale_x: float = (vp_size.x - 8.0) / design_sz.x
+		var scale_y: float = (vp_size.y - 8.0) / design_sz.y
+		var s: float = clampf(minf(scale_x, scale_y), 0.25, 1.0)
+		scale = Vector2(s, s)
+		position = Vector2(maxf(0.0, (vp_size.x - design_sz.x * s) * 0.5), maxf(0.0, (vp_size.y - design_sz.y * s) * 0.5))
+	else:
+		scale = Vector2.ONE
+		position = Vector2.ZERO
+
+func _on_viewport_size_changed() -> void:
+	_on_layout_changed(current_layout)
 
 func _get_map_transform() -> Dictionary:
 	var canvas_size = map_canvas.size if map_canvas else Vector2(1280, 720)

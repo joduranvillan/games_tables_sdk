@@ -58,6 +58,9 @@ func _ready() -> void:
 	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
+	if is_inside_tree() and get_viewport() != null:
+		if not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
+			get_viewport().size_changed.connect(_on_viewport_size_changed)
 
 	_setup_ui()
 	_init_board()
@@ -359,9 +362,29 @@ func _on_theme_changed(theme: BoardTheme) -> void:
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 	queue_redraw()
 
+func _on_viewport_size_changed() -> void:
+	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
+
 func _on_layout_changed(_layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
+	var vp_size := Vector2(1280, 720)
+	if is_inside_tree() and get_viewport() != null:
+		var visible_sz := get_viewport().get_visible_rect().size
+		if visible_sz.x > 0 and visible_sz.y > 0:
+			vp_size = visible_sz
+	if _layout == 2 and vp_size.x >= 1000.0:
+		vp_size = Vector2(375, 667)
+	var design_w := 1060.0
+	var design_h := 620.0
+	if _layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
+		var s := clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.30, 1.0)
+		scale = Vector2(s, s)
+		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
+	else:
+		scale = Vector2.ONE
+		position = Vector2.ZERO
 
 func cell_to_pixel(cell: Vector2i) -> Vector2:
 	return Vector2(cell.x * CELL_SIZE, cell.y * CELL_SIZE)
@@ -561,10 +584,10 @@ func _input(event: InputEvent) -> void:
 	var click_pos = Vector2.ZERO
 	var handled = false
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		click_pos = get_local_mouse_position() if (is_inside_tree() and not OS.has_feature("headless")) else event.position
+		click_pos = get_local_mouse_position() if (is_inside_tree() and not OS.has_feature("headless")) else to_local(event.position)
 		handled = true
 	elif event is InputEventScreenTouch and event.pressed:
-		click_pos = make_canvas_position_local(event.position) if (is_inside_tree() and not OS.has_feature("headless")) else event.position
+		click_pos = to_local(event.position)
 		handled = true
 		
 	if handled:

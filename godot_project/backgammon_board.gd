@@ -61,6 +61,9 @@ func _ready() -> void:
 	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
+	if is_inside_tree() and get_viewport() != null:
+		if not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
+			get_viewport().size_changed.connect(_on_viewport_size_changed)
 
 	_init_board_state()
 	_setup_ui()
@@ -107,6 +110,10 @@ func _ready() -> void:
 		_pause_menu.connect("quit_game_requested", _on_quit_to_menu)
 		add_child(_pause_menu)
 
+func _on_viewport_size_changed() -> void:
+	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
+
 func _on_quit_to_menu() -> void:
 	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://main.tscn")
@@ -123,6 +130,22 @@ func _on_theme_changed(theme: BoardTheme) -> void:
 func _on_layout_changed(_layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
+	var vp_size := Vector2(1280, 720)
+	if is_inside_tree() and get_viewport() != null:
+		var visible_sz := get_viewport().get_visible_rect().size
+		if visible_sz.x > 0 and visible_sz.y > 0:
+			vp_size = visible_sz
+	if _layout == 2 and vp_size.x >= 1000.0:
+		vp_size = Vector2(375, 667)
+	var design_w := 1150.0
+	var design_h := 600.0
+	if _layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
+		var s := clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.28, 1.0)
+		scale = Vector2(s, s)
+		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
+	else:
+		scale = Vector2.ONE
+		position = Vector2.ZERO
 
 func _init_board_state() -> void:
 	points = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
@@ -321,10 +344,10 @@ func _input(event: InputEvent) -> void:
 	var click_pos = Vector2.ZERO
 	var handled = false
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		click_pos = event.position
+		click_pos = to_local(event.position)
 		handled = true
 	elif event is InputEventScreenTouch and event.pressed:
-		click_pos = event.position
+		click_pos = to_local(event.position)
 		handled = true
 		
 	if handled:
@@ -417,7 +440,7 @@ func _update_checker_positions() -> void:
 		var count = points[pt]
 		if count == 0:
 			continue
-		var owner = P1 if count > 0 else P2
+		var pt_owner = P1 if count > 0 else P2
 		var total_num = abs(count)
 		var visible_num = min(total_num, 5)
 		var base_pos = _get_point_base_pos(pt)
@@ -426,7 +449,7 @@ func _update_checker_positions() -> void:
 		for k in range(visible_num):
 			var is_top_stack = (k == visible_num - 1) and (total_num > 5)
 			var badge_text = str(total_num) if is_top_stack else ""
-			var btn = _create_checker_button(owner, badge_text)
+			var btn = _create_checker_button(pt_owner, badge_text)
 			var y_off = k * 28.0 if is_top else -k * 28.0
 			var pos = base_pos + Vector2(-15, y_off - (0 if is_top else 30))
 			btn.position = pos
@@ -659,11 +682,11 @@ func _update_status() -> void:
 			turn_indicator.stop_timer()
 			turn_indicator.set_active(false)
 	else:
-		var name = "Rojo (P1)" if current == P1 else "Azul (P2)"
+		var p_name = "Rojo (P1)" if current == P1 else "Azul (P2)"
 		var col = PLAYER_COLORS[current]
-		status.text = "Turno: Jugador %s (Backgammon)" % name
+		status.text = "Turno: Jugador %s (Backgammon)" % p_name
 		if turn_indicator != null:
-			turn_indicator.set_turn(current, name, col)
+			turn_indicator.set_turn(current, p_name, col)
 			turn_indicator.set_active(true)
 
 # --- Conexión de eventos sonoros procedurales (AudioManager) ---

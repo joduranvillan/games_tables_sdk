@@ -154,6 +154,9 @@ func _ready() -> void:
 		gm = get_node_or_null("/root/GameManager")
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
+	if is_inside_tree() and get_viewport() != null:
+		if not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
+			get_viewport().size_changed.connect(_on_viewport_size_changed)
 
 	bridge = OpenTableBridge.new()
 	bridge.name = "Bridge"
@@ -2208,48 +2211,50 @@ func _on_move_rejected(reason: String) -> void:
 	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()
 
+func _on_viewport_size_changed() -> void:
+	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	_on_layout_changed(int(gm.get_layout()) if (gm != null and gm.has_method("get_layout")) else 0)
+
 func _on_layout_changed(layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
-	if layout == 2: # PHONE
-		table_mat_panel.position = Vector2(5, 5)
-		table_mat_panel.size = Vector2(365, 680)
-		top_bar.position = Vector2(10, 15)
-		top_bar.size = Vector2(355, 38)
-		turn_indicator.position = Vector2(10, 58)
-		turn_indicator.custom_minimum_size = Vector2(355, 36)
-		turn_indicator.size = Vector2(355, 36)
-		opp_vbox.position = Vector2(10, 98)
-		opp_vbox.size = Vector2(355, 68)
-		event_banner_panel.position = Vector2(10, 170)
-		event_banner_panel.size = Vector2(355, 32)
-		center_play_area.position = Vector2(10, 210)
-		center_play_area.size = Vector2(355, 200)
-		if action_buttons_bar != null:
-			action_buttons_bar.position = Vector2(10, 415)
-			action_buttons_bar.size = Vector2(355, 30)
-		hand_container.position = Vector2(5, 450)
-		hand_container.size = Vector2(365, 210)
-	else: # DESKTOP or TABLET (1280x720 wide centered table)
-		table_mat_panel.position = Vector2(40, 14)
-		table_mat_panel.size = Vector2(1200, 692)
-		top_bar.position = Vector2(70, 24)
-		top_bar.size = Vector2(1140, 40)
-		turn_indicator.position = Vector2(70, 70)
-		turn_indicator.custom_minimum_size = Vector2(1140, 38)
-		turn_indicator.size = Vector2(1140, 38)
-		opp_vbox.position = Vector2(190, 110)
-		opp_vbox.size = Vector2(900, 74)
-		event_banner_panel.position = Vector2(240, 190)
-		event_banner_panel.size = Vector2(800, 34)
-		center_play_area.position = Vector2(190, 230)
-		center_play_area.size = Vector2(900, 200)
-		if action_buttons_bar != null:
-			action_buttons_bar.position = Vector2(240, 436)
-			action_buttons_bar.size = Vector2(800, 36)
-		hand_container.position = Vector2(90, 476)
-		hand_container.size = Vector2(1100, 215)
+	table_mat_panel.position = Vector2(40, 14)
+	table_mat_panel.size = Vector2(1200, 692)
+	top_bar.position = Vector2(70, 24)
+	top_bar.size = Vector2(1140, 40)
+	turn_indicator.position = Vector2(70, 70)
+	turn_indicator.custom_minimum_size = Vector2(1140, 38)
+	turn_indicator.size = Vector2(1140, 38)
+	opp_vbox.position = Vector2(190, 110)
+	opp_vbox.size = Vector2(900, 74)
+	event_banner_panel.position = Vector2(240, 190)
+	event_banner_panel.size = Vector2(800, 34)
+	center_play_area.position = Vector2(190, 230)
+	center_play_area.size = Vector2(900, 200)
+	if action_buttons_bar != null:
+		action_buttons_bar.position = Vector2(240, 436)
+		action_buttons_bar.size = Vector2(800, 36)
+	hand_container.position = Vector2(90, 476)
+	hand_container.size = Vector2(1100, 215)
+
+	var vp_size := Vector2(1280, 720)
+	if is_inside_tree() and get_viewport() != null:
+		var visible_sz := get_viewport().get_visible_rect().size
+		if visible_sz.x > 0 and visible_sz.y > 0:
+			vp_size = visible_sz
+	if layout == 2 and vp_size.x >= 1000.0:
+		vp_size = Vector2(375, 667)
+
+	var design_w := 1280.0
+	var design_h := 720.0
+	if layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
+		var s := clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.28, 1.0)
+		scale = Vector2(s, s)
+		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
+	else:
+		scale = Vector2.ONE
+		position = Vector2.ZERO
 
 	_update_ui()
 	_restore_fixed_fonts(self)

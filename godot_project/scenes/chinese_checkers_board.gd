@@ -62,6 +62,9 @@ func _ready() -> void:
 	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
+	if is_inside_tree() and get_viewport() != null:
+		if not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
+			get_viewport().size_changed.connect(_on_viewport_size_changed)
 
 	_setup_ui_layers()
 	if gm != null and gm.get_game_mode() == "vs_ai" and mode_option_button != null:
@@ -74,6 +77,10 @@ func _ready() -> void:
 		_pause_menu = load("res://pause_menu.tscn").instantiate()
 		_pause_menu.connect("quit_game_requested", _on_quit_to_menu)
 		add_child(_pause_menu)
+
+func _on_viewport_size_changed() -> void:
+	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
 
 func _on_quit_to_menu() -> void:
 	if (is_inside_tree() and has_node("/root/SceneManager")):
@@ -90,6 +97,22 @@ func _on_theme_changed(theme: BoardTheme) -> void:
 func _on_layout_changed(_layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
+	var vp_size := Vector2(1280, 720)
+	if is_inside_tree() and get_viewport() != null:
+		var visible_sz := get_viewport().get_visible_rect().size
+		if visible_sz.x > 0 and visible_sz.y > 0:
+			vp_size = visible_sz
+	if _layout == 2 and vp_size.x >= 1000.0:
+		vp_size = Vector2(375, 667)
+	var design_w := 1040.0
+	var design_h := 680.0
+	if _layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
+		var s := clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.30, 1.0)
+		scale = Vector2(s, s)
+		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
+	else:
+		scale = Vector2.ONE
+		position = Vector2.ZERO
 
 func _rotate_60(p: Vector2i, times: int) -> Vector2i:
 	var curr = p

@@ -741,9 +741,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	var click_pos: Vector2 = Vector2(-1, -1)
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		click_pos = event.position
+		click_pos = to_local(event.position)
 	elif event is InputEventScreenTouch and event.pressed:
-		click_pos = event.position
+		click_pos = to_local(event.position)
 
 	if click_pos.x >= 0.0:
 		for i in range(TOTAL_SPACES):
@@ -1602,6 +1602,19 @@ func _on_layout_changed(layout: int) -> void:
 	_center_modal_over_board(buy_modal)
 	_center_modal_over_board(auction_modal)
 	_update_token_positions()
+
+	var total_w: float = (board_rect.end.x + 16.0) if is_portrait_or_phone else (control_dashboard.position.x + control_dashboard.size.x + 16.0 if control_dashboard != null else 720.0)
+	var total_h: float = (board_rect.end.y + 265.0) if is_portrait_or_phone else (board_rect.end.y + 36.0)
+	if vp_size.x < total_w or vp_size.y < total_h:
+		var sx: float = (vp_size.x - 8.0) / total_w
+		var sy: float = (vp_size.y - 8.0) / total_h
+		var s: float = clampf(minf(sx, sy), 0.3, 1.0)
+		scale = Vector2(s, s)
+		position = Vector2(maxf(0.0, (vp_size.x - total_w * s) * 0.5), maxf(0.0, (vp_size.y - total_h * s) * 0.5))
+	else:
+		scale = Vector2.ONE
+		position = Vector2.ZERO
+
 	queue_redraw()
 
 # -------------------------------------------------------------------------

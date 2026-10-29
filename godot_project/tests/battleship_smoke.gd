@@ -63,6 +63,34 @@ func _initialize() -> void:
 
 	results.append(["Colocación de flota fuera de límites genera rechazo move_rejected", move_rejected_reasons.size() > 0])
 
+	# 4. Verificar escena UI de Batalla Naval (validación de adyacencia, Auto-Flota y layout móvil)
+	var board_scene: PackedScene = load("res://battleship_board.tscn")
+	var board_inst: Node2D = board_scene.instantiate() if board_scene != null else null
+	if board_inst != null:
+		root.add_child(board_inst)
+		var orphan_status = board_inst.get_node_or_null("Status")
+		results.append(["Nodo huérfano Status ('Cargando...') está oculto en battleship_board.tscn", orphan_status != null and not orphan_status.visible])
+
+		# Colocar primer barco (Portaaviones, 5 casillas) en fila 0, col 0..4
+		board_inst._on_own_cell_pressed(0, 0)
+		results.append(["Primer barco se coloca en (0,0..4) avanzando current_ship_index a 1", board_inst.current_ship_index == 1])
+
+		# Intentar colocar segundo barco (Acorazado, 4 casillas) pegado en fila 1, col 0..3 -> debe rechazarse por adyacencia
+		board_inst._on_own_cell_pressed(1, 0)
+		results.append(["UI impide colocar segundo barco pegado al primero (adyacencia de 1 casilla)", board_inst.current_ship_index == 1])
+
+		# Probar botón Auto-Flota en modo vs_ai -> debe completar la flota y pasar a fase FIRE (2)
+		board_inst._on_auto_fleet_pressed()
+		results.append(["Botón Auto-Flota coloca 5 barcos válidos con separación y avanza a fase de disparo", board_inst.phase == board_inst.Phase.FIRE or board_inst.phase == board_inst.Phase.PLACEMENT_P2])
+
+		# Probar layout móvil vertical (layout = 2)
+		board_inst._on_layout_changed(2)
+		results.append(["Layout móvil (layout=2) apila verticalmente Mi Flota y Radar", board_inst.grids_container != null and board_inst.grids_container.vertical == true])
+
+		board_inst.free()
+	else:
+		results.append(["battleship_board.tscn carga correctamente", false])
+
 	var ok := true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])

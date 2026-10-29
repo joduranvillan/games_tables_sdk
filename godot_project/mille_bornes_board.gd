@@ -97,6 +97,9 @@ func _ready() -> void:
 	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
 	if gm != null and gm.has_signal("layout_changed"):
 		gm.layout_changed.connect(_on_layout_changed)
+	if is_inside_tree() and get_viewport() != null:
+		if not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
+			get_viewport().size_changed.connect(_on_viewport_size_changed)
 
 	bridge = OpenTableBridge.new()
 	bridge.name = "Bridge"
@@ -340,33 +343,42 @@ func _setup_ui() -> void:
 
 	_apply_theme_styling()
 
+func _on_viewport_size_changed() -> void:
+	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+	_on_layout_changed(gm.get_layout() if gm != null else 0)
+
 func _on_layout_changed(layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
-	if layout == 2: # PHONE
-		top_bar.position = Vector2(10, 10)
-		top_bar.size = Vector2(355, 40)
-		turn_indicator.position = Vector2(10, 55)
-		local_tableau.position = Vector2(10, 100)
-		local_tableau.size = Vector2(355, 200)
-		opponent_tableau.position = Vector2(10, 310)
-		opponent_tableau.size = Vector2(355, 130)
-		draw_button.position = Vector2(10, 450)
-		hand_panel.position = Vector2(10, 500)
-		hand_panel.size = Vector2(355, 140)
-		hand_container.size = Vector2(340, 120)
-	else: # DESKTOP or TABLET
-		top_bar.position = Vector2(50, 20)
-		top_bar.size = Vector2(700, 45)
-		turn_indicator.position = Vector2(50, 75)
-		local_tableau.position = Vector2(50, 130)
-		local_tableau.size = Vector2(400, 310)
-		opponent_tableau.position = Vector2(480, 130)
-		opponent_tableau.size = Vector2(270, 310)
-		hand_panel.position = Vector2(50, 520)
-		hand_panel.size = Vector2(700, 140)
-		hand_container.size = Vector2(676, 120)
+	top_bar.position = Vector2(50, 20)
+	top_bar.size = Vector2(700, 45)
+	turn_indicator.position = Vector2(50, 75)
+	local_tableau.position = Vector2(50, 130)
+	local_tableau.size = Vector2(400, 310)
+	opponent_tableau.position = Vector2(480, 130)
+	opponent_tableau.size = Vector2(270, 310)
+	hand_panel.position = Vector2(50, 520)
+	hand_panel.size = Vector2(700, 140)
+	hand_container.size = Vector2(676, 120)
+
+	var vp_size := Vector2(1280, 720)
+	if is_inside_tree() and get_viewport() != null:
+		var visible_sz := get_viewport().get_visible_rect().size
+		if visible_sz.x > 0 and visible_sz.y > 0:
+			vp_size = visible_sz
+	if layout == 2 and vp_size.x >= 1000.0:
+		vp_size = Vector2(375, 667)
+
+	var design_w := 800.0
+	var design_h := 680.0
+	if layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
+		var s := clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.35, 1.0)
+		scale = Vector2(s, s)
+		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
+	else:
+		scale = Vector2.ONE
+		position = Vector2.ZERO
 
 # -------------------------------------------------------------------------
 # CARD PARSING & VISUAL RENDERING (a)
