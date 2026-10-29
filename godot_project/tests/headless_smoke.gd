@@ -26,14 +26,25 @@ func _initialize() -> void:
 	results.append(["el turno pasó al jugador 2", bridge.current_player() == 2])
 	results.append(["se emitió la señal turn_changed con nuevo jugador 2", turns_changed.size() == 1 and turns_changed[0] == 2])
 
-	# Verificar resaltado de multicaptura en CheckersBoard
+	# Verificar resaltado de movimientos válidos y ejecución de primer movimiento en CheckersBoard
 	var board_scene: PackedScene = load("res://checkers_board.tscn")
 	var board_node = board_scene.instantiate()
 	root.add_child(board_node)
 	if board_node.board.is_empty() and board_node.has_method("_ready"):
 		board_node._ready()
 
+	var initial_valid: Array = board_node._calculate_valid_moves(2, 1)
+	results.append(["_calculate_valid_moves(2,1) devuelve 2 destinos válidos [(3,0), (3,2)]", initial_valid.size() == 2 and initial_valid.has(Vector2i(3, 0)) and initial_valid.has(Vector2i(3, 2))])
+
+	board_node._handle_click(Vector2(1.5 * board_node.CELL, 2.5 * board_node.CELL))
+	results.append(["click en (2,1) selecciona la ficha y calcula valid_moves", board_node.selected != null and board_node.valid_moves.size() == 2])
+
+	board_node._handle_click(Vector2(0.5 * board_node.CELL, 3.5 * board_node.CELL))
+	results.append(["click en destino (3,0) avanza la ficha en la primera jugada", board_node.board[3][0] != null and int(board_node.board[3][0].owner) == 1])
+
 	# Simular evento de salto en el que el turno continúa perteneciendo al jugador 1 (multicaptura activa)
+	board_node.current = 1
+	board_node.board[0][1] = {"owner": 1, "king": false}
 	board_node.board[3][4] = {"owner": 2, "king": false}
 	board_node._on_piece_moved(1, 0, 1, 2, 3, 1, 2, false)
 	var mc_selected: bool = (

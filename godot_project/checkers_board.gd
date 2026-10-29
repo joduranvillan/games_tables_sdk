@@ -364,31 +364,77 @@ func _on_piece_dropped(to_cell: Vector2i) -> void:
 
 func _calculate_valid_moves(row: int, col: int) -> Array[Vector2i]:
 	var moves: Array[Vector2i] = []
-	if bridge == null or not bridge.has_method("get_legal_moves"):
+	if bridge != null and bridge.has_method("get_legal_moves"):
+		var legal_moves = bridge.get_legal_moves(current)
+		for m in legal_moves:
+			if not (m is Dictionary):
+				continue
+			var f_row: int = -1
+			var f_col: int = -1
+			var t_row: int = -1
+			var t_col: int = -1
+
+			if m.has("from") and m["from"] is Dictionary:
+				var f_dict: Dictionary = m["from"]
+				f_row = int(f_dict.get("row", -1))
+				f_col = int(f_dict.get("col", -1))
+			elif m.has("from_row"):
+				f_row = int(m.get("from_row", -1))
+				f_col = int(m.get("from_col", -1))
+
+			if m.has("to") and m["to"] is Dictionary:
+				var t_dict: Dictionary = m["to"]
+				t_row = int(t_dict.get("row", -1))
+				t_col = int(t_dict.get("col", -1))
+			elif m.has("to_row"):
+				t_row = int(m.get("to_row", -1))
+				t_col = int(m.get("to_col", -1))
+
+			if f_row == row and f_col == col and t_row >= 0 and t_col >= 0:
+				var dest: Vector2i = Vector2i(t_row, t_col)
+				if not moves.has(dest):
+					moves.append(dest)
+		if not legal_moves.is_empty():
+			return moves
+
+	return _calculate_local_valid_moves(row, col)
+
+func _calculate_local_valid_moves(row: int, col: int) -> Array[Vector2i]:
+	var moves: Array[Vector2i] = []
+	if row < 0 or row >= BOARD or col < 0 or col >= BOARD:
 		return moves
-	var legal_moves = bridge.get_legal_moves(current)
-	for m in legal_moves:
-		var f_row := -1
-		var f_col := -1
-		var t_row := -1
-		var t_col := -1
+	var cell = board[row][col]
+	if cell == null or int(cell.owner) != current:
+		return moves
+	if multi_capture_cell != null:
+		if int(multi_capture_cell.row) != row or int(multi_capture_cell.col) != col:
+			return moves
 
-		if m.has("from") and m.from is Dictionary:
-			f_row = m.from.get("row", -1)
-			f_col = m.from.get("col", -1)
-		elif m.has("from_row"):
-			f_row = m.get("from_row", -1)
-			f_col = m.get("from_col", -1)
+	var directions: Array[Vector2i] = []
+	if bool(cell.king):
+		directions = [Vector2i(-1, -1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(1, 1)]
+	elif int(cell.owner) == P_TOP:
+		directions = [Vector2i(1, -1), Vector2i(1, 1)]
+	else:
+		directions = [Vector2i(-1, -1), Vector2i(-1, 1)]
 
-		if m.has("to") and m.to is Dictionary:
-			t_row = m.to.get("row", -1)
-			t_col = m.to.get("col", -1)
-		elif m.has("to_row"):
-			t_row = m.get("to_row", -1)
-			t_col = m.get("to_col", -1)
+	var all_captures: Array[Vector2i] = _get_pieces_with_captures(current)
+	if not all_captures.is_empty() or multi_capture_cell != null:
+		for d in directions:
+			var mid_r: int = row + d.x
+			var mid_c: int = col + d.y
+			var land_r: int = row + d.x * 2
+			var land_c: int = col + d.y * 2
+			if land_r >= 0 and land_r < BOARD and land_c >= 0 and land_c < BOARD:
+				if board[mid_r][mid_c] != null and int(board[mid_r][mid_c].owner) != int(cell.owner) and board[land_r][land_c] == null:
+					moves.append(Vector2i(land_r, land_c))
+		return moves
 
-		if f_row == row and f_col == col:
-			moves.append(Vector2i(t_row, t_col))
+	for d in directions:
+		var nr: int = row + d.x
+		var nc: int = col + d.y
+		if nr >= 0 and nr < BOARD and nc >= 0 and nc < BOARD and board[nr][nc] == null:
+			moves.append(Vector2i(nr, nc))
 	return moves
 
 func _init_board() -> void:
@@ -457,10 +503,10 @@ func _handle_unified_input(event: InputEvent) -> void:
 	if rules_popup != null and rules_popup.visible:
 		return
 
-	var event_pos := Vector2.ZERO
-	var is_press := false
-	var is_release := false
-	var is_drag := false
+	var event_pos: Vector2 = Vector2.ZERO
+	var is_press: bool = false
+	var is_release: bool = false
+	var is_drag: bool = false
 
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -483,14 +529,14 @@ func _handle_unified_input(event: InputEvent) -> void:
 
 	if is_press:
 		touch_down_pos = event_pos
-		var press_col := int(floor(event_pos.x / CELL))
-		var press_row := int(floor(event_pos.y / CELL))
+		var press_col: int = int(floor(event_pos.x / CELL))
+		var press_row: int = int(floor(event_pos.y / CELL))
 		touch_start_cell = Vector2i(press_row, press_col)
 		is_touch_dragging = false
 		_selected_on_current_press = false
 		if press_row >= 0 and press_row < BOARD and press_col >= 0 and press_col < BOARD:
 			var p_cell = board[press_row][press_col]
-			if p_cell != null and p_cell.owner == current:
+			if p_cell != null and int(p_cell.owner) == current:
 				var already_sel: bool = (selected != null and int(selected.get("row", -1)) == press_row and int(selected.get("col", -1)) == press_col)
 				if not already_sel:
 					_sfx_piece_slide()
@@ -507,29 +553,29 @@ func _handle_unified_input(event: InputEvent) -> void:
 		if touch_down_pos.distance_to(event_pos) > DEAD_ZONE:
 			is_touch_dragging = true
 	elif is_release:
-		var release_col := int(floor(event_pos.x / CELL))
-		var release_row := int(floor(event_pos.y / CELL))
-		var release_cell := Vector2i(release_row, release_col)
+		var release_col: int = int(floor(event_pos.x / CELL))
+		var release_row: int = int(floor(event_pos.y / CELL))
+		var release_cell: Vector2i = Vector2i(release_row, release_col)
 		if release_cell == touch_start_cell:
 			if not _selected_on_current_press:
 				_handle_click(event_pos)
 		else:
-			if selected == null and touch_start_cell.x >= 0 and touch_start_cell.x < BOARD and touch_start_cell.y >= 0 and touch_start_cell.y < BOARD:
+			if not _selected_on_current_press and selected == null and touch_start_cell.x >= 0 and touch_start_cell.x < BOARD and touch_start_cell.y >= 0 and touch_start_cell.y < BOARD:
 				var start_cell = board[touch_start_cell.x][touch_start_cell.y]
-				if start_cell != null and start_cell.owner == current:
+				if start_cell != null and int(start_cell.owner) == current:
 					_reset_all_piece_scales()
 					selected = {"row": touch_start_cell.x, "col": touch_start_cell.y}
 					valid_moves = _calculate_valid_moves(touch_start_cell.x, touch_start_cell.y)
 					_bounce_piece(touch_start_cell.x, touch_start_cell.y)
-			_handle_click(event_pos)
+			if selected != null:
+				_handle_click(event_pos)
 		touch_start_cell = Vector2i(-1, -1)
 		is_touch_dragging = false
 		_selected_on_current_press = false
 
 func _handle_click(pos: Vector2) -> void:
-
-	var col := int(floor(pos.x / CELL))
-	var row := int(floor(pos.y / CELL))
+	var col: int = int(floor(pos.x / CELL))
+	var row: int = int(floor(pos.y / CELL))
 
 	if row < 0 or row >= BOARD or col < 0 or col >= BOARD:
 		_reset_all_piece_scales()
@@ -540,7 +586,7 @@ func _handle_click(pos: Vector2) -> void:
 
 	if selected == null:
 		var clicked_cell = board[row][col]
-		if clicked_cell != null and clicked_cell.owner == current:
+		if clicked_cell != null and int(clicked_cell.owner) == current:
 			_reset_all_piece_scales()
 			selected = {"row": row, "col": col}
 			valid_moves = _calculate_valid_moves(row, col)
@@ -548,28 +594,37 @@ func _handle_click(pos: Vector2) -> void:
 			queue_redraw()
 		return
 
-	# Si se hace click sobre una de las casillas resaltadas
-	var clicked_dest = Vector2i(row, col)
-	if clicked_dest in valid_moves:
-		var from = selected
-		_reset_all_piece_scales()
-		selected = null
-		valid_moves.clear()
-		queue_redraw()
-		var caps = _get_pieces_with_captures(current)
-		if caps.size() > 0 and abs(row - from.row) != 2:
-			_show_mandatory_capture_warning()
-		bridge.send_move(current, from.row, from.col, row, col)
-		return
-
-	# Si se hace click sobre otra ficha propia -> cambiar selección
+	# Si se hace click sobre otra ficha propia -> cambiar selección (o deseleccionar si es la misma)
 	var cell = board[row][col]
-	if cell != null and cell.owner == current:
+	if cell != null and int(cell.owner) == current:
+		if int(selected.row) == row and int(selected.col) == col:
+			_reset_all_piece_scales()
+			selected = null
+			valid_moves.clear()
+			queue_redraw()
+			return
 		_reset_all_piece_scales()
 		selected = {"row": row, "col": col}
 		valid_moves = _calculate_valid_moves(row, col)
 		_bounce_piece(row, col)
 		queue_redraw()
+		return
+
+	# Si se hace click sobre una de las casillas resaltadas o casilla diagonal oscura vacía
+	var clicked_dest: Vector2i = Vector2i(row, col)
+	var from_r: int = int(selected.row)
+	var from_c: int = int(selected.col)
+	var is_diag_step: bool = (cell == null and (row + col) % 2 == 1 and abs(row - from_r) in [1, 2] and abs(col - from_c) == abs(row - from_r))
+	if valid_moves.has(clicked_dest) or is_diag_step:
+		_reset_all_piece_scales()
+		selected = null
+		valid_moves.clear()
+		queue_redraw()
+		var caps: Array[Vector2i] = _get_pieces_with_captures(current)
+		if caps.size() > 0 and abs(row - from_r) != 2:
+			_show_mandatory_capture_warning()
+		if bridge != null:
+			bridge.send_move(current, from_r, from_c, row, col)
 		return
 
 	# Click en otra casilla no válida -> deseleccionar
@@ -624,8 +679,8 @@ func _on_piece_moved(player: int, from_row: int, from_col: int, to_row: int, to_
 	queue_redraw()
 
 	if moving_sprite != null and is_inside_tree():
-		var target_pos := Vector2(to_col * CELL + CELL / 2.0, to_row * CELL + CELL / 2.0)
-		var tween := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+		var target_pos: Vector2 = Vector2(to_col * CELL + CELL / 2.0, to_row * CELL + CELL / 2.0)
+		var tween: Tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 		tween.tween_property(moving_sprite, "position", target_pos, 0.25)
 		if captured_sprite != null and is_instance_valid(captured_sprite):
 			tween.chain().tween_property(captured_sprite, "scale", Vector2.ZERO, 0.15)
@@ -681,7 +736,7 @@ func _draw() -> void:
 		for col in BOARD:
 			var dark: bool = (row + col) % 2 == 1
 			var color: Color = col_d if dark else col_l
-			var cell_rect := Rect2(col * CELL, row * CELL, CELL, CELL)
+			var cell_rect: Rect2 = Rect2(col * CELL, row * CELL, CELL, CELL)
 			draw_rect(cell_rect, color)
 			if dark:
 				draw_rect(Rect2(col * CELL + 2, row * CELL + 2, CELL - 4, CELL - 4), color.darkened(0.08), false, 1.0)
@@ -689,23 +744,23 @@ func _draw() -> void:
 
 	# Casilla seleccionada
 	if selected != null:
-		draw_rect(Rect2(selected.col * CELL, selected.row * CELL, CELL, CELL), col_sel)
-		draw_rect(Rect2(selected.col * CELL + 2, selected.row * CELL + 2, CELL - 4, CELL - 4), Color(1.0, 0.85, 0.15, 0.95), false, 3.0)
+		draw_rect(Rect2(float(selected.col) * CELL, float(selected.row) * CELL, CELL, CELL), col_sel)
+		draw_rect(Rect2(float(selected.col) * CELL + 2.0, float(selected.row) * CELL + 2.0, CELL - 4.0, CELL - 4.0), Color(1.0, 0.85, 0.15, 0.95), false, 3.0)
 
 	# Resaltar casilla de multicaptura obligatoria con borde dorado
 	if multi_capture_cell != null:
-		var mc_rect := Rect2(multi_capture_cell.col * CELL + 2.0, multi_capture_cell.row * CELL + 2.0, CELL - 4.0, CELL - 4.0)
+		var mc_rect: Rect2 = Rect2(float(multi_capture_cell.col) * CELL + 2.0, float(multi_capture_cell.row) * CELL + 2.0, CELL - 4.0, CELL - 4.0)
 		draw_rect(mc_rect, Color(1.0, 0.84, 0.0, 0.95), false, 4.0)
 
 	# Resaltar movimientos válidos con anillos esmeralda
 	for move_pos in valid_moves:
-		var center = Vector2(move_pos.y * CELL + CELL / 2.0, move_pos.x * CELL + CELL / 2.0)
+		var center: Vector2 = Vector2(move_pos.y * CELL + CELL / 2.0, move_pos.x * CELL + CELL / 2.0)
 		draw_circle(center, 18.0, Color(0.15, 0.88, 0.45, 0.45))
 		draw_arc(center, 18.0, 0.0, TAU, 28, Color(0.35, 1.0, 0.60, 0.90), 2.5)
 
 	# Cursor virtual de Gamepad / Steam Deck
 	if gamepad_cursor_active and gamepad_cursor.x >= 0 and gamepad_cursor.x < BOARD and gamepad_cursor.y >= 0 and gamepad_cursor.y < BOARD:
-		var cur_rect := Rect2(gamepad_cursor.y * CELL + 3.0, gamepad_cursor.x * CELL + 3.0, CELL - 6.0, CELL - 6.0)
+		var cur_rect: Rect2 = Rect2(gamepad_cursor.y * CELL + 3.0, gamepad_cursor.x * CELL + 3.0, CELL - 6.0, CELL - 6.0)
 		draw_rect(cur_rect, Color(0.2, 0.95, 1.0, 0.95), false, 3.0)
 
 # --- Soporte de Gamepad y Steam Deck con cursor virtual ---
@@ -721,7 +776,7 @@ func move_gamepad_cursor(delta: Vector2i) -> void:
 
 func gamepad_select_current_cell() -> void:
 	gamepad_cursor_active = true
-	var center_pos := Vector2(gamepad_cursor.y * CELL + CELL / 2.0, gamepad_cursor.x * CELL + CELL / 2.0)
+	var center_pos: Vector2 = Vector2(gamepad_cursor.y * CELL + CELL / 2.0, gamepad_cursor.x * CELL + CELL / 2.0)
 	_handle_click(center_pos)
 
 func gamepad_cancel_selection() -> void:
@@ -774,7 +829,7 @@ func _update_status() -> void:
 			turn_indicator.stop_timer()
 			turn_indicator.set_active(false)
 	else:
-		var who := "Jugador 1" if current == P_TOP else "Jugador 2"
+		var who: String = "Jugador 1" if current == P_TOP else "Jugador 2"
 		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)] as Color)
 		status.text = "Turno: %s" % who
 		if turn_indicator != null:
@@ -793,7 +848,7 @@ func _sfx_piece_place() -> void:
 func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
 	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place(2.0)
-	var particles := CPUParticles2D.new()
+	var particles: CPUParticles2D = CPUParticles2D.new()
 	particles.position = world_pos
 	particles.emitting = true
 	particles.one_shot = true
