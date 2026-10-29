@@ -107,6 +107,7 @@ func _update_responsive_layout() -> void:
 	if has_node("Title"):
 		var title_node := get_node("Title") as Label
 		if title_node != null:
+			title_node.set_anchors_preset(Control.PRESET_TOP_LEFT)
 			title_node.position = Vector2(20.0, 12.0)
 			title_node.size = Vector2(vp_size.x - 40.0, 44.0)
 			title_node.add_theme_font_size_override("font_size", 22 if vp_size.x < 700.0 else 28)

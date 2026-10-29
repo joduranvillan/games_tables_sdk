@@ -1311,14 +1311,14 @@ func _on_event_json(json_str: String) -> void:
 
 			elif event_type == "RentPaidEvent":
 				var payer = int(event.get("payer", 0))
-				var owner = int(event.get("owner", 0))
+				var prop_owner = int(event.get("owner", 0))
 				var amt = int(event.get("amount", 0))
 				var sp = int(event.get("space", 0))
 				if money.has(payer):
 					money[payer] -= amt
-				if money.has(owner):
-					money[owner] += amt
-				card_event_label.text = "J%d pagó $%d de renta a J%d en %s" % [payer, amt, owner, SPACES[sp]["name"]]
+				if money.has(prop_owner):
+					money[prop_owner] += amt
+				card_event_label.text = "J%d pagó $%d de renta a J%d en %s" % [payer, amt, prop_owner, SPACES[sp]["name"]]
 
 			elif event_type == "TaxPaidEvent":
 				var p = int(event.get("player", current))
