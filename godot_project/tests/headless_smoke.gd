@@ -43,8 +43,7 @@ func _initialize() -> void:
 	results.append(["click en destino (3,0) avanza la ficha en la primera jugada", board_node.board[3][0] != null and int(board_node.board[3][0].owner) == 1])
 
 	# Simular evento de salto en el que el turno continúa perteneciendo al jugador 1 (multicaptura activa)
-	board_node.current = 1
-	board_node.board[0][1] = {"owner": 1, "king": false}
+	board_node._on_mode_selected(0)
 	board_node.board[3][4] = {"owner": 2, "king": false}
 	board_node._on_piece_moved(1, 0, 1, 2, 3, 1, 2, false)
 	var mc_selected: bool = (
