@@ -107,16 +107,18 @@ var pending_buy_space: int = -1
 var current_screen_layout: int = 0
 
 # Board Geometry
-var board_rect: Rect2 = Rect2(24, 68, 560, 560)
-var corner_size: float = 68.0
-var space_step: float = 47.11
+var board_rect: Rect2 = Rect2(16, 48, 430, 430)
+var corner_size: float = 54.0
+var space_step: float = 35.78
 
 # UI Containers
 var top_bar: HBoxContainer
 var title_lbl: Label
 var control_dashboard: PanelContainer
 var dashboard_vbox: VBoxContainer
-var players_hud_hbox: HBoxContainer
+var players_hud_hbox: BoxContainer
+var simple_turn_banner: PanelContainer
+var simple_turn_lbl: Label
 
 # UI Components
 var player_tokens = {P1: null, P2: null}
@@ -321,7 +323,7 @@ func _apply_theme_styling() -> void:
 		c_style.bg_color = current_theme.dark_color.darkened(0.18)
 		c_style.border_color = current_theme.line_color.lightened(0.1)
 		c_style.set_border_width_all(2)
-		c_style.set_corner_radius_all(10)
+		c_style.set_corner_radius_all(8)
 		center_panel.add_theme_stylebox_override("panel", c_style)
 
 	if control_dashboard:
@@ -329,25 +331,25 @@ func _apply_theme_styling() -> void:
 		d_style.bg_color = current_theme.dark_color.darkened(0.28)
 		d_style.border_color = current_theme.line_color
 		d_style.set_border_width_all(2)
-		d_style.set_corner_radius_all(12)
-		d_style.content_margin_left = 12
-		d_style.content_margin_right = 12
-		d_style.content_margin_top = 10
-		d_style.content_margin_bottom = 10
+		d_style.set_corner_radius_all(10)
+		d_style.content_margin_left = 8
+		d_style.content_margin_right = 8
+		d_style.content_margin_top = 8
+		d_style.content_margin_bottom = 8
 		control_dashboard.add_theme_stylebox_override("panel", d_style)
 
 func _setup_ui() -> void:
-	# 1. Top Header Bar
+	# 1. Compact Header Bar aligned above the board
 	top_bar = HBoxContainer.new()
-	top_bar.name = "TopBar"
-	top_bar.position = Vector2(24, 14)
-	top_bar.size = Vector2(560, 42)
-	top_bar.add_theme_constant_override("separation", 10)
+	top_bar.name = "BoardHeaderBar"
+	top_bar.position = Vector2(16, 8)
+	top_bar.size = Vector2(430, 34)
+	top_bar.add_theme_constant_override("separation", 8)
 	add_child(top_bar)
 
 	title_lbl = Label.new()
 	title_lbl.text = "🎩 MONOPOLY"
-	title_lbl.add_theme_font_size_override("font_size", 19)
+	title_lbl.add_theme_font_size_override("font_size", 16)
 	title_lbl.add_theme_color_override("font_color", Color(0.95, 0.85, 0.3))
 	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top_bar.add_child(title_lbl)
@@ -355,12 +357,15 @@ func _setup_ui() -> void:
 	var btn_rules = Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
-	btn_rules.custom_minimum_size = Vector2(88, 34)
+	btn_rules.custom_minimum_size = Vector2(78, 30)
+	btn_rules.add_theme_font_size_override("font_size", 12)
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("monopoly"))
 	top_bar.add_child(btn_rules)
 
 	var mode_opt := OptionButton.new()
 	mode_opt.name = "ModeOptionButton"
+	mode_opt.custom_minimum_size = Vector2(105, 30)
+	mode_opt.add_theme_font_size_override("font_size", 12)
 	mode_opt.add_item("👥 Hotseat", 0)
 	mode_opt.add_item("🤖 vs IA (J1)", 1)
 	mode_opt.add_item("🤖 vs IA (J2)", 2)
@@ -373,7 +378,7 @@ func _setup_ui() -> void:
 	mode_opt.item_selected.connect(_on_mode_selected)
 	top_bar.add_child(mode_opt)
 
-	# 2. Clean Center Board Area (Only Logo, Dice, Event Feed, and Roll Action)
+	# 2. Clean Center Board Area (Logo, Dice, Event Feed, and Roll Action)
 	center_panel = Panel.new()
 	center_panel.name = "CenterPanel"
 	center_panel.clip_contents = true
@@ -381,18 +386,18 @@ func _setup_ui() -> void:
 
 	var center_vbox = VBoxContainer.new()
 	center_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center_vbox.offset_left = 10
-	center_vbox.offset_top = 8
-	center_vbox.offset_right = -10
-	center_vbox.offset_bottom = -8
+	center_vbox.offset_left = 8
+	center_vbox.offset_top = 6
+	center_vbox.offset_right = -8
+	center_vbox.offset_bottom = -6
 	center_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	center_vbox.add_theme_constant_override("separation", 6)
+	center_vbox.add_theme_constant_override("separation", 5)
 	center_panel.add_child(center_vbox)
 
 	logo_lbl = Label.new()
 	logo_lbl.text = "🎩 M O N O P O L Y"
 	logo_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	logo_lbl.add_theme_font_size_override("font_size", 18)
+	logo_lbl.add_theme_font_size_override("font_size", 16)
 	logo_lbl.add_theme_color_override("font_color", Color(0.95, 0.32, 0.32))
 	center_vbox.add_child(logo_lbl)
 
@@ -400,7 +405,7 @@ func _setup_ui() -> void:
 	dice_display_lbl.name = "DiceDisplayLabel"
 	dice_display_lbl.text = "🎲 [ ⚀ ]  [ ⚀ ]  (Total: 2)"
 	dice_display_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	dice_display_lbl.add_theme_font_size_override("font_size", 16)
+	dice_display_lbl.add_theme_font_size_override("font_size", 14)
 	dice_display_lbl.add_theme_color_override("font_color", Color(0.98, 0.95, 0.8))
 	center_vbox.add_child(dice_display_lbl)
 
@@ -412,14 +417,14 @@ func _setup_ui() -> void:
 	ev_style.border_color = Color(0.3, 0.45, 0.65, 0.6)
 	ev_style.set_border_width_all(1)
 	ev_style.set_corner_radius_all(6)
-	ev_style.content_margin_left = 8
-	ev_style.content_margin_right = 8
+	ev_style.content_margin_left = 6
+	ev_style.content_margin_right = 6
 	ev_style.content_margin_top = 4
 	ev_style.content_margin_bottom = 4
 	card_event_banner.add_theme_stylebox_override("panel", ev_style)
 
 	card_event_label = Label.new()
-	card_event_label.text = "¡Tira los dados o toca cualquier casilla para ver sus detalles!"
+	card_event_label.text = "¡Tira los dados o toca una casilla para ver detalles!"
 	card_event_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	card_event_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	card_event_label.add_theme_font_size_override("font_size", 11)
@@ -428,144 +433,158 @@ func _setup_ui() -> void:
 
 	var actions_hbox = HBoxContainer.new()
 	actions_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	actions_hbox.add_theme_constant_override("separation", 8)
+	actions_hbox.add_theme_constant_override("separation", 6)
 	center_vbox.add_child(actions_hbox)
 
 	roll_button = Button.new()
 	roll_button.name = "RollButton"
-	roll_button.custom_minimum_size = Vector2(130, 38)
+	roll_button.custom_minimum_size = Vector2(120, 34)
 	roll_button.text = "🎲 Tirar Dados"
-	roll_button.add_theme_font_size_override("font_size", 14)
+	roll_button.add_theme_font_size_override("font_size", 13)
 	roll_button.pressed.connect(_on_roll_pressed)
 	actions_hbox.add_child(roll_button)
 
 	pay_jail_btn = Button.new()
 	pay_jail_btn.name = "PayJailButton"
-	pay_jail_btn.custom_minimum_size = Vector2(110, 38)
+	pay_jail_btn.custom_minimum_size = Vector2(100, 34)
 	pay_jail_btn.text = "🔓 Fianza $50"
-	pay_jail_btn.add_theme_font_size_override("font_size", 12)
+	pay_jail_btn.add_theme_font_size_override("font_size", 11)
 	pay_jail_btn.visible = false
 	pay_jail_btn.pressed.connect(_on_pay_jail_pressed)
 	actions_hbox.add_child(pay_jail_btn)
 
-	# 3. External Control Dashboard (Players HUD, Space Inspector, Property Management)
+	# Keep TurnIndicator node in tree for compatibility, hidden so its Undo/Redo buttons never force horizontal overflow
+	turn_indicator = TurnIndicator.new()
+	turn_indicator.name = "TurnIndicator"
+	turn_indicator.visible = false
+	add_child(turn_indicator)
+
+	# 3. Narrow External Control Dashboard (Simple Turn Banner, 1-Line Player Summaries, Space Inspector, Actions)
 	control_dashboard = PanelContainer.new()
 	control_dashboard.name = "ControlDashboard"
 	add_child(control_dashboard)
 
 	dashboard_vbox = VBoxContainer.new()
 	dashboard_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	dashboard_vbox.add_theme_constant_override("separation", 8)
+	dashboard_vbox.add_theme_constant_override("separation", 6)
 	control_dashboard.add_child(dashboard_vbox)
 
-	var turn_row = HBoxContainer.new()
-	turn_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	turn_row.custom_minimum_size = Vector2(0, 34)
-	dashboard_vbox.add_child(turn_row)
+	# Simple Turn Banner (no Undo/Redo buttons or wide progress bar)
+	simple_turn_banner = PanelContainer.new()
+	simple_turn_banner.name = "SimpleTurnBanner"
+	simple_turn_banner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var tb_style = StyleBoxFlat.new()
+	tb_style.bg_color = Color(0.14, 0.19, 0.28, 0.96)
+	tb_style.border_color = PLAYER_COLORS[P1]
+	tb_style.set_border_width_all(1)
+	tb_style.set_corner_radius_all(6)
+	tb_style.content_margin_left = 8
+	tb_style.content_margin_right = 8
+	tb_style.content_margin_top = 4
+	tb_style.content_margin_bottom = 4
+	simple_turn_banner.add_theme_stylebox_override("panel", tb_style)
 
-	turn_indicator = TurnIndicator.new()
-	turn_indicator.name = "TurnIndicator"
-	turn_row.add_child(turn_indicator)
+	simple_turn_lbl = Label.new()
+	simple_turn_lbl.name = "SimpleTurnLabel"
+	simple_turn_lbl.text = "🎯 Turno: ▲ Jugador 1"
+	simple_turn_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	simple_turn_lbl.add_theme_font_size_override("font_size", 12)
+	simple_turn_lbl.add_theme_color_override("font_color", Color(0.98, 0.94, 0.78))
+	simple_turn_banner.add_child(simple_turn_lbl)
+	dashboard_vbox.add_child(simple_turn_banner)
 
-	# Players Money & Position HUD Cards
-	players_hud_hbox = HBoxContainer.new()
-	players_hud_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	players_hud_hbox.add_theme_constant_override("separation", 8)
+	# Players HUD: Stacked 1-Line Summary Cards (compact width ~230px)
+	players_hud_hbox = VBoxContainer.new()
+	players_hud_hbox.name = "PlayersHudContainer"
+	players_hud_hbox.add_theme_constant_override("separation", 4)
 	dashboard_vbox.add_child(players_hud_hbox)
 
-	p1_hud = _create_player_hud_card(P1, "▲ Jugador 1")
+	p1_hud = _create_player_hud_card(P1, "▲ J1")
 	players_hud_hbox.add_child(p1_hud)
 
-	p2_hud = _create_player_hud_card(P2, "● Jugador 2")
+	p2_hud = _create_player_hud_card(P2, "● J2")
 	players_hud_hbox.add_child(p2_hud)
 
 	# Interactive Space Inspector Card (updates on tap/click or player movement)
 	_setup_space_inspector()
 
-	# Property Management & Trade Panel (outside board perimeter)
+	# Compact Property Management & Trade Panel
 	property_mgmt_panel = PanelContainer.new()
 	property_mgmt_panel.name = "PropertyManagementPanel"
 	var mgmt_style = StyleBoxFlat.new()
 	mgmt_style.bg_color = Color(0.11, 0.15, 0.22, 0.95)
 	mgmt_style.border_color = Color(0.3, 0.4, 0.55, 0.8)
 	mgmt_style.set_border_width_all(1)
-	mgmt_style.set_corner_radius_all(8)
-	mgmt_style.content_margin_left = 8
-	mgmt_style.content_margin_right = 8
-	mgmt_style.content_margin_top = 6
-	mgmt_style.content_margin_bottom = 6
+	mgmt_style.set_corner_radius_all(6)
+	mgmt_style.content_margin_left = 6
+	mgmt_style.content_margin_right = 6
+	mgmt_style.content_margin_top = 5
+	mgmt_style.content_margin_bottom = 5
 	property_mgmt_panel.add_theme_stylebox_override("panel", mgmt_style)
 	dashboard_vbox.add_child(property_mgmt_panel)
 
 	var mgmt_vbox = VBoxContainer.new()
 	mgmt_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	mgmt_vbox.add_theme_constant_override("separation", 6)
+	mgmt_vbox.add_theme_constant_override("separation", 4)
 	property_mgmt_panel.add_child(mgmt_vbox)
-
-	var mgmt_title = Label.new()
-	mgmt_title.text = "🏢 Gestión de Propiedades e Intercambios"
-	mgmt_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	mgmt_title.add_theme_font_size_override("font_size", 12)
-	mgmt_title.add_theme_color_override("font_color", Color(0.95, 0.85, 0.55))
-	mgmt_vbox.add_child(mgmt_title)
 
 	mgmt_btns_grid = GridContainer.new()
 	mgmt_btns_grid.columns = 3
-	mgmt_btns_grid.add_theme_constant_override("h_separation", 6)
-	mgmt_btns_grid.add_theme_constant_override("v_separation", 6)
+	mgmt_btns_grid.add_theme_constant_override("h_separation", 4)
+	mgmt_btns_grid.add_theme_constant_override("v_separation", 4)
 	mgmt_vbox.add_child(mgmt_btns_grid)
 
 	build_house_btn = Button.new()
 	build_house_btn.name = "BuildHouseButton"
-	build_house_btn.text = "🏠 Construir"
+	build_house_btn.text = "🏠 Casa"
 	build_house_btn.tooltip_text = "Construir Casa u Hotel en grupo completo"
 	build_house_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	build_house_btn.custom_minimum_size = Vector2(95, 34)
+	build_house_btn.custom_minimum_size = Vector2(72, 28)
 	build_house_btn.add_theme_font_size_override("font_size", 11)
 	build_house_btn.pressed.connect(_on_build_house_pressed)
 	mgmt_btns_grid.add_child(build_house_btn)
 
 	mortgage_btn = Button.new()
 	mortgage_btn.name = "MortgageButton"
-	mortgage_btn.text = "🏦 Hipotecar"
+	mortgage_btn.text = "🏦 Hipot."
 	mortgage_btn.tooltip_text = "Hipotecar o Deshipotecar propiedad seleccionada"
 	mortgage_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mortgage_btn.custom_minimum_size = Vector2(95, 34)
+	mortgage_btn.custom_minimum_size = Vector2(72, 28)
 	mortgage_btn.add_theme_font_size_override("font_size", 11)
 	mortgage_btn.pressed.connect(_on_mortgage_pressed)
 	mgmt_btns_grid.add_child(mortgage_btn)
 
 	trade_btn = Button.new()
 	trade_btn.name = "TradeButton"
-	trade_btn.text = "🤝 Intercambio"
+	trade_btn.text = "🤝 Trato"
 	trade_btn.tooltip_text = "Proponer intercambio al otro jugador"
 	trade_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	trade_btn.custom_minimum_size = Vector2(95, 34)
+	trade_btn.custom_minimum_size = Vector2(72, 28)
 	trade_btn.add_theme_font_size_override("font_size", 11)
 	trade_btn.pressed.connect(_on_trade_pressed)
 	mgmt_btns_grid.add_child(trade_btn)
 
 	var trade_resp_hbox = HBoxContainer.new()
 	trade_resp_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	trade_resp_hbox.add_theme_constant_override("separation", 8)
+	trade_resp_hbox.add_theme_constant_override("separation", 6)
 	mgmt_vbox.add_child(trade_resp_hbox)
 
 	accept_trade_btn = Button.new()
 	accept_trade_btn.name = "AcceptTradeButton"
-	accept_trade_btn.text = "✅ Aceptar Trato"
+	accept_trade_btn.text = "✅ Aceptar"
 	accept_trade_btn.visible = false
 	accept_trade_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	accept_trade_btn.custom_minimum_size = Vector2(110, 32)
+	accept_trade_btn.custom_minimum_size = Vector2(88, 26)
 	accept_trade_btn.add_theme_font_size_override("font_size", 11)
 	accept_trade_btn.pressed.connect(_on_accept_trade_pressed)
 	trade_resp_hbox.add_child(accept_trade_btn)
 
 	reject_trade_btn = Button.new()
 	reject_trade_btn.name = "RejectTradeButton"
-	reject_trade_btn.text = "❌ Rechazar Trato"
+	reject_trade_btn.text = "❌ Rechazar"
 	reject_trade_btn.visible = false
 	reject_trade_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	reject_trade_btn.custom_minimum_size = Vector2(110, 32)
+	reject_trade_btn.custom_minimum_size = Vector2(88, 26)
 	reject_trade_btn.add_theme_font_size_override("font_size", 11)
 	reject_trade_btn.pressed.connect(_on_reject_trade_pressed)
 	trade_resp_hbox.add_child(reject_trade_btn)
@@ -575,17 +594,17 @@ func _setup_ui() -> void:
 		var token = Control.new()
 		token.name = "PlayerToken%d" % p
 		token.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		token.size = Vector2(22, 22)
-		token.pivot_offset = Vector2(11, 11)
+		token.size = Vector2(20, 20)
+		token.pivot_offset = Vector2(10, 10)
 
-		var img = Image.create(22, 22, false, Image.FORMAT_RGBA8)
+		var img = Image.create(20, 20, false, Image.FORMAT_RGBA8)
 		var p_col = _get_player_token_color(p)
-		for x in range(22):
-			for y in range(22):
-				var dist = Vector2(x - 11, y - 11).length()
-				if dist <= 8.5:
+		for x in range(20):
+			for y in range(20):
+				var dist = Vector2(x - 10, y - 10).length()
+				if dist <= 7.5:
 					img.set_pixel(x, y, p_col)
-				elif dist <= 10.0:
+				elif dist <= 9.0:
 					img.set_pixel(x, y, Color.WHITE)
 				else:
 					img.set_pixel(x, y, Color(0, 0, 0, 0))
@@ -593,7 +612,7 @@ func _setup_ui() -> void:
 		var tex = TextureRect.new()
 		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tex.texture = ImageTexture.create_from_image(img)
-		tex.size = Vector2(22, 22)
+		tex.size = Vector2(20, 20)
 		token.add_child(tex)
 
 		var sym_lbl = Label.new()
@@ -602,7 +621,7 @@ func _setup_ui() -> void:
 		sym_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 		sym_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		sym_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		sym_lbl.add_theme_font_size_override("font_size", 10)
+		sym_lbl.add_theme_font_size_override("font_size", 9)
 		sym_lbl.add_theme_color_override("font_color", Color.WHITE)
 		token.add_child(sym_lbl)
 
@@ -614,7 +633,7 @@ func _setup_ui() -> void:
 
 	rules_popup = RulesPopup.new()
 	rules_popup.visible = false
-	rules_popup.position = Vector2(100, 80)
+	rules_popup.position = Vector2(80, 60)
 	add_child(rules_popup)
 
 	_apply_theme_styling()
@@ -628,44 +647,44 @@ func _setup_space_inspector() -> void:
 	insp_style.bg_color = Color(0.10, 0.14, 0.20, 0.96)
 	insp_style.border_color = Color(0.95, 0.80, 0.30, 0.85)
 	insp_style.set_border_width_all(1)
-	insp_style.set_corner_radius_all(8)
-	insp_style.content_margin_left = 8
-	insp_style.content_margin_right = 8
-	insp_style.content_margin_top = 6
-	insp_style.content_margin_bottom = 6
+	insp_style.set_corner_radius_all(6)
+	insp_style.content_margin_left = 6
+	insp_style.content_margin_right = 6
+	insp_style.content_margin_top = 5
+	insp_style.content_margin_bottom = 5
 	space_inspector_panel.add_theme_stylebox_override("panel", insp_style)
 
 	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 3)
+	vbox.add_theme_constant_override("separation", 2)
 	space_inspector_panel.add_child(vbox)
 
 	inspector_header_bar = ColorRect.new()
-	inspector_header_bar.custom_minimum_size = Vector2(0, 10)
+	inspector_header_bar.custom_minimum_size = Vector2(0, 6)
 	inspector_header_bar.color = GROUP_COLORS["Especial"]
 	vbox.add_child(inspector_header_bar)
 
 	inspector_title_lbl = Label.new()
 	inspector_title_lbl.name = "InspectorTitleLabel"
-	inspector_title_lbl.text = "📍 Casilla #0: SALIDA"
+	inspector_title_lbl.text = "🏁 #0 — SALIDA"
 	inspector_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	inspector_title_lbl.add_theme_font_size_override("font_size", 13)
+	inspector_title_lbl.add_theme_font_size_override("font_size", 12)
 	inspector_title_lbl.add_theme_color_override("font_color", Color.WHITE)
 	vbox.add_child(inspector_title_lbl)
 
 	inspector_status_lbl = Label.new()
 	inspector_status_lbl.name = "InspectorStatusLabel"
-	inspector_status_lbl.text = "Grupo: Especial | Casilla Pública"
+	inspector_status_lbl.text = "Especial • Casilla Pública"
 	inspector_status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	inspector_status_lbl.add_theme_font_size_override("font_size", 11)
+	inspector_status_lbl.add_theme_font_size_override("font_size", 10)
 	inspector_status_lbl.add_theme_color_override("font_color", Color(0.75, 0.88, 1.0))
 	vbox.add_child(inspector_status_lbl)
 
 	inspector_rent_lbl = Label.new()
 	inspector_rent_lbl.name = "InspectorRentLabel"
-	inspector_rent_lbl.text = "Cobra $200 al pasar (Toca cualquier casilla del tablero)"
+	inspector_rent_lbl.text = "Cobra $200 al pasar"
 	inspector_rent_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	inspector_rent_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	inspector_rent_lbl.add_theme_font_size_override("font_size", 11)
+	inspector_rent_lbl.add_theme_font_size_override("font_size", 10)
 	inspector_rent_lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
 	vbox.add_child(inspector_rent_lbl)
 
@@ -689,30 +708,30 @@ func _update_space_inspector(space_idx: int) -> void:
 
 	if prop["price"] > 0:
 		var owner_id = property_owners.get(space_idx, -1)
-		var owner_str = "Disponible ($%d)" % prop["price"]
+		var owner_str = "Libre ($%d)" % prop["price"]
 		if owner_id != -1:
 			var is_mort = mortgaged_properties.has(space_idx)
 			var h_lvl = property_houses.get(space_idx, 0)
 			var h_text = ""
 			if h_lvl == 5:
-				h_text = " | 🏨 Hotel"
+				h_text = " | 🏨Hotel"
 			elif h_lvl > 0:
-				h_text = " | 🏠 x%d" % h_lvl
-			owner_str = "Dueño: J%d%s%s" % [owner_id, " (HIPOTECADA)" if is_mort else "", h_text]
-		inspector_status_lbl.text = "Grupo: %s  •  %s" % [grp, owner_str]
+				h_text = " | 🏠x%d" % h_lvl
+			owner_str = "J%d%s%s" % [owner_id, " (HIP.)" if is_mort else "", h_text]
+		inspector_status_lbl.text = "%s • %s" % [grp, owner_str]
 
 		var base_r = int(prop["rent"])
 		if grp == "Ferrocarril":
-			inspector_rent_lbl.text = "Renta: 1 Estación $25 | 2: $50 | 3: $100 | 4: $200  •  Hipoteca: $100"
+			inspector_rent_lbl.text = "Renta: 1-4 Est.: $25/$50/$100/$200 • Hip: $100"
 		elif grp == "Suministros":
-			inspector_rent_lbl.text = "Renta: 4x dados (1 servicio) | 10x dados (ambos servicios)"
+			inspector_rent_lbl.text = "Renta: 4x dados (1) | 10x dados (ambos)"
 		else:
-			inspector_rent_lbl.text = "Renta Base: $%d | Grupo: $%d | 1-4 Casas: $%d-$%d | Hotel: $%d" % [
+			inspector_rent_lbl.text = "Renta: $%d | Grupo $%d | Casas $%d-$%d | Hotel $%d" % [
 				base_r, base_r * 2, base_r * 4, base_r * 12, base_r * 20
 			]
 	else:
 		inspector_status_lbl.text = "Grupo: %s" % grp
-		inspector_rent_lbl.text = str(prop.get("desc", "Casilla especial del tablero"))
+		inspector_rent_lbl.text = str(prop.get("desc", "Casilla especial"))
 
 func _unhandled_input(event: InputEvent) -> void:
 	if buy_modal != null and buy_modal.visible:
@@ -736,45 +755,48 @@ func _unhandled_input(event: InputEvent) -> void:
 func _create_player_hud_card(p_id: int, p_name: String) -> PanelContainer:
 	var panel = PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.custom_minimum_size = Vector2(135, 68)
+	panel.custom_minimum_size = Vector2(210, 28)
 
 	var sb = StyleBoxFlat.new()
 	sb.bg_color = Color(0.12, 0.16, 0.24, 0.95)
 	sb.border_color = PLAYER_COLORS[p_id]
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(8)
-	sb.content_margin_left = 8
-	sb.content_margin_right = 8
-	sb.content_margin_top = 5
-	sb.content_margin_bottom = 5
+	sb.set_border_width_all(2 if p_id == P1 else 1)
+	sb.set_corner_radius_all(6)
+	sb.content_margin_left = 6
+	sb.content_margin_right = 6
+	sb.content_margin_top = 3
+	sb.content_margin_bottom = 3
 	panel.add_theme_stylebox_override("panel", sb)
 
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 2)
-	panel.add_child(vbox)
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	panel.add_child(row)
 
 	var title = Label.new()
 	title.text = p_name
-	title.add_theme_font_size_override("font_size", 12)
-	title.add_theme_color_override("font_color", PLAYER_COLORS[p_id].lightened(0.2))
-	vbox.add_child(title)
+	title.add_theme_font_size_override("font_size", 11)
+	title.add_theme_color_override("font_color", PLAYER_COLORS[p_id].lightened(0.25))
+	row.add_child(title)
 
 	var m_lbl = Label.new()
-	m_lbl.text = "💰 $1500"
-	m_lbl.add_theme_font_size_override("font_size", 13)
-	vbox.add_child(m_lbl)
+	m_lbl.text = "💰$1500"
+	m_lbl.add_theme_font_size_override("font_size", 11)
+	row.add_child(m_lbl)
 
 	var p_lbl = Label.new()
-	p_lbl.text = "🏠 Propiedades: 0"
-	p_lbl.add_theme_font_size_override("font_size", 10)
-	p_lbl.add_theme_color_override("font_color", Color(0.82, 0.85, 0.9))
-	vbox.add_child(p_lbl)
+	p_lbl.text = "🏠0"
+	p_lbl.add_theme_font_size_override("font_size", 11)
+	p_lbl.add_theme_color_override("font_color", Color(0.85, 0.88, 0.94))
+	row.add_child(p_lbl)
 
 	var pos_lbl = Label.new()
-	pos_lbl.text = "📍 SALIDA"
+	pos_lbl.text = "📍SALIDA"
+	pos_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pos_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	pos_lbl.add_theme_font_size_override("font_size", 10)
-	pos_lbl.add_theme_color_override("font_color", Color(0.7, 0.8, 0.95))
-	vbox.add_child(pos_lbl)
+	pos_lbl.add_theme_color_override("font_color", Color(0.72, 0.84, 0.98))
+	row.add_child(pos_lbl)
 
 	if p_id == P1:
 		p1_money_lbl = m_lbl
@@ -793,8 +815,8 @@ func _create_player_hud_card(p_id: int, p_name: String) -> PanelContainer:
 func _setup_purchase_modal() -> void:
 	buy_modal = PanelContainer.new()
 	buy_modal.name = "BuyModal"
-	buy_modal.position = Vector2(140, 210)
-	buy_modal.custom_minimum_size = Vector2(320, 250)
+	buy_modal.position = Vector2(95, 160)
+	buy_modal.custom_minimum_size = Vector2(280, 220)
 	buy_modal.visible = false
 	buy_modal.z_index = 25
 
@@ -803,55 +825,55 @@ func _setup_purchase_modal() -> void:
 	style.border_color = Color(0.95, 0.85, 0.3)
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(10)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 10
-	style.content_margin_bottom = 12
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 8
+	style.content_margin_bottom = 10
 	buy_modal.add_theme_stylebox_override("panel", style)
 
 	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
+	vbox.add_theme_constant_override("separation", 6)
 	buy_modal.add_child(vbox)
 
 	buy_header_bar = ColorRect.new()
-	buy_header_bar.custom_minimum_size = Vector2(0, 16)
+	buy_header_bar.custom_minimum_size = Vector2(0, 14)
 	buy_header_bar.color = Color("#8B4513")
 	vbox.add_child(buy_header_bar)
 
 	buy_title_lbl = Label.new()
 	buy_title_lbl.text = "TÍTULO DE PROPIEDAD"
 	buy_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	buy_title_lbl.add_theme_font_size_override("font_size", 16)
+	buy_title_lbl.add_theme_font_size_override("font_size", 15)
 	buy_title_lbl.add_theme_color_override("font_color", Color.WHITE)
 	vbox.add_child(buy_title_lbl)
 
 	buy_price_lbl = Label.new()
 	buy_price_lbl.text = "PRECIO: $200"
 	buy_price_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	buy_price_lbl.add_theme_font_size_override("font_size", 14)
+	buy_price_lbl.add_theme_font_size_override("font_size", 13)
 	buy_price_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 0.5))
 	vbox.add_child(buy_price_lbl)
 
 	buy_rent_info_lbl = Label.new()
 	buy_rent_info_lbl.text = "Renta Base: $10\nRenta con Grupo Completo: $20\nCasa 1: $50 | Casa 2: $150 | Hotel: $450"
 	buy_rent_info_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	buy_rent_info_lbl.add_theme_font_size_override("font_size", 12)
+	buy_rent_info_lbl.add_theme_font_size_override("font_size", 11)
 	buy_rent_info_lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
 	vbox.add_child(buy_rent_info_lbl)
 
 	var btns_hbox = HBoxContainer.new()
 	btns_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	btns_hbox.add_theme_constant_override("separation", 12)
+	btns_hbox.add_theme_constant_override("separation", 10)
 	vbox.add_child(btns_hbox)
 
 	buy_btn_confirm = Button.new()
-	buy_btn_confirm.custom_minimum_size = Vector2(125, 38)
+	buy_btn_confirm.custom_minimum_size = Vector2(110, 34)
 	buy_btn_confirm.text = "🟢 Comprar"
 	buy_btn_confirm.pressed.connect(func(): _send_buy_decision(true))
 	btns_hbox.add_child(buy_btn_confirm)
 
 	buy_btn_auction = Button.new()
-	buy_btn_auction.custom_minimum_size = Vector2(125, 38)
+	buy_btn_auction.custom_minimum_size = Vector2(110, 34)
 	buy_btn_auction.text = "🔨 Subastar"
 	buy_btn_auction.pressed.connect(func(): _send_buy_decision(false))
 	btns_hbox.add_child(buy_btn_auction)
@@ -864,8 +886,8 @@ func _setup_purchase_modal() -> void:
 func _setup_auction_modal() -> void:
 	auction_modal = PanelContainer.new()
 	auction_modal.name = "AuctionModal"
-	auction_modal.position = Vector2(140, 210)
-	auction_modal.custom_minimum_size = Vector2(320, 240)
+	auction_modal.position = Vector2(95, 160)
+	auction_modal.custom_minimum_size = Vector2(280, 210)
 	auction_modal.visible = false
 	auction_modal.z_index = 25
 
@@ -874,27 +896,27 @@ func _setup_auction_modal() -> void:
 	style.border_color = Color(0.9, 0.6, 0.2)
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(10)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 10
-	style.content_margin_bottom = 12
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 8
+	style.content_margin_bottom = 10
 	auction_modal.add_theme_stylebox_override("panel", style)
 
 	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
+	vbox.add_theme_constant_override("separation", 6)
 	auction_modal.add_child(vbox)
 
 	auction_title_lbl = Label.new()
 	auction_title_lbl.text = "🏛️ SUBASTA DE PROPIEDAD"
 	auction_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	auction_title_lbl.add_theme_font_size_override("font_size", 15)
+	auction_title_lbl.add_theme_font_size_override("font_size", 14)
 	auction_title_lbl.add_theme_color_override("font_color", Color(0.95, 0.75, 0.3))
 	vbox.add_child(auction_title_lbl)
 
 	auction_current_bid_lbl = Label.new()
 	auction_current_bid_lbl.text = "Puja actual: $0\nLíder: Ninguno"
 	auction_current_bid_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	auction_current_bid_lbl.add_theme_font_size_override("font_size", 13)
+	auction_current_bid_lbl.add_theme_font_size_override("font_size", 12)
 	vbox.add_child(auction_current_bid_lbl)
 
 	var input_hbox = HBoxContainer.new()
@@ -903,7 +925,7 @@ func _setup_auction_modal() -> void:
 
 	var lbl_bid = Label.new()
 	lbl_bid.text = "Tu Oferta: $"
-	lbl_bid.add_theme_font_size_override("font_size", 14)
+	lbl_bid.add_theme_font_size_override("font_size", 13)
 	input_hbox.add_child(lbl_bid)
 
 	auction_bid_input = SpinBox.new()
@@ -915,17 +937,17 @@ func _setup_auction_modal() -> void:
 
 	var btns_hbox = HBoxContainer.new()
 	btns_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	btns_hbox.add_theme_constant_override("separation", 12)
+	btns_hbox.add_theme_constant_override("separation", 10)
 	vbox.add_child(btns_hbox)
 
 	auction_btn_bid = Button.new()
-	auction_btn_bid.custom_minimum_size = Vector2(125, 38)
+	auction_btn_bid.custom_minimum_size = Vector2(110, 34)
 	auction_btn_bid.text = "🔨 Ofertar"
 	auction_btn_bid.pressed.connect(_on_send_bid_pressed)
 	btns_hbox.add_child(auction_btn_bid)
 
 	auction_btn_pass = Button.new()
-	auction_btn_pass.custom_minimum_size = Vector2(125, 38)
+	auction_btn_pass.custom_minimum_size = Vector2(110, 34)
 	auction_btn_pass.text = "❌ Pasar"
 	auction_btn_pass.pressed.connect(_on_pass_bid_pressed)
 	btns_hbox.add_child(auction_btn_pass)
@@ -982,9 +1004,9 @@ func _update_token_positions() -> void:
 			continue
 		var pos_idx = positions[p]
 		var base_pos = _get_space_center(pos_idx)
-		var spread = clampf(corner_size * 0.14, 6.0, 10.0)
+		var spread = clampf(corner_size * 0.14, 5.0, 9.0)
 		var offset = Vector2(-spread, -spread) if p == P1 else Vector2(spread, spread)
-		player_tokens[p].position = base_pos + offset - Vector2(11, 11)
+		player_tokens[p].position = base_pos + offset - Vector2(10, 10)
 
 func _animate_player_move(p: int, target_space: int) -> void:
 	positions[p] = target_space
@@ -992,9 +1014,9 @@ func _animate_player_move(p: int, target_space: int) -> void:
 	_update_space_inspector(selected_space)
 
 	var base_pos = _get_space_center(target_space)
-	var spread = clampf(corner_size * 0.14, 6.0, 10.0)
+	var spread = clampf(corner_size * 0.14, 5.0, 9.0)
 	var offset = Vector2(-spread, -spread) if p == P1 else Vector2(spread, spread)
-	var target_pos = base_pos + offset - Vector2(11, 11)
+	var target_pos = base_pos + offset - Vector2(10, 10)
 
 	_check_pending_purchase(p, target_space)
 	if is_inside_tree():
@@ -1200,23 +1222,43 @@ func _update_hud_display() -> void:
 		elif property_owners[sp] == P2:
 			p2_count += 1
 
+	# Update simple turn banner & active card border
+	if simple_turn_lbl:
+		var sym = "▲" if current == P1 else "●"
+		simple_turn_lbl.text = "🎯 Turno: %s Jugador %d" % [sym, current]
+	if simple_turn_banner:
+		var tb_sb = simple_turn_banner.get_theme_stylebox("panel")
+		if tb_sb is StyleBoxFlat:
+			tb_sb.border_color = _get_player_token_color(current)
+
+	if p1_hud:
+		var sb1 = p1_hud.get_theme_stylebox("panel")
+		if sb1 is StyleBoxFlat:
+			sb1.border_color = _get_player_token_color(P1) if current == P1 else _get_player_token_color(P1).darkened(0.45)
+			sb1.set_border_width_all(2 if current == P1 else 1)
+	if p2_hud:
+		var sb2 = p2_hud.get_theme_stylebox("panel")
+		if sb2 is StyleBoxFlat:
+			sb2.border_color = _get_player_token_color(P2) if current == P2 else _get_player_token_color(P2).darkened(0.45)
+			sb2.set_border_width_all(2 if current == P2 else 1)
+
 	if p1_money_lbl:
-		p1_money_lbl.text = "💰 $%d" % money[P1]
+		p1_money_lbl.text = "💰$%d" % money[P1]
 	if p1_props_lbl:
-		p1_props_lbl.text = "🏠 Propiedades: %d" % p1_count
+		p1_props_lbl.text = "🏠%d" % p1_count
 	if p1_pos_lbl:
 		var p1_sp = clampi(positions.get(P1, 0), 0, TOTAL_SPACES - 1)
-		var p1_jail_str = " (🔒)" if jailed_players.get(P1, 0) > 0 else ""
-		p1_pos_lbl.text = "📍 %s%s" % [SPACES[p1_sp]["short"], p1_jail_str]
+		var p1_jail_str = "🔒" if jailed_players.get(P1, 0) > 0 else ""
+		p1_pos_lbl.text = "📍%s%s" % [SPACES[p1_sp]["short"], p1_jail_str]
 
 	if p2_money_lbl:
-		p2_money_lbl.text = "💰 $%d" % money[P2]
+		p2_money_lbl.text = "💰$%d" % money[P2]
 	if p2_props_lbl:
-		p2_props_lbl.text = "🏠 Propiedades: %d" % p2_count
+		p2_props_lbl.text = "🏠%d" % p2_count
 	if p2_pos_lbl:
 		var p2_sp = clampi(positions.get(P2, 0), 0, TOTAL_SPACES - 1)
-		var p2_jail_str = " (🔒)" if jailed_players.get(P2, 0) > 0 else ""
-		p2_pos_lbl.text = "📍 %s%s" % [SPACES[p2_sp]["short"], p2_jail_str]
+		var p2_jail_str = "🔒" if jailed_players.get(P2, 0) > 0 else ""
+		p2_pos_lbl.text = "📍%s%s" % [SPACES[p2_sp]["short"], p2_jail_str]
 
 	# Update Jail Fee button visibility
 	if pay_jail_btn:
@@ -1462,92 +1504,92 @@ func _on_layout_changed(layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
-	var vp_size := Vector2(1280, 720)
+	var vp_size := Vector2(800, 600)
 	if is_inside_tree() and get_viewport() != null:
 		var visible_sz = get_viewport().get_visible_rect().size
 		if visible_sz.x > 0 and visible_sz.y > 0:
 			vp_size = visible_sz
 
-	var is_portrait_or_phone: bool = (layout == 2) or (vp_size.x < 780.0) or (vp_size.y > vp_size.x)
+	var is_portrait_or_phone: bool = (layout == 2) or (vp_size.x < 700.0) or (vp_size.y > vp_size.x)
 
 	if is_portrait_or_phone:
-		# Mobile / Portrait / Compact Layout:
-		# Top bar at top, square board centered below it, external ControlDashboard stacked cleanly below the board.
-		var avail_w = clampf(vp_size.x - 20.0, 320.0, 520.0)
-		var b_size = clampf(avail_w, 330.0, 420.0)
+		# Mobile / Portrait / Compact Vertical Stack Layout:
+		var avail_w = clampf(vp_size.x - 20.0, 310.0, 420.0)
+		var b_size = clampf(avail_w, 320.0, 390.0)
 		if layout == 2:
-			b_size = 350.0
-		var bx = maxf(10.0, (vp_size.x - b_size) * 0.5) if vp_size.x < 700.0 else 16.0
-		var by = 56.0
+			b_size = 340.0
+		var bx = maxf(10.0, (vp_size.x - b_size) * 0.5) if vp_size.x < 680.0 else 14.0
+		var by = 46.0
 
 		board_rect = Rect2(bx, by, b_size, b_size)
-		corner_size = roundf(b_size * 0.132)
+		corner_size = roundf(b_size * 0.13)
 
 		if top_bar:
-			top_bar.position = Vector2(bx, 10.0)
-			top_bar.size = Vector2(b_size, 38.0)
+			top_bar.position = Vector2(bx, 8.0)
+			top_bar.size = Vector2(b_size, 34.0)
 		if title_lbl:
 			title_lbl.text = "🎩 MONOPOLY"
-			title_lbl.add_theme_font_size_override("font_size", 16)
+			title_lbl.add_theme_font_size_override("font_size", 15)
 
 		if control_dashboard:
 			control_dashboard.position = Vector2(bx, board_rect.end.y + 8.0)
-			control_dashboard.size = Vector2(b_size, 310.0)
+			control_dashboard.size = Vector2(b_size, 225.0)
 
 		if logo_lbl:
 			logo_lbl.add_theme_font_size_override("font_size", 14)
 		if dice_display_lbl:
-			dice_display_lbl.add_theme_font_size_override("font_size", 13)
+			dice_display_lbl.add_theme_font_size_override("font_size", 12)
 		if roll_button:
-			roll_button.custom_minimum_size = Vector2(110, 32)
+			roll_button.custom_minimum_size = Vector2(105, 30)
 			roll_button.add_theme_font_size_override("font_size", 12)
 		if pay_jail_btn:
-			pay_jail_btn.custom_minimum_size = Vector2(95, 32)
+			pay_jail_btn.custom_minimum_size = Vector2(90, 30)
 			pay_jail_btn.add_theme_font_size_override("font_size", 11)
 
 		if status != null:
-			status.position = Vector2(bx, board_rect.end.y + 324.0)
+			status.position = Vector2(bx, board_rect.end.y + 240.0)
+			status.add_theme_font_size_override("font_size", 13)
 	else:
-		# Landscape / Desktop / Tablet Side-by-Side Layout:
-		# Left Column: Header + Square Board
-		# Right Column: External ControlDashboard (Players, Space Inspector, Property & Trade Controls)
-		var b_size = clampf(minf(vp_size.y - 108.0, vp_size.x * 0.50), 460.0, 580.0)
-		var bx = 24.0
-		var by = 62.0
+		# Landscape / Desktop / Tablet Side-by-Side Compact Layout:
+		# Total width ~ 16 + 420 + 12 + 265 = 713px (fits comfortably inside 750px-1280px windows without clipping)
+		var b_size = clampf(minf(vp_size.y - 84.0, vp_size.x - 310.0), 390.0, 430.0)
+		var bx = 16.0
+		var by = 48.0
 
 		board_rect = Rect2(bx, by, b_size, b_size)
-		corner_size = roundf(b_size * 0.122)
+		corner_size = roundf(b_size * 0.125)
 
 		if top_bar:
-			top_bar.position = Vector2(bx, 14.0)
-			top_bar.size = Vector2(b_size, 40.0)
+			top_bar.position = Vector2(bx, 8.0)
+			top_bar.size = Vector2(b_size, 34.0)
 		if title_lbl:
-			title_lbl.text = "🎩 MONOPOLY 40 CASILLAS"
-			title_lbl.add_theme_font_size_override("font_size", 19)
+			title_lbl.text = "🎩 MONOPOLY"
+			title_lbl.add_theme_font_size_override("font_size", 16)
 
-		var dash_x = board_rect.end.x + 18.0
-		var dash_w = clampf(vp_size.x - dash_x - 24.0, 360.0, 560.0)
+		var dash_x = board_rect.end.x + 12.0
+		var dash_w = clampf(vp_size.x - dash_x - 16.0, 250.0, 280.0)
 		if control_dashboard:
 			control_dashboard.position = Vector2(dash_x, by)
-			control_dashboard.size = Vector2(dash_w, b_size)
+			control_dashboard.size = Vector2(dash_w, 260.0)
 
 		if logo_lbl:
-			logo_lbl.add_theme_font_size_override("font_size", 20)
+			logo_lbl.add_theme_font_size_override("font_size", 16)
 		if dice_display_lbl:
-			dice_display_lbl.add_theme_font_size_override("font_size", 16)
+			dice_display_lbl.add_theme_font_size_override("font_size", 14)
 		if roll_button:
-			roll_button.custom_minimum_size = Vector2(145, 40)
-			roll_button.add_theme_font_size_override("font_size", 15)
+			roll_button.custom_minimum_size = Vector2(120, 34)
+			roll_button.add_theme_font_size_override("font_size", 13)
 		if pay_jail_btn:
-			pay_jail_btn.custom_minimum_size = Vector2(120, 40)
-			pay_jail_btn.add_theme_font_size_override("font_size", 13)
+			pay_jail_btn.custom_minimum_size = Vector2(100, 34)
+			pay_jail_btn.add_theme_font_size_override("font_size", 11)
 
 		if status != null:
-			status.position = Vector2(bx, board_rect.end.y + 10.0)
+			status.position = Vector2(bx, board_rect.end.y + 8.0)
+			status.add_theme_font_size_override("font_size", 14)
 
 	# Keep CenterPanel strictly inside the inner hole of the board (never overlapping perimeter tiles)
 	if center_panel:
-		var pad = 6.0 if is_portrait_or_phone else 10.0
+		var pad = 6.0 if is_portrait_or_phone else 8.0
 		center_panel.position = Vector2(
 			board_rect.position.x + corner_size + pad,
 			board_rect.position.y + corner_size + pad
@@ -1573,8 +1615,8 @@ func _draw() -> void:
 	var tile_bg = Color(0.95, 0.95, 0.91)
 	var corner_bg = Color(0.90, 0.93, 0.89)
 	var border_col = Color(0.20, 0.22, 0.28)
-	var is_compact = corner_size < 54.0
-	var bar_thickness = 10.0 if is_compact else 14.0
+	var is_compact = corner_size < 50.0
+	var bar_thickness = 9.0 if is_compact else 12.0
 
 	for i in range(TOTAL_SPACES):
 		var rect = _get_space_rect(i)
@@ -1611,7 +1653,7 @@ func _draw() -> void:
 					grp_sym,
 					HORIZONTAL_ALIGNMENT_LEFT,
 					int(bar_thickness),
-					8 if is_compact else 9,
+					7 if is_compact else 8,
 					Color.WHITE
 				)
 
@@ -1620,15 +1662,15 @@ func _draw() -> void:
 				var h_count = property_houses[i]
 				if h_count == 5:
 					var h_center = bar_rect.position + (bar_rect.size * 0.5)
-					draw_rect(Rect2(h_center.x - 5, h_center.y - 4, 10, 8), Color(0.85, 0.1, 0.1))
-					draw_rect(Rect2(h_center.x - 5, h_center.y - 4, 10, 8), Color.WHITE, false, 1.0)
+					draw_rect(Rect2(h_center.x - 4, h_center.y - 3, 8, 6), Color(0.85, 0.1, 0.1))
+					draw_rect(Rect2(h_center.x - 4, h_center.y - 3, 8, 6), Color.WHITE, false, 1.0)
 				else:
-					var h_sz = 5.0 if is_compact else 6.5
-					var h_step = 6.0 if is_compact else 8.0
+					var h_sz = 4.5 if is_compact else 5.5
+					var h_step = 5.5 if is_compact else 7.0
 					for h in range(h_count):
-						var h_pos = bar_rect.position + Vector2(3 + h * h_step, 2)
+						var h_pos = bar_rect.position + Vector2(2 + h * h_step, 2)
 						if (i > 10 and i < 20) or (i > 30 and i < 40):
-							h_pos = bar_rect.position + Vector2(2, 3 + h * h_step)
+							h_pos = bar_rect.position + Vector2(2, 2 + h * h_step)
 						draw_rect(Rect2(h_pos.x, h_pos.y, h_sz, h_sz), Color(0.1, 0.85, 0.25))
 
 		# 3. Ownership Border & Badge
@@ -1636,32 +1678,32 @@ func _draw() -> void:
 			var owner_p = property_owners[i]
 			var owner_col = _get_player_token_color(owner_p)
 			draw_rect(rect.grow(-1.5), owner_col, false, 2.0)
-			var badge_pos = rect.position + Vector2(rect.size.x - 7, 7)
-			draw_circle(badge_pos, 4.5 if is_compact else 5.5, owner_col)
-			draw_circle(badge_pos, 4.5 if is_compact else 5.5, Color.WHITE, false, 1.0)
+			var badge_pos = rect.position + Vector2(rect.size.x - 6, 6)
+			draw_circle(badge_pos, 4.0 if is_compact else 5.0, owner_col)
+			draw_circle(badge_pos, 4.0 if is_compact else 5.0, Color.WHITE, false, 1.0)
 			if mortgaged_properties.has(i):
 				draw_string(
 					ThemeDB.fallback_font,
-					rect.position + Vector2(3, 10),
+					rect.position + Vector2(2, 9),
 					"H",
 					HORIZONTAL_ALIGNMENT_LEFT,
-					12,
-					9,
+					10,
+					8,
 					Color(0.8, 0.1, 0.1)
 				)
 
 		# 4. Icon + Short Name + Price
 		var icon_str = prop.get("icon", "")
 		if icon_str != "":
-			var icon_font_sz = 10 if is_compact else 13
-			var icon_y_offset = 2.0 if not is_compact else 4.0
-			var icon_pos = rect.position + Vector2(2, (rect.size.y * 0.5) + icon_y_offset)
+			var icon_font_sz = 9 if is_compact else 11
+			var icon_y_offset = 2.0 if not is_compact else 3.0
+			var icon_pos = rect.position + Vector2(1, (rect.size.y * 0.5) + icon_y_offset)
 			draw_string(
 				ThemeDB.fallback_font,
 				icon_pos,
 				icon_str,
 				HORIZONTAL_ALIGNMENT_CENTER,
-				int(rect.size.x - 4),
+				int(rect.size.x - 2),
 				icon_font_sz,
 				Color.BLACK
 			)
@@ -1669,21 +1711,21 @@ func _draw() -> void:
 		# Abbreviated Name on Desktop/Tablet for horizontal/corner tiles
 		if not is_compact and (is_corner or i < 10 or (i > 20 and i < 30)):
 			var short_lbl: String = str(prop.get("short", ""))
-			var lbl_y = rect.position.y + bar_thickness + 10.0 if (i < 10 and not is_corner) else rect.position.y + 11.0
+			var lbl_y = rect.position.y + bar_thickness + 9.0 if (i < 10 and not is_corner) else rect.position.y + 9.5
 			draw_string(
 				ThemeDB.fallback_font,
-				Vector2(rect.position.x + 2, lbl_y),
+				Vector2(rect.position.x + 1, lbl_y),
 				short_lbl,
 				HORIZONTAL_ALIGNMENT_CENTER,
-				int(rect.size.x - 4),
-				8,
+				int(rect.size.x - 2),
+				7,
 				Color(0.15, 0.18, 0.22)
 			)
 
 		# Price Tag for Unowned Purchasable Spaces
 		if prop["price"] > 0 and not property_owners.has(i):
-			var pr_font_sz = 7 if is_compact else 9
-			var pr_y = rect.position.y + rect.size.y - 3.0
+			var pr_font_sz = 7 if is_compact else 8
+			var pr_y = rect.position.y + rect.size.y - 2.5
 			if i > 20 and i < 30:
 				pr_y = rect.position.y + rect.size.y - bar_thickness - 2.0
 			draw_string(

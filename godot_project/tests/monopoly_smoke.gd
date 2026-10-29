@@ -123,12 +123,14 @@ func _initialize() -> void:
 		results.append(["monopoly_board contiene botón 🏦 Hipotecar/Deshipotecar", has_mortgage_btn])
 		results.append(["monopoly_board contiene botón 🤝 Proponer Intercambio", has_trade_btn])
 
-		# 8. Verificar distribución visual limpia sin solapamientos en escritorio (layout 0) y móvil (layout 2)
+		# 8. Verificar distribución visual limpia y compacta sin desborde en escritorio (layout 0) y móvil (layout 2)
 		board_inst._on_layout_changed(0)
 		var desktop_no_overlap = not board_inst.board_rect.intersects(Rect2(board_inst.control_dashboard.position, board_inst.control_dashboard.size))
+		var desktop_compact_width = (board_inst.control_dashboard.position.x + board_inst.control_dashboard.size.x) <= 760.0
+		var has_simple_turn = board_inst.find_child("SimpleTurnBanner", true, false) != null
 		board_inst._on_layout_changed(2)
 		var mobile_no_overlap = not board_inst.board_rect.intersects(Rect2(board_inst.control_dashboard.position, board_inst.control_dashboard.size))
-		results.append(["monopoly_board separa el panel de controles del tablero en escritorio y móvil", desktop_no_overlap and mobile_no_overlap])
+		results.append(["monopoly_board separa el panel de controles del tablero y cabe sin desbordar la escena", desktop_no_overlap and desktop_compact_width and mobile_no_overlap and has_simple_turn])
 
 		# 9. Verificar que tocar/seleccionar una casilla actualiza la tarjeta de detalle (SpaceInspectorPanel)
 		board_inst.select_space(39)
