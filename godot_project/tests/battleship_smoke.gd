@@ -92,18 +92,18 @@ func _initialize() -> void:
 		results.append(["Permite colocar barco en orientación Vertical con ajuste de borde (filas 6..9, col 7)", vertical_ship_ok])
 
 		# Verificar que los barcos colocados generan nodos visuales con SVG cenital en OwnShipsLayer
-		var svg_ok := false
+		var svg_ok: bool = false
 		if board_inst.own_ships_layer != null and board_inst.own_ships_layer.get_child_count() == 2:
 			var first_svg_node: Node = board_inst.own_ships_layer.get_child(0)
 			var second_svg_node: Node = board_inst.own_ships_layer.get_child(1)
-			var svg_str_0 := str(first_svg_node.get_meta("svg_source", ""))
-			var svg_str_1 := str(second_svg_node.get_meta("svg_source", ""))
+			var svg_str_0: String = str(first_svg_node.get_meta("svg_source", ""))
+			var svg_str_1: String = str(second_svg_node.get_meta("svg_source", ""))
 			svg_ok = svg_str_0.begins_with("<svg") and svg_str_1.begins_with("<svg") and bool(second_svg_node.get_meta("is_horizontal", true)) == false
 		results.append(["Barcos colocados se renderizan en formato SVG cenital (horizontal y vertical)", svg_ok])
 
 		# Verificar menú desplegable superior derecho (GameAppMenu) con Temas, Deshacer, Rehacer, Tutorial y Reglas
 		var app_menu: Node = board_inst.get_node_or_null("GameAppMenu")
-		var menu_ok := (app_menu != null and app_menu.get("theme_item_btn") != null and app_menu.get("undo_item_btn") != null and app_menu.get("tutorial_item_btn") != null and app_menu.get("rules_item_btn") != null)
+		var menu_ok: bool = (app_menu != null and app_menu.get("theme_item_btn") != null and app_menu.get("undo_item_btn") != null and app_menu.get("tutorial_item_btn") != null and app_menu.get("rules_item_btn") != null)
 		results.append(["Menú desplegable superior derecho (GameAppMenu) agrupa Temas, Deshacer, Rehacer, Tutorial y Reglas", menu_ok])
 
 		# Probar botón Auto-Flota -> debe completar la flota y avanzar de fase

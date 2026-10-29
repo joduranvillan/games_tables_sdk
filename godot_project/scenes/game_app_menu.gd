@@ -164,11 +164,11 @@ func _find_button_recursive(node: Node, target_name: String, text_hint: String) 
 	if node == self:
 		return null
 	if node is Button:
-		var b := node as Button
+		var b: Button = node as Button
 		if b.name == target_name or (text_hint != "" and b.text.find(text_hint) != -1):
 			return b
 	for child in node.get_children():
-		var res := _find_button_recursive(child, target_name, text_hint)
+		var res: Button = _find_button_recursive(child, target_name, text_hint)
 		if res != null:
 			return res
 	return null
@@ -177,11 +177,11 @@ func _find_tutorial_button_recursive(node: Node) -> Button:
 	if node == self:
 		return null
 	if node is Button:
-		var b := node as Button
+		var b: Button = node as Button
 		if b.name.ends_with("TutorialButton") or b.text.find("Tutorial") != -1:
 			return b
 	for child in node.get_children():
-		var res := _find_tutorial_button_recursive(child)
+		var res: Button = _find_tutorial_button_recursive(child)
 		if res != null:
 			return res
 	return null

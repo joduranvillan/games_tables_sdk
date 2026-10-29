@@ -567,7 +567,7 @@ func _on_rotate_pressed() -> void:
 func _on_clear_fleet_pressed() -> void:
 	if phase != Phase.PLACEMENT_P1 and phase != Phase.PLACEMENT_P2:
 		return
-	var target_ships := p1_ships if phase == Phase.PLACEMENT_P1 else p2_ships
+	var target_ships: Array = p1_ships if phase == Phase.PLACEMENT_P1 else p2_ships
 	target_ships.clear()
 	current_ship_index = 0
 	_last_move_rejected = false
@@ -578,10 +578,10 @@ func _on_clear_fleet_pressed() -> void:
 func _on_auto_fleet_pressed() -> void:
 	if phase != Phase.PLACEMENT_P1 and phase != Phase.PLACEMENT_P2:
 		return
-	var target_ships := p1_ships if phase == Phase.PLACEMENT_P1 else p2_ships
+	var target_ships: Array = p1_ships if phase == Phase.PLACEMENT_P1 else p2_ships
 	target_ships.clear()
 
-	var generated := _generate_valid_random_fleet()
+	var generated: Array = _generate_valid_random_fleet()
 	for ship in generated:
 		target_ships.append(ship)
 	current_ship_index = SHIP_SPECS.size()
@@ -592,15 +592,15 @@ func _on_auto_fleet_pressed() -> void:
 	_submit_fleet_for_active_player()
 
 func _generate_valid_random_fleet() -> Array:
-	var rng := RandomNumberGenerator.new()
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.randomize()
 
 	for _attempt in range(200):
 		var candidate_ships: Array = []
-		var all_placed := true
+		var all_placed: bool = true
 		for spec in SHIP_SPECS:
 			var ship_len: int = int(spec["size"])
-			var placed_this := false
+			var placed_this: bool = false
 			for _try_pos in range(120):
 				var horiz: bool = (rng.randi_range(0, 1) == 0)
 				var max_r: int = BOARD_SIZE - (1 if horiz else ship_len)
@@ -608,11 +608,11 @@ func _generate_valid_random_fleet() -> Array:
 				var sr: int = rng.randi_range(0, max_r)
 				var sc: int = rng.randi_range(0, max_c)
 				var cells: Array[Vector2i] = []
-				var valid := true
+				var valid: bool = true
 				for i in range(ship_len):
 					var r: int = sr + (0 if horiz else i)
 					var c: int = sc + (i if horiz else 0)
-					var pos := Vector2i(r, c)
+					var pos: Vector2i = Vector2i(r, c)
 					if _is_cell_occupied_in_ships(pos, candidate_ships) or _is_cell_adjacent_to_ships(pos, candidate_ships):
 						valid = false
 						break
@@ -629,10 +629,10 @@ func _generate_valid_random_fleet() -> Array:
 
 	# Fallback determinista garantizado con separación de 1 fila entre cada barco
 	var fallback: Array = []
-	var rows := [0, 2, 4, 6, 8]
+	var rows: Array = [0, 2, 4, 6, 8]
 	for idx in range(SHIP_SPECS.size()):
 		var s_len: int = int(SHIP_SPECS[idx]["size"])
-		var r_idx: int = rows[idx]
+		var r_idx: int = int(rows[idx])
 		var ship_cells: Array[Vector2i] = []
 		for c_idx in range(s_len):
 			ship_cells.append(Vector2i(r_idx, c_idx))
@@ -648,8 +648,8 @@ func _on_opp_cell_pressed(row: int, col: int) -> void:
 		_handle_fire_click(row, col)
 
 func _resolve_placement_origin(start_row: int, start_col: int, ship_size: int, horizontal: bool) -> Vector2i:
-	var r := start_row
-	var c := start_col
+	var r: int = start_row
+	var c: int = start_col
 	if r >= 0 and r < BOARD_SIZE and c >= 0 and c < BOARD_SIZE:
 		if horizontal:
 			c = mini(c, BOARD_SIZE - ship_size)
@@ -662,16 +662,16 @@ func _handle_placement(start_row: int, start_col: int) -> void:
 		return
 
 	var spec = SHIP_SPECS[current_ship_index]
-	var ship_size: int = spec["size"]
-	var target_ships := p1_ships if phase == Phase.PLACEMENT_P1 else p2_ships
-	var clamped_origin := _resolve_placement_origin(start_row, start_col, ship_size, is_horizontal)
-	var base_row := clamped_origin.x
-	var base_col := clamped_origin.y
+	var ship_size: int = int(spec["size"])
+	var target_ships: Array = p1_ships if phase == Phase.PLACEMENT_P1 else p2_ships
+	var clamped_origin: Vector2i = _resolve_placement_origin(start_row, start_col, ship_size, is_horizontal)
+	var base_row: int = clamped_origin.x
+	var base_col: int = clamped_origin.y
 	var ship_cells: Array[Vector2i] = []
 
 	for i in range(ship_size):
-		var r = base_row + (0 if is_horizontal else i)
-		var c = base_col + (i if is_horizontal else 0)
+		var r: int = base_row + (0 if is_horizontal else i)
+		var c: int = base_col + (i if is_horizontal else 0)
 		if r < 0 or r >= BOARD_SIZE or c < 0 or c >= BOARD_SIZE:
 			if status_label != null:
 				status_label.text = "❌ ¡El barco no cabe ahí! Prueba otra casilla o cambia la orientación."
@@ -679,7 +679,7 @@ func _handle_placement(start_row: int, start_col: int) -> void:
 				get_node("/root/AudioManager").play_error_buzz()
 			return
 
-		var pos = Vector2i(r, c)
+		var pos: Vector2i = Vector2i(r, c)
 		if _is_cell_occupied_in_ships(pos, target_ships):
 			if status_label != null:
 				status_label.text = "❌ ¡Casilla ocupada por otro barco!"
@@ -709,8 +709,8 @@ func _handle_placement(start_row: int, start_col: int) -> void:
 	queue_redraw()
 
 func _submit_fleet_for_active_player() -> void:
-	var active_player := P1 if phase == Phase.PLACEMENT_P1 else P2
-	var target_ships := p1_ships if phase == Phase.PLACEMENT_P1 else p2_ships
+	var active_player: int = P1 if phase == Phase.PLACEMENT_P1 else P2
+	var target_ships: Array = p1_ships if phase == Phase.PLACEMENT_P1 else p2_ships
 	var formatted_ships = []
 	for ship in target_ships:
 		var ship_dict = []
@@ -784,7 +784,7 @@ func _spawn_shot_animation(player: int, row: int, col: int, is_hit: bool) -> voi
 	if OS.has_feature("headless"):
 		return
 
-	var my_player := local_player if is_vs_ai else P1
+	var my_player: int = local_player if is_vs_ai else P1
 	var is_opp_target = (player == my_player)
 	var btn: Button = null
 	if is_opp_target and row < opp_grid_buttons.size() and col < opp_grid_buttons[row].size():
@@ -857,7 +857,7 @@ func _spawn_shot_animation(player: int, row: int, col: int, is_hit: bool) -> voi
 		timer.timeout.connect(particles.queue_free)
 
 func _on_shot_result(player: int, row: int, col: int, is_hit: bool) -> void:
-	var my_player := local_player if is_vs_ai else P1
+	var my_player: int = local_player if is_vs_ai else P1
 	if player == my_player:
 		opp_shot_grid[row][col] = "hit" if is_hit else "miss"
 	else:
@@ -900,7 +900,7 @@ func _on_event_json(json_str: String) -> void:
 				var res_str: String = event.get("result", "")
 				var is_hit = (res_str == "Hit" or res_str == "Sunk")
 				var shooting_player = int(event.get("player", event.get("shooter", current)))
-				var my_player := local_player if is_vs_ai else P1
+				var my_player: int = local_player if is_vs_ai else P1
 				if shooting_player == my_player:
 					opp_shot_grid[r][c] = "sunk" if res_str == "Sunk" else ("hit" if is_hit else "miss")
 				else:
@@ -914,9 +914,9 @@ func _on_event_json(json_str: String) -> void:
 					for coord in sunk_coords:
 						var sr = int(coord.get("row", 0))
 						var sc = int(coord.get("col", 0))
-						var spos = Vector2i(sr, sc)
+						var spos: Vector2i = Vector2i(sr, sc)
 						sunk_ship_cells.append(spos)
-						if not spos in sunken_cells:
+						if not sunken_cells.has(spos):
 							sunken_cells.append(spos)
 					if shooting_player == my_player and not sunk_ship_cells.is_empty():
 						opp_sunken_ships.append(sunk_ship_cells)
@@ -926,17 +926,17 @@ func _on_event_json(json_str: String) -> void:
 					for pos_obj in event["positions"]:
 						var sr = int(pos_obj.get("row", 0)) if pos_obj is Dictionary else int(pos_obj[0])
 						var sc = int(pos_obj.get("col", 0)) if pos_obj is Dictionary else int(pos_obj[1])
-						var spos = Vector2i(sr, sc)
+						var spos: Vector2i = Vector2i(sr, sc)
 						sunk_ship_cells2.append(spos)
-						if not spos in sunken_cells:
+						if not sunken_cells.has(spos):
 							sunken_cells.append(spos)
 				elif event.has("coords"):
 					for pair in event["coords"]:
 						var sr = int(pair[0]) if pair is Array else int(pair.get("row", 0))
 						var sc = int(pair[1]) if pair is Array else int(pair.get("col", 0))
-						var spos = Vector2i(sr, sc)
+						var spos: Vector2i = Vector2i(sr, sc)
 						sunk_ship_cells2.append(spos)
-						if not spos in sunken_cells:
+						if not sunken_cells.has(spos):
 							sunken_cells.append(spos)
 				if not sunk_ship_cells2.is_empty():
 					opp_sunken_ships.append(sunk_ship_cells2)
@@ -969,7 +969,7 @@ func _on_move_rejected(reason: String) -> void:
 		get_node("/root/AudioManager").play_error_buzz()
 
 func _update_status() -> void:
-	var in_placement := (phase == Phase.PLACEMENT_P1 or phase == Phase.PLACEMENT_P2)
+	var in_placement: bool = (phase == Phase.PLACEMENT_P1 or phase == Phase.PLACEMENT_P2)
 	if rotate_btn != null:
 		rotate_btn.disabled = not in_placement
 	if auto_fleet_btn != null:
@@ -977,7 +977,7 @@ func _update_status() -> void:
 	if clear_fleet_btn != null:
 		clear_fleet_btn.disabled = not in_placement
 
-	var orient_txt := "Horizontal ↔" if is_horizontal else "Vertical ↕"
+	var orient_txt: String = "Horizontal ↔" if is_horizontal else "Vertical ↕"
 	if winner != -1 or phase == Phase.GAME_OVER:
 		if status_label != null:
 			status_label.text = "🏆 ¡Fin del juego! Ganó el Jugador %d" % winner
@@ -1026,24 +1026,24 @@ func _update_status() -> void:
 		opp_vbox.modulate = Color(1.0, 1.0, 1.0, 1.0) if phase == Phase.FIRE else Color(1.0, 1.0, 1.0, 0.65)
 
 func _get_hover_preview_info(active_ships: Array) -> Dictionary:
-	var result := {"cells": [], "valid": true}
-	var in_placement := (phase == Phase.PLACEMENT_P1 or phase == Phase.PLACEMENT_P2)
+	var result: Dictionary = {"cells": [], "valid": true}
+	var in_placement: bool = (phase == Phase.PLACEMENT_P1 or phase == Phase.PLACEMENT_P2)
 	if not in_placement or current_ship_index >= SHIP_SPECS.size():
 		return result
 	if hovered_cell.x < 0 or hovered_cell.x >= BOARD_SIZE or hovered_cell.y < 0 or hovered_cell.y >= BOARD_SIZE:
 		return result
 
 	var ship_size: int = int(SHIP_SPECS[current_ship_index]["size"])
-	var origin := _resolve_placement_origin(hovered_cell.x, hovered_cell.y, ship_size, is_horizontal)
+	var origin: Vector2i = _resolve_placement_origin(hovered_cell.x, hovered_cell.y, ship_size, is_horizontal)
 	var cells: Array[Vector2i] = []
-	var is_valid := true
+	var is_valid: bool = true
 	for i in range(ship_size):
 		var r: int = origin.x + (0 if is_horizontal else i)
 		var c: int = origin.y + (i if is_horizontal else 0)
 		if r < 0 or r >= BOARD_SIZE or c < 0 or c >= BOARD_SIZE:
 			is_valid = false
 			continue
-		var pos := Vector2i(r, c)
+		var pos: Vector2i = Vector2i(r, c)
 		if _is_cell_occupied_in_ships(pos, active_ships) or _is_cell_adjacent_to_ships(pos, active_ships):
 			is_valid = false
 		cells.append(pos)
@@ -1054,9 +1054,9 @@ func _get_hover_preview_info(active_ships: Array) -> Dictionary:
 func _update_grid_ui() -> void:
 	if own_grid_buttons.is_empty() or opp_grid_buttons.is_empty() or own_shot_grid.is_empty() or opp_shot_grid.is_empty():
 		return
-	var active_ships = p2_ships if (phase == Phase.PLACEMENT_P2 or (is_vs_ai and local_player == P2)) else p1_ships
-	var in_placement := (phase == Phase.PLACEMENT_P1 or phase == Phase.PLACEMENT_P2)
-	var preview_info := _get_hover_preview_info(active_ships)
+	var active_ships: Array = p2_ships if (phase == Phase.PLACEMENT_P2 or (is_vs_ai and local_player == P2)) else p1_ships
+	var in_placement: bool = (phase == Phase.PLACEMENT_P1 or phase == Phase.PLACEMENT_P2)
+	var preview_info: Dictionary = _get_hover_preview_info(active_ships)
 	var preview_cells: Array = preview_info["cells"]
 	var preview_valid: bool = bool(preview_info["valid"])
 
@@ -1064,11 +1064,11 @@ func _update_grid_ui() -> void:
 	for r in BOARD_SIZE:
 		for c in BOARD_SIZE:
 			var btn: Button = own_grid_buttons[r][c]
-			var pos = Vector2i(r, c)
+			var pos: Vector2i = Vector2i(r, c)
 			var shot = own_shot_grid[r][c]
-			var in_preview := pos in preview_cells
+			var in_preview: bool = preview_cells.has(pos)
 
-			if shot == "sunk" or pos in sunken_cells:
+			if shot == "sunk" or sunken_cells.has(pos):
 				btn.text = "⚓"
 				btn.modulate = Color(0.45, 0.45, 0.5, 0.9)
 			elif shot == "hit":
@@ -1095,10 +1095,10 @@ func _update_grid_ui() -> void:
 	for r in BOARD_SIZE:
 		for c in BOARD_SIZE:
 			var btn: Button = opp_grid_buttons[r][c]
-			var pos = Vector2i(r, c)
+			var pos: Vector2i = Vector2i(r, c)
 			var shot = opp_shot_grid[r][c]
 
-			if shot == "sunk" or pos in sunken_cells:
+			if shot == "sunk" or sunken_cells.has(pos):
 				btn.text = "⚓"
 				btn.modulate = Color(0.45, 0.45, 0.5, 0.88)
 				btn.disabled = true
@@ -1123,11 +1123,11 @@ func _build_ship_svg(ship_index: int, ship_size: int, horizontal: bool, cell_px:
 	var svg_w: int = int(round(length_px if horizontal else breadth_px))
 	var svg_h: int = int(round(breadth_px if horizontal else length_px))
 
-	var hull_fill := "#3b2323" if is_sunk else "#2b3b4b"
-	var hull_stroke := "#ff5555" if is_sunk else "#8fb4d4"
-	var deck_fill := "#4d2f2f" if is_sunk else "#445b73"
-	var bridge_fill := "#633b3b" if is_sunk else "#6a88a6"
-	var turret_fill := "#291818" if is_sunk else "#1c2733"
+	var hull_fill: String = "#3b2323" if is_sunk else "#2b3b4b"
+	var hull_stroke: String = "#ff5555" if is_sunk else "#8fb4d4"
+	var deck_fill: String = "#4d2f2f" if is_sunk else "#445b73"
+	var bridge_fill: String = "#633b3b" if is_sunk else "#6a88a6"
+	var turret_fill: String = "#291818" if is_sunk else "#1c2733"
 
 	if not is_sunk and ship_index >= 0 and ship_index < SHIP_SPECS.size():
 		var c: Color = SHIP_SPECS[ship_index]["color"]
@@ -1143,7 +1143,7 @@ func _build_ship_svg(ship_index: int, ship_size: int, horizontal: bool, cell_px:
 	var bow_tip_x: float = L - pad * 0.9
 	var bow_shoulder_x: float = L - B * 0.65
 
-	var inner := ""
+	var inner: String = ""
 	if ship_index == 3:
 		# Submarino (casco elíptico fusiforme + vela central + hidroplanos)
 		var rx: float = (L - pad * 2.0) * 0.5
@@ -1200,7 +1200,7 @@ func _build_ship_svg(ship_index: int, ship_size: int, horizontal: bool, cell_px:
 			inner += '<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s" stroke="%s" stroke-width="1.2"/>' % [aft_x, cy, turret_r, turret_fill, hull_stroke]
 			inner += '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2"/>' % [aft_x, cy, aft_x - turret_r * 1.8, cy, hull_stroke]
 
-	var group_transform := "" if horizontal else ('transform="translate(%.1f, 0) rotate(90)"' % breadth_px)
+	var group_transform: String = "" if horizontal else ('transform="translate(%.1f, 0) rotate(90)"' % breadth_px)
 	return '<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d"><g %s>%s</g></svg>' % [
 		svg_w, svg_h, svg_w, svg_h, group_transform, inner
 	]
@@ -1223,27 +1223,27 @@ func _create_ship_visual_node(ship_cells: Array, ship_idx: int, is_sunk: bool) -
 	var horizontal: bool = (min_r == max_r)
 	var w_cells: int = maxi(max_c - min_c + 1, 1)
 	var h_cells: int = maxi(max_r - min_r + 1, 1)
-	var box_size := Vector2(float(w_cells) * current_cell_size, float(h_cells) * current_cell_size)
+	var box_size: Vector2 = Vector2(float(w_cells) * current_cell_size, float(h_cells) * current_cell_size)
 
-	var holder := Control.new()
+	var holder: Control = Control.new()
 	holder.name = "ShipSVG_%d" % ship_idx
 	holder.position = Vector2(float(min_c) * current_cell_size, float(min_r) * current_cell_size)
 	holder.size = box_size
 	holder.custom_minimum_size = box_size
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var svg_str := _build_ship_svg(ship_idx, ship_size, horizontal, current_cell_size, is_sunk)
+	var svg_str: String = _build_ship_svg(ship_idx, ship_size, horizontal, current_cell_size, is_sunk)
 	holder.set_meta("svg_source", svg_str)
 	holder.set_meta("is_horizontal", horizontal)
 	holder.set_meta("ship_size", ship_size)
 
-	var rasterized_ok := false
-	var img := Image.new()
+	var rasterized_ok: bool = false
+	var img: Image = Image.new()
 	if img.has_method("load_svg_from_string"):
-		var err := img.load_svg_from_string(svg_str)
+		var err: int = img.load_svg_from_string(svg_str)
 		if err == OK and not img.is_empty():
-			var tex := ImageTexture.create_from_image(img)
-			var tex_rect := TextureRect.new()
+			var tex: ImageTexture = ImageTexture.create_from_image(img)
+			var tex_rect: TextureRect = TextureRect.new()
 			tex_rect.name = "ShipTextureRect"
 			tex_rect.texture = tex
 			tex_rect.position = Vector2.ZERO
@@ -1258,17 +1258,17 @@ func _create_ship_visual_node(ship_cells: Array, ship_idx: int, is_sunk: bool) -
 		var stroke_col: Color = Color(1.0, 0.35, 0.35) if is_sunk else (SHIP_SPECS[ship_idx]["color"] if ship_idx >= 0 and ship_idx < SHIP_SPECS.size() else Color(0.55, 0.75, 0.95))
 		var hull_col: Color = Color(0.24, 0.14, 0.14, 0.92) if is_sunk else Color(0.17, 0.24, 0.31, 0.94)
 		holder.draw.connect(func():
-			var pad := maxf(current_cell_size * 0.14, 3.0)
-			var pts := PackedVector2Array()
+			var pad: float = maxf(current_cell_size * 0.14, 3.0)
+			var pts: PackedVector2Array = PackedVector2Array()
 			if horizontal:
-				var cy := box_size.y * 0.5
+				var cy: float = box_size.y * 0.5
 				pts.append(Vector2(pad, pad))
 				pts.append(Vector2(box_size.x - current_cell_size * 0.55, pad))
 				pts.append(Vector2(box_size.x - pad, cy))
 				pts.append(Vector2(box_size.x - current_cell_size * 0.55, box_size.y - pad))
 				pts.append(Vector2(pad, box_size.y - pad))
 			else:
-				var cx := box_size.x * 0.5
+				var cx: float = box_size.x * 0.5
 				pts.append(Vector2(pad, pad))
 				pts.append(Vector2(box_size.x - pad, pad))
 				pts.append(Vector2(box_size.x - pad, box_size.y - current_cell_size * 0.55))
@@ -1296,20 +1296,20 @@ func _refresh_ship_svg_overlays() -> void:
 	if own_ships_layer != null:
 		for idx in range(active_ships.size()):
 			var ship_cells: Array = active_ships[idx]
-			var ship_is_sunk := true
+			var ship_is_sunk: bool = true
 			for cell_pos in ship_cells:
 				var p: Vector2i = cell_pos
-				if own_shot_grid[p.x][p.y] != "sunk" and not (p in sunken_cells):
+				if own_shot_grid[p.x][p.y] != "sunk" and not sunken_cells.has(p):
 					ship_is_sunk = false
 					break
-			var node := _create_ship_visual_node(ship_cells, idx, ship_is_sunk)
+			var node: Control = _create_ship_visual_node(ship_cells, idx, ship_is_sunk)
 			if node != null:
 				own_ships_layer.add_child(node)
 
 	if opp_ships_layer != null:
 		for idx in range(opp_sunken_ships.size()):
 			var sunk_cells_arr: Array = opp_sunken_ships[idx]
-			var node_opp := _create_ship_visual_node(sunk_cells_arr, idx % SHIP_SPECS.size(), true)
+			var node_opp: Control = _create_ship_visual_node(sunk_cells_arr, idx % SHIP_SPECS.size(), true)
 			if node_opp != null:
 				opp_ships_layer.add_child(node_opp)
 

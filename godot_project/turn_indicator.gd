@@ -62,10 +62,10 @@ func _find_board_root() -> Node:
 	return candidate
 
 func _ensure_game_app_menu() -> void:
-	var board_root := _find_board_root()
+	var board_root: Node = _find_board_root()
 	if board_root == null:
 		return
-	var existing := board_root.get_node_or_null("GameAppMenu")
+	var existing: Node = board_root.get_node_or_null("GameAppMenu")
 	if existing != null:
 		app_menu = existing
 		if app_menu.has_method("setup"):
