@@ -32,6 +32,8 @@ var is_horizontal: bool = true
 var own_shot_grid: Array = [] # 10x10: null | "hit" | "miss" | "sunk"
 var opp_shot_grid: Array = [] # 10x10: null | "hit" | "miss" | "sunk"
 var sunken_cells: Array[Vector2i] = []
+var opp_sunken_ships: Array = [] # Array of Arrays of Vector2i
+var hovered_cell: Vector2i = Vector2i(-1, -1)
 
 var own_grid_buttons: Array = []
 var opp_grid_buttons: Array = []
@@ -47,6 +49,8 @@ var own_title_lbl: Label
 var opp_title_lbl: Label
 var own_grid_container: GridContainer
 var opp_grid_container: GridContainer
+var own_ships_layer: Control
+var opp_ships_layer: Control
 var status_label: Label
 var phase_label: Label
 var rotate_btn: Button
@@ -240,6 +244,7 @@ func _on_layout_changed(layout: int) -> void:
 			b_opp.size = Vector2(current_cell_size, current_cell_size)
 			b_opp.add_theme_font_size_override("font_size", btn_font_sz)
 
+	_refresh_ship_svg_overlays()
 	queue_redraw()
 
 func _init_grids() -> void:
@@ -269,7 +274,7 @@ func _setup_ui() -> void:
 	main_vbox.add_theme_constant_override("separation", 6)
 	main_margin.add_child(main_vbox)
 
-	# Row 1: Status + Turn Indicator + Rules
+	# Row 1: Status + Turn Indicator + Rules (Rules oculto: agrupado en GameAppMenu superior derecho)
 	header_top_hbox = HBoxContainer.new()
 	header_top_hbox.add_theme_constant_override("separation", 10)
 	header_top_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -292,11 +297,14 @@ func _setup_ui() -> void:
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.custom_minimum_size = Vector2(96, 32)
-	btn_rules.pressed.connect(func():
-		if _rules_popup != null:
-			_rules_popup.show_for_game("battleship")
-	)
+	btn_rules.visible = false
+	btn_rules.pressed.connect(_on_rules_pressed)
 	header_top_hbox.add_child(btn_rules)
+
+	var top_menu_spacer := Control.new()
+	top_menu_spacer.name = "TopMenuSpacer"
+	top_menu_spacer.custom_minimum_size = Vector2(126, 32)
+	header_top_hbox.add_child(top_menu_spacer)
 
 	# Row 2: Mode selector + Orientation + Auto-Fleet + Reset Fleet
 	controls_flow = HFlowContainer.new()
@@ -315,8 +323,9 @@ func _setup_ui() -> void:
 
 	rotate_btn = Button.new()
 	rotate_btn.name = "RotateButton"
-	rotate_btn.text = "🔄 Orientación: Horizontal"
-	rotate_btn.custom_minimum_size = Vector2(170, 34)
+	rotate_btn.text = "🔄 Orientación: Horizontal (R)"
+	rotate_btn.tooltip_text = "Alternar colocación Horizontal / Vertical (Tecla R o Clic Derecho en el tablero)"
+	rotate_btn.custom_minimum_size = Vector2(190, 34)
 	rotate_btn.pressed.connect(_on_rotate_pressed)
 	controls_flow.add_child(rotate_btn)
 
@@ -366,8 +375,16 @@ func _setup_ui() -> void:
 	own_grid_container.columns = BOARD_SIZE
 	own_grid_container.add_theme_constant_override("h_separation", 0)
 	own_grid_container.add_theme_constant_override("v_separation", 0)
-	own_grid_container.resized.connect(func(): queue_redraw())
+	own_grid_container.resized.connect(func():
+		_refresh_ship_svg_overlays()
+		queue_redraw()
+	)
 	own_margin.add_child(own_grid_container)
+
+	own_ships_layer = Control.new()
+	own_ships_layer.name = "OwnShipsLayer"
+	own_ships_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	own_margin.add_child(own_ships_layer)
 
 	own_grid_buttons = []
 	for r in BOARD_SIZE:
@@ -377,6 +394,9 @@ func _setup_ui() -> void:
 			btn.custom_minimum_size = Vector2(CELL_SIZE, CELL_SIZE)
 			btn.text = "~"
 			btn.pressed.connect(_on_own_cell_pressed.bind(r, c))
+			btn.gui_input.connect(_on_own_cell_gui_input.bind(r, c))
+			btn.mouse_entered.connect(_on_own_cell_mouse_entered.bind(r, c))
+			btn.mouse_exited.connect(_on_own_cell_mouse_exited.bind(r, c))
 			own_grid_container.add_child(btn)
 			row_btns.append(btn)
 		own_grid_buttons.append(row_btns)
@@ -401,8 +421,16 @@ func _setup_ui() -> void:
 	opp_grid_container.columns = BOARD_SIZE
 	opp_grid_container.add_theme_constant_override("h_separation", 0)
 	opp_grid_container.add_theme_constant_override("v_separation", 0)
-	opp_grid_container.resized.connect(func(): queue_redraw())
+	opp_grid_container.resized.connect(func():
+		_refresh_ship_svg_overlays()
+		queue_redraw()
+	)
 	opp_margin.add_child(opp_grid_container)
+
+	opp_ships_layer = Control.new()
+	opp_ships_layer.name = "OppShipsLayer"
+	opp_ships_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	opp_margin.add_child(opp_ships_layer)
 
 	opp_grid_buttons = []
 	for r in BOARD_SIZE:
@@ -418,7 +446,37 @@ func _setup_ui() -> void:
 
 	# Container for animated ship textures
 	ship_sprites_container = Node2D.new()
+	ship_sprites_container.name = "ShipSpritesContainer"
 	add_child(ship_sprites_container)
+
+func _on_rules_pressed() -> void:
+	if _rules_popup != null:
+		_rules_popup.show_for_game("battleship")
+
+func _input(event: InputEvent) -> void:
+	if phase != Phase.PLACEMENT_P1 and phase != Phase.PLACEMENT_P2:
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
+		_on_rotate_pressed()
+		get_viewport().set_input_as_handled()
+
+func _on_own_cell_gui_input(event: InputEvent, row: int, col: int) -> void:
+	if phase != Phase.PLACEMENT_P1 and phase != Phase.PLACEMENT_P2:
+		return
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		hovered_cell = Vector2i(row, col)
+		_on_rotate_pressed()
+
+func _on_own_cell_mouse_entered(row: int, col: int) -> void:
+	hovered_cell = Vector2i(row, col)
+	if phase == Phase.PLACEMENT_P1 or phase == Phase.PLACEMENT_P2:
+		_update_grid_ui()
+
+func _on_own_cell_mouse_exited(row: int, col: int) -> void:
+	if hovered_cell == Vector2i(row, col):
+		hovered_cell = Vector2i(-1, -1)
+		if phase == Phase.PLACEMENT_P1 or phase == Phase.PLACEMENT_P2:
+			_update_grid_ui()
 
 func _on_mode_selected(index: int) -> void:
 	var gm = get_node_or_null("/root/GameManager") if is_inside_tree() else null
@@ -426,6 +484,7 @@ func _on_mode_selected(index: int) -> void:
 	p1_ships.clear()
 	p2_ships.clear()
 	sunken_cells.clear()
+	opp_sunken_ships.clear()
 	current_ship_index = 0
 	_last_move_rejected = false
 	_init_grids()
@@ -501,7 +560,9 @@ func _draw_grid_coordinates(grid_buttons: Array, font: Font, font_sz: int, coord
 func _on_rotate_pressed() -> void:
 	is_horizontal = not is_horizontal
 	if rotate_btn != null:
-		rotate_btn.text = "🔄 Orientación: " + ("Horizontal" if is_horizontal else "Vertical")
+		rotate_btn.text = "🔄 Orientación: " + ("Horizontal (R)" if is_horizontal else "Vertical (R)")
+	_update_status()
+	_update_grid_ui()
 
 func _on_clear_fleet_pressed() -> void:
 	if phase != Phase.PLACEMENT_P1 and phase != Phase.PLACEMENT_P2:
@@ -586,6 +647,16 @@ func _on_opp_cell_pressed(row: int, col: int) -> void:
 	if phase == Phase.FIRE and winner == -1:
 		_handle_fire_click(row, col)
 
+func _resolve_placement_origin(start_row: int, start_col: int, ship_size: int, horizontal: bool) -> Vector2i:
+	var r := start_row
+	var c := start_col
+	if r >= 0 and r < BOARD_SIZE and c >= 0 and c < BOARD_SIZE:
+		if horizontal:
+			c = mini(c, BOARD_SIZE - ship_size)
+		else:
+			r = mini(r, BOARD_SIZE - ship_size)
+	return Vector2i(r, c)
+
 func _handle_placement(start_row: int, start_col: int) -> void:
 	if current_ship_index >= SHIP_SPECS.size():
 		return
@@ -593,11 +664,14 @@ func _handle_placement(start_row: int, start_col: int) -> void:
 	var spec = SHIP_SPECS[current_ship_index]
 	var ship_size: int = spec["size"]
 	var target_ships := p1_ships if phase == Phase.PLACEMENT_P1 else p2_ships
+	var clamped_origin := _resolve_placement_origin(start_row, start_col, ship_size, is_horizontal)
+	var base_row := clamped_origin.x
+	var base_col := clamped_origin.y
 	var ship_cells: Array[Vector2i] = []
 
 	for i in range(ship_size):
-		var r = start_row + (0 if is_horizontal else i)
-		var c = start_col + (i if is_horizontal else 0)
+		var r = base_row + (0 if is_horizontal else i)
+		var c = base_col + (i if is_horizontal else 0)
 		if r < 0 or r >= BOARD_SIZE or c < 0 or c >= BOARD_SIZE:
 			if status_label != null:
 				status_label.text = "❌ ¡El barco no cabe ahí! Prueba otra casilla o cambia la orientación."
@@ -836,18 +910,24 @@ func _on_event_json(json_str: String) -> void:
 
 				if res_str == "Sunk" and event.has("sunken_ship"):
 					var sunk_coords = event["sunken_ship"]
+					var sunk_ship_cells: Array[Vector2i] = []
 					for coord in sunk_coords:
 						var sr = int(coord.get("row", 0))
 						var sc = int(coord.get("col", 0))
 						var spos = Vector2i(sr, sc)
+						sunk_ship_cells.append(spos)
 						if not spos in sunken_cells:
 							sunken_cells.append(spos)
+					if shooting_player == my_player and not sunk_ship_cells.is_empty():
+						opp_sunken_ships.append(sunk_ship_cells)
 			elif ev_type == "SunkenShipEvent" or ev_type == "SunkShipEvent":
+				var sunk_ship_cells2: Array[Vector2i] = []
 				if event.has("positions"):
 					for pos_obj in event["positions"]:
 						var sr = int(pos_obj.get("row", 0)) if pos_obj is Dictionary else int(pos_obj[0])
 						var sc = int(pos_obj.get("col", 0)) if pos_obj is Dictionary else int(pos_obj[1])
 						var spos = Vector2i(sr, sc)
+						sunk_ship_cells2.append(spos)
 						if not spos in sunken_cells:
 							sunken_cells.append(spos)
 				elif event.has("coords"):
@@ -855,8 +935,11 @@ func _on_event_json(json_str: String) -> void:
 						var sr = int(pair[0]) if pair is Array else int(pair.get("row", 0))
 						var sc = int(pair[1]) if pair is Array else int(pair.get("col", 0))
 						var spos = Vector2i(sr, sc)
+						sunk_ship_cells2.append(spos)
 						if not spos in sunken_cells:
 							sunken_cells.append(spos)
+				if not sunk_ship_cells2.is_empty():
+					opp_sunken_ships.append(sunk_ship_cells2)
 			elif ev_type == "GameOverEvent":
 				winner = int(event.get("winner", -1))
 				phase = Phase.GAME_OVER
@@ -894,6 +977,7 @@ func _update_status() -> void:
 	if clear_fleet_btn != null:
 		clear_fleet_btn.disabled = not in_placement
 
+	var orient_txt := "Horizontal ↔" if is_horizontal else "Vertical ↕"
 	if winner != -1 or phase == Phase.GAME_OVER:
 		if status_label != null:
 			status_label.text = "🏆 ¡Fin del juego! Ganó el Jugador %d" % winner
@@ -904,8 +988,8 @@ func _update_status() -> void:
 		var spec = SHIP_SPECS[current_ship_index] if current_ship_index < SHIP_SPECS.size() else null
 		if status_label != null:
 			if spec:
-				status_label.text = "⚓ J1: Coloca %s (%d casillas) [%d/%d] o pulsa 🎲 Auto-Flota" % [
-					spec["name"], spec["size"], current_ship_index + 1, SHIP_SPECS.size()
+				status_label.text = "⚓ J1: Coloca %s (%d casillas, %s) [%d/%d] — R/Clic Der. rota" % [
+					spec["name"], spec["size"], orient_txt, current_ship_index + 1, SHIP_SPECS.size()
 				]
 			else:
 				status_label.text = "⚓ Jugador 1: Flota lista."
@@ -917,8 +1001,8 @@ func _update_status() -> void:
 		var spec = SHIP_SPECS[current_ship_index] if current_ship_index < SHIP_SPECS.size() else null
 		if status_label != null:
 			if spec:
-				status_label.text = "⚓ J2: Coloca %s (%d casillas) [%d/%d] o pulsa 🎲 Auto-Flota" % [
-					spec["name"], spec["size"], current_ship_index + 1, SHIP_SPECS.size()
+				status_label.text = "⚓ J2: Coloca %s (%d casillas, %s) [%d/%d] — R/Clic Der. rota" % [
+					spec["name"], spec["size"], orient_txt, current_ship_index + 1, SHIP_SPECS.size()
 				]
 			else:
 				status_label.text = "⚓ Jugador 2: Flota lista."
@@ -941,11 +1025,40 @@ func _update_status() -> void:
 	if opp_vbox != null:
 		opp_vbox.modulate = Color(1.0, 1.0, 1.0, 1.0) if phase == Phase.FIRE else Color(1.0, 1.0, 1.0, 0.65)
 
+func _get_hover_preview_info(active_ships: Array) -> Dictionary:
+	var result := {"cells": [], "valid": true}
+	var in_placement := (phase == Phase.PLACEMENT_P1 or phase == Phase.PLACEMENT_P2)
+	if not in_placement or current_ship_index >= SHIP_SPECS.size():
+		return result
+	if hovered_cell.x < 0 or hovered_cell.x >= BOARD_SIZE or hovered_cell.y < 0 or hovered_cell.y >= BOARD_SIZE:
+		return result
+
+	var ship_size: int = int(SHIP_SPECS[current_ship_index]["size"])
+	var origin := _resolve_placement_origin(hovered_cell.x, hovered_cell.y, ship_size, is_horizontal)
+	var cells: Array[Vector2i] = []
+	var is_valid := true
+	for i in range(ship_size):
+		var r: int = origin.x + (0 if is_horizontal else i)
+		var c: int = origin.y + (i if is_horizontal else 0)
+		if r < 0 or r >= BOARD_SIZE or c < 0 or c >= BOARD_SIZE:
+			is_valid = false
+			continue
+		var pos := Vector2i(r, c)
+		if _is_cell_occupied_in_ships(pos, active_ships) or _is_cell_adjacent_to_ships(pos, active_ships):
+			is_valid = false
+		cells.append(pos)
+	result["cells"] = cells
+	result["valid"] = is_valid
+	return result
+
 func _update_grid_ui() -> void:
 	if own_grid_buttons.is_empty() or opp_grid_buttons.is_empty() or own_shot_grid.is_empty() or opp_shot_grid.is_empty():
 		return
 	var active_ships = p2_ships if (phase == Phase.PLACEMENT_P2 or (is_vs_ai and local_player == P2)) else p1_ships
 	var in_placement := (phase == Phase.PLACEMENT_P1 or phase == Phase.PLACEMENT_P2)
+	var preview_info := _get_hover_preview_info(active_ships)
+	var preview_cells: Array = preview_info["cells"]
+	var preview_valid: bool = bool(preview_info["valid"])
 
 	# Update Own Grid UI
 	for r in BOARD_SIZE:
@@ -953,19 +1066,24 @@ func _update_grid_ui() -> void:
 			var btn: Button = own_grid_buttons[r][c]
 			var pos = Vector2i(r, c)
 			var shot = own_shot_grid[r][c]
+			var in_preview := pos in preview_cells
 
 			if shot == "sunk" or pos in sunken_cells:
 				btn.text = "⚓"
-				btn.modulate = Color(0.3, 0.3, 0.3, 0.8)
+				btn.modulate = Color(0.45, 0.45, 0.5, 0.9)
 			elif shot == "hit":
 				btn.text = "💥"
-				btn.modulate = Color(1.0, 0.2, 0.2)
+				btn.modulate = Color(1.0, 0.25, 0.25)
 			elif shot == "miss":
 				btn.text = "💧"
 				btn.modulate = Color(0.3, 0.7, 1.0)
 			elif _is_cell_occupied_in_ships(pos, active_ships):
-				btn.text = "🚢"
-				btn.modulate = Color(0.3, 0.85, 0.45)
+				# Texto vacío para dejar visible la silueta cenital SVG del barco sobre las casillas
+				btn.text = ""
+				btn.modulate = Color(0.22, 0.48, 0.65, 0.92) if not in_preview else Color(0.95, 0.35, 0.35, 0.95)
+			elif in_preview:
+				btn.text = "▭" if is_horizontal else "▮"
+				btn.modulate = Color(0.35, 0.95, 0.55, 0.95) if preview_valid else Color(1.0, 0.35, 0.35, 0.95)
 			elif in_placement and _is_cell_adjacent_to_ships(pos, active_ships):
 				btn.text = "·"
 				btn.modulate = Color(0.55, 0.65, 0.78, 0.75)
@@ -982,7 +1100,7 @@ func _update_grid_ui() -> void:
 
 			if shot == "sunk" or pos in sunken_cells:
 				btn.text = "⚓"
-				btn.modulate = Color(0.3, 0.3, 0.3, 0.8)
+				btn.modulate = Color(0.45, 0.45, 0.5, 0.88)
 				btn.disabled = true
 			elif shot == "hit":
 				btn.text = "💥"
@@ -996,6 +1114,204 @@ func _update_grid_ui() -> void:
 				btn.text = "~"
 				btn.modulate = Color.WHITE
 				btn.disabled = (phase != Phase.FIRE or winner != -1)
+
+	_refresh_ship_svg_overlays()
+
+func _build_ship_svg(ship_index: int, ship_size: int, horizontal: bool, cell_px: float, is_sunk: bool = false) -> String:
+	var length_px: float = maxf(float(ship_size) * cell_px, 32.0)
+	var breadth_px: float = maxf(cell_px, 20.0)
+	var svg_w: int = int(round(length_px if horizontal else breadth_px))
+	var svg_h: int = int(round(breadth_px if horizontal else length_px))
+
+	var hull_fill := "#3b2323" if is_sunk else "#2b3b4b"
+	var hull_stroke := "#ff5555" if is_sunk else "#8fb4d4"
+	var deck_fill := "#4d2f2f" if is_sunk else "#445b73"
+	var bridge_fill := "#633b3b" if is_sunk else "#6a88a6"
+	var turret_fill := "#291818" if is_sunk else "#1c2733"
+
+	if not is_sunk and ship_index >= 0 and ship_index < SHIP_SPECS.size():
+		var c: Color = SHIP_SPECS[ship_index]["color"]
+		hull_stroke = "#%02x%02x%02x" % [int(clampf(c.r * 255.0, 0, 255)), int(clampf(c.g * 255.0, 0, 255)), int(clampf(c.b * 255.0, 0, 255))]
+
+	var L: float = length_px
+	var B: float = breadth_px
+	var cy: float = B * 0.5
+	var pad: float = maxf(B * 0.14, 3.0)
+	var top_y: float = pad
+	var bot_y: float = B - pad
+	var stern_x: float = pad * 1.1
+	var bow_tip_x: float = L - pad * 0.9
+	var bow_shoulder_x: float = L - B * 0.65
+
+	var inner := ""
+	if ship_index == 3:
+		# Submarino (casco elíptico fusiforme + vela central + hidroplanos)
+		var rx: float = (L - pad * 2.0) * 0.5
+		var ry: float = (B - pad * 2.4) * 0.5
+		var cx: float = L * 0.5
+		inner += '<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s" stroke="%s" stroke-width="2"/>' % [cx, cy, rx, ry, hull_fill, hull_stroke]
+		inner += '<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s"/>' % [cx, cy, rx * 0.72, ry * 0.55, deck_fill]
+		inner += '<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s" stroke="%s" stroke-width="1.2"/>' % [cx + rx * 0.12, cy, rx * 0.22, ry * 0.48, bridge_fill, hull_stroke]
+		inner += '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="1.5"/>' % [stern_x, cy, bow_tip_x - 4.0, cy, hull_stroke]
+	elif ship_index == 0:
+		# Portaaviones (cubierta de vuelo angulada + pista punteada + isla a estribor)
+		inner += '<polygon points="%.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f" fill="%s" stroke="%s" stroke-width="2"/>' % [
+			stern_x, top_y + 2.0,
+			bow_shoulder_x, top_y,
+			bow_tip_x, cy,
+			bow_shoulder_x, bot_y,
+			stern_x + 4.0, bot_y,
+			stern_x, bot_y - 3.0,
+			hull_fill, hull_stroke
+		]
+		inner += '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#e8f0f8" stroke-width="1.6" stroke-dasharray="6,4"/>' % [
+			stern_x + 8.0, cy + 2.0, bow_shoulder_x - 4.0, cy - 2.0
+		]
+		inner += '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="2" fill="%s" stroke="%s" stroke-width="1.2"/>' % [
+			L * 0.38, top_y + 2.0, L * 0.22, B * 0.24, bridge_fill, hull_stroke
+		]
+	else:
+		# Acorazado, Crucero, Destructor (casco naval cenital en punta de proa + cubierta + puente + torretas)
+		inner += '<polygon points="%.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f" fill="%s" stroke="%s" stroke-width="2"/>' % [
+			stern_x, top_y + 1.0,
+			bow_shoulder_x, top_y + 1.0,
+			bow_tip_x, cy,
+			bow_shoulder_x, bot_y - 1.0,
+			stern_x, bot_y - 1.0,
+			hull_fill, hull_stroke
+		]
+		inner += '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="4" fill="%s"/>' % [
+			stern_x + 6.0, top_y + 4.0, maxf(bow_shoulder_x - stern_x - 10.0, 12.0), maxf(B - pad * 2.0 - 8.0, 6.0), deck_fill
+		]
+		# Superestructura / Puente central
+		var bridge_w: float = L * 0.22
+		var bridge_h: float = (B - pad * 2.0) * 0.52
+		inner += '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="3" fill="%s" stroke="%s" stroke-width="1"/>' % [
+			L * 0.42, cy - bridge_h * 0.5, bridge_w, bridge_h, bridge_fill, hull_stroke
+		]
+		# Torretas de artillería en proa y popa
+		var turret_r: float = maxf(B * 0.14, 3.2)
+		var fore_x: float = L * 0.74
+		var aft_x: float = L * 0.24
+		inner += '<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s" stroke="%s" stroke-width="1.2"/>' % [fore_x, cy, turret_r, turret_fill, hull_stroke]
+		inner += '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2"/>' % [fore_x, cy - 1.5, fore_x + turret_r * 1.9, cy - 1.5, hull_stroke]
+		inner += '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2"/>' % [fore_x, cy + 1.5, fore_x + turret_r * 1.9, cy + 1.5, hull_stroke]
+		if ship_size >= 3:
+			inner += '<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s" stroke="%s" stroke-width="1.2"/>' % [aft_x, cy, turret_r, turret_fill, hull_stroke]
+			inner += '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2"/>' % [aft_x, cy, aft_x - turret_r * 1.8, cy, hull_stroke]
+
+	var group_transform := "" if horizontal else ('transform="translate(%.1f, 0) rotate(90)"' % breadth_px)
+	return '<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d"><g %s>%s</g></svg>' % [
+		svg_w, svg_h, svg_w, svg_h, group_transform, inner
+	]
+
+func _create_ship_visual_node(ship_cells: Array, ship_idx: int, is_sunk: bool) -> Control:
+	if ship_cells.is_empty():
+		return null
+	var min_r: int = 999
+	var max_r: int = -999
+	var min_c: int = 999
+	var max_c: int = -999
+	for cell in ship_cells:
+		var pos: Vector2i = cell
+		min_r = mini(min_r, pos.x)
+		max_r = maxi(max_r, pos.x)
+		min_c = mini(min_c, pos.y)
+		max_c = maxi(max_c, pos.y)
+
+	var ship_size: int = ship_cells.size()
+	var horizontal: bool = (min_r == max_r)
+	var w_cells: int = maxi(max_c - min_c + 1, 1)
+	var h_cells: int = maxi(max_r - min_r + 1, 1)
+	var box_size := Vector2(float(w_cells) * current_cell_size, float(h_cells) * current_cell_size)
+
+	var holder := Control.new()
+	holder.name = "ShipSVG_%d" % ship_idx
+	holder.position = Vector2(float(min_c) * current_cell_size, float(min_r) * current_cell_size)
+	holder.size = box_size
+	holder.custom_minimum_size = box_size
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var svg_str := _build_ship_svg(ship_idx, ship_size, horizontal, current_cell_size, is_sunk)
+	holder.set_meta("svg_source", svg_str)
+	holder.set_meta("is_horizontal", horizontal)
+	holder.set_meta("ship_size", ship_size)
+
+	var rasterized_ok := false
+	var img := Image.new()
+	if img.has_method("load_svg_from_string"):
+		var err := img.load_svg_from_string(svg_str)
+		if err == OK and not img.is_empty():
+			var tex := ImageTexture.create_from_image(img)
+			var tex_rect := TextureRect.new()
+			tex_rect.name = "ShipTextureRect"
+			tex_rect.texture = tex
+			tex_rect.position = Vector2.ZERO
+			tex_rect.size = box_size
+			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tex_rect.stretch_mode = TextureRect.STRETCH_SCALE
+			tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			holder.add_child(tex_rect)
+			rasterized_ok = true
+
+	if not rasterized_ok:
+		var stroke_col: Color = Color(1.0, 0.35, 0.35) if is_sunk else (SHIP_SPECS[ship_idx]["color"] if ship_idx >= 0 and ship_idx < SHIP_SPECS.size() else Color(0.55, 0.75, 0.95))
+		var hull_col: Color = Color(0.24, 0.14, 0.14, 0.92) if is_sunk else Color(0.17, 0.24, 0.31, 0.94)
+		holder.draw.connect(func():
+			var pad := maxf(current_cell_size * 0.14, 3.0)
+			var pts := PackedVector2Array()
+			if horizontal:
+				var cy := box_size.y * 0.5
+				pts.append(Vector2(pad, pad))
+				pts.append(Vector2(box_size.x - current_cell_size * 0.55, pad))
+				pts.append(Vector2(box_size.x - pad, cy))
+				pts.append(Vector2(box_size.x - current_cell_size * 0.55, box_size.y - pad))
+				pts.append(Vector2(pad, box_size.y - pad))
+			else:
+				var cx := box_size.x * 0.5
+				pts.append(Vector2(pad, pad))
+				pts.append(Vector2(box_size.x - pad, pad))
+				pts.append(Vector2(box_size.x - pad, box_size.y - current_cell_size * 0.55))
+				pts.append(Vector2(cx, box_size.y - pad))
+				pts.append(Vector2(pad, box_size.y - current_cell_size * 0.55))
+			holder.draw_colored_polygon(pts, hull_col)
+			pts.append(pts[0])
+			holder.draw_polyline(pts, stroke_col, 2.0)
+		)
+		holder.queue_redraw()
+
+	return holder
+
+func _refresh_ship_svg_overlays() -> void:
+	if own_ships_layer != null:
+		for child in own_ships_layer.get_children():
+			own_ships_layer.remove_child(child)
+			child.queue_free()
+	if opp_ships_layer != null:
+		for child in opp_ships_layer.get_children():
+			opp_ships_layer.remove_child(child)
+			child.queue_free()
+
+	var active_ships: Array = p2_ships if (phase == Phase.PLACEMENT_P2 or (is_vs_ai and local_player == P2)) else p1_ships
+	if own_ships_layer != null:
+		for idx in range(active_ships.size()):
+			var ship_cells: Array = active_ships[idx]
+			var ship_is_sunk := true
+			for cell_pos in ship_cells:
+				var p: Vector2i = cell_pos
+				if own_shot_grid[p.x][p.y] != "sunk" and not (p in sunken_cells):
+					ship_is_sunk = false
+					break
+			var node := _create_ship_visual_node(ship_cells, idx, ship_is_sunk)
+			if node != null:
+				own_ships_layer.add_child(node)
+
+	if opp_ships_layer != null:
+		for idx in range(opp_sunken_ships.size()):
+			var sunk_cells_arr: Array = opp_sunken_ships[idx]
+			var node_opp := _create_ship_visual_node(sunk_cells_arr, idx % SHIP_SPECS.size(), true)
+			if node_opp != null:
+				opp_ships_layer.add_child(node_opp)
 
 # --- Conexión de eventos sonoros procedurales (AudioManager) ---
 func _sfx_piece_slide() -> void:

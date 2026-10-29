@@ -74,13 +74,37 @@ func _initialize() -> void:
 		var orphan_status = board_inst.get_node_or_null("Status")
 		results.append(["Nodo huérfano Status ('Cargando...') está oculto en battleship_board.tscn", orphan_status != null and not orphan_status.visible])
 
-		# Colocar primer barco (Portaaviones, 5 casillas) en fila 0, col 0..4
+		# Colocar primer barco (Portaaviones, 5 casillas) horizontal en fila 0, col 0..4
 		board_inst._on_own_cell_pressed(0, 0)
 		results.append(["Primer barco se coloca en (0,0..4) avanzando current_ship_index a 1", board_inst.current_ship_index == 1])
 
 		# Intentar colocar segundo barco (Acorazado, 4 casillas) pegado en fila 1, col 0..3 -> debe rechazarse por adyacencia
 		board_inst._on_own_cell_pressed(1, 0)
 		results.append(["UI impide colocar segundo barco pegado al primero (adyacencia de 1 casilla)", board_inst.current_ship_index == 1])
+
+		# Cambiar orientación a Vertical y colocar segundo barco (Acorazado, 4 casillas) cerca del borde inferior (fila 8, col 7 -> auto-clamp a filas 6..9, col 7)
+		board_inst._on_rotate_pressed()
+		board_inst._on_own_cell_pressed(8, 7)
+		var vertical_ship_ok: bool = (board_inst.current_ship_index == 2 and board_inst.p1_ships.size() == 2)
+		if vertical_ship_ok:
+			var v_ship: Array = board_inst.p1_ships[1]
+			vertical_ship_ok = (v_ship.size() == 4 and v_ship[0].y == 7 and v_ship[3].y == 7 and v_ship[0].x == 6 and v_ship[3].x == 9)
+		results.append(["Permite colocar barco en orientación Vertical con ajuste de borde (filas 6..9, col 7)", vertical_ship_ok])
+
+		# Verificar que los barcos colocados generan nodos visuales con SVG cenital en OwnShipsLayer
+		var svg_ok := false
+		if board_inst.own_ships_layer != null and board_inst.own_ships_layer.get_child_count() == 2:
+			var first_svg_node: Node = board_inst.own_ships_layer.get_child(0)
+			var second_svg_node: Node = board_inst.own_ships_layer.get_child(1)
+			var svg_str_0 := str(first_svg_node.get_meta("svg_source", ""))
+			var svg_str_1 := str(second_svg_node.get_meta("svg_source", ""))
+			svg_ok = svg_str_0.begins_with("<svg") and svg_str_1.begins_with("<svg") and bool(second_svg_node.get_meta("is_horizontal", true)) == false
+		results.append(["Barcos colocados se renderizan en formato SVG cenital (horizontal y vertical)", svg_ok])
+
+		# Verificar menú desplegable superior derecho (GameAppMenu) con Temas, Deshacer, Rehacer, Tutorial y Reglas
+		var app_menu: Node = board_inst.get_node_or_null("GameAppMenu")
+		var menu_ok := (app_menu != null and app_menu.get("theme_item_btn") != null and app_menu.get("undo_item_btn") != null and app_menu.get("tutorial_item_btn") != null and app_menu.get("rules_item_btn") != null)
+		results.append(["Menú desplegable superior derecho (GameAppMenu) agrupa Temas, Deshacer, Rehacer, Tutorial y Reglas", menu_ok])
 
 		# Probar botón Auto-Flota -> debe completar la flota y avanzar de fase
 		board_inst._on_auto_fleet_pressed()

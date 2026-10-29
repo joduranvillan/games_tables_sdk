@@ -36,14 +36,46 @@ func set_active(is_active: bool) -> void:
 		_active_tween.kill()
 		_active_tween = null
 
+const GameAppMenuScript = preload("res://scenes/game_app_menu.gd")
+var app_menu: Node = null
+
 func _init() -> void:
-	custom_minimum_size = Vector2(360, 40)
-	add_theme_constant_override("separation", 12)
+	custom_minimum_size = Vector2(180, 34)
+	add_theme_constant_override("separation", 10)
 	
 func _ready() -> void:
 	if timer_bar == null:
 		_setup_nodes()
 	_find_and_bind_bridge()
+	call_deferred("_find_and_bind_bridge")
+	_ensure_game_app_menu()
+
+func _find_board_root() -> Node:
+	var p = get_parent()
+	var candidate: Node = p
+	while p != null:
+		if ("bridge" in p) or ("_rules_popup" in p) or ("rules_popup" in p) or p.has_node("Bridge"):
+			return p
+		if not (p is Window) and not (p is SubViewport):
+			candidate = p
+		p = p.get_parent()
+	return candidate
+
+func _ensure_game_app_menu() -> void:
+	var board_root := _find_board_root()
+	if board_root == null:
+		return
+	var existing := board_root.get_node_or_null("GameAppMenu")
+	if existing != null:
+		app_menu = existing
+		if app_menu.has_method("setup"):
+			app_menu.setup(board_root, self)
+		return
+	app_menu = GameAppMenuScript.new()
+	app_menu.name = "GameAppMenu"
+	board_root.add_child(app_menu)
+	if app_menu.has_method("setup"):
+		app_menu.setup(board_root, self)
 
 func _find_and_bind_bridge() -> void:
 	var p = get_parent()
@@ -108,33 +140,36 @@ func _setup_nodes() -> void:
 	turn_timer_hud.progress_bar.visible = false
 	add_child(turn_timer_hud)
 	
-	# 4. Undo button
+	# 4. Undo button (oculto en barra: agrupado en GameAppMenu superior derecho)
 	undo_btn = Button.new()
 	undo_btn.name = "UndoButton"
 	undo_btn.text = "⟵ Deshacer"
 	undo_btn.custom_minimum_size = Vector2(80, 30)
 	undo_btn.size_flags_vertical = SIZE_SHRINK_CENTER
 	undo_btn.add_theme_font_size_override("font_size", 12)
+	undo_btn.visible = false
 	undo_btn.pressed.connect(_on_undo_pressed)
 	add_child(undo_btn)
 
-	# 5. Redo button
+	# 5. Redo button (oculto en barra: agrupado en GameAppMenu superior derecho)
 	redo_btn = Button.new()
 	redo_btn.name = "RedoButton"
 	redo_btn.text = "Rehacer ⟶"
 	redo_btn.custom_minimum_size = Vector2(80, 30)
 	redo_btn.size_flags_vertical = SIZE_SHRINK_CENTER
 	redo_btn.add_theme_font_size_override("font_size", 12)
+	redo_btn.visible = false
 	redo_btn.pressed.connect(_on_redo_pressed)
 	add_child(redo_btn)
 
-	# 6. Theme switcher button
+	# 6. Theme switcher button (oculto en barra: agrupado en GameAppMenu superior derecho)
 	theme_btn = Button.new()
 	theme_btn.name = "ThemeButton"
 	theme_btn.text = "🎨 Tema"
 	theme_btn.custom_minimum_size = Vector2(75, 30)
 	theme_btn.size_flags_vertical = SIZE_SHRINK_CENTER
 	theme_btn.add_theme_font_size_override("font_size", 12)
+	theme_btn.visible = false
 	theme_btn.pressed.connect(_on_theme_pressed)
 	add_child(theme_btn)
 
