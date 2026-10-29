@@ -172,6 +172,7 @@ func _setup_nodes() -> void:
 	theme_btn.visible = false
 	theme_btn.pressed.connect(_on_theme_pressed)
 	add_child(theme_btn)
+	_ensure_game_app_menu()
 
 func get_configured_player_name(player_id: int, fallback_name: String = "") -> String:
 	if is_inside_tree() and has_node("/root/SettingsMenu"):
@@ -194,6 +195,8 @@ func set_current_player(player_id: int) -> void:
 func set_turn(player_id: int, player_name: String, player_color: Color) -> void:
 	if timer_bar == null:
 		_setup_nodes()
+	if app_menu == null:
+		_ensure_game_app_menu()
 	current_player_id = player_id
 	if color_rect:
 		color_rect.color = player_color
