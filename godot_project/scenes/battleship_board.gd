@@ -1,10 +1,10 @@
 extends Node2D
 
-const BOARD_SIZE := 10
-const CELL_SIZE := 40.0
-const P1 := 1
-const P2 := 2
-const SHIP_SPECS := [
+const BOARD_SIZE: int = 10
+const CELL_SIZE: float = 40.0
+const P1: int = 1
+const P2: int = 2
+const SHIP_SPECS: Array = [
 	{"name": "Portaaviones", "size": 5, "color": Color(0.2, 0.6, 0.9)},
 	{"name": "Acorazado", "size": 4, "color": Color(0.3, 0.8, 0.4)},
 	{"name": "Crucero", "size": 3, "color": Color(0.8, 0.4, 0.8)},
@@ -102,7 +102,7 @@ func _ready() -> void:
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
 		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
-			var hud_script := load("res://network_status_hud.gd")
+			var hud_script = load("res://network_status_hud.gd")
 			if hud_script:
 				var hud: Node = hud_script.new()
 				if hud.has_method("setup"):
@@ -175,9 +175,9 @@ func _on_layout_changed(layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
-	var vp_size := Vector2(1280, 720)
+	var vp_size: Vector2 = Vector2(1280, 720)
 	if is_inside_tree() and get_viewport() != null:
-		var visible_sz := get_viewport().get_visible_rect().size
+		var visible_sz: Vector2 = get_viewport().get_visible_rect().size
 		if visible_sz.x > 0 and visible_sz.y > 0:
 			vp_size = visible_sz
 	if layout == 2 and vp_size.x >= 1000.0:
@@ -301,7 +301,7 @@ func _setup_ui() -> void:
 	btn_rules.pressed.connect(_on_rules_pressed)
 	header_top_hbox.add_child(btn_rules)
 
-	var top_menu_spacer := Control.new()
+	var top_menu_spacer: Control = Control.new()
 	top_menu_spacer.name = "TopMenuSpacer"
 	top_menu_spacer.custom_minimum_size = Vector2(126, 32)
 	header_top_hbox.add_child(top_menu_spacer)
@@ -531,8 +531,8 @@ func _draw() -> void:
 	if font == null:
 		font = ThemeDB.fallback_font
 
-	var font_sz := 11 if current_cell_size < 28.0 else 13
-	var coord_color := Color(0.85, 0.85, 0.9, 0.9)
+	var font_sz: int = 11 if current_cell_size < 28.0 else 13
+	var coord_color: Color = Color(0.85, 0.85, 0.9, 0.9)
 
 	_draw_grid_coordinates(own_grid_buttons, font, font_sz, coord_color)
 	_draw_grid_coordinates(opp_grid_buttons, font, font_sz, coord_color)
@@ -799,13 +799,13 @@ func _spawn_shot_animation(player: int, row: int, col: int, is_hit: bool) -> voi
 	var local_pos = to_local(center_pos)
 
 	var explosion_tex: Texture2D = null
-	var explosion_tex_path := "res://assets/explosion.png"
+	var explosion_tex_path: String = "res://assets/explosion.png"
 	if ResourceLoader.exists(explosion_tex_path + ".import"):
 		explosion_tex = load(explosion_tex_path) as Texture2D
 	else:
-		var abs_exp := ProjectSettings.globalize_path(explosion_tex_path)
+		var abs_exp: String = ProjectSettings.globalize_path(explosion_tex_path)
 		if FileAccess.file_exists(abs_exp):
-			var img := Image.load_from_file(abs_exp)
+			var img: Image = Image.load_from_file(abs_exp)
 			if img != null and not img.is_empty():
 				explosion_tex = ImageTexture.create_from_image(img)
 
@@ -1255,7 +1255,11 @@ func _create_ship_visual_node(ship_cells: Array, ship_idx: int, is_sunk: bool) -
 			rasterized_ok = true
 
 	if not rasterized_ok:
-		var stroke_col: Color = Color(1.0, 0.35, 0.35) if is_sunk else (SHIP_SPECS[ship_idx]["color"] if ship_idx >= 0 and ship_idx < SHIP_SPECS.size() else Color(0.55, 0.75, 0.95))
+		var stroke_col: Color = Color(0.55, 0.75, 0.95)
+		if is_sunk:
+			stroke_col = Color(1.0, 0.35, 0.35)
+		elif ship_idx >= 0 and ship_idx < SHIP_SPECS.size():
+			stroke_col = SHIP_SPECS[ship_idx]["color"] as Color
 		var hull_col: Color = Color(0.24, 0.14, 0.14, 0.92) if is_sunk else Color(0.17, 0.24, 0.31, 0.94)
 		holder.draw.connect(func():
 			var pad: float = maxf(current_cell_size * 0.14, 3.0)
@@ -1325,7 +1329,7 @@ func _sfx_piece_place() -> void:
 func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
 	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place(2.0)
-	var particles := CPUParticles2D.new()
+	var particles: CPUParticles2D = CPUParticles2D.new()
 	particles.position = world_pos
 	particles.emitting = true
 	particles.one_shot = true

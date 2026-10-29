@@ -58,7 +58,7 @@ func _build_ui() -> void:
 	toggle_btn.offset_bottom = 42.0
 	toggle_btn.add_theme_font_size_override("font_size", 13)
 
-	var btn_style := StyleBoxFlat.new()
+	var btn_style: StyleBoxFlat = StyleBoxFlat.new()
 	btn_style.bg_color = Color(0.14, 0.19, 0.27, 0.95)
 	btn_style.border_color = Color(0.38, 0.58, 0.85, 0.9)
 	btn_style.set_border_width_all(1)
@@ -69,7 +69,7 @@ func _build_ui() -> void:
 	btn_style.content_margin_bottom = 4
 	toggle_btn.add_theme_stylebox_override("normal", btn_style)
 
-	var btn_hover := btn_style.duplicate() as StyleBoxFlat
+	var btn_hover: StyleBoxFlat = btn_style.duplicate() as StyleBoxFlat
 	btn_hover.bg_color = Color(0.20, 0.27, 0.38, 0.98)
 	toggle_btn.add_theme_stylebox_override("hover", btn_hover)
 	toggle_btn.add_theme_stylebox_override("pressed", btn_hover)
@@ -89,7 +89,7 @@ func _build_ui() -> void:
 	dropdown_panel.offset_top = 46.0
 	dropdown_panel.offset_bottom = 244.0
 
-	var panel_style := StyleBoxFlat.new()
+	var panel_style: StyleBoxFlat = StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.10, 0.14, 0.20, 0.97)
 	panel_style.border_color = Color(0.38, 0.58, 0.85, 0.9)
 	panel_style.set_border_width_all(1)
@@ -113,7 +113,7 @@ func _build_ui() -> void:
 	rules_item_btn = _create_menu_item("RulesMenuItem", "📖 Reglas", _on_rules_item_pressed)
 
 func _create_menu_item(item_name: String, item_text: String, callback: Callable) -> Button:
-	var b := Button.new()
+	var b: Button = Button.new()
 	b.name = item_name
 	b.text = item_text
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
