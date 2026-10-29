@@ -68,6 +68,9 @@ func _initialize() -> void:
 	var board_inst: Node2D = board_scene.instantiate() if board_scene != null else null
 	if board_inst != null:
 		root.add_child(board_inst)
+		if board_inst.grids_container == null and board_inst.has_method("_ready"):
+			board_inst._ready()
+
 		var orphan_status = board_inst.get_node_or_null("Status")
 		results.append(["Nodo huérfano Status ('Cargando...') está oculto en battleship_board.tscn", orphan_status != null and not orphan_status.visible])
 
@@ -79,7 +82,7 @@ func _initialize() -> void:
 		board_inst._on_own_cell_pressed(1, 0)
 		results.append(["UI impide colocar segundo barco pegado al primero (adyacencia de 1 casilla)", board_inst.current_ship_index == 1])
 
-		# Probar botón Auto-Flota en modo vs_ai -> debe completar la flota y pasar a fase FIRE (2)
+		# Probar botón Auto-Flota -> debe completar la flota y avanzar de fase
 		board_inst._on_auto_fleet_pressed()
 		results.append(["Botón Auto-Flota coloca 5 barcos válidos con separación y avanza a fase de disparo", board_inst.phase == board_inst.Phase.FIRE or board_inst.phase == board_inst.Phase.PLACEMENT_P2])
 
@@ -87,6 +90,7 @@ func _initialize() -> void:
 		board_inst._on_layout_changed(2)
 		results.append(["Layout móvil (layout=2) apila verticalmente Mi Flota y Radar", board_inst.grids_container != null and board_inst.grids_container.vertical == true])
 
+		root.remove_child(board_inst)
 		board_inst.free()
 	else:
 		results.append(["battleship_board.tscn carga correctamente", false])

@@ -64,6 +64,8 @@ var _rules_popup: RulesPopup
 var _pause_menu: CanvasLayer
 
 func _ready() -> void:
+	if main_margin != null:
+		return
 	if has_node("Status"):
 		var legacy_status = get_node_or_null("Status")
 		if legacy_status != null:
@@ -597,19 +599,22 @@ func _handle_placement(start_row: int, start_col: int) -> void:
 		var r = start_row + (0 if is_horizontal else i)
 		var c = start_col + (i if is_horizontal else 0)
 		if r < 0 or r >= BOARD_SIZE or c < 0 or c >= BOARD_SIZE:
-			status_label.text = "❌ ¡El barco no cabe ahí! Prueba otra casilla o cambia la orientación."
+			if status_label != null:
+				status_label.text = "❌ ¡El barco no cabe ahí! Prueba otra casilla o cambia la orientación."
 			if (is_inside_tree() and has_node("/root/AudioManager")):
 				get_node("/root/AudioManager").play_error_buzz()
 			return
 
 		var pos = Vector2i(r, c)
 		if _is_cell_occupied_in_ships(pos, target_ships):
-			status_label.text = "❌ ¡Casilla ocupada por otro barco!"
+			if status_label != null:
+				status_label.text = "❌ ¡Casilla ocupada por otro barco!"
 			if (is_inside_tree() and has_node("/root/AudioManager")):
 				get_node("/root/AudioManager").play_error_buzz()
 			return
 		if _is_cell_adjacent_to_ships(pos, target_ships):
-			status_label.text = "⚠️ Los barcos no pueden tocarse (deja 1 casilla de separación o usa 🎲 Auto-Flota)."
+			if status_label != null:
+				status_label.text = "⚠️ Los barcos no pueden tocarse (deja 1 casilla de separación o usa 🎲 Auto-Flota)."
 			if (is_inside_tree() and has_node("/root/AudioManager")):
 				get_node("/root/AudioManager").play_error_buzz()
 			return
@@ -687,8 +692,9 @@ func _is_cell_adjacent_to_ships(cell: Vector2i, ships: Array) -> bool:
 	return false
 
 func _handle_fire_click(row: int, col: int) -> void:
-	if opp_shot_grid[row][col] != null:
-		status_label.text = "⚠️ Ya disparaste en esa casilla (%s%d)" % [String.chr("A".unicode_at(0) + row), col + 1]
+	if row < opp_shot_grid.size() and col < opp_shot_grid[row].size() and opp_shot_grid[row][col] != null:
+		if status_label != null:
+			status_label.text = "⚠️ Ya disparaste en esa casilla (%s%d)" % [String.chr("A".unicode_at(0) + row), col + 1]
 		return
 
 	var shooter: int = local_player if is_vs_ai else current
@@ -874,7 +880,8 @@ func _on_game_over(w: int) -> void:
 
 func _on_move_rejected(reason: String) -> void:
 	_last_move_rejected = true
-	status_label.text = "⚠️ Acción inválida: %s" % reason
+	if status_label != null:
+		status_label.text = "⚠️ Acción inválida: %s" % reason
 	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_error_buzz()
 
@@ -888,37 +895,41 @@ func _update_status() -> void:
 		clear_fleet_btn.disabled = not in_placement
 
 	if winner != -1 or phase == Phase.GAME_OVER:
-		status_label.text = "🏆 ¡Fin del juego! Ganó el Jugador %d" % winner
+		if status_label != null:
+			status_label.text = "🏆 ¡Fin del juego! Ganó el Jugador %d" % winner
 		if turn_indicator != null:
 			turn_indicator.stop_timer()
 			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 0.4)
 	elif phase == Phase.PLACEMENT_P1:
 		var spec = SHIP_SPECS[current_ship_index] if current_ship_index < SHIP_SPECS.size() else null
-		if spec:
-			status_label.text = "⚓ J1: Coloca %s (%d casillas) [%d/%d] o pulsa 🎲 Auto-Flota" % [
-				spec["name"], spec["size"], current_ship_index + 1, SHIP_SPECS.size()
-			]
-		else:
-			status_label.text = "⚓ Jugador 1: Flota lista."
+		if status_label != null:
+			if spec:
+				status_label.text = "⚓ J1: Coloca %s (%d casillas) [%d/%d] o pulsa 🎲 Auto-Flota" % [
+					spec["name"], spec["size"], current_ship_index + 1, SHIP_SPECS.size()
+				]
+			else:
+				status_label.text = "⚓ Jugador 1: Flota lista."
 		if turn_indicator != null:
 			var p_col = get_node("/root/GameManager").get_player_color(P1) if (is_inside_tree() and has_node("/root/GameManager")) else Color(0.2, 0.6, 0.9)
 			turn_indicator.set_turn(P1, "Jugador 1", p_col)
 			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	elif phase == Phase.PLACEMENT_P2:
 		var spec = SHIP_SPECS[current_ship_index] if current_ship_index < SHIP_SPECS.size() else null
-		if spec:
-			status_label.text = "⚓ J2: Coloca %s (%d casillas) [%d/%d] o pulsa 🎲 Auto-Flota" % [
-				spec["name"], spec["size"], current_ship_index + 1, SHIP_SPECS.size()
-			]
-		else:
-			status_label.text = "⚓ Jugador 2: Flota lista."
+		if status_label != null:
+			if spec:
+				status_label.text = "⚓ J2: Coloca %s (%d casillas) [%d/%d] o pulsa 🎲 Auto-Flota" % [
+					spec["name"], spec["size"], current_ship_index + 1, SHIP_SPECS.size()
+				]
+			else:
+				status_label.text = "⚓ Jugador 2: Flota lista."
 		if turn_indicator != null:
 			var p_col = get_node("/root/GameManager").get_player_color(P2) if (is_inside_tree() and has_node("/root/GameManager")) else Color(0.9, 0.3, 0.3)
 			turn_indicator.set_turn(P2, "Jugador 2", p_col)
 			turn_indicator.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	elif phase == Phase.FIRE:
 		var p_name = "Jugador 1" if current == P1 else ("IA (J2)" if is_vs_ai and local_player == P1 else "Jugador 2")
-		status_label.text = "🎯 Fase de Combate — Turno de %s: Dispara en el Radar" % p_name
+		if status_label != null:
+			status_label.text = "🎯 Fase de Combate — Turno de %s: Dispara en el Radar" % p_name
 		if turn_indicator != null:
 			var p_col = get_node("/root/GameManager").get_player_color(current) if (is_inside_tree() and has_node("/root/GameManager")) else (Color(0.2, 0.6, 0.9) if current == P1 else Color(0.9, 0.3, 0.3))
 			turn_indicator.set_turn(current, p_name, p_col)
@@ -931,6 +942,8 @@ func _update_status() -> void:
 		opp_vbox.modulate = Color(1.0, 1.0, 1.0, 1.0) if phase == Phase.FIRE else Color(1.0, 1.0, 1.0, 0.65)
 
 func _update_grid_ui() -> void:
+	if own_grid_buttons.is_empty() or opp_grid_buttons.is_empty() or own_shot_grid.is_empty() or opp_shot_grid.is_empty():
+		return
 	var active_ships = p2_ships if (phase == Phase.PLACEMENT_P2 or (is_vs_ai and local_player == P2)) else p1_ships
 	var in_placement := (phase == Phase.PLACEMENT_P1 or phase == Phase.PLACEMENT_P2)
 
