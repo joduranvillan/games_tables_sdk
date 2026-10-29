@@ -16,6 +16,13 @@ var current_popup_overlay: Control = null
 var privacy_modal: Node = null
 var online_action_buttons: Array[Button] = []
 
+var menu_scroll: ScrollContainer = null
+var menu_center: CenterContainer = null
+var multiplayer_bar: PanelContainer = null
+var multiplayer_hbox: HBoxContainer = null
+var game_buttons: Array[Button] = []
+var utility_buttons: Array[Button] = []
+
 const GAMES = [
 	{ "id": "checkers", "name": "Damas (Checkers)", "method": "start_local_match_checkers", "ai_method": "start_local_match_checkers_vs_ai", "scene": "res://checkers_board.tscn", "color": Color(0.85, 0.25, 0.25) },
 	{ "id": "chess", "name": "Ajedrez (Chess)", "method": "start_local_match_chess", "ai_method": "start_local_match_chess_vs_ai", "scene": "res://chess_board.tscn", "color": Color(0.35, 0.35, 0.75) },
@@ -39,10 +46,124 @@ func _ready() -> void:
 	bridge.name = "Bridge"
 	add_child(bridge)
 
+	_setup_responsive_containers()
 	_setup_buttons()
-	_play_entry_animation()
 	_setup_multiplayer_row()
+	_update_responsive_layout()
+
+	if is_inside_tree() and get_viewport() != null:
+		get_viewport().size_changed.connect(_update_responsive_layout)
+
+	_play_entry_animation()
 	_check_and_show_privacy_modal()
+
+func _setup_responsive_containers() -> void:
+	if has_node("Title"):
+		var title_node := get_node("Title") as Label
+		if title_node != null:
+			title_node.set_anchors_preset(Control.PRESET_TOP_WIDE)
+			title_node.offset_left = 20.0
+			title_node.offset_top = 14.0
+			title_node.offset_right = -20.0
+			title_node.offset_bottom = 58.0
+			title_node.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			title_node.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	if grid_container == null:
+		grid_container = find_child("GridContainer", true, false) as GridContainer
+	if grid_container == null:
+		grid_container = GridContainer.new()
+		grid_container.name = "GridContainer"
+		add_child(grid_container)
+
+	if menu_scroll == null:
+		menu_scroll = ScrollContainer.new()
+		menu_scroll.name = "MenuScrollContainer"
+		menu_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		menu_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		add_child(menu_scroll)
+
+		menu_center = CenterContainer.new()
+		menu_center.name = "MenuCenterContainer"
+		menu_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		menu_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		menu_scroll.add_child(menu_center)
+
+		if grid_container.get_parent() != menu_center:
+			if grid_container.get_parent() != null:
+				grid_container.get_parent().remove_child(grid_container)
+			menu_center.add_child(grid_container)
+
+	grid_container.add_theme_constant_override("h_separation", 16)
+	grid_container.add_theme_constant_override("v_separation", 12)
+
+func _update_responsive_layout() -> void:
+	var vp_size := Vector2(1280, 720)
+	if is_inside_tree() and get_viewport() != null:
+		var r_sz := get_viewport_rect().size
+		if r_sz.x > 0 and r_sz.y > 0:
+			vp_size = r_sz
+
+	if has_node("Title"):
+		var title_node := get_node("Title") as Label
+		if title_node != null:
+			title_node.position = Vector2(20.0, 12.0)
+			title_node.size = Vector2(vp_size.x - 40.0, 44.0)
+			title_node.add_theme_font_size_override("font_size", 22 if vp_size.x < 700.0 else 28)
+
+	var cols := 4
+	var btn_w := 276.0
+	var game_btn_h := 84.0
+	var util_btn_h := 54.0
+
+	if vp_size.x < 560.0:
+		cols = 1
+		btn_w = clampf(vp_size.x - 48.0, 240.0, 360.0)
+		game_btn_h = 76.0
+		util_btn_h = 50.0
+	elif vp_size.x < 860.0:
+		cols = 2
+		btn_w = clampf((vp_size.x - 64.0) * 0.5, 220.0, 310.0)
+		game_btn_h = 80.0
+		util_btn_h = 52.0
+	elif vp_size.x < 1140.0:
+		cols = 3
+		btn_w = clampf((vp_size.x - 84.0) / 3.0, 230.0, 290.0)
+		game_btn_h = 82.0
+		util_btn_h = 54.0
+	else:
+		cols = 4
+		btn_w = clampf((vp_size.x - 120.0) / 4.0, 250.0, 285.0)
+		game_btn_h = 84.0
+		util_btn_h = 54.0
+
+	if grid_container != null:
+		grid_container.columns = cols
+
+	for btn in game_buttons:
+		if is_instance_valid(btn):
+			btn.custom_minimum_size = Vector2(btn_w, game_btn_h)
+			btn.pivot_offset = Vector2(btn_w * 0.5, game_btn_h * 0.5)
+
+	for btn in utility_buttons:
+		if is_instance_valid(btn):
+			btn.custom_minimum_size = Vector2(btn_w, util_btn_h)
+			btn.pivot_offset = Vector2(btn_w * 0.5, util_btn_h * 0.5)
+
+	var bottom_bar_h := 60.0
+	var top_offset := 62.0
+	var scroll_h := maxf(200.0, vp_size.y - top_offset - bottom_bar_h - 14.0)
+
+	if menu_scroll != null:
+		menu_scroll.position = Vector2(16.0, top_offset)
+		menu_scroll.size = Vector2(vp_size.x - 32.0, scroll_h)
+	if menu_center != null:
+		menu_center.custom_minimum_size = Vector2(vp_size.x - 32.0, scroll_h)
+
+	if multiplayer_bar != null:
+		var bar_w := minf(vp_size.x - 32.0, 920.0)
+		multiplayer_bar.position = Vector2((vp_size.x - bar_w) * 0.5, vp_size.y - bottom_bar_h - 6.0)
+		multiplayer_bar.size = Vector2(bar_w, bottom_bar_h - 4.0)
 
 func _process(delta: float) -> void:
 	if not is_attract_mode:
@@ -92,8 +213,9 @@ func _start_attract_mode() -> void:
 	demo_overlay.layer = 20
 	add_child(demo_overlay)
 
+	var vp_w := get_viewport_rect().size.x if is_inside_tree() else 1280.0
 	var banner = Panel.new()
-	banner.position = Vector2(100, 680)
+	banner.position = Vector2((vp_w - 600.0) * 0.5, 650)
 	banner.custom_minimum_size = Vector2(600, 50)
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color(0.1, 0.1, 0.15, 0.9)
@@ -165,8 +287,8 @@ func _load_game_icon(game_id: String) -> Texture2D:
 	return null
 
 func _apply_button_theme(btn: Button, color: Color) -> void:
-	var base_bg = Color(color.r, color.g, color.b, 0.85)
-	var hover_border = color.lightened(0.3)
+	var base_bg = Color(color.r, color.g, color.b, 0.88)
+	var hover_border = color.lightened(0.35)
 	var shadow_c = color.darkened(0.5)
 
 	var style_normal = StyleBoxFlat.new()
@@ -179,12 +301,12 @@ func _apply_button_theme(btn: Button, color: Color) -> void:
 	style_normal.shadow_offset = Vector2(0, 2)
 
 	var style_hover = StyleBoxFlat.new()
-	style_hover.bg_color = Color(color.r, color.g, color.b, 0.95)
+	style_hover.bg_color = Color(color.r, color.g, color.b, 0.98)
 	style_hover.border_color = hover_border
 	style_hover.set_border_width_all(2)
 	style_hover.set_corner_radius_all(10)
 	style_hover.shadow_color = shadow_c
-	style_hover.shadow_size = 4
+	style_hover.shadow_size = 5
 	style_hover.shadow_offset = Vector2(0, 2)
 
 	var style_pressed = StyleBoxFlat.new()
@@ -202,6 +324,8 @@ func _apply_button_theme(btn: Button, color: Color) -> void:
 
 func _setup_buttons() -> void:
 	online_action_buttons.clear()
+	game_buttons.clear()
+	utility_buttons.clear()
 	for child in grid_container.get_children():
 		child.queue_free()
 
@@ -212,8 +336,8 @@ func _setup_buttons() -> void:
 		var color = game.get("color", Color(0.35, 0.45, 0.65))
 
 		_apply_button_theme(btn, color)
-		btn.custom_minimum_size = Vector2(310, 90)
-		btn.pivot_offset = Vector2(155, 45)
+		btn.custom_minimum_size = Vector2(276, 84)
+		btn.pivot_offset = Vector2(138, 42)
 
 		var icon_tex = _load_game_icon(game["id"])
 		if icon_tex != null:
@@ -222,11 +346,11 @@ func _setup_buttons() -> void:
 			vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-			vbox.add_theme_constant_override("separation", 6)
+			vbox.add_theme_constant_override("separation", 4)
 
 			var icon_rect = TextureRect.new()
 			icon_rect.texture = icon_tex
-			icon_rect.custom_minimum_size = Vector2(48, 48)
+			icon_rect.custom_minimum_size = Vector2(42, 42)
 			icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -236,7 +360,7 @@ func _setup_buttons() -> void:
 			lbl.text = display_name
 			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			lbl.add_theme_font_size_override("font_size", 16)
+			lbl.add_theme_font_size_override("font_size", 15)
 			lbl.add_theme_color_override("font_color", Color.WHITE)
 			lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			vbox.add_child(lbl)
@@ -244,7 +368,7 @@ func _setup_buttons() -> void:
 			btn.add_child(vbox)
 		else:
 			btn.text = display_name
-			btn.add_theme_font_size_override("font_size", 18)
+			btn.add_theme_font_size_override("font_size", 17)
 
 		# Hover scaling animation
 		btn.mouse_entered.connect(func():
@@ -258,14 +382,15 @@ func _setup_buttons() -> void:
 
 		btn.pressed.connect(_on_game_selected.bind(game))
 		grid_container.add_child(btn)
+		game_buttons.append(btn)
 
 	# Tutorial TEG button
 	var tutorial_btn = Button.new()
 	tutorial_btn.text = "🎓 Tutorial TEG"
 	_apply_button_theme(tutorial_btn, Color(0.55, 0.35, 0.75))
-	tutorial_btn.custom_minimum_size = Vector2(310, 60)
-	tutorial_btn.pivot_offset = Vector2(155, 30)
-	tutorial_btn.add_theme_font_size_override("font_size", 18)
+	tutorial_btn.custom_minimum_size = Vector2(276, 54)
+	tutorial_btn.pivot_offset = Vector2(138, 27)
+	tutorial_btn.add_theme_font_size_override("font_size", 16)
 	tutorial_btn.mouse_entered.connect(func():
 		var tw = tutorial_btn.create_tween()
 		tw.tween_property(tutorial_btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -282,14 +407,15 @@ func _setup_buttons() -> void:
 				get_tree().change_scene_to_file("res://crisis_tutorial.gd")
 	)
 	grid_container.add_child(tutorial_btn)
+	utility_buttons.append(tutorial_btn)
 
 	# Settings button
 	var settings_btn = Button.new()
 	settings_btn.text = "⚙️ " + tr("BTN_SETTINGS")
 	_apply_button_theme(settings_btn, Color(0.35, 0.40, 0.45))
-	settings_btn.custom_minimum_size = Vector2(310, 60)
-	settings_btn.pivot_offset = Vector2(155, 30)
-	settings_btn.add_theme_font_size_override("font_size", 18)
+	settings_btn.custom_minimum_size = Vector2(276, 54)
+	settings_btn.pivot_offset = Vector2(138, 27)
+	settings_btn.add_theme_font_size_override("font_size", 16)
 	settings_btn.mouse_entered.connect(func():
 		var tw = settings_btn.create_tween()
 		tw.tween_property(settings_btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -300,14 +426,15 @@ func _setup_buttons() -> void:
 	)
 	settings_btn.pressed.connect(_on_settings_pressed)
 	grid_container.add_child(settings_btn)
+	utility_buttons.append(settings_btn)
 
 	# Repeticiones button
 	var replay_btn = Button.new()
 	replay_btn.text = "🎬 Repeticiones"
 	_apply_button_theme(replay_btn, Color(0.25, 0.50, 0.55))
-	replay_btn.custom_minimum_size = Vector2(310, 60)
-	replay_btn.pivot_offset = Vector2(155, 30)
-	replay_btn.add_theme_font_size_override("font_size", 18)
+	replay_btn.custom_minimum_size = Vector2(276, 54)
+	replay_btn.pivot_offset = Vector2(138, 27)
+	replay_btn.add_theme_font_size_override("font_size", 16)
 	replay_btn.mouse_entered.connect(func():
 		var tw = replay_btn.create_tween()
 		tw.tween_property(replay_btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -318,14 +445,15 @@ func _setup_buttons() -> void:
 	)
 	replay_btn.pressed.connect(_on_ver_replay_pressed)
 	grid_container.add_child(replay_btn)
+	utility_buttons.append(replay_btn)
 
 	# Clasificación Global ELO button
 	var leaderboard_btn = Button.new()
 	leaderboard_btn.text = "🏆 Clasificación"
 	_apply_button_theme(leaderboard_btn, Color(0.70, 0.52, 0.15))
-	leaderboard_btn.custom_minimum_size = Vector2(310, 60)
-	leaderboard_btn.pivot_offset = Vector2(155, 30)
-	leaderboard_btn.add_theme_font_size_override("font_size", 18)
+	leaderboard_btn.custom_minimum_size = Vector2(276, 54)
+	leaderboard_btn.pivot_offset = Vector2(138, 27)
+	leaderboard_btn.add_theme_font_size_override("font_size", 16)
 	leaderboard_btn.mouse_entered.connect(func():
 		var tw = leaderboard_btn.create_tween()
 		tw.tween_property(leaderboard_btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -344,6 +472,7 @@ func _setup_buttons() -> void:
 				get_tree().change_scene_to_file("res://scenes/leaderboard.tscn")
 	)
 	grid_container.add_child(leaderboard_btn)
+	utility_buttons.append(leaderboard_btn)
 	online_action_buttons.append(leaderboard_btn)
 
 	# Mis Estadísticas Locales button
@@ -351,9 +480,9 @@ func _setup_buttons() -> void:
 	stats_btn.name = "StatsButton"
 	stats_btn.text = "📊 Mis Estadísticas"
 	_apply_button_theme(stats_btn, Color(0.22, 0.54, 0.72))
-	stats_btn.custom_minimum_size = Vector2(310, 60)
-	stats_btn.pivot_offset = Vector2(155, 30)
-	stats_btn.add_theme_font_size_override("font_size", 18)
+	stats_btn.custom_minimum_size = Vector2(276, 54)
+	stats_btn.pivot_offset = Vector2(138, 27)
+	stats_btn.add_theme_font_size_override("font_size", 16)
 	stats_btn.mouse_entered.connect(func():
 		var tw = stats_btn.create_tween()
 		tw.tween_property(stats_btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -370,14 +499,15 @@ func _setup_buttons() -> void:
 				get_tree().change_scene_to_file("res://scenes/stats_screen.tscn")
 	)
 	grid_container.add_child(stats_btn)
+	utility_buttons.append(stats_btn)
 
 	# Torneo button
 	var tournament_btn = Button.new()
 	tournament_btn.text = "🏟 Torneo"
 	_apply_button_theme(tournament_btn, Color(0.65, 0.25, 0.35))
-	tournament_btn.custom_minimum_size = Vector2(310, 60)
-	tournament_btn.pivot_offset = Vector2(155, 30)
-	tournament_btn.add_theme_font_size_override("font_size", 18)
+	tournament_btn.custom_minimum_size = Vector2(276, 54)
+	tournament_btn.pivot_offset = Vector2(138, 27)
+	tournament_btn.add_theme_font_size_override("font_size", 16)
 	tournament_btn.mouse_entered.connect(func():
 		var tw = tournament_btn.create_tween()
 		tw.tween_property(tournament_btn, "scale", Vector2(1.04, 1.04), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -396,6 +526,7 @@ func _setup_buttons() -> void:
 				get_tree().change_scene_to_file("res://scenes/tournament_lobby.tscn")
 	)
 	grid_container.add_child(tournament_btn)
+	utility_buttons.append(tournament_btn)
 	online_action_buttons.append(tournament_btn)
 
 func _play_entry_animation() -> void:
@@ -403,10 +534,10 @@ func _play_entry_animation() -> void:
 	for i in range(buttons.size()):
 		var btn = buttons[i]
 		btn.modulate.a = 0.0
-		var delay = i * 0.05
+		var delay = i * 0.03
 		var tw = create_tween()
 		tw.tween_interval(delay)
-		tw.tween_property(btn, "modulate:a", 1.0, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(btn, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _on_settings_pressed() -> void:
 	if (is_inside_tree() and has_node("/root/SceneManager")):
@@ -764,47 +895,63 @@ func _launch_game(game: Dictionary, mode: String, difficulty_level: int = 1, hum
 			get_tree().change_scene_to_file(game["scene"])
 
 func _setup_multiplayer_row() -> void:
-	var hbox := HBoxContainer.new()
-	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	hbox.add_theme_constant_override("separation", 16)
-	hbox.position = Vector2(30, get_viewport_rect().size.y - 70)
-	hbox.size = Vector2(get_viewport_rect().size.x - 60, 50)
-	add_child(hbox)
+	multiplayer_bar = PanelContainer.new()
+	multiplayer_bar.name = "MultiplayerBarPanel"
+	var bar_style := StyleBoxFlat.new()
+	bar_style.bg_color = Color(0.09, 0.11, 0.15, 0.92)
+	bar_style.border_color = Color(0.25, 0.32, 0.45, 0.7)
+	bar_style.set_border_width_all(1)
+	bar_style.set_corner_radius_all(10)
+	bar_style.content_margin_left = 12
+	bar_style.content_margin_right = 12
+	bar_style.content_margin_top = 5
+	bar_style.content_margin_bottom = 5
+	multiplayer_bar.add_theme_stylebox_override("panel", bar_style)
+	add_child(multiplayer_bar)
+
+	multiplayer_hbox = HBoxContainer.new()
+	multiplayer_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	multiplayer_hbox.add_theme_constant_override("separation", 14)
+	multiplayer_bar.add_child(multiplayer_hbox)
 
 	var host_btn := Button.new()
 	host_btn.name = "HostNetworkButton"
 	host_btn.text = "🌐 Crear partida en red"
-	host_btn.custom_minimum_size = Vector2(220, 44)
-	host_btn.add_theme_font_size_override("font_size", 15)
+	host_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	host_btn.custom_minimum_size = Vector2(180, 42)
+	host_btn.add_theme_font_size_override("font_size", 14)
 	_apply_button_theme(host_btn, Color(0.25, 0.45, 0.75))
 	host_btn.pressed.connect(_on_host_pressed)
-	hbox.add_child(host_btn)
+	multiplayer_hbox.add_child(host_btn)
 	online_action_buttons.append(host_btn)
 
 	var join_code_btn := Button.new()
 	join_code_btn.name = "JoinCodeButton"
 	join_code_btn.text = "🔑 Unirse con Código"
-	join_code_btn.custom_minimum_size = Vector2(200, 44)
-	join_code_btn.add_theme_font_size_override("font_size", 15)
+	join_code_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	join_code_btn.custom_minimum_size = Vector2(170, 42)
+	join_code_btn.add_theme_font_size_override("font_size", 14)
 	_apply_button_theme(join_code_btn, Color(0.25, 0.60, 0.55))
 	join_code_btn.pressed.connect(_on_join_code_pressed)
-	hbox.add_child(join_code_btn)
+	multiplayer_hbox.add_child(join_code_btn)
 	online_action_buttons.append(join_code_btn)
 
 	var join_btn := Button.new()
 	join_btn.name = "JoinQrButton"
 	join_btn.text = "📷 Unirse (código QR)"
-	join_btn.custom_minimum_size = Vector2(200, 44)
-	join_btn.add_theme_font_size_override("font_size", 15)
+	join_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	join_btn.custom_minimum_size = Vector2(170, 42)
+	join_btn.add_theme_font_size_override("font_size", 14)
 	_apply_button_theme(join_btn, Color(0.35, 0.55, 0.35))
 	join_btn.pressed.connect(_on_join_pressed)
-	hbox.add_child(join_btn)
+	multiplayer_hbox.add_child(join_btn)
 	online_action_buttons.append(join_btn)
 
 	var about_btn := Button.new()
 	about_btn.text = "ℹ️ Acerca de"
-	about_btn.custom_minimum_size = Vector2(160, 44)
-	about_btn.add_theme_font_size_override("font_size", 15)
+	about_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	about_btn.custom_minimum_size = Vector2(140, 42)
+	about_btn.add_theme_font_size_override("font_size", 14)
 	_apply_button_theme(about_btn, Color(0.45, 0.35, 0.65))
 	about_btn.pressed.connect(func():
 		if (is_inside_tree() and has_node("/root/SceneManager")):
@@ -813,7 +960,7 @@ func _setup_multiplayer_row() -> void:
 			if is_inside_tree():
 				get_tree().change_scene_to_file("res://credits_screen.tscn")
 	)
-	hbox.add_child(about_btn)
+	multiplayer_hbox.add_child(about_btn)
 
 func _on_host_pressed() -> void:
 	if not is_online_mode_allowed():
@@ -875,31 +1022,54 @@ func _show_game_selector_for_network() -> void:
 
 	var panel := PanelContainer.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(300, 400)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	panel.custom_minimum_size = Vector2(460, 420)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.11, 0.13, 0.18, 0.98)
+	style.border_color = Color(0.35, 0.55, 0.85)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(12)
+	style.content_margin_left = 18
+	style.content_margin_right = 18
+	style.content_margin_top = 16
+	style.content_margin_bottom = 16
+	panel.add_theme_stylebox_override("panel", style)
 	overlay.add_child(panel)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 10)
+	vbox.add_theme_constant_override("separation", 12)
 	panel.add_child(vbox)
 
 	var lbl := Label.new()
 	lbl.text = "¿Qué juego quieres hostear?"
+	lbl.add_theme_font_size_override("font_size", 18)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(lbl)
+
+	var net_grid := GridContainer.new()
+	net_grid.columns = 2
+	net_grid.add_theme_constant_override("h_separation", 10)
+	net_grid.add_theme_constant_override("v_separation", 8)
+	vbox.add_child(net_grid)
 
 	for game in GAMES:
 		var btn := Button.new()
 		btn.text = game["name"]
-		btn.custom_minimum_size = Vector2(0, 36)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.custom_minimum_size = Vector2(200, 38)
+		_apply_button_theme(btn, game.get("color", Color(0.3, 0.45, 0.7)))
 		var gid: String = game["id"]
 		btn.pressed.connect(func():
 			overlay.queue_free()
 			_launch_host_lobby(gid)
 		)
-		vbox.add_child(btn)
+		net_grid.add_child(btn)
 
 	var cancel := Button.new()
 	cancel.text = "Cancelar"
+	cancel.custom_minimum_size = Vector2(0, 38)
+	_apply_button_theme(cancel, Color(0.35, 0.35, 0.4))
 	cancel.pressed.connect(func(): overlay.queue_free())
 	vbox.add_child(cancel)
 
@@ -955,5 +1125,3 @@ func _apply_online_mode_state(allow_online: bool) -> void:
 		if is_instance_valid(btn):
 			btn.disabled = not allow_online
 			btn.tooltip_text = "" if allow_online else "Deshabilitado en Modo Solo Local / Offline"
-
-
