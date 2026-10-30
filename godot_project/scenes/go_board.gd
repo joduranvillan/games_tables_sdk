@@ -334,17 +334,23 @@ func apply_handicap(stones: int) -> void:
 	_start_or_reset_match()
 	if stones <= 0 or bridge == null:
 		return
-	var cmd: Dictionary = {
-		"command_type": "go_game::PlaceHandicapCommand",
-		"stones": stones
-	}
-	bridge.send_command_json(P_BLACK, JSON.stringify(cmd))
 	var hoshi_coords: Array[Vector2i] = [
 		Vector2i(2, 6),
 		Vector2i(6, 2),
 		Vector2i(6, 6),
 		Vector2i(2, 2)
 	]
+	var pos_list: Array = []
+	for i in range(min(stones, hoshi_coords.size())):
+		var hc: Vector2i = hoshi_coords[i]
+		if hc.x < BOARD_SIZE and hc.y < BOARD_SIZE:
+			pos_list.append([hc.y, hc.x])
+	var cmd: Dictionary = {
+		"command_type": "go_game::PlaceHandicapCommand",
+		"player": P_BLACK,
+		"positions": pos_list
+	}
+	bridge.send_command_json(P_BLACK, JSON.stringify(cmd))
 	for i in range(min(stones, hoshi_coords.size())):
 		var hc: Vector2i = hoshi_coords[i]
 		if hc.x < BOARD_SIZE and hc.y < BOARD_SIZE and board[hc.x][hc.y] == null:
@@ -869,7 +875,7 @@ func _on_event_json(json_str: String) -> void:
 					if confirm_dead_button != null:
 						confirm_dead_button.visible = true
 					_update_scoring_banner()
-					if OS.has_feature("headless") and auto_confirm_dead_in_headless:
+					if auto_confirm_dead_in_headless and (DisplayServer.get_name() == "headless" or OS.has_feature("headless") or not is_inside_tree()):
 						bridge.send_command_json(P_BLACK, JSON.stringify({"command_type": "go_game::ConfirmDeadCommand", "player": P_BLACK}))
 						bridge.send_command_json(P_WHITE, JSON.stringify({"command_type": "go_game::ConfirmDeadCommand", "player": P_WHITE}))
 			elif event_type.ends_with("GameOverEvent") or event_type == "GameOverEvent":
