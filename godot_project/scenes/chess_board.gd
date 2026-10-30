@@ -47,6 +47,13 @@ var export_game_button: Button
 var export_toast_label: Label
 var _rules_popup: RulesPopup
 var _pause_menu: CanvasLayer
+var selected_promotion_kind: String = "Queen"
+var promotion_panel: PanelContainer = null
+var offer_draw_btn: Button = null
+var accept_draw_btn: Button = null
+var reject_draw_btn: Button = null
+var draw_offer_banner: PanelContainer = null
+var _pending_promo_move: Dictionary = {}
 
 var in_opening_practice: bool = false
 var current_opening_key: String = ""
@@ -78,7 +85,7 @@ func _ready() -> void:
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
 		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
-			var hud_script := load("res://network_status_hud.gd")
+			var hud_script = load("res://network_status_hud.gd")
 			if hud_script:
 				var hud: Node = hud_script.new()
 				if hud.has_method("setup"):
@@ -113,7 +120,7 @@ func _ready() -> void:
 	queue_redraw()
 
 	# --- Botón de reglas ---
-	var btn_rules := Button.new()
+	var btn_rules: Button = Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.position = Vector2(990, 270)
@@ -142,7 +149,7 @@ func _on_layout_changed(_layout: int) -> void:
 	if is_inside_tree() and has_node("/root/ThemeManager"):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
-	var side_x := 640.0
+	var side_x: float = 640.0
 	if mode_option_button != null:
 		mode_option_button.position = Vector2(side_x, 24)
 	if opening_option_button != null:
@@ -159,11 +166,15 @@ func _on_layout_changed(_layout: int) -> void:
 	var rules_btn = get_node_or_null("RulesButton")
 	if rules_btn != null:
 		rules_btn.position = Vector2(side_x + 350, 270)
+	if offer_draw_btn != null:
+		offer_draw_btn.position = Vector2(side_x, 316)
+	if draw_offer_banner != null:
+		draw_offer_banner.position = Vector2(side_x, 360)
 	if export_toast_label != null:
-		export_toast_label.position = Vector2(side_x, 315)
+		export_toast_label.position = Vector2(side_x, 420)
 
 func _setup_ui() -> void:
-	var side_x := 640.0
+	var side_x: float = 640.0
 	if status == null:
 		status = get_node_or_null("Status")
 	if status == null:
@@ -261,7 +272,7 @@ func _setup_ui() -> void:
 	add_child(export_game_button)
 
 	# Botón Tutorial Interactivo (8 pasos)
-	var tutorial_btn := Button.new()
+	var tutorial_btn: Button = Button.new()
 	tutorial_btn.name = "ChessTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
 	tutorial_btn.position = Vector2(side_x + 175, 270)
@@ -273,20 +284,107 @@ func _setup_ui() -> void:
 	export_toast_label.name = "ExportToastLabel"
 	export_toast_label.text = ""
 	export_toast_label.visible = false
-	export_toast_label.position = Vector2(side_x, 315)
+	export_toast_label.position = Vector2(side_x, 420)
 	export_toast_label.add_theme_font_size_override("font_size", 14)
 	export_toast_label.add_theme_color_override("font_color", Color(0.45, 0.95, 0.55))
 	add_child(export_toast_label)
 
+	# --- Controles FIDE: Oferta de Tablas y Modal Estilizado de Coronación (Atajos 1-4) ---
+	offer_draw_btn = Button.new()
+	offer_draw_btn.name = "OfferDrawButton"
+	offer_draw_btn.text = "🤝 Ofrecer Tablas"
+	offer_draw_btn.position = Vector2(side_x, 316)
+	offer_draw_btn.custom_minimum_size = Vector2(165, 36)
+	offer_draw_btn.pressed.connect(_on_offer_draw_pressed)
+	add_child(offer_draw_btn)
+
+	draw_offer_banner = PanelContainer.new()
+	draw_offer_banner.name = "DrawOfferBanner"
+	draw_offer_banner.position = Vector2(side_x, 360)
+	draw_offer_banner.visible = false
+	var draw_style: StyleBoxFlat = StyleBoxFlat.new()
+	draw_style.bg_color = Color(0.12, 0.16, 0.22, 0.96)
+	draw_style.border_color = Color(0.92, 0.76, 0.28, 0.95)
+	draw_style.set_border_width_all(2)
+	draw_style.set_corner_radius_all(8)
+	draw_style.content_margin_left = 10
+	draw_style.content_margin_right = 10
+	draw_style.content_margin_top = 6
+	draw_style.content_margin_bottom = 6
+	draw_offer_banner.add_theme_stylebox_override("panel", draw_style)
+	var draw_hb: HBoxContainer = HBoxContainer.new()
+	draw_hb.add_theme_constant_override("separation", 8)
+	var draw_lbl: Label = Label.new()
+	draw_lbl.text = "🤝 ¿Aceptar tablas?"
+	draw_lbl.add_theme_color_override("font_color", Color(0.98, 0.93, 0.75))
+	draw_hb.add_child(draw_lbl)
+	accept_draw_btn = Button.new()
+	accept_draw_btn.name = "AcceptDrawButton"
+	accept_draw_btn.text = "✅ Aceptar Tablas"
+	accept_draw_btn.pressed.connect(_on_accept_draw_pressed)
+	draw_hb.add_child(accept_draw_btn)
+	reject_draw_btn = Button.new()
+	reject_draw_btn.name = "RejectDrawButton"
+	reject_draw_btn.text = "✖ Rechazar"
+	reject_draw_btn.pressed.connect(_on_reject_draw_pressed)
+	draw_hb.add_child(reject_draw_btn)
+	draw_offer_banner.add_child(draw_hb)
+	add_child(draw_offer_banner)
+
+	promotion_panel = PanelContainer.new()
+	promotion_panel.name = "PromotionSelectorPanel"
+	promotion_panel.position = Vector2(74, 210)
+	promotion_panel.z_index = 25
+	promotion_panel.visible = false
+	var promo_style: StyleBoxFlat = StyleBoxFlat.new()
+	promo_style.bg_color = Color(0.11, 0.13, 0.18, 0.96)
+	promo_style.border_color = Color(0.92, 0.76, 0.28, 0.95)
+	promo_style.set_border_width_all(2)
+	promo_style.set_corner_radius_all(10)
+	promo_style.content_margin_left = 16
+	promo_style.content_margin_right = 16
+	promo_style.content_margin_top = 12
+	promo_style.content_margin_bottom = 12
+	promotion_panel.add_theme_stylebox_override("panel", promo_style)
+	var promo_vb: VBoxContainer = VBoxContainer.new()
+	promo_vb.add_theme_constant_override("separation", 10)
+	var promo_title: Label = Label.new()
+	promo_title.text = "👑 Coronación de Peón (Teclas 1–4)"
+	promo_title.add_theme_font_size_override("font_size", 18)
+	promo_title.add_theme_color_override("font_color", Color(0.98, 0.90, 0.55))
+	promo_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	promo_vb.add_child(promo_title)
+	var promo_hb: HBoxContainer = HBoxContainer.new()
+	promo_hb.add_theme_constant_override("separation", 10)
+	var promo_options: Array = [
+		{"kind": "Queen", "label": "[1] ♛ Dama", "btn_name": "PromoteQueenButton"},
+		{"kind": "Rook", "label": "[2] ♜ Torre", "btn_name": "PromoteRookButton"},
+		{"kind": "Bishop", "label": "[3] ♝ Alfil", "btn_name": "PromoteBishopButton"},
+		{"kind": "Knight", "label": "[4] ♞ Caballo", "btn_name": "PromoteKnightButton"}
+	]
+	for opt in promo_options:
+		var opt_dict: Dictionary = opt
+		var p_btn: Button = Button.new()
+		p_btn.name = str(opt_dict.get("btn_name", "PromoteBtn"))
+		p_btn.text = str(opt_dict.get("label", "Pieza"))
+		p_btn.custom_minimum_size = Vector2(106, 48)
+		p_btn.add_theme_font_size_override("font_size", 15)
+		var k_str: String = str(opt_dict.get("kind", "Queen"))
+		p_btn.pressed.connect(func(): select_promotion_piece(k_str))
+		promo_hb.add_child(p_btn)
+	promo_vb.add_child(promo_hb)
+	promotion_panel.add_child(promo_vb)
+	add_child(promotion_panel)
+
 func _on_export_game_pressed() -> void:
-	var pgn_text := ""
-	var fen_text := ""
+	var pgn_text: String = ""
+	var fen_text: String = ""
 	if bridge != null:
 		if bridge.has_method("export_chess_pgn"):
 			pgn_text = str(bridge.call("export_chess_pgn"))
 		if bridge.has_method("export_chess_fen"):
 			fen_text = str(bridge.call("export_chess_fen"))
-	var payload := pgn_text
+	var payload = pgn_text
 	if not fen_text.is_empty():
 		payload = "%s\n[FEN \"%s\"]" % [pgn_text, fen_text] if not pgn_text.is_empty() else fen_text
 	DisplayServer.clipboard_set(payload)
@@ -301,7 +399,7 @@ func _show_clipboard_notification(msg: String = "Copiado al portapapeles") -> vo
 		if nm.has_method("show_toast"):
 			nm.call("show_toast", msg)
 	if is_inside_tree():
-		var timer := get_tree().create_timer(2.0)
+		var timer: SceneTreeTimer = get_tree().create_timer(2.0)
 		timer.timeout.connect(func():
 			if is_instance_valid(export_toast_label):
 				export_toast_label.visible = false
@@ -432,14 +530,75 @@ func _on_piece_dropped(to_cell: Vector2i) -> void:
 	
 	_send_chess_move(from_r, from_c, to_r, to_c)
 
+func select_promotion_piece(kind: String) -> void:
+	if kind in ["Queen", "Rook", "Bishop", "Knight"]:
+		selected_promotion_kind = kind
+	else:
+		selected_promotion_kind = "Queen"
+	if promotion_panel != null:
+		promotion_panel.visible = false
+	if not _pending_promo_move.is_empty():
+		var f_r: int = int(_pending_promo_move.get("from_r", 0))
+		var f_c: int = int(_pending_promo_move.get("from_c", 0))
+		var t_r: int = int(_pending_promo_move.get("to_r", 0))
+		var t_c: int = int(_pending_promo_move.get("to_c", 0))
+		_pending_promo_move.clear()
+		_dispatch_chess_move(f_r, f_c, t_r, t_c, selected_promotion_kind)
+
+func handle_promotion_shortcut(index: int) -> void:
+	match index:
+		1: select_promotion_piece("Queen")
+		2: select_promotion_piece("Rook")
+		3: select_promotion_piece("Bishop")
+		4: select_promotion_piece("Knight")
+
+func _on_offer_draw_pressed() -> void:
+	if winner != -1 or bridge == null:
+		return
+	var cmd: Dictionary = {
+		"command_type": "chess_game::OfferDrawCommand",
+		"player": current
+	}
+	bridge.send_command_json(current, JSON.stringify(cmd))
+	if draw_offer_banner != null:
+		draw_offer_banner.visible = true
+
+func _on_accept_draw_pressed() -> void:
+	if winner != -1 or bridge == null:
+		return
+	var acceptor: int = P2 if current == P1 else P1
+	var cmd: Dictionary = {
+		"command_type": "chess_game::AcceptDrawCommand",
+		"player": acceptor
+	}
+	bridge.send_command_json(acceptor, JSON.stringify(cmd))
+	if draw_offer_banner != null:
+		draw_offer_banner.visible = false
+
+func _on_reject_draw_pressed() -> void:
+	if draw_offer_banner != null:
+		draw_offer_banner.visible = false
+
 func _send_chess_move(from_r: int, from_c: int, to_r: int, to_c: int) -> void:
-	var eng_from_r := (BOARD_SIZE - 1) - from_r
-	var eng_to_r := (BOARD_SIZE - 1) - to_r
 	var promo = null
 	var moving_piece = piece_sprites[from_r][from_c]
 	if moving_piece != null and moving_piece.has_meta("kind") and moving_piece.get_meta("kind") == "Pawn":
 		if to_r == 0 or to_r == BOARD_SIZE - 1:
-			promo = "Queen"
+			if not OS.has_feature("headless") and promotion_panel != null:
+				_pending_promo_move = {
+					"from_r": from_r,
+					"from_c": from_c,
+					"to_r": to_r,
+					"to_c": to_c
+				}
+				promotion_panel.visible = true
+				return
+			promo = selected_promotion_kind
+	_dispatch_chess_move(from_r, from_c, to_r, to_c, promo)
+
+func _dispatch_chess_move(from_r: int, from_c: int, to_r: int, to_c: int, promo) -> void:
+	var eng_from_r = (BOARD_SIZE - 1) - from_r
+	var eng_to_r = (BOARD_SIZE - 1) - to_r
 	var cmd = {
 		"command_type": "chess_game::MovePieceCommand",
 		"player": current,
@@ -506,11 +665,11 @@ func _load_piece_texture_safe(tex_path: String) -> Texture2D:
 		if imported != null:
 			_piece_texture_cache[tex_path] = imported
 			return imported
-	var abs_path := ProjectSettings.globalize_path(tex_path)
+	var abs_path: String = ProjectSettings.globalize_path(tex_path)
 	if FileAccess.file_exists(abs_path):
-		var img := Image.load_from_file(abs_path)
+		var img: Image = Image.load_from_file(abs_path)
 		if img != null and not img.is_empty():
-			var tex := ImageTexture.create_from_image(img)
+			var tex: ImageTexture = ImageTexture.create_from_image(img)
 			_piece_texture_cache[tex_path] = tex
 			return tex
 	return null
@@ -534,10 +693,10 @@ func _create_piece_sprite(row: int, col: int, player: int, kind: String) -> Node
 			created_texture = true
 
 	if not created_texture and fallback_to_unicode:
-		var badge := Node2D.new()
-		var is_white := (player == P1)
-		var disc_fill := Color(0.98, 0.95, 0.88) if is_white else Color(0.14, 0.16, 0.21)
-		var disc_rim := Color(0.22, 0.18, 0.14) if is_white else Color(0.85, 0.78, 0.58)
+		var badge: Node2D = Node2D.new()
+		var is_white: bool = (player == P1)
+		var disc_fill: Color = Color(0.98, 0.95, 0.88) if is_white else Color(0.14, 0.16, 0.21)
+		var disc_rim: Color = Color(0.22, 0.18, 0.14) if is_white else Color(0.85, 0.78, 0.58)
 		badge.draw.connect(func():
 			badge.draw_circle(Vector2(2, 3), CELL_SIZE * 0.36, Color(0, 0, 0, 0.35))
 			badge.draw_circle(Vector2.ZERO, CELL_SIZE * 0.36, disc_fill)
@@ -632,6 +791,20 @@ func _gui_input(event: InputEvent) -> void:
 		_handle_mouse_hover(_event_to_board_pos(event.position, true))
 
 func _input(event: InputEvent) -> void:
+	if promotion_panel != null and promotion_panel.visible and event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_1, KEY_KP_1:
+				handle_promotion_shortcut(1)
+				return
+			KEY_2, KEY_KP_2:
+				handle_promotion_shortcut(2)
+				return
+			KEY_3, KEY_KP_3:
+				handle_promotion_shortcut(3)
+				return
+			KEY_4, KEY_KP_4:
+				handle_promotion_shortcut(4)
+				return
 	_handle_gamepad_input(event)
 	if OS.has_feature("headless"):
 		return
@@ -653,10 +826,10 @@ func _handle_unified_input(event: InputEvent) -> void:
 	if _rules_popup != null and _rules_popup.visible:
 		return
 
-	var event_pos := Vector2.ZERO
-	var is_press := false
-	var is_release := false
-	var is_drag := false
+	var event_pos: Vector2 = Vector2.ZERO
+	var is_press: bool = false
+	var is_release: bool = false
+	var is_drag: bool = false
 
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -679,8 +852,8 @@ func _handle_unified_input(event: InputEvent) -> void:
 
 	if is_press:
 		touch_down_pos = event_pos
-		var press_col := int(floor(event_pos.x / CELL_SIZE))
-		var press_row := int(floor(event_pos.y / CELL_SIZE))
+		var press_col: int = int(floor(event_pos.x / CELL_SIZE))
+		var press_row: int = int(floor(event_pos.y / CELL_SIZE))
 		touch_start_cell = Vector2i(press_row, press_col)
 		is_touch_dragging = false
 		_selected_on_current_press = false
@@ -697,9 +870,9 @@ func _handle_unified_input(event: InputEvent) -> void:
 		if touch_down_pos.distance_to(event_pos) > DEAD_ZONE:
 			is_touch_dragging = true
 	elif is_release:
-		var col := int(floor(event_pos.x / CELL_SIZE))
-		var row := int(floor(event_pos.y / CELL_SIZE))
-		var release_cell := Vector2i(row, col)
+		var col: int = int(floor(event_pos.x / CELL_SIZE))
+		var row: int = int(floor(event_pos.y / CELL_SIZE))
+		var release_cell: Vector2i = Vector2i(row, col)
 		if _is_in_bounds(row, col):
 			if release_cell == touch_start_cell:
 				if not _selected_on_current_press:
@@ -727,8 +900,8 @@ func _handle_cell_click(row: int, col: int) -> void:
 	if (is_inside_tree() and has_node("/root/TutorialManager")):
 		var tm = get_node("/root/TutorialManager")
 		if tm.get("is_running") == true and tm.get("current_board") == self:
-			var vis_cell := Vector2i(col, row)
-			var eng_cell := Vector2i(col, (BOARD_SIZE - 1) - row)
+			var vis_cell: Vector2i = Vector2i(col, row)
+			var eng_cell: Vector2i = Vector2i(col, (BOARD_SIZE - 1) - row)
 			if not (tm.call("is_cell_allowed", vis_cell) or tm.call("is_cell_allowed", eng_cell)):
 				return
 
@@ -758,8 +931,8 @@ func _handle_cell_click(row: int, col: int) -> void:
 		if (is_inside_tree() and has_node("/root/TutorialManager")):
 			var tm = get_node("/root/TutorialManager")
 			if tm.get("is_running") == true and tm.get("current_board") == self:
-				var vis_cell := Vector2i(col, row)
-				var eng_cell := Vector2i(col, (BOARD_SIZE - 1) - row)
+				var vis_cell: Vector2i = Vector2i(col, row)
+				var eng_cell: Vector2i = Vector2i(col, (BOARD_SIZE - 1) - row)
 				if tm.call("is_cell_allowed", eng_cell):
 					tm.call("notify_cell_action", eng_cell)
 				else:
@@ -771,13 +944,13 @@ func _calculate_valid_moves(r: int, c: int) -> Array:
 	var moves: Array = []
 	if bridge == null or not bridge.has_method("get_legal_moves"):
 		return moves
-	var eng_r := (BOARD_SIZE - 1) - r
+	var eng_r = (BOARD_SIZE - 1) - r
 	var legal_moves = bridge.get_legal_moves(current)
 	for m in legal_moves:
-		var f_row := -1
-		var f_col := -1
-		var t_row := -1
-		var t_col := -1
+		var f_row: int = -1
+		var f_col: int = -1
+		var t_row: int = -1
+		var t_col: int = -1
 
 		if m.has("from") and m.from is Dictionary:
 			f_row = int(m.from.get("row", -1))
@@ -794,7 +967,7 @@ func _calculate_valid_moves(r: int, c: int) -> Array:
 			t_col = int(m.get("to_col", -1))
 
 		if f_row == eng_r and f_col == c and t_row >= 0 and t_col >= 0:
-			var vis_to_r := (BOARD_SIZE - 1) - t_row
+			var vis_to_r = (BOARD_SIZE - 1) - t_row
 			var dest = Vector2i(vis_to_r, t_col)
 			if not dest in moves:
 				moves.append(dest)
@@ -836,14 +1009,14 @@ func _move_piece_sprite(from_r: int, from_c: int, to_r: int, to_c: int, is_promo
 
 	# Castling rook movement: King moved 2 columns
 	if piece_kind == "King" and abs(to_c - from_c) == 2:
-		var rook_from_c := 7 if to_c > from_c else 0
-		var rook_to_c := 5 if to_c > from_c else 3
+		var rook_from_c = 7 if to_c > from_c else 0
+		var rook_to_c = 5 if to_c > from_c else 3
 		var rook_sprite = piece_sprites[to_r][rook_from_c]
 		if rook_sprite != null and is_instance_valid(rook_sprite):
 			piece_sprites[to_r][rook_from_c] = null
 			piece_sprites[to_r][rook_to_c] = rook_sprite
-			var rook_pos := Vector2(rook_to_c * CELL_SIZE + CELL_SIZE / 2.0, to_r * CELL_SIZE + CELL_SIZE / 2.0)
-			var r_tw := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+			var rook_pos: Vector2 = Vector2(rook_to_c * CELL_SIZE + CELL_SIZE / 2.0, to_r * CELL_SIZE + CELL_SIZE / 2.0)
+			var r_tw: Tween = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 			r_tw.tween_property(rook_sprite, "position", rook_pos, 0.22)
 	
 	var target_pos = Vector2(to_c * CELL_SIZE + CELL_SIZE / 2.0, to_r * CELL_SIZE + CELL_SIZE / 2.0)
@@ -891,8 +1064,8 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var raw_type := str(event.get("command_type", event.get("event_type", "")))
-			var event_type := raw_type.split("::")[-1]
+			var raw_type: String = str(event.get("command_type", event.get("event_type", "")))
+			var event_type: String = raw_type.split("::")[-1]
 			if event_type == "PieceMovedEvent":
 				var from_dict = event.get("from", {})
 				var to_dict = event.get("to", {})
@@ -901,7 +1074,7 @@ func _on_event_json(json_str: String) -> void:
 				var to_r = (BOARD_SIZE - 1) - int(to_dict.get("row", 0))
 				var to_c = int(to_dict.get("col", 0))
 				var is_prom: bool = event.get("promotion") != null or event.get("promoted", false) == true
-				var prom_kind := str(event.get("promoted_to", "Queen"))
+				var prom_kind: String = str(event.get("promoted_to", "Queen"))
 				if prom_kind == "" or prom_kind == "<null>" or prom_kind == "null":
 					prom_kind = "Queen"
 
@@ -923,7 +1096,14 @@ func _on_event_json(json_str: String) -> void:
 						get_node("/root/AudioManager").play_piece_place()
 
 				_move_piece_sprite(from_r, from_c, to_r, to_c, is_prom, prom_kind)
+			elif event_type == "DrawOfferedEvent":
+				if draw_offer_banner != null:
+					draw_offer_banner.visible = true
 			elif event_type == "GameOverEvent":
+				if draw_offer_banner != null:
+					draw_offer_banner.visible = false
+				if promotion_panel != null:
+					promotion_panel.visible = false
 				var w = event.get("winner", -1)
 				if w == null:
 					w = 0
@@ -945,8 +1125,8 @@ func _on_event_json(json_str: String) -> void:
 func _play_check_shake() -> void:
 	if OS.has_feature("headless"):
 		return
-	var original_pos := position
-	var t := create_tween()
+	var original_pos: Vector2 = position
+	var t: Tween = create_tween()
 	if t != null:
 		t.tween_property(self, "position", original_pos + Vector2(6, 0), 0.05)
 		t.tween_property(self, "position", original_pos - Vector2(6, 0), 0.05)
@@ -1035,7 +1215,7 @@ func _draw_board_overlay() -> void:
 			board_overlay.draw_circle(center, CELL_SIZE * 0.22, COL_VALID_MOVE)
 
 	if gamepad_cursor_active and _is_in_bounds(gamepad_cursor.x, gamepad_cursor.y):
-		var cur_rect := Rect2(gamepad_cursor.y * CELL_SIZE + 3.0, gamepad_cursor.x * CELL_SIZE + 3.0, CELL_SIZE - 6.0, CELL_SIZE - 6.0)
+		var cur_rect: Rect2 = Rect2(gamepad_cursor.y * CELL_SIZE + 3.0, gamepad_cursor.x * CELL_SIZE + 3.0, CELL_SIZE - 6.0, CELL_SIZE - 6.0)
 		board_overlay.draw_rect(cur_rect, Color(0.2, 0.95, 1.0, 0.95), false, 3.0)
 
 func _draw() -> void:
@@ -1096,7 +1276,7 @@ func _draw() -> void:
 	if font == null:
 		font = ThemeDB.fallback_font
 
-	var font_sz := int(CELL_SIZE * 0.22)
+	var font_sz: int = int(CELL_SIZE * 0.22)
 	var col_l = current_theme.light_color if current_theme else COL_LIGHT
 	var col_d = current_theme.dark_color if current_theme else COL_DARK
 
@@ -1124,7 +1304,7 @@ func _draw() -> void:
 
 	# Cursor virtual de Gamepad / Steam Deck
 	if gamepad_cursor_active and _is_in_bounds(gamepad_cursor.x, gamepad_cursor.y):
-		var cur_rect := Rect2(gamepad_cursor.y * CELL_SIZE + 3.0, gamepad_cursor.x * CELL_SIZE + 3.0, CELL_SIZE - 6.0, CELL_SIZE - 6.0)
+		var cur_rect: Rect2 = Rect2(gamepad_cursor.y * CELL_SIZE + 3.0, gamepad_cursor.x * CELL_SIZE + 3.0, CELL_SIZE - 6.0, CELL_SIZE - 6.0)
 		draw_rect(cur_rect, Color(0.2, 0.95, 1.0, 0.95), false, 3.0)
 
 # --- Soporte de Gamepad y Steam Deck con cursor virtual ---
@@ -1192,7 +1372,7 @@ func _update_status() -> void:
 	else:
 		var p_name = "Jugador %s" % current
 		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)] as Color)
-		var msg := ""
+		var msg: String = ""
 		if in_opening_practice and opening_step_index < opening_moves.size():
 			var expected = opening_moves[opening_step_index]
 			var op_data = ChessOpenings.get_opening(current_opening_key)
@@ -1223,7 +1403,7 @@ func _sfx_piece_place() -> void:
 func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
 	if is_inside_tree() and has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_piece_place(2.0)
-	var particles := CPUParticles2D.new()
+	var particles: CPUParticles2D = CPUParticles2D.new()
 	particles.position = world_pos
 	particles.emitting = true
 	particles.one_shot = true

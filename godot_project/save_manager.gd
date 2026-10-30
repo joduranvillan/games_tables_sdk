@@ -160,8 +160,8 @@ func load_game(save_id: String, p_bridge: Node = null) -> Dictionary:
 
 	var data: Dictionary = json.data
 	var target_bridge := p_bridge if p_bridge != null else active_bridge
-	var state_b64 := str(data.get("engine_state", ""))
-	var game_id := str(data.get("game_id", active_game_id))
+	var state_b64: String = str(data.get("engine_state", ""))
+	var game_id: String = str(data.get("game_id", active_game_id))
 
 	if target_bridge != null and is_instance_valid(target_bridge) and not state_b64.is_empty():
 		var raw_bytes := Marshalls.base64_to_raw(state_b64)

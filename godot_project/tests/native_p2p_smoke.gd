@@ -31,7 +31,7 @@ func _initialize() -> void:
 	var client_res = bridge.start_p2p_client("chess")
 	results.append(["start_p2p_client('chess') retorna sin crash", client_res == true or client_res == false or client_res == null])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + str(r[0]))
 		if not r[1]:

@@ -11,28 +11,70 @@ REDOT_BIN="${REDOT_BIN:-redot}"
 SHIM_REAL="$(realpath "$SDK_ROOT/tools/redot_gdext_shim.sh" 2>/dev/null || echo "")"
 BIN_REAL="$(realpath "$(command -v "$REDOT_BIN" 2>/dev/null || echo "")" 2>/dev/null || echo "")"
 
-if ! command -v "$REDOT_BIN" &>/dev/null || [ "$BIN_REAL" = "$SHIM_REAL" ]; then
-    echo "=== Redot/Godot no detectado en PATH ($REDOT_BIN); ejecutando validación estática headless de GDScript ==="
-    python3 -c '
-import os, re, sys
+echo "=== Ejecutando validador estático Redot strict (tipado explícito y paridad de tableros) ==="
+python3 -c '
+import os, re, sys, filecmp
+
 root = "godot_project"
 class_names = {}
+unsafe_walrus = []
+
+strict_files = {
+    "chess_board.gd",
+    "go_board.gd",
+    "shogi_board.gd",
+    "battleship_board.gd",
+    "mille_bornes_board.gd",
+    "scenes/chess_board.gd",
+    "scenes/go_board.gd",
+    "scenes/shogi_board.gd",
+    "scenes/battleship_board.gd",
+    "scenes/mille_bornes_board.gd",
+    "tests/canonical_rules_ui_smoke.gd",
+}
+
 for dirpath, _, filenames in os.walk(root):
     for f in sorted(filenames):
         if f.endswith(".gd"):
             p = os.path.join(dirpath, f)
-            rel = os.path.relpath(p, root)
+            rel = os.path.relpath(p, root).replace("\\", "/")
             with open(p, "r", encoding="utf-8") as fh:
                 for i, line in enumerate(fh, 1):
                     m = re.match(r"^\s*class_name\s+([A-Za-z0-9_]+)", line)
                     if m:
                         cn = m.group(1)
                         class_names.setdefault(cn, []).append(f"{rel}:{i}")
+                    code_part = line.split("#", 1)[0]
+                    if ":=" in code_part:
+                        if rel in strict_files:
+                            unsafe_walrus.append(f"{rel}:{i}: {line.strip()}")
+                        elif re.search(r":=.*(\.get\(|\.call\(|bridge\.|parser\.data|\bin\b)", code_part):
+                            unsafe_walrus.append(f"{rel}:{i}: {line.strip()}")
+
 dups = {k: v for k, v in class_names.items() if len(v) > 1}
 if dups:
     print(f"ERROR: class_name duplicado detectado: {dups}", file=sys.stderr)
     sys.exit(1)
+
+if unsafe_walrus:
+    print("ERROR: Inferencias := no permitidas en Redot strict detectadas:", file=sys.stderr)
+    for item in unsafe_walrus[:25]:
+        print("  " + item, file=sys.stderr)
+    sys.exit(1)
+
+for f in sorted(os.listdir(root)):
+    if f.endswith("_board.gd"):
+        root_p = os.path.join(root, f)
+        scene_p = os.path.join(root, "scenes", f)
+        if os.path.isfile(scene_p) and not filecmp.cmp(root_p, scene_p, shallow=False):
+            print(f"ERROR: Desincronización detectada entre {root_p} y {scene_p}", file=sys.stderr)
+            sys.exit(1)
+
+print("OK: Validador Redot strict superado (0 inferencias := en Variant, 13/13 tableros sincronizados).")
 '
+
+if ! command -v "$REDOT_BIN" &>/dev/null || [ "$BIN_REAL" = "$SHIM_REAL" ]; then
+    echo "=== Redot/Godot binario nativo no disponible en PATH ($REDOT_BIN); ejecutando verificación estática de scripts de test ==="
     TEST_FILES=()
     if [ $# -gt 0 ]; then
         for arg in "$@"; do
@@ -54,7 +96,7 @@ if dups:
     for test_file in "${TEST_FILES[@]}"; do
         [ -e "$test_file" ] || continue
         test_name=$(basename "$test_file")
-        echo "--- Corriendo test (validación): $test_name ---"
+        echo "--- Corriendo test (validación Redot strict): $test_name ---"
         grep -q "extends" "$test_file"
         echo "PASS: $test_name"
         echo "RESULTADO: PASS ($test_name)"

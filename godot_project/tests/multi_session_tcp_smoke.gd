@@ -107,7 +107,7 @@ func _initialize() -> void:
 	results.append(["Sesion B se mantuvo en 1 movimiento en Host B", events_b_host.size() == 1])
 	results.append(["Sesion B se mantuvo en 1 movimiento en Client B", events_b_client.size() == 1])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		var passed: bool = r[1]
 		print(("PASS  " if passed else "FAIL  ") + r[0])

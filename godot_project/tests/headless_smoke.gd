@@ -60,7 +60,7 @@ func _initialize() -> void:
 	board_node._on_game_over(0)
 	results.append(["fin de partida por tablas actualiza winner == 0 y limpia multi_capture_cell", board_node.winner == 0 and board_node.multi_capture_cell == null])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

@@ -14,7 +14,7 @@ func _initialize() -> void:
 	]
 
 	for method_name in methods:
-		var bridge := OpenTableBridge.new()
+		var bridge = OpenTableBridge.new()
 		if not bridge.has_method(method_name):
 			printerr("FAIL: OpenTableBridge no expone el método %s" % method_name)
 			bridge.free()

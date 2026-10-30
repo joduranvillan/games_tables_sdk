@@ -12,7 +12,7 @@ extends SceneTree
 
 func _initialize() -> void:
 	print("=== Iniciando Test: competitive_smoke.gd ===")
-	var ok := _run_competitive_flow()
+	var ok = _run_competitive_flow()
 	if ok:
 		print("PASS: competitive_smoke.gd — Flujo cola -> matched -> jugada -> ELO verificado")
 		quit(0)
@@ -23,8 +23,8 @@ func _initialize() -> void:
 func _run_competitive_flow() -> bool:
 	# 1. Cola de emparejamiento (2 clientes para "chess")
 	var queue: Array = []
-	var client_1 := {"player_id": "player1", "game_id": "chess", "elo": 1200.0}
-	var client_2 := {"player_id": "player2", "game_id": "chess", "elo": 1200.0}
+	var client_1: Dictionary = {"player_id": "player1", "game_id": "chess", "elo": 1200.0}
+	var client_2: Dictionary = {"player_id": "player2", "game_id": "chess", "elo": 1200.0}
 	queue.append(client_1)
 	queue.append(client_2)
 
@@ -33,7 +33,7 @@ func _run_competitive_flow() -> bool:
 		return false
 
 	# 2. Emparejamiento ("matched")
-	var matched_event := {
+	var matched_event: Dictionary = {
 		"op": "matched",
 		"game_id": "chess",
 		"room_code": "COMP01",
@@ -45,12 +45,12 @@ func _run_competitive_flow() -> bool:
 		return false
 
 	# 3. Jugar 1 movimiento en Chess (vía OpenTableBridge si está cargado, o validación determinista)
-	var move_ok := false
+	var move_ok: bool = false
 	if ClassDB.class_exists("OpenTableBridge"):
 		var bridge = OpenTableBridge.new()
 		if bridge != null:
 			bridge.start_local_match_chess(1, 2)
-			var cmd_json := JSON.stringify({
+			var cmd_json: String = JSON.stringify({
 				"command_type": "chess_game::MovePieceCommand",
 				"player": 1,
 				"from": {"row": 1, "col": 4},
@@ -85,8 +85,8 @@ func _run_competitive_flow() -> bool:
 
 	if new_winner_elo == 0.0 and new_loser_elo == 0.0:
 		# Fórmula FIDE K=32 determinista (idéntica a open_table_relay/src/elo.rs)
-		var expected_w := 1.0 / (1.0 + pow(10.0, (initial_loser_elo - initial_winner_elo) / 400.0))
-		var expected_l := 1.0 - expected_w
+		var expected_w = 1.0 / (1.0 + pow(10.0, (initial_loser_elo - initial_winner_elo) / 400.0))
+		var expected_l = 1.0 - expected_w
 		new_winner_elo = round(initial_winner_elo + 32.0 * (1.0 - expected_w))
 		new_loser_elo = round(initial_loser_elo + 32.0 * (0.0 - expected_l))
 

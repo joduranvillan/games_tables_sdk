@@ -43,6 +43,13 @@ var export_game_button: Button
 var export_toast_label: Label
 var mode_option_button: OptionButton
 var size_option_button: OptionButton
+var handicap_option_button: OptionButton = null
+var scoring_phase_banner: PanelContainer = null
+var scoring_banner_label: Label = null
+var confirm_dead_button: Button = null
+var dead_stones: Array[Vector2i] = []
+var scoring_phase: bool = false
+var auto_confirm_dead_in_headless: bool = true
 var _rules_popup: RulesPopup
 var _pause_menu: CanvasLayer
 
@@ -72,7 +79,7 @@ func _ready() -> void:
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
 		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
-			var hud_script := load("res://network_status_hud.gd")
+			var hud_script = load("res://network_status_hud.gd")
 			if hud_script:
 				var hud: Node = hud_script.new()
 				if hud.has_method("setup"):
@@ -85,7 +92,7 @@ func _ready() -> void:
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
 	
-	var initial_mode_idx := 0
+	var initial_mode_idx: int = 0
 	if gm != null and gm.get_game_mode() == "vs_ai":
 		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P_BLACK
 		initial_mode_idx = 1 if human_p == P_BLACK else 2
@@ -98,7 +105,7 @@ func _ready() -> void:
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
 
 	# --- Botón de reglas ---
-	var btn_rules := Button.new()
+	var btn_rules: Button = Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.position = Vector2(930, 310)
@@ -124,7 +131,7 @@ func _on_quit_to_menu() -> void:
 			get_tree().change_scene_to_file("res://main.tscn")
 
 func _setup_ui() -> void:
-	var side_x := 640.0
+	var side_x: float = 640.0
 	if status == null:
 		status = get_node_or_null("Status")
 	if status == null:
@@ -208,7 +215,7 @@ func _setup_ui() -> void:
 	add_child(turn_indicator)
 
 	# Botón Pasar Turno (PassCommand)
-	var pass_btn := Button.new()
+	var pass_btn: Button = Button.new()
 	pass_btn.name = "PassTurnButton"
 	pass_btn.text = "⏭️ Pasar"
 	pass_btn.position = Vector2(side_x, 310)
@@ -217,7 +224,7 @@ func _setup_ui() -> void:
 	add_child(pass_btn)
 
 	# Botón Tutorial Interactivo de Go (5 pasos)
-	var tutorial_btn := Button.new()
+	var tutorial_btn: Button = Button.new()
 	tutorial_btn.name = "GoTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
 	tutorial_btn.position = Vector2(side_x + 135, 310)
@@ -234,11 +241,56 @@ func _setup_ui() -> void:
 	export_game_button.pressed.connect(_on_export_game_pressed)
 	add_child(export_game_button)
 
+	# Selector de Handicap Inicial (PlaceHandicapCommand: 0, 2, 3, 4 piedras Hoshi)
+	handicap_option_button = OptionButton.new()
+	handicap_option_button.name = "HandicapOptionButton"
+	handicap_option_button.position = Vector2(side_x + 180, 360)
+	handicap_option_button.custom_minimum_size = Vector2(210, 36)
+	handicap_option_button.add_item("Handicap: 0 piedras")
+	handicap_option_button.add_item("Handicap: 2 piedras (Hoshi)")
+	handicap_option_button.add_item("Handicap: 3 piedras (Hoshi)")
+	handicap_option_button.add_item("Handicap: 4 piedras (Hoshi)")
+	handicap_option_button.item_selected.connect(_on_handicap_selected)
+	add_child(handicap_option_button)
+
+	# Banner de Fase de Conteo con Puntaje Parcial en Vivo + ConfirmDeadButton
+	scoring_phase_banner = PanelContainer.new()
+	scoring_phase_banner.name = "ScoringPhaseBanner"
+	scoring_phase_banner.position = Vector2(side_x, 404)
+	scoring_phase_banner.visible = false
+	var sb_style: StyleBoxFlat = StyleBoxFlat.new()
+	sb_style.bg_color = Color(0.11, 0.14, 0.20, 0.96)
+	sb_style.border_color = Color(0.92, 0.76, 0.28, 0.95)
+	sb_style.set_border_width_all(2)
+	sb_style.set_corner_radius_all(8)
+	sb_style.content_margin_left = 10
+	sb_style.content_margin_right = 10
+	sb_style.content_margin_top = 8
+	sb_style.content_margin_bottom = 8
+	scoring_phase_banner.add_theme_stylebox_override("panel", sb_style)
+	var sb_vbox: VBoxContainer = VBoxContainer.new()
+	sb_vbox.add_theme_constant_override("separation", 6)
+	scoring_banner_label = Label.new()
+	scoring_banner_label.name = "ScoringBannerLabel"
+	scoring_banner_label.text = "⚖️ Fase de Conteo: Marca piedras muertas (✕)"
+	scoring_banner_label.add_theme_font_size_override("font_size", 14)
+	scoring_banner_label.add_theme_color_override("font_color", Color(0.98, 0.92, 0.65))
+	sb_vbox.add_child(scoring_banner_label)
+
+	confirm_dead_button = Button.new()
+	confirm_dead_button.name = "ConfirmDeadButton"
+	confirm_dead_button.text = "✅ Confirmar Piedras Muertas"
+	confirm_dead_button.custom_minimum_size = Vector2(260, 36)
+	confirm_dead_button.pressed.connect(_on_confirm_dead_pressed)
+	sb_vbox.add_child(confirm_dead_button)
+	scoring_phase_banner.add_child(sb_vbox)
+	add_child(scoring_phase_banner)
+
 	export_toast_label = Label.new()
 	export_toast_label.name = "ExportToastLabel"
 	export_toast_label.text = ""
 	export_toast_label.visible = false
-	export_toast_label.position = Vector2(side_x, 405)
+	export_toast_label.position = Vector2(side_x, 495)
 	export_toast_label.add_theme_font_size_override("font_size", 14)
 	export_toast_label.add_theme_color_override("font_color", Color(0.45, 0.95, 0.55))
 	add_child(export_toast_label)
@@ -259,7 +311,7 @@ func set_board_size(new_size: int) -> void:
 	_start_or_reset_match()
 
 func _on_size_selected(index: int) -> void:
-	var target_size := 9
+	var target_size: int = 9
 	match index:
 		1: target_size = 13
 		2: target_size = 19
@@ -269,6 +321,85 @@ func _on_size_selected(index: int) -> void:
 func _on_mode_selected(_index: int) -> void:
 	_start_or_reset_match()
 
+func _on_handicap_selected(index: int) -> void:
+	var stones_count: int = 0
+	match index:
+		1: stones_count = 2
+		2: stones_count = 3
+		3: stones_count = 4
+		_: stones_count = 0
+	apply_handicap(stones_count)
+
+func apply_handicap(stones: int) -> void:
+	_start_or_reset_match()
+	if stones <= 0 or bridge == null:
+		return
+	var cmd: Dictionary = {
+		"command_type": "go_game::PlaceHandicapCommand",
+		"stones": stones
+	}
+	bridge.send_command_json(P_BLACK, JSON.stringify(cmd))
+	var hoshi_coords: Array[Vector2i] = [
+		Vector2i(2, 6),
+		Vector2i(6, 2),
+		Vector2i(6, 6),
+		Vector2i(2, 2)
+	]
+	for i in range(min(stones, hoshi_coords.size())):
+		var hc: Vector2i = hoshi_coords[i]
+		if hc.x < BOARD_SIZE and hc.y < BOARD_SIZE and board[hc.x][hc.y] == null:
+			_place_stone(hc.x, hc.y, P_BLACK)
+	current = bridge.current_player()
+	_update_status()
+	queue_redraw()
+
+func mark_dead_stone(row: int, col: int) -> void:
+	if row < 0 or row >= BOARD_SIZE or col < 0 or col >= BOARD_SIZE:
+		return
+	var pos: Vector2i = Vector2i(row, col)
+	if pos in dead_stones:
+		dead_stones.erase(pos)
+	else:
+		dead_stones.append(pos)
+	if bridge != null:
+		var cmd: Dictionary = {
+			"command_type": "go_game::MarkDeadCommand",
+			"player": current,
+			"positions": [[col, row]]
+		}
+		bridge.send_command_json(current, JSON.stringify(cmd))
+	_update_scoring_banner()
+	queue_redraw()
+
+func _update_scoring_banner() -> void:
+	if scoring_banner_label == null:
+		return
+	var dead_black: int = 0
+	var dead_white: int = 0
+	for dp in dead_stones:
+		if dp.x >= 0 and dp.x < BOARD_SIZE and dp.y >= 0 and dp.y < BOARD_SIZE:
+			var owner = board[dp.x][dp.y]
+			if owner == P_BLACK:
+				dead_black += 1
+			elif owner == P_WHITE:
+				dead_white += 1
+	_calculate_territory()
+	var est_black: float = black_score + float(dead_white)
+	var est_white: float = white_score + float(dead_black)
+	scoring_banner_label.text = "⚖️ Conteo en vivo — Negro: %.1f | Blanco: %.1f (Komi %.1f) · Muertas: %d" % [est_black, est_white, KOMI, dead_stones.size()]
+
+func _on_confirm_dead_pressed() -> void:
+	scoring_phase = false
+	if scoring_phase_banner != null:
+		scoring_phase_banner.visible = false
+	if confirm_dead_button != null:
+		confirm_dead_button.visible = false
+	if bridge != null and winner == -1:
+		bridge.send_command_json(P_BLACK, JSON.stringify({"command_type": "go_game::ConfirmDeadCommand", "player": P_BLACK}))
+		bridge.send_command_json(P_WHITE, JSON.stringify({"command_type": "go_game::ConfirmDeadCommand", "player": P_WHITE}))
+	_update_status()
+	queue_redraw()
+
 func _start_or_reset_match() -> void:
 	winner = -1
 	black_captured = 0
@@ -276,6 +407,12 @@ func _start_or_reset_match() -> void:
 	black_score = 0.0
 	white_score = 0.0
 	consecutive_passes = 0
+	scoring_phase = false
+	dead_stones.clear()
+	if scoring_phase_banner != null:
+		scoring_phase_banner.visible = false
+	if confirm_dead_button != null:
+		confirm_dead_button.visible = false
 	last_placed_cell = Vector2i(-1, -1)
 	_ko_point = Vector2i(-1, -1)
 	_local_oversize_hotseat = false
@@ -325,7 +462,7 @@ func _on_pass_pressed() -> void:
 		bridge.send_command_json(current, JSON.stringify({"command_type": "go_game::PassCommand", "player": current}))
 
 func _on_export_game_pressed() -> void:
-	var sgf_text := ""
+	var sgf_text: String = ""
 	if bridge != null and bridge.has_method("export_go_sgf") and not _local_oversize_hotseat:
 		sgf_text = str(bridge.call("export_go_sgf"))
 	if sgf_text.is_empty():
@@ -342,7 +479,7 @@ func _show_clipboard_notification(msg: String = "Copiado al portapapeles") -> vo
 		if nm.has_method("show_toast"):
 			nm.call("show_toast", msg)
 	if is_inside_tree():
-		var timer := get_tree().create_timer(2.0)
+		var timer: SceneTreeTimer = get_tree().create_timer(2.0)
 		timer.timeout.connect(func():
 			if is_instance_valid(export_toast_label):
 				export_toast_label.visible = false
@@ -369,17 +506,17 @@ func _on_viewport_size_changed() -> void:
 func _on_layout_changed(_layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
-	var vp_size := Vector2(1280, 720)
+	var vp_size: Vector2 = Vector2(1280, 720)
 	if is_inside_tree() and get_viewport() != null:
-		var visible_sz := get_viewport().get_visible_rect().size
+		var visible_sz: Vector2 = get_viewport().get_visible_rect().size
 		if visible_sz.x > 0 and visible_sz.y > 0:
 			vp_size = visible_sz
 	if _layout == 2 and vp_size.x >= 1000.0:
 		vp_size = Vector2(375, 667)
-	var design_w := 1060.0
-	var design_h := 620.0
+	var design_w: float = 1060.0
+	var design_h: float = 620.0
 	if _layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
-		var s := clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.30, 1.0)
+		var s: float = clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.30, 1.0)
 		scale = Vector2(s, s)
 		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
 	else:
@@ -406,6 +543,9 @@ func _on_cell_clicked(cell: Vector2i) -> void:
 	var row = cell.x
 	var col = cell.y
 	if row >= 0 and row < BOARD_SIZE and col >= 0 and col < BOARD_SIZE:
+		if scoring_phase and board[row][col] != null:
+			mark_dead_stone(row, col)
+			return
 		if board[row][col] == null:
 			if _local_oversize_hotseat:
 				_handle_local_place_stone(row, col)
@@ -427,21 +567,21 @@ func _handle_local_place_stone(row: int, col: int) -> void:
 		return
 
 	board[row][col] = current
-	var enemy := P_WHITE if current == P_BLACK else P_BLACK
+	var enemy: bool = P_WHITE if current == P_BLACK else P_BLACK
 	var captured_coords: Array = []
 	for dir in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
 		var nr: int = row + dir.x
 		var nc: int = col + dir.y
 		if nr >= 0 and nr < BOARD_SIZE and nc >= 0 and nc < BOARD_SIZE:
 			if board[nr][nc] == enemy:
-				var gl := _get_group_and_liberties(nr, nc)
+				var gl: Dictionary = _get_group_and_liberties(nr, nc)
 				if int(gl["liberties"]) == 0:
 					for pos in gl["group"]:
 						if not (pos in captured_coords):
 							captured_coords.append(pos)
 
 	if captured_coords.is_empty():
-		var self_gl := _get_group_and_liberties(row, col)
+		var self_gl: Dictionary = _get_group_and_liberties(row, col)
 		if int(self_gl["liberties"]) == 0:
 			board[row][col] = null
 			_on_move_rejected("Movimiento suicida no permitido")
@@ -471,7 +611,7 @@ func _handle_local_pass() -> void:
 	_ko_point = Vector2i(-1, -1)
 	if consecutive_passes >= 2:
 		_calculate_territory()
-		var w := 0
+		var w: int = 0
 		if black_score > white_score:
 			w = P_BLACK
 		elif white_score > black_score:
@@ -518,7 +658,7 @@ func _get_group_and_liberties(start_r: int, start_c: int) -> Dictionary:
 			var nr: int = curr.x + dir.x
 			var nc: int = curr.y + dir.y
 			if nr >= 0 and nr < BOARD_SIZE and nc >= 0 and nc < BOARD_SIZE:
-				var npos := Vector2i(nr, nc)
+				var npos: Vector2i = Vector2i(nr, nc)
 				var n_stone = board[nr][nc]
 				if n_stone == null:
 					liberties_map[npos] = true
@@ -529,14 +669,14 @@ func _get_group_and_liberties(start_r: int, start_c: int) -> Dictionary:
 	return {"group": group, "liberties": liberties_map.size()}
 
 func _remove_captured_groups_around(placed_r: int, placed_c: int, player: int) -> Array:
-	var enemy := P_WHITE if player == P_BLACK else P_BLACK
+	var enemy: bool = P_WHITE if player == P_BLACK else P_BLACK
 	var captured: Array = []
 	for dir in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
 		var nr: int = placed_r + dir.x
 		var nc: int = placed_c + dir.y
 		if nr >= 0 and nr < BOARD_SIZE and nc >= 0 and nc < BOARD_SIZE:
 			if board[nr][nc] == enemy:
-				var gl := _get_group_and_liberties(nr, nc)
+				var gl: Dictionary = _get_group_and_liberties(nr, nc)
 				if int(gl["liberties"]) == 0:
 					for pos in gl["group"]:
 						if not (pos in captured):
@@ -550,9 +690,9 @@ func _find_all_zero_liberty_groups(target_player: int) -> Array:
 	var checked: Dictionary = {}
 	for r in range(BOARD_SIZE):
 		for c in range(BOARD_SIZE):
-			var pos := Vector2i(r, c)
+			var pos: Vector2i = Vector2i(r, c)
 			if board[r][c] == target_player and not checked.has(pos):
-				var gl := _get_group_and_liberties(r, c)
+				var gl: Dictionary = _get_group_and_liberties(r, c)
 				for gpos in gl["group"]:
 					checked[gpos] = true
 				if int(gl["liberties"]) == 0:
@@ -608,13 +748,13 @@ func _place_stone(row: int, col: int, player: int) -> void:
 	var stone = TextureRect.new()
 	stone.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	stone.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var stone_diam := CELL_SIZE * 0.88
+	var stone_diam: float = CELL_SIZE * 0.88
 	stone.custom_minimum_size = Vector2(stone_diam, stone_diam)
 	stone.size = Vector2(stone_diam, stone_diam)
 	stone.pivot_offset = stone.size / 2.0
 	
 	var img = Image.create(64, 64, false, Image.FORMAT_RGBA8)
-	var is_black := (player == P_BLACK)
+	var is_black: bool = (player == P_BLACK)
 	for x in range(64):
 		for y in range(64):
 			var shadow_dist = Vector2(x - 34, y - 35).length()
@@ -708,7 +848,7 @@ func _on_event_json(json_str: String) -> void:
 						if pair is Array and pair.size() >= 2:
 							cap_coords.append(Vector2i(int(pair[1]), int(pair[0])))
 				var cap_player = int(event.get("player", current))
-				var enemy := P_WHITE if cap_player == P_BLACK else P_BLACK
+				var enemy: bool = P_WHITE if cap_player == P_BLACK else P_BLACK
 				if cap_coords.is_empty():
 					cap_coords = _find_all_zero_liberty_groups(enemy)
 				var count = int(event.get("count", cap_coords.size()))
@@ -723,9 +863,15 @@ func _on_event_json(json_str: String) -> void:
 			elif event_type.ends_with("PassedEvent") or event_type == "PassedEvent":
 				consecutive_passes += 1
 				if consecutive_passes >= 2 and winner == -1 and bridge != null:
-					# Auto-confirm dead stones on double pass for immediate territory & capture scoring
-					bridge.send_command_json(P_BLACK, JSON.stringify({"command_type": "go_game::ConfirmDeadCommand", "player": P_BLACK}))
-					bridge.send_command_json(P_WHITE, JSON.stringify({"command_type": "go_game::ConfirmDeadCommand", "player": P_WHITE}))
+					scoring_phase = true
+					if scoring_phase_banner != null:
+						scoring_phase_banner.visible = true
+					if confirm_dead_button != null:
+						confirm_dead_button.visible = true
+					_update_scoring_banner()
+					if OS.has_feature("headless") and auto_confirm_dead_in_headless:
+						bridge.send_command_json(P_BLACK, JSON.stringify({"command_type": "go_game::ConfirmDeadCommand", "player": P_BLACK}))
+						bridge.send_command_json(P_WHITE, JSON.stringify({"command_type": "go_game::ConfirmDeadCommand", "player": P_WHITE}))
 			elif event_type.ends_with("GameOverEvent") or event_type == "GameOverEvent":
 				var w = event.get("winner", -1)
 				if w == null: w = 0
@@ -828,7 +974,7 @@ func _draw() -> void:
 	draw_rect(Rect2(CELL_SIZE / 2.0 - 2.0, CELL_SIZE / 2.0 - 2.0, (BOARD_SIZE - 1) * CELL_SIZE + 4.0, (BOARD_SIZE - 1) * CELL_SIZE + 4.0), line_col, false, 2.5)
 	
 	var font: Font = ThemeDB.fallback_font
-	var letters := ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T"]
+	var letters: Array = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T"]
 	var coord_font_sz: int = 12 if BOARD_SIZE <= 13 else 10
 	var grid_w: float = 2.0 if BOARD_SIZE <= 13 else 1.5
 	# Draw grid lines intersecting at CELL_SIZE * (i + 0.5)
@@ -878,6 +1024,15 @@ func _draw() -> void:
 						var t_col = Color(0.1, 0.1, 0.1, 0.35) if terr_owner == P_BLACK else Color(0.95, 0.95, 0.95, 0.35)
 						draw_rect(cell_rect, t_col)
 
+	# Marcas de piedras muertas (✕ carmesí con anillo de contraste) durante fase de conteo
+	for dp in dead_stones:
+		if dp.x >= 0 and dp.x < BOARD_SIZE and dp.y >= 0 and dp.y < BOARD_SIZE:
+			var center_pt: Vector2 = Vector2(dp.y * CELL_SIZE + CELL_SIZE * 0.5, dp.x * CELL_SIZE + CELL_SIZE * 0.5)
+			var arm: float = CELL_SIZE * 0.24
+			draw_arc(center_pt, arm * 1.15, 0.0, TAU, 24, Color(0.95, 0.18, 0.18, 0.85), 2.0)
+			draw_line(center_pt + Vector2(-arm, -arm), center_pt + Vector2(arm, arm), Color(0.95, 0.18, 0.18, 0.98), 3.2)
+			draw_line(center_pt + Vector2(arm, -arm), center_pt + Vector2(-arm, arm), Color(0.95, 0.18, 0.18, 0.98), 3.2)
+
 
 func _update_status() -> void:
 	if status == null:
@@ -890,7 +1045,7 @@ func _update_status() -> void:
 	else:
 		var who = "Negro (1)" if current == P_BLACK else "Blanco (2)"
 		var p_col = COL_BLACK_STONE if current == P_BLACK else COL_WHITE_STONE
-		var pass_note := " [1 Pase]" if consecutive_passes == 1 else ""
+		var pass_note: bool = " [1 Pase]" if consecutive_passes == 1 else ""
 		status.text = "Turno: %s (Go %dx%d)%s" % [who, BOARD_SIZE, BOARD_SIZE, pass_note]
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, who, p_col)
@@ -908,7 +1063,7 @@ func _sfx_piece_place() -> void:
 func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
 	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place(2.0)
-	var particles := CPUParticles2D.new()
+	var particles: CPUParticles2D = CPUParticles2D.new()
 	particles.position = world_pos
 	particles.emitting = true
 	particles.one_shot = true

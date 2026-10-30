@@ -131,7 +131,7 @@ func _initialize() -> void:
 		# 10. Probar partida vs IA en uno_board.gd jugando una carta desde la mano humana
 		board_inst._on_mode_selected(1) # vs IA (Humano = J1, IA = J2)
 		var tick_before: int = board_inst.bridge.current_tick()
-		var played_non_wild := false
+		var played_non_wild: bool = false
 		for i in range(board_inst.player_hand.size()):
 			var c = board_inst.player_hand[i]
 			var c_col = str(c.get("color", ""))
@@ -157,7 +157,7 @@ func _initialize() -> void:
 		root.remove_child(board_inst)
 		board_inst.free()
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

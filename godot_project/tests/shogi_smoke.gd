@@ -53,7 +53,7 @@ func _initialize() -> void:
 	results.append(["Se recibieron 2 eventos PieceMovedEvent", events_received.size() == 2])
 
 	# 4. Prueba E2E de interfaz en ShogiBoard (tipografía nítida + clics multi-turno)
-	var board_scene := load("res://shogi_board.tscn")
+	var board_scene = load("res://shogi_board.tscn")
 	var shogi_ui: Node2D = board_scene.instantiate()
 	shogi_ui._ready()
 
@@ -68,8 +68,8 @@ func _initialize() -> void:
 			and west_lbl.position.y + west_lbl.size.y <= kanji_lbl.position.y
 	])
 
-	var make_click := func(row: int, col: int) -> void:
-		var press := InputEventMouseButton.new()
+	var make_click = func(row: int, col: int) -> void:
+		var press: InputEventMouseButton = InputEventMouseButton.new()
 		press.button_index = MOUSE_BUTTON_LEFT
 		press.pressed = true
 		press.position = Vector2(
@@ -77,7 +77,7 @@ func _initialize() -> void:
 			shogi_ui.BOARD_ORIGIN_Y + row * shogi_ui.CELL_SIZE + shogi_ui.CELL_SIZE * 0.5
 		)
 		shogi_ui._input(press)
-		var release := InputEventMouseButton.new()
+		var release: InputEventMouseButton = InputEventMouseButton.new()
 		release.button_index = MOUSE_BUTTON_LEFT
 		release.pressed = false
 		release.position = press.position
@@ -101,7 +101,7 @@ func _initialize() -> void:
 
 	shogi_ui.free()
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

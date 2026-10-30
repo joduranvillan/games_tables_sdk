@@ -40,7 +40,7 @@ func is_online_enabled() -> bool:
 
 func load_or_init_identity(config_path: String = IDENTITY_CONFIG_PATH) -> void:
 	var cfg := ConfigFile.new()
-	var err := cfg.load(config_path)
+	var err = cfg.load(config_path)
 	if err == OK:
 		device_id = str(cfg.get_value(IDENTITY_SECTION, "device_id", "")).strip_edges()
 		token = str(cfg.get_value(IDENTITY_SECTION, "token", "")).strip_edges()
@@ -88,7 +88,7 @@ static func is_valid_uuid_v4(candidate: String) -> bool:
 	var clean := candidate.strip_edges().to_lower()
 	if clean.length() != 36:
 		return false
-	var parts := clean.split("-")
+	var parts: String = clean.split("-")
 	if parts.size() != 5:
 		return false
 	if parts[0].length() != 8 or parts[1].length() != 4 or parts[2].length() != 4 or parts[3].length() != 4 or parts[4].length() != 12:
@@ -177,9 +177,9 @@ func _on_guest_auth_request_completed(result: int, response_code: int, _headers:
 		apply_guest_auth_response(parsed)
 
 func apply_guest_auth_response(data: Dictionary, config_path: String = IDENTITY_CONFIG_PATH) -> bool:
-	var new_token := str(data.get("token", "")).strip_edges()
-	var new_player_id := str(data.get("player_id", "")).strip_edges()
-	var new_expires_at := int(data.get("expires_at", 0))
+	var new_token: String = str(data.get("token", "")).strip_edges()
+	var new_player_id: String = str(data.get("player_id", "")).strip_edges()
+	var new_expires_at: int = int(data.get("expires_at", 0))
 	if new_token.is_empty() or not new_player_id.begins_with("guest_") or new_expires_at <= 0:
 		return false
 

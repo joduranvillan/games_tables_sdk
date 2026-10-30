@@ -184,8 +184,8 @@ func _draw_bracket() -> void:
 			bracket_canvas.draw_rect(rect, Color(0.15, 0.20, 0.28, 0.95), true)
 			bracket_canvas.draw_rect(rect, Color(0.4, 0.65, 0.95, 0.9), false, 2.0)
 
-			var p1 := str(match_data.get("player1", "TBD"))
-			var p2 := str(match_data.get("player2", "TBD"))
+			var p1: String = str(match_data.get("player1", "TBD"))
+			var p2: String = str(match_data.get("player2", "TBD"))
 			if font != null:
 				bracket_canvas.draw_string(font, Vector2(x + 10, center_y - 4), p1, HORIZONTAL_ALIGNMENT_LEFT, box_w - 20, 13, Color.WHITE)
 				bracket_canvas.draw_string(font, Vector2(x + 10, center_y + 16), p2, HORIZONTAL_ALIGNMENT_LEFT, box_w - 20, 13, Color(0.8, 0.9, 1.0))

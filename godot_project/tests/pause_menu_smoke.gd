@@ -17,7 +17,7 @@ func _initialize() -> void:
 
 	# 2. Verificar TurnTimerHud (barra regresiva, MM:SS, alerta visual <= 10s, pulso de AudioManager y adjudicación en 00:00)
 	var timer_hud: TurnTimerHud = TurnTimerHudScript.new()
-	var am := AudioManagerScript.new()
+	var am = AudioManagerScript.new()
 	root.add_child(am)
 	timer_hud.audio_manager_ref = am
 	timer_hud.timer_enabled = true
@@ -34,7 +34,7 @@ func _initialize() -> void:
 	assert(am.last_played_sfx == "timer_tick", "AudioManager debe reproducir pulso sonoro suave (timer_tick) en los últimos 10s")
 
 	# Avanzar los 9 segundos restantes -> 00:00 y adjudicación al rival (Jugador 2)
-	var state := {
+	var state: Dictionary = {
 		"timeout_winner": -1,
 		"resigned_winner": -1,
 		"draw_ok": false,

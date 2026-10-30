@@ -309,11 +309,11 @@ func load_replay_data(bytes: PackedByteArray, type_str: String) -> void:
 func _format_move_entry(index: int, entry: Variant) -> String:
 	if entry is Array and entry.size() >= 3 and entry[2] is Dictionary:
 		var cmd: Dictionary = entry[2]
-		var ctype := str(cmd.get("command_type", " Jugada"))
-		var player := int(cmd.get("player", 0))
+		var ctype: String = str(cmd.get("command_type", " Jugada"))
+		var player: int = int(cmd.get("player", 0))
 		return "#%d (J%d): %s" % [index + 1, player, ctype]
 	elif entry is Dictionary:
-		var ctype := str(entry.get("command_type", "Jugada"))
+		var ctype: String = str(entry.get("command_type", "Jugada"))
 		return "#%d: %s" % [index + 1, ctype]
 	return "Turno #%d" % (index + 1)
 
@@ -499,7 +499,7 @@ func import_otr_replay(path: String) -> bool:
 	var ok: bool = bool(save_mgr.call("import_replay_file", path))
 	if ok:
 		var imported_data: Dictionary = save_mgr.get("last_imported_replay")
-		var imported_game_id := str(imported_data.get("game_id", game_type))
+		var imported_game_id: String = str(imported_data.get("game_id", game_type))
 		var imported_names: Array = imported_data.get("player_names", [])
 		player_names.clear()
 		for n in imported_names:

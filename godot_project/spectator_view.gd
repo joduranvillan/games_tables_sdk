@@ -152,7 +152,7 @@ func receive_relay_message(raw_json: String) -> bool:
 		return false
 
 	var msg: Dictionary = parsed
-	var op := str(msg.get("op", ""))
+	var op: String = str(msg.get("op", ""))
 	match op:
 		"spectating":
 			is_relay_spectator = true
@@ -165,11 +165,11 @@ func receive_relay_message(raw_json: String) -> bool:
 			return true
 		"relay":
 			var event_data = msg.get("data", null)
-			var from_pid := int(msg.get("from", 0))
+			var from_pid: int = int(msg.get("from", 0))
 			apply_relay_event(event_data, from_pid)
 			return true
 		"error":
-			var reason := str(msg.get("reason", msg.get("message", "unknown_error")))
+			var reason: String = str(msg.get("reason", msg.get("message", "unknown_error")))
 			last_error_reason = reason
 			if _status_label != null:
 				if reason == "spectator_limit":

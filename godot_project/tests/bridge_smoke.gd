@@ -55,7 +55,7 @@ func _initialize() -> void:
 	var step_end: bool = replay_bridge.step_replay()
 	results.append(["step_replay retorna false al terminar", not step_end])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

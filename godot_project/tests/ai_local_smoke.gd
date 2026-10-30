@@ -67,8 +67,8 @@ func _initialize() -> void:
 	# 3. TEST GO (9x9) VS IA
 	# =========================================================================
 	# --- Go vs IA ---
-	var bridge_go := OpenTableBridge.new()
-	var ok_go := bridge_go.start_local_match_go_vs_ai(1, 2, 9)
+	var bridge_go = OpenTableBridge.new()
+	var ok_go = bridge_go.start_local_match_go_vs_ai(1, 2, 9)
 	results.append(["Go vs IA: start_local_match_go_vs_ai inició correctamente", ok_go])
 	# Jugador 1 (humano) coloca primera piedra en (2, 2) para que la IA (P2) responda
 	bridge_go.send_command_json(1, JSON.stringify({
@@ -94,8 +94,8 @@ func _initialize() -> void:
 	# 4. TEST LUDO VS IA
 	# =========================================================================
 	# --- Ludo vs IA ---
-	var bridge_ludo := OpenTableBridge.new()
-	var ok_ludo := bridge_ludo.start_local_match_ludo_vs_ai(1, 2)
+	var bridge_ludo = OpenTableBridge.new()
+	var ok_ludo = bridge_ludo.start_local_match_ludo_vs_ai(1, 2)
 	results.append(["Ludo vs IA: start_local_match_ludo_vs_ai inició correctamente", ok_ludo])
 	# Ludo necesita un RollDice antes de que la IA actúe
 	bridge_ludo.send_command_json(1, JSON.stringify({"command_type": "ludo_game::RollDiceCommand", "player": 1}))
@@ -108,7 +108,7 @@ func _initialize() -> void:
 	# =========================================================================
 	# EVALUACIÓN DE RESULTADOS
 	# =========================================================================
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

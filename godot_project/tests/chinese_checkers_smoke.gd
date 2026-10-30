@@ -95,7 +95,7 @@ func _initialize() -> void:
 		bridge.start_local_match_chinese_checkers_n_players(2)
 		results.append(["start_local_match_chinese_checkers_n_players(2) inicializa sesión de 2 jugadores", bridge.current_player() == 1])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

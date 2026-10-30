@@ -124,7 +124,7 @@ func _ready() -> void:
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
 		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
-			var hud_script := load("res://network_status_hud.gd")
+			var hud_script = load("res://network_status_hud.gd")
 			if hud_script:
 				var hud: Node = hud_script.new()
 				if hud.has_method("setup"):
@@ -753,8 +753,8 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var raw_type := str(event.get("command_type", event.get("event_type", "")))
-			var event_type := raw_type.split("::")[-1]
+			var raw_type: String = str(event.get("command_type", event.get("event_type", "")))
+			var event_type: String = raw_type.split("::")[-1]
 			if event_type == "PieceMovedEvent":
 				var from = event.get("from", [0, 0])
 				var to = event.get("to", [0, 0])

@@ -6,7 +6,7 @@ func _initialize() -> void:
 	var results: Array = []
 	var events_received: Array = []
 	var move_rejected_reasons: Array = []
-	var tracked := {"p1_distance": 0}
+	var tracked: Dictionary = {"p1_distance": 0}
 
 	var bridge = OpenTableBridge.new()
 
@@ -71,7 +71,7 @@ func _initialize() -> void:
 
 	results.append(["5 rondas jugadas y bridge.get_distance(1) incrementa correctamente a %d km" % total_expected, distance_increments_ok])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

@@ -63,7 +63,7 @@ func _initialize() -> void:
 
 	# 4. Verificar integración con host_lobby.gd y unión en 1 clic a <ip_origen>:<port>
 	var lobby = HostLobbyScript.new()
-	var mock_bridge := MockLanBridge.new()
+	var mock_bridge = MockLanBridge.new()
 	lobby.bridge = mock_bridge
 	lobby._setup_ui()
 	lobby._on_lan_rooms_updated([

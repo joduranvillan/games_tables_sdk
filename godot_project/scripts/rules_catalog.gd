@@ -662,15 +662,15 @@ static func format_bbcode(game_id: String, locale: String = "es") -> String:
 	var data := get_rules(game_id, locale)
 	var lines := PackedStringArray()
 	lines.append("[b][font_size=18]%s[/font_size][/b]" % String(data.get("title", "")))
-	var summary := String(data.get("summary", ""))
+	var summary: String = String(data.get("summary", ""))
 	if not summary.is_empty():
 		lines.append("[i][color=#B8C7E0]%s[/color][/i]" % summary)
 	lines.append("")
 	var sections: Array = data.get("sections", [])
 	for sec in sections:
 		if typeof(sec) == TYPE_DICTIONARY:
-			var heading := String(sec.get("heading", ""))
-			var body := String(sec.get("body", ""))
+			var heading: String = String(sec.get("heading", ""))
+			var body: String = String(sec.get("body", ""))
 			lines.append("[b][color=#F5D061]%s[/color][/b]" % heading)
 			lines.append(body)
 			lines.append("")

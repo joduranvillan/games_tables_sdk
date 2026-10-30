@@ -25,7 +25,7 @@ func _initialize() -> void:
 	# 4. Crear ReplayViewer y cargar datos
 	var viewer = load("res://replay_viewer.gd").new()
 	root.add_child(viewer)
-	var move_events := {"count": 0}
+	var move_events: Dictionary = {"count": 0}
 
 	# Escuchar los eventos de movimiento del bridge de ReplayViewer
 	viewer.load_replay_data(log_bytes, "checkers")
@@ -66,7 +66,7 @@ func _initialize() -> void:
 	results.append(["Panel lateral contiene las 3 jugadas con scroll automático", viewer.move_row_nodes.size() == 3])
 	results.append(["ReplayViewer incluye botón 'Importar Replay' y FileDialog *.otr", viewer.btn_import_replay != null and viewer.import_otr_dialog != null])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		var status = "PASS" if r[1] else "FAIL"
 		print("%s  %s" % [status, r[0]])

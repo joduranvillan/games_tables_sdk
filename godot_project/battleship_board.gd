@@ -56,6 +56,9 @@ var phase_label: Label
 var rotate_btn: Button
 var auto_fleet_btn: Button
 var clear_fleet_btn: Button
+var extra_turn_check: CheckBox = null
+var rematch_btn: Button = null
+var extra_turn_on_hit_enabled: bool = false
 var btn_rules: Button
 var ships_container: Control
 var ship_sprites_container: Node2D
@@ -345,6 +348,22 @@ func _setup_ui() -> void:
 	clear_fleet_btn.pressed.connect(_on_clear_fleet_pressed)
 	controls_flow.add_child(clear_fleet_btn)
 
+	extra_turn_check = CheckBox.new()
+	extra_turn_check.name = "ExtraTurnCheckBox"
+	extra_turn_check.text = "🔥 Racha al impactar"
+	extra_turn_check.tooltip_text = "Si aciertas un disparo, conservas el turno para volver a disparar"
+	extra_turn_check.button_pressed = extra_turn_on_hit_enabled
+	extra_turn_check.toggled.connect(_on_extra_turn_toggled)
+	controls_flow.add_child(extra_turn_check)
+
+	rematch_btn = Button.new()
+	rematch_btn.name = "RematchButton"
+	rematch_btn.text = "🔁 Revancha"
+	rematch_btn.tooltip_text = "Iniciar una revancha rápida manteniendo el modo actual"
+	rematch_btn.custom_minimum_size = Vector2(110, 34)
+	rematch_btn.pressed.connect(_on_rematch_pressed)
+	controls_flow.add_child(rematch_btn)
+
 	# Two Grids Container (Horizontal on Desktop/Landscape, Vertical on Mobile/Portrait)
 	grids_container = BoxContainer.new()
 	grids_container.name = "GridsContainer"
@@ -571,6 +590,40 @@ func _on_clear_fleet_pressed() -> void:
 	target_ships.clear()
 	current_ship_index = 0
 	_last_move_rejected = false
+	_update_status()
+	_update_grid_ui()
+	queue_redraw()
+
+func _on_extra_turn_toggled(toggled_on: bool) -> void:
+	extra_turn_on_hit_enabled = toggled_on
+	if bridge != null:
+		var cmd: Dictionary = {
+			"command_type": "SetBattleshipRulesCommand",
+			"extra_turn_on_hit": toggled_on
+		}
+		bridge.send_command_json(current, JSON.stringify(cmd))
+	_update_status()
+
+func _on_rematch_pressed() -> void:
+	if bridge != null:
+		var cmd: Dictionary = {
+			"command_type": "RematchCommand",
+			"player": P1
+		}
+		bridge.send_command_json(P1, JSON.stringify(cmd))
+	winner = -1
+	phase = Phase.PLACEMENT_P1
+	current = P1
+	current_ship_index = 0
+	p1_ships.clear()
+	p2_ships.clear()
+	_init_grids()
+	if extra_turn_on_hit_enabled and bridge != null:
+		var rules_cmd: Dictionary = {
+			"command_type": "SetBattleshipRulesCommand",
+			"extra_turn_on_hit": extra_turn_on_hit_enabled
+		}
+		bridge.send_command_json(P1, JSON.stringify(rules_cmd))
 	_update_status()
 	_update_grid_ui()
 	queue_redraw()

@@ -58,7 +58,7 @@ func _initialize() -> void:
 	results.append(["game_a recibió 2do movimiento", game1_moves.size() == 2])
 	results.append(["game_b mantiene 1 movimiento", game2_moves.size() == 1])
 
-	var all_ok := true
+	var all_ok: bool = true
 	for r in results:
 		var passed: bool = r[1]
 		print(("PASS  " if passed else "FAIL  ") + r[0])
@@ -71,7 +71,7 @@ func _initialize() -> void:
 		print("❌ TEST MULTI_SESSION FALLÓ")
 
 	# --- Verificar que start_hosting y connect_to_host son métodos disponibles ---
-	var bridge_host := OpenTableBridge.new()
+	var bridge_host = OpenTableBridge.new()
 	assert(bridge_host.has_method("start_hosting"), "Bridge debe tener start_hosting")
 	assert(bridge_host.has_method("connect_to_host"), "Bridge debe tener connect_to_host")
 	bridge_host.free()

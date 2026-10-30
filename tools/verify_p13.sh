@@ -26,7 +26,10 @@ for doc in chess checkers go shogi xiangqi chinese_checkers backgammon battleshi
   test -f "docs/games/${doc}.md"
 done
 
-echo "=== 4. Ejecutando todos los smoke tests de Godot/Redot headless ==="
+echo "=== 4. Verificando cumplimiento Redot strict en los 5 tableros pendientes y canonical_rules_ui_smoke.gd ==="
+bash tools/run_godot_tests.sh canonical_rules_ui_smoke.gd
+
+echo "=== 5. Ejecutando todos los smoke tests de Godot/Redot headless ==="
 bash tools/run_godot_tests.sh
 
-echo "ALL PROMPTS13 CHECKS PASSED — 13/13 Games Complete Canonical Rules Verified!"
+echo "ALL PROMPTS13 CHECKS PASSED — 13/13 Games Complete Canonical Rules & Redot Strict Verified!"

@@ -65,6 +65,9 @@ var current_theme: BoardTheme
 var network_hud: NetworkStatusHUD
 var _rules_popup: RulesPopup
 var _pause_menu: CanvasLayer
+var promotion_dialog_panel: PanelContainer = null
+var auto_promote_choice: bool = true
+var _pending_shogi_move: Dictionary = {}
 
 @onready var status: Label = get_node_or_null("Status")
 
@@ -89,7 +92,7 @@ func _ready() -> void:
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
 		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
-			var hud_script := load("res://network_status_hud.gd")
+			var hud_script = load("res://network_status_hud.gd")
 			if hud_script:
 				var hud: Node = hud_script.new()
 				if hud.has_method("setup"):
@@ -121,7 +124,7 @@ func _ready() -> void:
 	_request_board_redraw()
 
 	# --- Botón de reglas ---
-	var btn_rules := Button.new()
+	var btn_rules: Button = Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.position = Vector2(820, 230)
@@ -188,7 +191,7 @@ func _ensure_board_containers() -> void:
 		add_child(board_overlay)
 
 func _setup_ui() -> void:
-	var side_x := 660.0
+	var side_x: float = 660.0
 	if status == null:
 		status = get_node_or_null("Status")
 	if status == null:
@@ -258,13 +261,55 @@ func _setup_ui() -> void:
 	add_child(turn_indicator)
 
 	# Botón Tutorial Interactivo de Shogi (5 pasos)
-	var tutorial_btn := Button.new()
+	var tutorial_btn: Button = Button.new()
 	tutorial_btn.name = "ShogiTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
 	tutorial_btn.position = Vector2(side_x, 230)
 	tutorial_btn.custom_minimum_size = Vector2(145, 36)
 	tutorial_btn.pressed.connect(start_shogi_tutorial)
 	add_child(tutorial_btn)
+
+	# Diálogo Modal Estilizado de Promoción Opcional FESA (PromotionDialogPanel)
+	promotion_dialog_panel = PanelContainer.new()
+	promotion_dialog_panel.name = "PromotionDialogPanel"
+	promotion_dialog_panel.position = Vector2(125, 225)
+	promotion_dialog_panel.z_index = 25
+	promotion_dialog_panel.visible = false
+	var shogi_promo_style: StyleBoxFlat = StyleBoxFlat.new()
+	shogi_promo_style.bg_color = Color(0.11, 0.13, 0.18, 0.96)
+	shogi_promo_style.border_color = Color(0.92, 0.76, 0.28, 0.95)
+	shogi_promo_style.set_border_width_all(2)
+	shogi_promo_style.set_corner_radius_all(10)
+	shogi_promo_style.content_margin_left = 16
+	shogi_promo_style.content_margin_right = 16
+	shogi_promo_style.content_margin_top = 12
+	shogi_promo_style.content_margin_bottom = 12
+	promotion_dialog_panel.add_theme_stylebox_override("panel", shogi_promo_style)
+	var promo_vb: VBoxContainer = VBoxContainer.new()
+	promo_vb.add_theme_constant_override("separation", 10)
+	var promo_lbl: Label = Label.new()
+	promo_lbl.text = "⛩️ ¿Promocionar pieza (Nari / 成)? (Teclas 1–2)"
+	promo_lbl.add_theme_font_size_override("font_size", 17)
+	promo_lbl.add_theme_color_override("font_color", Color(0.98, 0.90, 0.55))
+	promo_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	promo_vb.add_child(promo_lbl)
+	var promo_hb: HBoxContainer = HBoxContainer.new()
+	promo_hb.add_theme_constant_override("separation", 12)
+	var btn_yes: Button = Button.new()
+	btn_yes.name = "PromoteYesButton"
+	btn_yes.text = "[1] ⬆️ Promocionar"
+	btn_yes.custom_minimum_size = Vector2(155, 42)
+	btn_yes.pressed.connect(func(): set_promotion_choice(true))
+	promo_hb.add_child(btn_yes)
+	var btn_no: Button = Button.new()
+	btn_no.name = "PromoteNoButton"
+	btn_no.text = "[2] ➡️ No promocionar"
+	btn_no.custom_minimum_size = Vector2(165, 42)
+	btn_no.pressed.connect(func(): set_promotion_choice(false))
+	promo_hb.add_child(btn_no)
+	promo_vb.add_child(promo_hb)
+	promotion_dialog_panel.add_child(promo_vb)
+	add_child(promotion_dialog_panel)
 
 	_setup_hand_panels()
 
@@ -282,13 +327,13 @@ func _setup_hand_panels() -> void:
 	add_child(_hand_p2)
 
 func _update_hand_display(player: int, pieces: Array) -> void:
-	var panel := _hand_p1 if player == 1 else _hand_p2
+	var panel: bool = _hand_p1 if player == 1 else _hand_p2
 	if panel == null:
 		return
 	for child in panel.get_children():
 		child.queue_free()
 	for piece_name in pieces:
-		var lbl := Label.new()
+		var lbl: Label = Label.new()
 		lbl.text = tr(str(piece_name))  # nombre de pieza en idioma activo via tr()
 		panel.add_child(lbl)
 
@@ -426,9 +471,9 @@ func _create_pentagon_piece_node(player: int, kind: String) -> Control:
 	piece_ctrl.add_child(border_line)
 
 	# Promoted pieces display traditional vermilion/red ink; standard pieces use deep sumi ink
-	var is_prom := _is_promoted(kind)
-	var primary_col := Color(0.76, 0.10, 0.08) if is_prom else Color(0.08, 0.06, 0.04)
-	var secondary_col := Color(0.76, 0.10, 0.08, 0.88) if is_prom else Color(0.20, 0.15, 0.10, 0.88)
+	var is_prom = _is_promoted(kind)
+	var primary_col: Color = Color(0.76, 0.10, 0.08) if is_prom else Color(0.08, 0.06, 0.04)
+	var secondary_col: Color = Color(0.76, 0.10, 0.08, 0.88) if is_prom else Color(0.20, 0.15, 0.10, 0.88)
 
 	# Primary glyph: Large Western letter (K, R, B, G, S, N, L, P, +R, +B, +S, +N, +L, +P)
 	var abbr = Label.new()
@@ -481,21 +526,29 @@ func _event_to_board_pos(event_pos: Vector2, is_mouse: bool = true) -> Vector2:
 func _input(event: InputEvent) -> void:
 	if winner != -1:
 		return
+	if promotion_dialog_panel != null and promotion_dialog_panel.visible and event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_1, KEY_KP_1, KEY_Y:
+				set_promotion_choice(true)
+				return
+			KEY_2, KEY_KP_2, KEY_N:
+				set_promotion_choice(false)
+				return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		var local_pos := _event_to_board_pos(event.position, true)
+		var local_pos: Vector2 = _event_to_board_pos(event.position, true)
 		_handle_unified_input(local_pos, event.pressed, not event.pressed)
 	elif event is InputEventScreenTouch:
-		var local_pos := _event_to_board_pos(event.position, false)
+		var local_pos: Vector2 = _event_to_board_pos(event.position, false)
 		_handle_unified_input(local_pos, event.pressed, not event.pressed)
 
 func _handle_unified_input(pos: Vector2, is_press: bool, is_release: bool) -> void:
-	var board_x := pos.x - BOARD_ORIGIN_X
-	var board_y := pos.y - BOARD_ORIGIN_Y
+	var board_x = pos.x - BOARD_ORIGIN_X
+	var board_y = pos.y - BOARD_ORIGIN_Y
 	if board_x < 0.0 or board_x >= BOARD_SIZE * CELL_SIZE or board_y < 0.0 or board_y >= BOARD_SIZE * CELL_SIZE:
 		return
 
-	var col := int(board_x / CELL_SIZE)
-	var row := int(board_y / CELL_SIZE)
+	var col: int = int(board_x / CELL_SIZE)
+	var row: int = int(board_y / CELL_SIZE)
 	if row < 0 or row >= BOARD_SIZE or col < 0 or col >= BOARD_SIZE:
 		return
 
@@ -523,7 +576,7 @@ func _calculate_valid_shogi_moves(r: int, c: int) -> Array:
 				if f is Array and f.size() >= 2 and t is Array and t.size() >= 2:
 					# En Rust shogi_game, from/to son [col, row]
 					if int(f[0]) == c and int(f[1]) == r:
-						var dest := Vector2i(int(t[1]), int(t[0]))
+						var dest: Vector2i = Vector2i(int(t[1]), int(t[0]))
 						if not dest in moves:
 							moves.append(dest)
 		return moves
@@ -550,7 +603,7 @@ func _calculate_valid_drops() -> Array:
 				if str(m.get("piece", "")) == selected_hand_piece:
 					var t = m["to"]
 					if t is Array and t.size() >= 2:
-						var dest := Vector2i(int(t[1]), int(t[0]))
+						var dest: Vector2i = Vector2i(int(t[1]), int(t[0]))
 						if not dest in drops:
 							drops.append(dest)
 		if not drops.is_empty():
@@ -626,7 +679,7 @@ func _handle_board_click(row: int, col: int) -> void:
 			return
 
 		# If valid_moves is populated by the bridge, ignore clicks on squares that aren't legal destinations
-		var dest_vec := Vector2i(row, col)
+		var dest_vec: Vector2i = Vector2i(row, col)
 		if bridge != null and not valid_moves.is_empty() and not (dest_vec in valid_moves):
 			return
 			
@@ -636,24 +689,61 @@ func _handle_board_click(row: int, col: int) -> void:
 		_request_board_redraw()
 		
 		var moving_piece = board[from_pos.x][from_pos.y]
-		var should_promote := false
+		var should_promote: bool = false
 		if moving_piece != null:
 			var p_kind: String = str(moving_piece.get("kind", ""))
-			if p_kind in ["Pawn", "Lance", "Knight", "Silver", "Bishop", "Rook"]:
-				if current == P_SENTE and (row <= 2 or from_pos.x <= 2):
-					should_promote = true
-				elif current == P_GOTE and (row >= 6 or from_pos.x >= 6):
-					should_promote = true
+			if _is_promotion_mandatory_fesa(p_kind, row, current):
+				should_promote = true
+			elif _can_piece_promote(p_kind, from_pos.x, row, current):
+				if not OS.has_feature("headless") and promotion_dialog_panel != null:
+					_pending_shogi_move = {
+						"from_r": from_pos.x,
+						"from_c": from_pos.y,
+						"to_r": row,
+						"to_c": col
+					}
+					promotion_dialog_panel.visible = true
+					return
+				should_promote = auto_promote_choice
 
-		var cmd = {
-			"command_type": "shogi_game::MovePieceCommand",
-			"player": current,
-			"from": [from_pos.y, from_pos.x],
-			"to": [col, row],
-			"promote": should_promote
-		}
-		if bridge != null:
-			bridge.send_command_json(current, JSON.stringify(cmd))
+		_dispatch_shogi_move(from_pos.x, from_pos.y, row, col, should_promote)
+
+func set_promotion_choice(promote: bool) -> void:
+	auto_promote_choice = promote
+	if promotion_dialog_panel != null:
+		promotion_dialog_panel.visible = false
+	if not _pending_shogi_move.is_empty():
+		var f_r: int = int(_pending_shogi_move.get("from_r", 0))
+		var f_c: int = int(_pending_shogi_move.get("from_c", 0))
+		var t_r: int = int(_pending_shogi_move.get("to_r", 0))
+		var t_c: int = int(_pending_shogi_move.get("to_c", 0))
+		_pending_shogi_move.clear()
+		_dispatch_shogi_move(f_r, f_c, t_r, t_c, promote)
+
+func _is_promotion_mandatory_fesa(kind: String, to_row: int, player: int) -> bool:
+	if kind in ["Pawn", "Lance"]:
+		return (player == P_SENTE and to_row == 0) or (player == P_GOTE and to_row == BOARD_SIZE - 1)
+	if kind == "Knight":
+		return (player == P_SENTE and to_row <= 1) or (player == P_GOTE and to_row >= BOARD_SIZE - 2)
+	return false
+
+func _can_piece_promote(kind: String, from_row: int, to_row: int, player: int) -> bool:
+	if not (kind in ["Pawn", "Lance", "Knight", "Silver", "Bishop", "Rook"]):
+		return false
+	if player == P_SENTE:
+		return from_row <= 2 or to_row <= 2
+	return from_row >= 6 or to_row >= 6
+
+func _dispatch_shogi_move(from_r: int, from_c: int, to_r: int, to_c: int, should_promote: bool) -> void:
+	var cmd = {
+		"command_type": "shogi_game::MovePieceCommand",
+		"player": current,
+		"from": [from_c, from_r],
+		"to": [to_c, to_r],
+		"promote": should_promote
+	}
+	if bridge != null:
+		bridge.send_command_json(current, JSON.stringify(cmd))
 
 func _update_hand_panels() -> void:
 	if sente_hand_panel != null:
@@ -739,8 +829,8 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var raw_type := str(event.get("command_type", event.get("event_type", "")))
-			var event_type := raw_type.split("::")[-1]
+			var raw_type: String = str(event.get("command_type", event.get("event_type", "")))
+			var event_type: String = raw_type.split("::")[-1]
 			if event_type == "PieceMovedEvent":
 				var from = event.get("from", [0, 0])
 				var to = event.get("to", [0, 0])
@@ -805,9 +895,9 @@ func _on_event_json(json_str: String) -> void:
 					else:
 						piece_nodes[to_r][to_c] = node
 						if node != null:
-							var target_pos := Vector2(BOARD_ORIGIN_X + to_c * CELL_SIZE + 3, BOARD_ORIGIN_Y + to_r * CELL_SIZE + 3)
+							var target_pos: Vector2 = Vector2(BOARD_ORIGIN_X + to_c * CELL_SIZE + 3, BOARD_ORIGIN_Y + to_r * CELL_SIZE + 3)
 							if is_inside_tree() and not OS.has_feature("headless"):
-								var tw := create_tween()
+								var tw: Tween = create_tween()
 								tw.tween_property(node, "position", target_pos, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 							else:
 								node.position = target_pos
@@ -859,24 +949,24 @@ func _on_move_rejected(reason: String) -> void:
 		get_node("/root/AudioManager").play_error_buzz()
 
 func _draw() -> void:
-	var board_px := BOARD_SIZE * CELL_SIZE
+	var board_px: float = BOARD_SIZE * CELL_SIZE
 	var bg_col: Color = current_theme.board_color if current_theme != null else COL_BOARD
 	var line_col: Color = current_theme.line_color if current_theme != null else COL_LINE
 
 	# Outer wooden frame & warm Kaya Shogiban surface
-	var outer_rect := Rect2(BOARD_ORIGIN_X - 8.0, BOARD_ORIGIN_Y - 8.0, board_px + 16.0, board_px + 16.0)
+	var outer_rect: Rect2 = Rect2(BOARD_ORIGIN_X - 8.0, BOARD_ORIGIN_Y - 8.0, board_px + 16.0, board_px + 16.0)
 	draw_rect(outer_rect, COL_BOARD_FRAME, true)
 	draw_rect(outer_rect, Color(0.16, 0.09, 0.04), false, 2.0)
 
-	var b_rect := Rect2(BOARD_ORIGIN_X, BOARD_ORIGIN_Y, board_px, board_px)
+	var b_rect: Rect2 = Rect2(BOARD_ORIGIN_X, BOARD_ORIGIN_Y, board_px, board_px)
 	draw_rect(b_rect, bg_col, true)
 
 	# Continuous 2.0px grid lines (never culled at scaled viewport resolutions)
 	for i in range(BOARD_SIZE + 1):
-		var offset := float(i) * CELL_SIZE
-		var x := BOARD_ORIGIN_X + offset
-		var y := BOARD_ORIGIN_Y + offset
-		var w_line := 2.5 if (i == 0 or i == BOARD_SIZE) else 2.0
+		var offset: float = float(i) * CELL_SIZE
+		var x = BOARD_ORIGIN_X + offset
+		var y = BOARD_ORIGIN_Y + offset
+		var w_line: bool = 2.5 if (i == 0 or i == BOARD_SIZE) else 2.0
 		draw_line(Vector2(x, BOARD_ORIGIN_Y), Vector2(x, BOARD_ORIGIN_Y + board_px), line_col, w_line)
 		draw_line(Vector2(BOARD_ORIGIN_X, y), Vector2(BOARD_ORIGIN_X + board_px, y), line_col, w_line)
 
@@ -892,19 +982,19 @@ func _draw_board_overlay() -> void:
 	if board_overlay == null:
 		return
 	if last_move_from != null:
-		var from_rect := Rect2(BOARD_ORIGIN_X + last_move_from.y * CELL_SIZE + 1.0, BOARD_ORIGIN_Y + last_move_from.x * CELL_SIZE + 1.0, CELL_SIZE - 2.0, CELL_SIZE - 2.0)
+		var from_rect: Rect2 = Rect2(BOARD_ORIGIN_X + last_move_from.y * CELL_SIZE + 1.0, BOARD_ORIGIN_Y + last_move_from.x * CELL_SIZE + 1.0, CELL_SIZE - 2.0, CELL_SIZE - 2.0)
 		board_overlay.draw_rect(from_rect, COL_LAST_MOVE, true)
 	if last_move_to != null:
-		var to_rect := Rect2(BOARD_ORIGIN_X + last_move_to.y * CELL_SIZE + 1.0, BOARD_ORIGIN_Y + last_move_to.x * CELL_SIZE + 1.0, CELL_SIZE - 2.0, CELL_SIZE - 2.0)
+		var to_rect: Rect2 = Rect2(BOARD_ORIGIN_X + last_move_to.y * CELL_SIZE + 1.0, BOARD_ORIGIN_Y + last_move_to.x * CELL_SIZE + 1.0, CELL_SIZE - 2.0, CELL_SIZE - 2.0)
 		board_overlay.draw_rect(to_rect, COL_LAST_MOVE, true)
 
 	if selected_board_pos != null:
-		var sel_rect := Rect2(BOARD_ORIGIN_X + selected_board_pos.y * CELL_SIZE + 1.0, BOARD_ORIGIN_Y + selected_board_pos.x * CELL_SIZE + 1.0, CELL_SIZE - 2.0, CELL_SIZE - 2.0)
+		var sel_rect: Rect2 = Rect2(BOARD_ORIGIN_X + selected_board_pos.y * CELL_SIZE + 1.0, BOARD_ORIGIN_Y + selected_board_pos.x * CELL_SIZE + 1.0, CELL_SIZE - 2.0, CELL_SIZE - 2.0)
 		board_overlay.draw_rect(sel_rect, COL_SELECT, true)
 		board_overlay.draw_rect(sel_rect, Color(1.0, 0.92, 0.35, 0.95), false, 2.5)
 
 	for pos in valid_moves:
-		var center := Vector2(BOARD_ORIGIN_X + pos.y * CELL_SIZE + CELL_SIZE * 0.5, BOARD_ORIGIN_Y + pos.x * CELL_SIZE + CELL_SIZE * 0.5)
+		var center: Vector2 = Vector2(BOARD_ORIGIN_X + pos.y * CELL_SIZE + CELL_SIZE * 0.5, BOARD_ORIGIN_Y + pos.x * CELL_SIZE + CELL_SIZE * 0.5)
 		var target_cell = board[pos.x][pos.y] if (pos.x >= 0 and pos.x < board.size() and pos.y >= 0 and pos.y < board[pos.x].size()) else null
 		if target_cell != null:
 			# Capture target ring
@@ -942,7 +1032,7 @@ func _sfx_piece_place() -> void:
 func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
 	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place(2.0)
-	var particles := CPUParticles2D.new()
+	var particles: CPUParticles2D = CPUParticles2D.new()
 	particles.position = world_pos
 	particles.emitting = true
 	particles.one_shot = true

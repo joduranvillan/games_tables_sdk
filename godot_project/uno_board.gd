@@ -171,7 +171,7 @@ func _ready() -> void:
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
 		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
-			var hud_script := load("res://network_status_hud.gd")
+			var hud_script = load("res://network_status_hud.gd")
 			if hud_script:
 				var hud: Node = hud_script.new()
 				if hud.has_method("setup"):
@@ -856,7 +856,7 @@ func _init_default_game_state() -> void:
 	is_clockwise = true
 
 func _normalize_card_dict(raw_card: Dictionary) -> Dictionary:
-	var col_str := str(raw_card.get("color", "Red"))
+	var col_str: String = str(raw_card.get("color", "Red"))
 	if col_str == "WildColor":
 		col_str = "Wild"
 	var raw_val = raw_card.get("value", "0")

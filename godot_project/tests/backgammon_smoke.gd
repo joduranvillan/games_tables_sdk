@@ -79,7 +79,7 @@ func _initialize() -> void:
 	var started_ai = bridge.start_local_match_backgammon_vs_ai(1, 2)
 	results.append(["start_local_match_backgammon_vs_ai inicia correctamente", started_ai == true])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

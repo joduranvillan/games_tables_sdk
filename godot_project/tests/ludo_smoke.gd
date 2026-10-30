@@ -93,7 +93,7 @@ func _initialize() -> void:
 
 		board.free()
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

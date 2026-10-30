@@ -15,7 +15,7 @@ const PORT: int = 19877
 func _initialize() -> void:
 	var results: Array = []
 	var events_client: Array = []
-	var hs := {"player_id": 2, "token": ""}
+	var hs: Dictionary = {"player_id": 2, "token": ""}
 
 	# 1. Arrancar host TCP en puerto 19877
 	var host = OpenTableBridge.new()
@@ -90,7 +90,7 @@ func _initialize() -> void:
 	var player_consistent = (client2_current == host_current)
 	results.append(["client2.current_player() (%d) es consistente con host (%d)" % [client2_current, host_current], player_consistent])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		var passed: bool = r[1]
 		print(("PASS  " if passed else "FAIL  ") + r[0])

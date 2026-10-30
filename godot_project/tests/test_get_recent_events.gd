@@ -17,7 +17,7 @@ func _initialize() -> void:
 	results.append(["get_recent_events() retorna un Array no vacío", recent.size() >= 2])
 
 	# Verificar orden de los eventos
-	var in_order := true
+	var in_order: bool = true
 	if recent.size() >= 2:
 		var ev1 = recent[0]
 		var ev2 = recent[1]
@@ -29,7 +29,7 @@ func _initialize() -> void:
 	results.append(["test_get_recent_events_retorna_eventos_en_orden", in_order])
 	bridge.free()
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		var status = "PASS" if r[1] else "FAIL"
 		print("%s  %s" % [status, r[0]])

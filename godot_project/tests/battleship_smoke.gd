@@ -119,7 +119,7 @@ func _initialize() -> void:
 	else:
 		results.append(["battleship_board.tscn carga correctamente", false])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

@@ -105,7 +105,7 @@ func _initialize() -> void:
 		results.append(["TurnIndicator soporta set_current_player y set_turn sin errores", board_inst.turn_indicator != null and board_inst.turn_indicator.has_method("set_current_player")])
 
 		# Probar que los 30 centros están dentro de su polígono y tienen separación mínima sin solapamiento (>= 55px)
-		var all_inside := true
+		var all_inside: bool = true
 		var min_dist: float = 99999.0
 		for i in range(30):
 			if not Geometry2D.is_point_in_polygon(board_inst.TERRITORY_CENTERS[i], board_inst.TERRITORY_POLYGONS[i]):
@@ -151,7 +151,7 @@ func _initialize() -> void:
 		root.remove_child(board_inst)
 		board_inst.free()
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

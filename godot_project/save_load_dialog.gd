@@ -209,11 +209,11 @@ func refresh_saves_list() -> void:
 		return
 
 	for entry in entries:
-		var sid := str(entry.get("save_id", ""))
-		var sname := str(entry.get("slot_name", sid))
-		var gid := str(entry.get("game_id", "chess"))
-		var turn_num := int(entry.get("turn_number", 1))
-		var ts := str(entry.get("timestamp", ""))
+		var sid: String = str(entry.get("save_id", ""))
+		var sname: String = str(entry.get("slot_name", sid))
+		var gid: String = str(entry.get("game_id", "chess"))
+		var turn_num: int = int(entry.get("turn_number", 1))
+		var ts: String = str(entry.get("timestamp", ""))
 
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)

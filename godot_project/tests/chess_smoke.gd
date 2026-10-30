@@ -61,14 +61,14 @@ func _initialize() -> void:
 	chess_node._on_mode_selected(0) # Hotseat P1 vs P2
 
 	# Click 1 en e2 (fila visual 6, col 4): press + release
-	var e2_pos := Vector2(4 * 76.0 + 38.0, 6 * 76.0 + 38.0)
-	var ev_press1 := InputEventMouseButton.new()
+	var e2_pos: Vector2 = Vector2(4 * 76.0 + 38.0, 6 * 76.0 + 38.0)
+	var ev_press1: InputEventMouseButton = InputEventMouseButton.new()
 	ev_press1.button_index = MOUSE_BUTTON_LEFT
 	ev_press1.pressed = true
 	ev_press1.position = e2_pos
 	chess_node._handle_unified_input(ev_press1)
 
-	var ev_rel1 := InputEventMouseButton.new()
+	var ev_rel1: InputEventMouseButton = InputEventMouseButton.new()
 	ev_rel1.button_index = MOUSE_BUTTON_LEFT
 	ev_rel1.pressed = false
 	ev_rel1.position = e2_pos
@@ -78,14 +78,14 @@ func _initialize() -> void:
 	results.append(["ChessBoard calcula jugadas válidas para e2 (e3 y e4)", chess_node.valid_moves.size() == 2])
 
 	# Click 2 en e4 (fila visual 4, col 4): press + release
-	var e4_pos := Vector2(4 * 76.0 + 38.0, 4 * 76.0 + 38.0)
-	var ev_press2 := InputEventMouseButton.new()
+	var e4_pos: Vector2 = Vector2(4 * 76.0 + 38.0, 4 * 76.0 + 38.0)
+	var ev_press2: InputEventMouseButton = InputEventMouseButton.new()
 	ev_press2.button_index = MOUSE_BUTTON_LEFT
 	ev_press2.pressed = true
 	ev_press2.position = e4_pos
 	chess_node._handle_unified_input(ev_press2)
 
-	var ev_rel2 := InputEventMouseButton.new()
+	var ev_rel2: InputEventMouseButton = InputEventMouseButton.new()
 	ev_rel2.button_index = MOUSE_BUTTON_LEFT
 	ev_rel2.pressed = false
 	ev_rel2.position = e4_pos
@@ -95,14 +95,14 @@ func _initialize() -> void:
 
 	# 5. Prueba multi-turno vs IA (Medio, index 2): 1. e2->e4, 2. d2->d3, 3. Caballo g1->f3
 	chess_node._on_mode_selected(2) # vs IA (Blancas J1 - Medio)
-	var click_square := func(r: int, c: int):
-		var pos := Vector2(c * 76.0 + 38.0, r * 76.0 + 38.0)
-		var p := InputEventMouseButton.new()
+	var click_square = func(r: int, c: int):
+		var pos: Vector2 = Vector2(c * 76.0 + 38.0, r * 76.0 + 38.0)
+		var p: InputEventMouseButton = InputEventMouseButton.new()
 		p.button_index = MOUSE_BUTTON_LEFT
 		p.pressed = true
 		p.position = pos
 		chess_node._handle_unified_input(p)
-		var rel := InputEventMouseButton.new()
+		var rel: InputEventMouseButton = InputEventMouseButton.new()
 		rel.button_index = MOUSE_BUTTON_LEFT
 		rel.pressed = false
 		rel.position = pos
@@ -127,7 +127,7 @@ func _initialize() -> void:
 	root.remove_child(chess_node)
 	chess_node.free()
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

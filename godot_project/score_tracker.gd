@@ -96,7 +96,7 @@ func _ensure_entry(player_name: String, game_type: String) -> Dictionary:
 		for dk in ["easy", "normal", "hard", "expert"]:
 			if not ai_d.has(dk):
 				ai_d[dk] = 0
-	var min_played := int(g_scores.get("wins", 0)) + int(g_scores.get("losses", 0)) + int(g_scores.get("draws", 0))
+	var min_played: int = int(g_scores.get("wins", 0)) + int(g_scores.get("losses", 0)) + int(g_scores.get("draws", 0))
 	if int(g_scores.get("games_played", 0)) < min_played:
 		g_scores["games_played"] = min_played
 	return g_scores
@@ -234,8 +234,8 @@ func get_elo(player_name: String, game_type: String) -> float:
 func get_total_games(player_name: String, game_type: String) -> int:
 	if scores.has(player_name) and scores[player_name].has(game_type):
 		var g_dict: Dictionary = scores[player_name][game_type]
-		var gp := int(g_dict.get("games_played", 0))
-		var wl := int(g_dict.get("wins", 0)) + int(g_dict.get("losses", 0)) + int(g_dict.get("draws", 0))
+		var gp: int = int(g_dict.get("games_played", 0))
+		var wl: int = int(g_dict.get("wins", 0)) + int(g_dict.get("losses", 0)) + int(g_dict.get("draws", 0))
 		return maxi(gp, wl)
 	return 0
 
@@ -255,7 +255,7 @@ func record_match(
 		g_scores["win_streak"] = 0
 	elif is_win:
 		g_scores["wins"] = int(g_scores.get("wins", 0)) + 1
-		var new_streak := int(g_scores.get("win_streak", 0)) + 1
+		var new_streak: int = int(g_scores.get("win_streak", 0)) + 1
 		g_scores["win_streak"] = new_streak
 		if new_streak > int(g_scores.get("best_streak", 0)):
 			g_scores["best_streak"] = new_streak
@@ -382,7 +382,7 @@ func load_stats_cfg(cfg_path: String = STATS_CFG_PATH) -> void:
 		return
 
 	for section in cfg.get_sections():
-		var parts := section.split("::", false, 1)
+		var parts: String = section.split("::", false, 1)
 		var player_name := parts[0] if parts.size() == 2 else "Player 1"
 		var game_type := parts[1] if parts.size() == 2 else section
 		var g := _ensure_entry(player_name, game_type)

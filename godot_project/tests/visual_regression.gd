@@ -27,7 +27,7 @@ func _initialize() -> void:
 	
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SNAPSHOT_DIR))
 
-	var overall_ok := true
+	var overall_ok: bool = true
 	print("=== INICIANDO VISUAL REGRESSION TESTS (UPDATE_SNAPSHOTS=%s) ===" % str(update_snapshots))
 
 	var sub_viewport = SubViewport.new()

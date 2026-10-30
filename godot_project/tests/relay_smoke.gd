@@ -6,14 +6,14 @@
 # Correr: redot --headless --path godot_project -s tests/relay_smoke.gd
 extends SceneTree
 
-const VALID_ALPHABET := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-const RELAY_URL := "ws://127.0.0.1:8080"
+const VALID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+const RELAY_URL = "ws://127.0.0.1:8080"
 
 func _is_valid_room_code(code: String) -> bool:
 	if code.length() != 4:
 		return false
 	for i in range(code.length()):
-		var ch := code.substr(i, 1)
+		var ch: String = code.substr(i, 1)
 		if not VALID_ALPHABET.contains(ch):
 			return false
 	return true
@@ -109,7 +109,7 @@ func _initialize() -> void:
 		host_peers_disconnected.has(2)
 	])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		var passed: bool = r[1]
 		print(("PASS  " if passed else "FAIL  ") + r[0])

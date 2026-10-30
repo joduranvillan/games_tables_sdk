@@ -39,7 +39,7 @@ func _initialize() -> void:
 
 	results.append(["JSON contiene 'primera_victoria' con unlocked = true", json_contains_achievement])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

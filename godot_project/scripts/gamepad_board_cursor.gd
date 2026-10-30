@@ -89,19 +89,19 @@ func _infer_board_geometry(board_node: Node) -> void:
 	if board_node == null:
 		return
 	if board_node.get("BOARD_SIZE") != null:
-		var bs := int(board_node.get("BOARD_SIZE"))
+		var bs: int = int(board_node.get("BOARD_SIZE"))
 		grid_size = Vector2i(bs, bs)
 	elif board_node.get("BOARD") != null:
-		var b := int(board_node.get("BOARD"))
+		var b: int = int(board_node.get("BOARD"))
 		grid_size = Vector2i(b, b)
 	elif board_node.get("ROWS") != null and board_node.get("COLS") != null:
 		grid_size = Vector2i(int(board_node.get("COLS")), int(board_node.get("ROWS")))
 
 	if board_node.get("CELL_SIZE") != null:
-		var cs := float(board_node.get("CELL_SIZE"))
+		var cs: float = float(board_node.get("CELL_SIZE"))
 		cell_pixel_size = Vector2(cs, cs)
 	elif board_node.get("CELL") != null:
-		var c := float(board_node.get("CELL"))
+		var c: float = float(board_node.get("CELL"))
 		cell_pixel_size = Vector2(c, c)
 	_rebuild_cursor_polygon()
 

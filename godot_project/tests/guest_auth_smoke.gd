@@ -10,7 +10,7 @@ class MockWsPeer extends RefCounted:
 		sent_messages.append(msg)
 
 func _initialize() -> void:
-	var test_cfg_path := "user://test_identity_469.cfg"
+	var test_cfg_path: String = "user://test_identity_469.cfg"
 	if FileAccess.file_exists(test_cfg_path):
 		DirAccess.remove_absolute(test_cfg_path)
 
@@ -27,7 +27,7 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	var base_now := 1735084800
+	var base_now: int = 1735084800
 	var tok: String = auth.ensure_valid_token(base_now, test_cfg_path)
 	if tok.is_empty() or tok.split(".").size() != 3:
 		printerr("FAIL: JWT inválido generado en modo local: %s" % tok)
@@ -52,7 +52,7 @@ func _initialize() -> void:
 		return
 
 	# Verificar primer mensaje WebSocket {"op": "auth", "token": "<jwt>"}
-	var ws_mock := MockWsPeer.new()
+	var ws_mock = MockWsPeer.new()
 	auth.send_auth_on_websocket(ws_mock, base_now)
 	if ws_mock.sent_messages.size() != 1:
 		printerr("FAIL: No se envió el mensaje inicial de autenticación WebSocket")

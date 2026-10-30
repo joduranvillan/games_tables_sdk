@@ -79,7 +79,7 @@ func _ready() -> void:
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
 		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
-			var hud_script := load("res://network_status_hud.gd")
+			var hud_script = load("res://network_status_hud.gd")
 			if hud_script:
 				var hud: Node = hud_script.new()
 				if hud.has_method("setup"):
@@ -532,8 +532,8 @@ func _on_event_json(json_str: String) -> void:
 	if parser.parse(json_str) == OK:
 		var event = parser.data
 		if event is Dictionary:
-			var raw_type := str(event.get("command_type", event.get("event_type", "")))
-			var event_type := raw_type.split("::")[-1]
+			var raw_type: String = str(event.get("command_type", event.get("event_type", "")))
+			var event_type: String = raw_type.split("::")[-1]
 			if event_type == "DiceRolledEvent":
 				rolled_dice = event.get("values", [])
 				dice_label.text = "Dados: %s" % str(rolled_dice)
@@ -586,7 +586,7 @@ func _on_event_json(json_str: String) -> void:
 				_animate_arc_movement(p, start_pos, end_pos)
 			elif event_type == "DoubleOfferedEvent":
 				cube_offered = true
-				var new_stakes := int(event.get("new_stakes", cube_value * 2))
+				var new_stakes: int = int(event.get("new_stakes", cube_value * 2))
 				if cube_label != null:
 					cube_label.text = "Cubo propuesto: ×%d" % new_stakes
 				if double_modal != null:

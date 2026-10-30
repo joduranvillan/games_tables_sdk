@@ -55,12 +55,12 @@ func _initialize() -> void:
 	# Verificar campo Relay Server URL, resolución de /health y diagnóstico Probar Conexión (Prompt 476)
 	assert(settings.relay_url_line != null, "SettingsMenu debe incluir el campo RelayUrlLineEdit")
 	assert(settings.test_relay_button != null and settings.test_relay_button.text == "Probar Conexión", "SettingsMenu debe incluir botón Probar Conexión")
-	var resolved_health := SettingsMenu.resolve_health_url("ws://127.0.0.1:8080")
+	var resolved_health = SettingsMenu.resolve_health_url("ws://127.0.0.1:8080")
 	assert(resolved_health == "http://127.0.0.1:8081/health", "resolve_health_url debe mapear ws://127.0.0.1:8080 a http://127.0.0.1:8081/health")
 	var probe_msg: String = settings.simulate_health_probe_response(200, '{"status":"ok","version":"0.1.0","active_rooms":2}', 28)
 	assert(probe_msg == "Conectado — 28 ms" and settings.relay_health_label.text == "Conectado — 28 ms", "Probar Conexión debe mostrar 'Conectado — 28 ms'")
 
-	var test_settings_cfg := "user://test_settings_476.cfg"
+	var test_settings_cfg: String = "user://test_settings_476.cfg"
 	SettingsMenu.save_relay_url_to_config("wss://relay.opentable.gg", test_settings_cfg)
 	var loaded_cfg: Dictionary = SettingsMenu.get_saved_settings(test_settings_cfg)
 	assert(loaded_cfg.get("relay_url") == "wss://relay.opentable.gg", "user://settings.cfg debe persistir relay_url")
@@ -87,7 +87,7 @@ func _initialize() -> void:
 	overlay.free()
 
 	# 6. ScoreTracker & StatsScreen (Prompt 488: user://stats.cfg, 13 juegos y 3 tarjetas de hitos)
-	var test_stats_cfg := "user://test_stats_488.cfg"
+	var test_stats_cfg: String = "user://test_stats_488.cfg"
 	if FileAccess.file_exists(test_stats_cfg):
 		DirAccess.remove_absolute(test_stats_cfg)
 
@@ -133,47 +133,47 @@ func _initialize() -> void:
 	gp_cursor.bind_board(null, 8, 8, 64.0, Vector2(40, 40))
 	assert(gp_cursor.cursor_active == false and gp_cursor.visible == false, "GamepadBoardCursor debe iniciar oculto")
 
-	var joy_right := InputEventJoypadButton.new()
+	var joy_right: InputEventJoypadButton = InputEventJoypadButton.new()
 	joy_right.button_index = JOY_BUTTON_DPAD_RIGHT
 	joy_right.pressed = true
 	gp_cursor.handle_input_event(joy_right)
 	assert(gp_cursor.cursor_active == true and gp_cursor.visible == true, "GamepadBoardCursor debe activarse al detectar InputEventJoypadButton")
 	assert(gp_cursor.cursor_cell == Vector2i(1, 0), "D-Pad Right debe mover el cursor a (1, 0)")
 
-	var joy_motion := InputEventJoypadMotion.new()
+	var joy_motion: InputEventJoypadMotion = InputEventJoypadMotion.new()
 	joy_motion.axis = JOY_AXIS_LEFT_Y
 	joy_motion.axis_value = 0.85
 	gp_cursor.stick_cooldown = 0.0
 	gp_cursor.handle_input_event(joy_motion)
 	assert(gp_cursor.cursor_cell == Vector2i(1, 1), "InputEventJoypadMotion (Stick izquierdo abajo) debe mover el cursor a (1, 1)")
 
-	var gp_state := {
+	var gp_state: Dictionary = {
 		"selected_cell": Vector2i(-1, -1),
 		"cancelled": false,
 		"pause_triggered": false,
 	}
 	gp_cursor.cell_selected.connect(func(c: Vector2i): gp_state["selected_cell"] = c)
-	var joy_a := InputEventJoypadButton.new()
+	var joy_a: InputEventJoypadButton = InputEventJoypadButton.new()
 	joy_a.button_index = JOY_BUTTON_A
 	joy_a.pressed = true
 	gp_cursor.handle_input_event(joy_a)
 	assert(gp_state["selected_cell"] == Vector2i(1, 1), "Botón A (ui_gamepad_select) debe seleccionar la celda actual")
 
 	gp_cursor.selection_cancelled.connect(func(): gp_state["cancelled"] = true)
-	var joy_b := InputEventJoypadButton.new()
+	var joy_b: InputEventJoypadButton = InputEventJoypadButton.new()
 	joy_b.button_index = JOY_BUTTON_B
 	joy_b.pressed = true
 	gp_cursor.handle_input_event(joy_b)
 	assert(gp_state["cancelled"] == true, "Botón B (ui_gamepad_cancel) debe cancelar la selección")
 
 	gp_cursor.pause_requested.connect(func(): gp_state["pause_triggered"] = true)
-	var joy_start := InputEventJoypadButton.new()
+	var joy_start: InputEventJoypadButton = InputEventJoypadButton.new()
 	joy_start.button_index = JOY_BUTTON_START
 	joy_start.pressed = true
 	gp_cursor.handle_input_event(joy_start)
 	assert(gp_state["pause_triggered"] == true, "Botón Start (ui_gamepad_start) debe solicitar el menú de pausa")
 
-	var mouse_ev := InputEventMouseMotion.new()
+	var mouse_ev: InputEventMouseMotion = InputEventMouseMotion.new()
 	mouse_ev.position = Vector2(200, 200)
 	gp_cursor.handle_input_event(mouse_ev)
 	assert(gp_cursor.cursor_active == false and gp_cursor.visible == false, "GamepadBoardCursor debe ocultarse al mover el ratón")
@@ -234,7 +234,7 @@ func _initialize() -> void:
 	var simulated_safe_margins: Dictionary = gm_test.get_safe_area_margins(Rect2i(0, 44, 1280, 642), Vector2i(1280, 720))
 	assert(int(simulated_safe_margins["top"]) == 44 and int(simulated_safe_margins["bottom"]) == 34, "get_safe_area_margins debe calcular márgenes de notch superior (44) y barra inferior (34)")
 
-	var hud_container := MarginContainer.new()
+	var hud_container: MarginContainer = MarginContainer.new()
 	hud_container.name = "SafeAreaHudContainer"
 	gm_test.apply_safe_area_to_hud(hud_container, simulated_safe_margins)
 	assert(hud_container.get_theme_constant("margin_top") == 44 and hud_container.get_theme_constant("margin_bottom") == 34, "apply_safe_area_to_hud debe aplicar márgenes de safe-area a contenedores HUD")
@@ -243,7 +243,7 @@ func _initialize() -> void:
 	print("Mobile Safe-Area & HapticsManager verified.")
 
 	# 10. Cumplimiento Legal para Tiendas: Política de Privacidad, Términos y Modal en Primer Arranque (Prompt 492)
-	var test_privacy_cfg := "user://test_privacy_492.cfg"
+	var test_privacy_cfg: String = "user://test_privacy_492.cfg"
 	if FileAccess.file_exists(test_privacy_cfg):
 		DirAccess.remove_absolute(test_privacy_cfg)
 

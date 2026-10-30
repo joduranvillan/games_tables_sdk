@@ -189,7 +189,7 @@ func build_diagnostics_payload() -> Dictionary:
 
 func export_diagnostics(path: String = DEFAULT_DIAG_PATH) -> bool:
 	var target_path := path.strip_edges() if not path.strip_edges().is_empty() else DEFAULT_DIAG_PATH
-	var payload := build_diagnostics_payload()
+	var payload = build_diagnostics_payload()
 	var json_str := JSON.stringify(payload, "  ")
 	var out_file := FileAccess.open(target_path, FileAccess.WRITE)
 	if out_file == null:

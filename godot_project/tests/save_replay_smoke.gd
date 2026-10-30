@@ -31,7 +31,7 @@ func _initialize() -> void:
 	var save_mgr = load("res://scripts/save_manager.gd").new()
 	save_mgr._ready()
 
-	var players_meta := [
+	var players_meta: Array = [
 		{"id": 1, "name": "Jugador 1", "score": 0},
 		{"id": 2, "name": "Jugador 2", "score": 0},
 	]
@@ -115,7 +115,7 @@ func _initialize() -> void:
 
 	# 7. Exportar e importar Replay (.otr comprimido con gzip, version "1")
 	save_mgr.set_context(restored_bridge, "checkers", 3, players_meta)
-	var otr_path := "user://saves/test_share.otr"
+	var otr_path: String = "user://saves/test_share.otr"
 	var exported_otr: bool = save_mgr.export_replay_file(otr_path)
 	results.append([
 		"export_replay_file guarda archivo .otr comprimido con gzip en disco",
@@ -153,7 +153,7 @@ func _initialize() -> void:
 		deleted_ok and not FileAccess.file_exists(save_file_path)
 	])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		var passed: bool = r[1]
 		print(("PASS  " if passed else "FAIL  ") + r[0])

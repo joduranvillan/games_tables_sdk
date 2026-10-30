@@ -50,7 +50,7 @@ func _initialize() -> void:
 	results.append(["P2 mueve soldado -> turno pasa a P1", bridge.current_player() == 1])
 	results.append(["Se recibieron 2 eventos PieceMovedEvent", events_received.size() == 2])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

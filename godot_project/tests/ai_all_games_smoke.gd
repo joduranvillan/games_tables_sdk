@@ -8,7 +8,7 @@ extends SceneTree
 
 func _initialize() -> void:
 	var results: Array = []
-	var bridge := OpenTableBridge.new()
+	var bridge = OpenTableBridge.new()
 
 	# 1. Backgammon vs IA (IA como J1 y como J2)
 	var bg_started = bridge.start_local_match_backgammon_vs_ai(2, 1)
@@ -145,7 +145,7 @@ func _initialize() -> void:
 	results.append(["Xiangqi vs IA (IA=J2): IA respondió tras jugada de J1 y devolvió turno a J1", bridge.current_player() == 1 and bridge.current_tick() >= 2])
 	bridge.free()
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

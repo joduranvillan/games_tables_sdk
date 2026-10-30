@@ -37,7 +37,7 @@ func sync_save(slot: String, data: PackedByteArray) -> bool:
 	if not steam_available or bridge == null:
 		return false
 	if bridge.has_method("steam_sync_save"):
-		var ok := bool(bridge.call("steam_sync_save", slot, data))
+		var ok: bool = bool(bridge.call("steam_sync_save", slot, data))
 		cloud_save_synced.emit(slot, ok)
 		return ok
 	return false

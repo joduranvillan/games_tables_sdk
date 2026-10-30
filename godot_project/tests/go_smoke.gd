@@ -68,7 +68,7 @@ func _initialize() -> void:
 		results.append(["Cantidad de piedras capturadas es count == 1", captured_counts[0] == 1])
 
 	# 5. P2 pasa su turno
-	var p2 := bridge.current_player()
+	var p2 = bridge.current_player()
 	bridge.send_command_json(p2, JSON.stringify({
 		"command_type": "go_game::PassCommand",
 		"player": p2
@@ -76,7 +76,7 @@ func _initialize() -> void:
 	results.append(["Primer pass exitoso, no hay game_over aún", game_over_winners.size() == 0])
 
 	# 6. P1 pasa su turno. Dos pases entran en fase dead marking
-	var p1 := bridge.current_player()
+	var p1 = bridge.current_player()
 	bridge.send_command_json(p1, JSON.stringify({
 		"command_type": "go_game::PassCommand",
 		"player": p1
@@ -94,7 +94,7 @@ func _initialize() -> void:
 	results.append(["Dos pases consecutivos y confirmación gatillan la señal game_over", game_over_winners.size() >= 1])
 
 	# 8. Verificar inicialización, captura visual, selector 9x9/13x13/19x19 y doble pase en GoBoard
-	var go_scene := load("res://go_board.tscn")
+	var go_scene = load("res://go_board.tscn")
 	if go_scene != null:
 		var go_ui: Node2D = go_scene.instantiate()
 		go_ui._ready()
@@ -128,7 +128,7 @@ func _initialize() -> void:
 
 		go_ui.free()
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
 		if not r[1]:

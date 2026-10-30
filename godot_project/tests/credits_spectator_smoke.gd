@@ -2,7 +2,7 @@ extends SceneTree
 
 func _initialize() -> void:
 	# Verificar que credits_screen carga y cuenta con pestaña "Licencias Open Source" y botón "Exportar Diagnóstico" (Prompt 493)
-	var credits_res := ResourceLoader.exists("res://credits_screen.tscn")
+	var credits_res: bool = ResourceLoader.exists("res://credits_screen.tscn")
 	assert(credits_res, "credits_screen.tscn debe existir")
 
 	var credits_script = load("res://scenes/credits_screen.gd")
@@ -21,15 +21,15 @@ func _initialize() -> void:
 	for i in range(60):
 		logger_inst.log_info("Test log entry #%d" % i)
 
-	var diag_path := "user://test_opentable_diag.json"
+	var diag_path: String = "user://test_opentable_diag.json"
 	if FileAccess.file_exists(diag_path):
 		DirAccess.remove_absolute(diag_path)
 
 	var exported_ok: bool = logger_inst.export_diagnostics(diag_path)
 	assert(exported_ok == true and FileAccess.file_exists(diag_path), "export_diagnostics debe generar el archivo JSON de diagnóstico")
 
-	var f_diag := FileAccess.open(diag_path, FileAccess.READ)
-	var diag_text := f_diag.get_as_text()
+	var f_diag = FileAccess.open(diag_path, FileAccess.READ)
+	var diag_text = f_diag.get_as_text()
 	f_diag.close()
 	var diag_json = JSON.parse_string(diag_text)
 	assert(diag_json is Dictionary, "El archivo de diagnóstico debe ser un JSON válido")
@@ -47,7 +47,7 @@ func _initialize() -> void:
 	credits_inst.free()
 
 	# Verificar que spectator_view carga
-	var spectator_res := ResourceLoader.exists("res://spectator_view.tscn")
+	var spectator_res: bool = ResourceLoader.exists("res://spectator_view.tscn")
 	assert(spectator_res, "spectator_view.tscn debe existir")
 
 	# Verificar que spectator_view tiene método setup y soporte Relay Spectator

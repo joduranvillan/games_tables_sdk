@@ -4,7 +4,7 @@
 extends SceneTree
 
 func _initialize() -> void:
-	var run_perf := OS.get_environment("RUN_PERF_TESTS")
+	var run_perf: String = OS.get_environment("RUN_PERF_TESTS")
 	if run_perf != "1":
 		print("SKIP: RUN_PERF_TESTS no está configurado a 1. Omitiendo test de rendimiento.")
 		quit(0)
@@ -21,8 +21,8 @@ func _initialize() -> void:
 
 	bridge.call("start_local_match", 1, 2)
 
-	var iterations := 1000
-	var start_time := Time.get_ticks_msec()
+	var iterations: int = 1000
+	var start_time: int = Time.get_ticks_msec()
 
 	for i in range(iterations):
 		var p: int = bridge.call("current_player")

@@ -16,7 +16,7 @@ func _initialize() -> void:
 		audio_mgr.player != null and audio_mgr.music_player != null
 	])
 
-	var sfx_methods := [
+	var sfx_methods: Array = [
 		["piece_slide", "play_piece_slide"],
 		["piece_place", "play_piece_place"],
 		["dice_roll", "play_dice_roll"],
@@ -47,7 +47,7 @@ func _initialize() -> void:
 	])
 
 	# Iterar sobre todos los métodos semánticos adicionales de AudioManager
-	var semantic_methods := [
+	var semantic_methods: Array = [
 		"play_move",
 		"play_capture",
 		"play_invalid",
@@ -80,7 +80,7 @@ func _initialize() -> void:
 		is_equal_approx(audio_mgr.get_sfx_volume_db(), -6.0)
 	])
 
-	var boards := [
+	var boards: Array = [
 		"backgammon_board.gd",
 		"battleship_board.gd",
 		"checkers_board.gd",
@@ -114,7 +114,7 @@ func _initialize() -> void:
 		if b_inst != null:
 			b_inst.free()
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		var passed: bool = r[1]
 		print(("PASS  " if passed else "FAIL  ") + r[0])

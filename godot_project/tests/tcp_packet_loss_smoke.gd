@@ -124,8 +124,8 @@ func _initialize() -> void:
 		client_events.append({"player": p, "from_row": fr, "from_col": fc, "to_row": tr, "to_col": tc})
 	)
 
-	var handshake_state := {"done": false}
-	var handshake_thread := Thread.new()
+	var handshake_state: Dictionary = {"done": false}
+	var handshake_thread: Thread = Thread.new()
 	handshake_thread.start(func():
 		while not handshake_state["done"]:
 			proxy.poll()
@@ -188,7 +188,7 @@ func _initialize() -> void:
 	var player_equal = (host_current == client_current)
 	results.append(["host.current_player() (%d) == client.current_player() (%d)" % [host_current, client_current], player_equal])
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		var passed: bool = r[1]
 		print(("PASS  " if passed else "FAIL  ") + r[0])

@@ -19,7 +19,7 @@ func _initialize() -> void:
 	results.append(["get_legal_moves(1) en Chess tiene 20 jugadas en posicion inicial", chess_p1_moves.size() == 20])
 	bridge.free()
 
-	var ok := true
+	var ok: bool = true
 	for r in results:
 		var status = "PASS" if r[1] else "FAIL"
 		print("%s  %s" % [status, r[0]])

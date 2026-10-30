@@ -13,8 +13,8 @@ const AuthClientScript = preload("res://scripts/auth_client.gd")
 const LanDiscoveryScript = preload("res://scripts/lan_discovery.gd")
 const NetworkStatusHUDScript = preload("res://network_status_hud.gd")
 
-const TEST_IDENTITY_CFG := "user://online_viability_smoke_identity.cfg"
-const TEST_LAN_PORT := 42423
+const TEST_IDENTITY_CFG = "user://online_viability_smoke_identity.cfg"
+const TEST_LAN_PORT = 42423
 
 func _initialize() -> void:
 	print("=== INICIANDO TEST: online_viability_smoke.gd ===")

@@ -42,9 +42,18 @@ var current: int = P1
 var winner: int = -1
 
 # Player state
+const SHIELD_INACTIVE = "INACTIVE"
+const SHIELD_ACTIVE = "ACTIVE"
+const SHIELD_COUP_FOURRE = "COUP_FOURRE"
+
 var distance = {P1: 0, P2: 0}
 var hazards = {P1: "Luz Verde (Siga)", P2: "Luz Verde (Siga)"}
 var safeties = {P1: [], P2: []}
+var coup_fourre_safeties = {P1: [], P2: []}
+var shield_states = {
+	P1: {"RightOfWay": SHIELD_INACTIVE, "ExtraTank": SHIELD_INACTIVE, "PunctureProof": SHIELD_INACTIVE, "DrivingAce": SHIELD_INACTIVE},
+	P2: {"RightOfWay": SHIELD_INACTIVE, "ExtraTank": SHIELD_INACTIVE, "PunctureProof": SHIELD_INACTIVE, "DrivingAce": SHIELD_INACTIVE}
+}
 var hand_p1 = ["Distance 25", "Distance 50", "Distance 75", "Distance 100", "Luz Verde", "Gasolina"]
 var speed_limit = {P1: false, P2: false}
 var deck_count: int = 44
@@ -61,6 +70,7 @@ var local_tableau: Panel
 var opponent_tableau: Panel
 var draw_button: Button
 var discard_mode: CheckBox
+var coup_fourre_btn: Button = null
 var selected_card_idx: int = -1
 
 # Hazard & Status HUD overlays
@@ -108,7 +118,7 @@ func _ready() -> void:
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
 		if bridge.has_method("is_network_mode") and bridge.call("is_network_mode"):
-			var hud_script := load("res://network_status_hud.gd")
+			var hud_script = load("res://network_status_hud.gd")
 			if hud_script:
 				var hud: Node = hud_script.new()
 				if hud.has_method("setup"):
@@ -161,6 +171,11 @@ func _on_mode_selected(index: int) -> void:
 	distance = {P1: 0, P2: 0}
 	hazards = {P1: "Luz Verde (Siga)", P2: "Luz Verde (Siga)"}
 	safeties = {P1: [], P2: []}
+	coup_fourre_safeties = {P1: [], P2: []}
+	shield_states = {
+		P1: {"RightOfWay": SHIELD_INACTIVE, "ExtraTank": SHIELD_INACTIVE, "PunctureProof": SHIELD_INACTIVE, "DrivingAce": SHIELD_INACTIVE},
+		P2: {"RightOfWay": SHIELD_INACTIVE, "ExtraTank": SHIELD_INACTIVE, "PunctureProof": SHIELD_INACTIVE, "DrivingAce": SHIELD_INACTIVE}
+	}
 	if index == 0:
 		if gm != null and gm.has_method("set_game_mode"):
 			gm.set_game_mode("local")
@@ -268,7 +283,7 @@ func _setup_ui() -> void:
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("mille_bornes"))
 	top_bar.add_child(btn_rules)
 
-	var mode_opt := OptionButton.new()
+	var mode_opt: OptionButton = OptionButton.new()
 	mode_opt.name = "ModeOptionButton"
 	mode_opt.add_item("👥 Hotseat", 0)
 	mode_opt.add_item("🤖 vs IA (J1)", 1)
@@ -322,6 +337,15 @@ func _setup_ui() -> void:
 	discard_mode.add_theme_font_size_override("font_size", 14)
 	controls_hbox.add_child(discard_mode)
 
+	coup_fourre_btn = Button.new()
+	coup_fourre_btn.name = "CoupFourreButton"
+	coup_fourre_btn.custom_minimum_size = Vector2(170, 42)
+	coup_fourre_btn.text = "⚡ ¡Coup Fourré!"
+	coup_fourre_btn.tooltip_text = "Declarar Coup Fourré reactivo con un Escudo (Safety) ante un peligro (+300 pts)"
+	coup_fourre_btn.add_theme_font_size_override("font_size", 14)
+	coup_fourre_btn.pressed.connect(_on_coup_fourre_pressed)
+	controls_hbox.add_child(coup_fourre_btn)
+
 	# Hand Container & Panel (Bottom)
 	hand_panel = Panel.new()
 	hand_panel.name = "HandPanel"
@@ -362,18 +386,18 @@ func _on_layout_changed(layout: int) -> void:
 	hand_panel.size = Vector2(700, 140)
 	hand_container.size = Vector2(676, 120)
 
-	var vp_size := Vector2(1280, 720)
+	var vp_size: Vector2 = Vector2(1280, 720)
 	if is_inside_tree() and get_viewport() != null:
-		var visible_sz := get_viewport().get_visible_rect().size
+		var visible_sz: Vector2 = get_viewport().get_visible_rect().size
 		if visible_sz.x > 0 and visible_sz.y > 0:
 			vp_size = visible_sz
 	if layout == 2 and vp_size.x >= 1000.0:
 		vp_size = Vector2(375, 667)
 
-	var design_w := 800.0
-	var design_h := 680.0
+	var design_w: float = 800.0
+	var design_h: float = 680.0
 	if layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
-		var s := clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.35, 1.0)
+		var s: float = clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.35, 1.0)
 		scale = Vector2(s, s)
 		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
 	else:
@@ -542,7 +566,7 @@ func _create_card_button(card_info: Dictionary, idx: int) -> PanelContainer:
 	panel.add_child(vbox)
 
 	var icon_lbl = Label.new()
-	var geom_sym := _get_category_symbol(category_key)
+	var geom_sym = _get_category_symbol(category_key)
 	icon_lbl.text = "%s %s" % [geom_sym, card_info["icon"]]
 	icon_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_lbl.add_theme_font_size_override("font_size", 19)
@@ -657,6 +681,202 @@ func _on_draw_pressed() -> void:
 		deck_count -= 1
 	draw_button.text = "🎴 Robar Carta (%d)" % deck_count
 
+func _normalize_shield_key(raw_name: String) -> String:
+	var low: String = raw_name.to_lower()
+	if "right" in low or "prioridad" in low or "paso" in low or "prioritario" in low:
+		return "RightOfWay"
+	if "tank" in low or "cisterna" in low:
+		return "ExtraTank"
+	if "puncture" in low or "impinchable" in low or "sellador" in low:
+		return "PunctureProof"
+	if "ace" in low or "volante" in low:
+		return "DrivingAce"
+	return ""
+
+func _get_required_shield_for_hazard(hazard_str: String, has_speed_lim: bool = false) -> String:
+	var low: String = hazard_str.to_lower()
+	if not ("luz verde" in low or "siga" in low or low.is_empty()):
+		if "gas" in low or "combustible" in low:
+			return "ExtraTank"
+		if "tire" in low or "pinchazo" in low or "llanta" in low or "neumático" in low or "neumatico" in low:
+			return "PunctureProof"
+		if "accident" in low or "accidente" in low or "choque" in low:
+			return "DrivingAce"
+		if "stop" in low or "roja" in low or "pare" in low or "límite" in low or "limite" in low or "speed" in low:
+			return "RightOfWay"
+	if has_speed_lim:
+		return "RightOfWay"
+	return ""
+
+func _find_matching_coup_fourre_card_index(p_id: int = P1) -> int:
+	var h_str: String = str(hazards.get(p_id, ""))
+	var spd: bool = bool(speed_limit.get(p_id, false))
+	var req_shield: String = _get_required_shield_for_hazard(h_str, spd)
+	if req_shield == "":
+		return -1
+	for i in range(hand_p1.size()):
+		var c_name: String = str(hand_p1[i])
+		if _normalize_shield_key(c_name) == req_shield:
+			return i
+	return -1
+
+func is_coup_fourre_playable(p_id: int = P1) -> bool:
+	return _find_matching_coup_fourre_card_index(p_id) >= 0
+
+func get_shield_state(p_id: int, shield_key: String) -> String:
+	var norm_key = _normalize_shield_key(shield_key)
+	if norm_key == "":
+		norm_key = shield_key
+	var p_map: Dictionary = shield_states.get(p_id, {})
+	var recorded: String = str(p_map.get(norm_key, SHIELD_INACTIVE))
+	if recorded == SHIELD_COUP_FOURRE:
+		return SHIELD_COUP_FOURRE
+	var cf_list: Array = coup_fourre_safeties.get(p_id, [])
+	for item in cf_list:
+		if _normalize_shield_key(str(item)) == norm_key:
+			return SHIELD_COUP_FOURRE
+	if recorded == SHIELD_ACTIVE:
+		return SHIELD_ACTIVE
+	var act_list: Array = safeties.get(p_id, [])
+	for item in act_list:
+		if _normalize_shield_key(str(item)) == norm_key:
+			return SHIELD_ACTIVE
+	return SHIELD_INACTIVE
+
+func set_shield_state(p_id: int, shield_key: String, state: String) -> void:
+	var norm_key = _normalize_shield_key(shield_key)
+	if norm_key == "":
+		norm_key = shield_key
+	if not shield_states.has(p_id):
+		shield_states[p_id] = {}
+	shield_states[p_id][norm_key] = state
+	var act_list: Array = safeties.get(p_id, [])
+	var cf_list: Array = coup_fourre_safeties.get(p_id, [])
+	if state == SHIELD_INACTIVE:
+		act_list.erase(norm_key)
+		cf_list.erase(norm_key)
+	elif state == SHIELD_ACTIVE:
+		if not (norm_key in act_list):
+			act_list.append(norm_key)
+		cf_list.erase(norm_key)
+	elif state == SHIELD_COUP_FOURRE:
+		if not (norm_key in act_list):
+			act_list.append(norm_key)
+		if not (norm_key in cf_list):
+			cf_list.append(norm_key)
+	_update_tableaus()
+
+func _on_coup_fourre_pressed() -> void:
+	_sfx_card_flip()
+	if winner != -1 or bridge == null:
+		return
+	var acting_p: int = local_player if is_vs_ai else current
+	var auto_idx: int = _find_matching_coup_fourre_card_index(acting_p)
+	var card_idx: int = auto_idx if auto_idx >= 0 else maxi(0, selected_card_idx)
+	if card_idx >= 0 and card_idx < hand_p1.size():
+		var played_card_name: String = str(hand_p1[card_idx])
+		var norm_s: String = _normalize_shield_key(played_card_name)
+		if norm_s != "":
+			if not shield_states.has(acting_p):
+				shield_states[acting_p] = {}
+			shield_states[acting_p][norm_s] = SHIELD_COUP_FOURRE
+			if not (norm_s in safeties[acting_p]):
+				safeties[acting_p].append(norm_s)
+			if not (norm_s in coup_fourre_safeties[acting_p]):
+				coup_fourre_safeties[acting_p].append(norm_s)
+			hazards[acting_p] = "Luz Verde (Siga)"
+			if norm_s == "RightOfWay":
+				speed_limit[acting_p] = false
+	var cmd: Dictionary = {
+		"command_type": "CoupFourreCommand",
+		"player": acting_p,
+		"card_index": card_idx
+	}
+	bridge.send_command_json(acting_p, JSON.stringify(cmd))
+	_sync_hand_from_bridge()
+	_update_hand_ui()
+	_update_tableaus()
+
+func _refresh_coup_fourre_button_style() -> void:
+	if coup_fourre_btn == null:
+		return
+	var check_p: int = local_player if is_vs_ai else P1
+	var match_idx: int = _find_matching_coup_fourre_card_index(check_p)
+	var playable: bool = (match_idx >= 0)
+	coup_fourre_btn.disabled = not playable
+	var cf_style: StyleBoxFlat = StyleBoxFlat.new()
+	cf_style.set_corner_radius_all(8)
+	cf_style.content_margin_left = 10
+	cf_style.content_margin_right = 10
+	cf_style.content_margin_top = 6
+	cf_style.content_margin_bottom = 6
+	if playable:
+		var matched_card: String = str(hand_p1[match_idx])
+		coup_fourre_btn.text = "⚡ ¡Coup Fourré! (%s)" % matched_card
+		cf_style.bg_color = Color(0.55, 0.35, 0.05, 0.98)
+		cf_style.border_color = Color(1.0, 0.85, 0.25, 1.0)
+		cf_style.set_border_width_all(2)
+		coup_fourre_btn.add_theme_color_override("font_color", Color(1.0, 0.95, 0.65))
+	else:
+		coup_fourre_btn.text = "⚡ ¡Coup Fourré!"
+		cf_style.bg_color = Color(0.16, 0.18, 0.22, 0.75)
+		cf_style.border_color = Color(0.38, 0.40, 0.46, 0.65)
+		cf_style.set_border_width_all(1)
+		coup_fourre_btn.add_theme_color_override("font_color", Color(0.62, 0.64, 0.68))
+	coup_fourre_btn.add_theme_stylebox_override("normal", cf_style)
+	coup_fourre_btn.add_theme_stylebox_override("disabled", cf_style)
+
+func _create_safety_shields_hbox(p_id: int) -> HBoxContainer:
+	var shields_hb: HBoxContainer = HBoxContainer.new()
+	shields_hb.name = "SafetyShieldsP%d" % p_id
+	shields_hb.add_theme_constant_override("separation", 6)
+	var shield_defs: Array = [
+		{"id": "RightOfWay", "label": "🚦 Prioridad"},
+		{"id": "ExtraTank", "label": "⛽ Cisterna"},
+		{"id": "PunctureProof", "label": "🛞 Impinchable"},
+		{"id": "DrivingAce", "label": "🏆 As Volante"}
+	]
+	for s_def in shield_defs:
+		var sd: Dictionary = s_def
+		var s_id: String = str(sd.get("id", "RightOfWay"))
+		var base_label: String = str(sd.get("label", "Escudo"))
+		var st: String = get_shield_state(p_id, s_id)
+		var pill: PanelContainer = PanelContainer.new()
+		pill.name = "ShieldBadge_%s" % s_id
+		pill.set_meta("shield_id", s_id)
+		pill.set_meta("shield_state", st)
+		var p_style: StyleBoxFlat = StyleBoxFlat.new()
+		p_style.set_corner_radius_all(5)
+		p_style.content_margin_left = 6
+		p_style.content_margin_right = 6
+		p_style.content_margin_top = 2
+		p_style.content_margin_bottom = 2
+		var badge: Label = Label.new()
+		badge.name = "BadgeLabel"
+		badge.add_theme_font_size_override("font_size", 11)
+		if st == SHIELD_COUP_FOURRE:
+			p_style.bg_color = Color(0.56, 0.40, 0.04, 0.98)
+			p_style.border_color = Color(1.0, 0.88, 0.22, 1.0)
+			p_style.set_border_width_all(2)
+			badge.text = "%s ⚡ CF +300" % base_label
+			badge.add_theme_color_override("font_color", Color(1.0, 0.96, 0.55))
+		elif st == SHIELD_ACTIVE:
+			p_style.bg_color = Color(0.42, 0.32, 0.06, 0.95)
+			p_style.border_color = Color(0.98, 0.84, 0.25, 0.98)
+			p_style.set_border_width_all(1)
+			badge.text = "%s ✨" % base_label
+			badge.add_theme_color_override("font_color", Color(1.0, 0.92, 0.40))
+		else:
+			p_style.bg_color = Color(0.14, 0.16, 0.20, 0.65)
+			p_style.border_color = Color(0.35, 0.38, 0.44, 0.55)
+			p_style.set_border_width_all(1)
+			badge.text = base_label
+			badge.add_theme_color_override("font_color", Color(0.58, 0.60, 0.65, 0.75))
+		pill.add_theme_stylebox_override("panel", p_style)
+		pill.add_child(badge)
+		shields_hb.add_child(pill)
+	return shields_hb
+
 # -------------------------------------------------------------------------
 # TABLEAUS & HAZARD INDICATORS (c, d)
 # -------------------------------------------------------------------------
@@ -743,6 +963,8 @@ func _update_tableaus() -> void:
 	p1_safeties_label.add_theme_font_size_override("font_size", 12)
 	p1_safeties_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	p1_vbox.add_child(p1_safeties_label)
+	p1_vbox.add_child(_create_safety_shields_hbox(P1))
+	_refresh_coup_fourre_button_style()
 
 	# ----------------- OPPONENT TABLEAU (P2) -----------------
 	var p2_vbox = VBoxContainer.new()
@@ -808,6 +1030,7 @@ func _update_tableaus() -> void:
 	p2_safeties_label.text = "🛡️ Safeties: %s" % (", ".join(safeties[P2]) if safeties[P2].size() > 0 else "Ninguna")
 	p2_safeties_label.add_theme_font_size_override("font_size", 12)
 	p2_vbox.add_child(p2_safeties_label)
+	p2_vbox.add_child(_create_safety_shields_hbox(P2))
 
 # -------------------------------------------------------------------------
 # EVENT JSON & TURN MANAGEMENT
@@ -841,7 +1064,30 @@ func _on_event_json(json_str: String) -> void:
 			elif event_type == "SafetyPlayedEvent":
 				var p = int(event.get("player", current))
 				var sf = str(event.get("safety", "Protección"))
+				var is_cf: bool = bool(event.get("coup_fourre", false))
+				var norm_sf: String = _normalize_shield_key(sf)
 				safeties[p].append(sf)
+				if norm_sf != "":
+					if not shield_states.has(p):
+						shield_states[p] = {}
+					shield_states[p][norm_sf] = SHIELD_COUP_FOURRE if is_cf else SHIELD_ACTIVE
+				if is_cf:
+					coup_fourre_safeties[p].append(sf)
+					hazards[p] = "Luz Verde (Siga)"
+				_update_tableaus()
+			elif event_type == "CoupFourreEvent":
+				var p = int(event.get("player", current))
+				var sf = str(event.get("safety", "Protección"))
+				var norm_sf: String = _normalize_shield_key(sf)
+				if not (sf in safeties[p]):
+					safeties[p].append(sf)
+				if not (sf in coup_fourre_safeties[p]):
+					coup_fourre_safeties[p].append(sf)
+				if norm_sf != "":
+					if not shield_states.has(p):
+						shield_states[p] = {}
+					shield_states[p][norm_sf] = SHIELD_COUP_FOURRE
+				hazards[p] = "Luz Verde (Siga)"
 				_update_tableaus()
 			elif event_type == "GameOverEvent":
 				var w = event.get("winner", -1)
@@ -902,7 +1148,7 @@ func _sfx_piece_place() -> void:
 func _sfx_capture(world_pos: Vector2 = Vector2(240, 240)) -> void:
 	if (is_inside_tree() and has_node("/root/AudioManager")):
 		get_node("/root/AudioManager").play_piece_place(2.0)
-	var particles := CPUParticles2D.new()
+	var particles: CPUParticles2D = CPUParticles2D.new()
 	particles.position = world_pos
 	particles.emitting = true
 	particles.one_shot = true

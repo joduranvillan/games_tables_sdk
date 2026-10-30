@@ -1,7 +1,7 @@
 extends SceneTree
 
 func _initialize() -> void:
-    var bridge := OpenTableBridge.new()
+    var bridge = OpenTableBridge.new()
 
     # Shogi vs IA (depth 1 para velocidad)
     var ok_shogi = bridge.start_local_match_shogi_vs_ai(1, 2, 1)

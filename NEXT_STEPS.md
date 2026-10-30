@@ -113,38 +113,33 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
 - [x] **467.** Modo espectador en tiempo real para partidas online del Relay (`join_spectator`, límite 10 por sala)
 - [x] **468.** Script de verificación integral `tools/verify_p11.sh`
 
-## 8. Próximos Pasos hacia Lanzamiento Comercial Viable (PROMP12.md / PROMPTS12.md — v3.0.0)
+## 8. Lanzamiento Comercial Viable (PROMPTS12.md — v3.0.0) — Completado ✅
 
-Hoja de ruta detallada en `PROMP12.md` (`PROMPTS12.md`, prompts **469 al 495**):
-1. **Relay Autoritativo v2 y Resiliencia Online (Prompts 469–474)**:
-   - Emisión automática de JWT de invitado (`POST /auth/guest`) + `auth_client.gd`.
-   - Anti-cheat autoritativo extendido a los **13 juegos** y actualización automática de ELO desde el motor (anti-spoofing).
-   - Reconexión a sala activa (`rejoin_room`) con ventana de gracia de 90s y reloj de turno autoritativo (anti-AFK).
-2. **Red Local Cero-Fricción y Conectividad Resiliente (Prompts 475–478)**:
-   - Auto-descubrimiento de partidas LAN por UDP broadcast (`lan_discovery.gd`) sin teclear IPs.
-   - Configuración de URL del Relay en Ajustes con test de latencia (`GET /health`) y reconexión automática con backoff exponencial.
-3. **Empaquetado Comercial y Exportación Multiplataforma (Prompts 479–483)**:
-   - Identidad visual unificada de la suite (`opentable_suite.svg`), manifiesto `.gdextension` para las 6 plataformas y `godot_project/export_presets.cfg` canónico.
-   - Generación de `.aab` para Google Play y scripts SteamPipe (`app_build.vdf`).
-4. **UX Completa en los 13 Tableros (Prompts 484–488)**:
-   - Catálogo de reglas in-game para los 13 juegos (`rules_catalog.gd`), tutoriales adicionales, reloj visual de turno, rendición/tablas, deshacer jugada (`undo`) en modo local/IA y pantalla de estadísticas locales.
-5. **Accesibilidad, Steam Deck y Pulido Móvil (Prompts 489–491)**:
-   - Cursor virtual con Gamepad/Steam Deck, modo daltónico (paleta Okabe-Ito + símbolos), safe-area móvil y vibración háptica.
-6. **Cumplimiento Legal, QA de Carga y Release Gate (Prompts 492–495)**:
-   - `PRIVACY_POLICY.md`, `TERMS_OF_SERVICE.md`, modal de consentimiento offline/online, `THIRD_PARTY_LICENSES.md`, test de carga concurrente del Relay y `tools/verify_p12.sh`.
+- [x] **469–474.** Relay Autoritativo v2, JWT invitado (`auth_client.gd`), anti-cheat en 13 juegos, reconexión 90s y reloj de turno autoritativo.
+- [x] **475–478.** Auto-descubrimiento LAN UDP (`lan_discovery.gd`), test de latencia `/health` y reconexión con backoff exponencial.
+- [x] **479–483.** Identidad visual (`opentable_suite.svg`), manifiesto `.gdextension` 6 plataformas, `export_presets.cfg`, `.aab` y SteamPipe (`app_build.vdf`).
+- [x] **484–488.** Catálogo de reglas in-game (`rules_catalog.gd`), tutoriales adicionales, reloj visual, menú desplegable superior derecho (`GameAppMenu`), rendición/tablas, deshacer/rehacer y estadísticas locales.
+- [x] **489–495.** Cursor virtual Gamepad/Steam Deck, paleta daltónica Okabe-Ito, safe-area móvil, vibración háptica, documentos legales y `tools/verify_p12.sh`.
 
-## 9. Para publicación en crates.io
+## 9. Certificación de Reglas Oficiales Canónicas y UI (PROMPTS13.md — v4.0.0) — Completado ✅
+
+- [x] **496–512.** Motores Rust (`*_game`) y tests de certificación `tests/canonical_rules.rs` completados al 100% en los 13 juegos.
+- [x] **513–518.** Controles UI canónicos en los 13 tableros de Godot (`godot_project/*_board.gd` y `godot_project/scenes/*_board.gd`):
+  - **Ajedrez (`chess_board.gd`)**: Modal selector de pieza de coronación (`PromotionSelectorPanel`: Dama, Torre, Alfil, Caballo) y botones de oferta/aceptación de tablas (`OfferDrawButton`, `DrawOfferBanner`, `AcceptDrawButton`).
+  - **Go (`go_board.gd`)**: Selector de Handicap inicial (`HandicapOptionButton`: 0, 2, 3, 4 piedras Hoshi), marcado interactivo de piedras muertas con `✕` carmesí (`mark_dead_stone`) y confirmación (`ConfirmDeadButton`).
+  - **Shogi (`shogi_board.gd`)**: Diálogo de promoción opcional (`PromotionDialogPanel`) con detección de promoción obligatoria FESA (`_is_promotion_mandatory_fesa`).
+  - **Batalla Naval (`battleship_board.gd`)**: Siluetas cenitales SVG, orientación Horizontal/Vertical (`R`/clic derecho/vista previa), `ExtraTurnCheckBox` (`🔥 Racha al impactar`) y `RematchButton` (`🔁 Revancha`).
+  - **Mille Bornes (`mille_bornes_board.gd`)**: Botón reactivo `CoupFourreButton` (`⚡ ¡Coup Fourré!`) y visualización de los 4 Escudos (`Prioridad`, `Cisterna`, `Impinchable`, `As Volante`).
+  - **Xiangqi, Backgammon, Ludo, UNO, Monopoly, Crisis/TEG, Damas Chinas y Damas**: Todos los controles e interacciones canónicas verificados y compatibles con Redot Engine (`safeguards strict`).
+- [x] **519–520.** Smoke test headless de controles UI canónicos (`godot_project/tests/canonical_rules_ui_smoke.gd`) y script de certificación `tools/verify_p13.sh`.
+
+## 10. Para publicación en crates.io y Estado de Deuda Técnica
 
 - [x] Doubling cube Backgammon (prompt 310) — ✅ Implementado
 - [x] Jump-in UNO (prompt 311) — ✅ Implementado
-- [x] `get_legal_moves` con `LegalMoveGenerator` para checkers y chess (prompts 306-309) — ✅ Implementado
+- [x] `get_legal_moves` con `LegalMoveGenerator` para los 13 juegos — ✅ Implementado
 - [x] 0 warnings de Clippy (`cargo clippy --workspace --exclude open_table_godot -- -D warnings`) — ✅ 0 warnings (exit 0)
 - [x] **401.** Versión semántica 0.1.0 en todos los `Cargo.toml` y dependencias internas (`version = "0.1.0"`) — ✅ Verificado
-- [x] **402.** Documentación pública en `docs.rs` (`cargo doc --workspace --exclude open_table_godot --no-deps` y `RUSTDOCFLAGS="--cfg docsrs"`) — ✅ 0 errores, 0 warnings (exit 0)
+- [x] **402.** Documentación pública en `docs.rs` (`cargo doc --workspace --exclude open_table_godot --no-deps`) — ✅ 0 errores, 0 warnings (exit 0)
+- **0 TODOs activos** en el código fuente de los crates de Rust y GDScript, y 0 inferencias inseguras `:=` sobre `Variant` en Redot strict.
 
-## 8. Deuda Técnica Conocida
-
-- **0 TODOs activos** en el código fuente de los crates de Rust y GDScript.
-- **Señal de final de partida en bridge (`game_ended` vs `game_over`)**: El bridge GDExtension (`open_table_godot/src/lib.rs`) emite canónicamente la señal `game_over(winner: i64)` (línea 449) y no `game_ended(winner: int, loser: int)`. `score_tracker.gd` conecta `game_over` para registrar el resultado y el cálculo ELO; además, mantiene compatibilidad defensiva con `game_ended` en caso de que un bridge futuro o mock emita dicha firma (ítem de prompt 395 marcado como N/A con justificación).
-- **Plugins nativos móviles (`platform_plugins/`)**: `OpenTableNearby` (Android) y `OpenTableMultipeer` (iOS) probados en arquitectura mock/unit-test; requieren compilación nativa en Android Studio / Xcode (proceso Android documentado en `platform_plugins/android/BUILD.md`).
-- **Simplificaciones voluntarias de reglas**: Documentadas en la tabla anterior y en cada `README.md` individual para mantener la agilidad del engine.
