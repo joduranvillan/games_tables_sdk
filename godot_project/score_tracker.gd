@@ -382,9 +382,9 @@ func load_stats_cfg(cfg_path: String = STATS_CFG_PATH) -> void:
 		return
 
 	for section in cfg.get_sections():
-		var parts: String = section.split("::", false, 1)
-		var player_name := parts[0] if parts.size() == 2 else "Player 1"
-		var game_type := parts[1] if parts.size() == 2 else section
+		var parts: PackedStringArray = section.split("::", false, 1)
+		var player_name: String = parts[0] if parts.size() == 2 else "Player 1"
+		var game_type: String = parts[1] if parts.size() == 2 else section
 		var g := _ensure_entry(player_name, game_type)
 		g["games_played"] = int(cfg.get_value(section, "games_played", g["games_played"]))
 		g["wins"] = int(cfg.get_value(section, "wins", g["wins"]))

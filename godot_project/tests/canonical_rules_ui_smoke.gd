@@ -24,6 +24,8 @@ func _initialize() -> void:
 	if chess_script != null:
 		var chess_node = chess_script.new()
 		get_root().add_child(chess_node)
+		if chess_node.get("promotion_panel") == null and chess_node.has_method("_ready"):
+			chess_node._ready()
 		_check(chess_node.get("promotion_panel") != null, "Ajedrez: PromotionSelectorPanel estilizado instanciado")
 		_check(chess_node.get("offer_draw_btn") != null, "Ajedrez: OfferDrawButton instanciado")
 		_check(chess_node.get("accept_draw_btn") != null, "Ajedrez: AcceptDrawButton instanciado")
@@ -47,6 +49,8 @@ func _initialize() -> void:
 	if go_script != null:
 		var go_node = go_script.new()
 		get_root().add_child(go_node)
+		if go_node.get("handicap_option_button") == null and go_node.has_method("_ready"):
+			go_node._ready()
 		_check(go_node.get("handicap_option_button") != null, "Go: HandicapOptionButton instanciado")
 		_check(go_node.get("scoring_phase_banner") != null, "Go: ScoringPhaseBanner con puntaje en vivo instanciado")
 		_check(go_node.get("confirm_dead_button") != null, "Go: ConfirmDeadButton instanciado")
@@ -72,6 +76,8 @@ func _initialize() -> void:
 	if shogi_script != null:
 		var shogi_node = shogi_script.new()
 		get_root().add_child(shogi_node)
+		if shogi_node.get("promotion_dialog_panel") == null and shogi_node.has_method("_ready"):
+			shogi_node._ready()
 		_check(shogi_node.get("promotion_dialog_panel") != null, "Shogi: PromotionDialogPanel estilizado instanciado")
 		_check(shogi_node.has_method("set_promotion_choice"), "Shogi: Expone set_promotion_choice(promote)")
 		_check(bool(shogi_node.call("_is_promotion_mandatory_fesa", "Pawn", 0, 1)) == true, "Shogi: Peón Sente en fila 0 tiene promoción obligatoria FESA")
@@ -90,6 +96,8 @@ func _initialize() -> void:
 	if bs_script != null:
 		var bs_node = bs_script.new()
 		get_root().add_child(bs_node)
+		if bs_node.get("extra_turn_check") == null and bs_node.has_method("_ready"):
+			bs_node._ready()
 		_check(bs_node.get("extra_turn_check") != null, "Batalla Naval: ExtraTurnCheckBox instanciado")
 		_check(bs_node.get("rematch_btn") != null, "Batalla Naval: RematchButton instanciado")
 		bs_node.call("_on_extra_turn_toggled", true)
@@ -108,6 +116,8 @@ func _initialize() -> void:
 	if mb_script != null:
 		var mb_node = mb_script.new()
 		get_root().add_child(mb_node)
+		if mb_node.get("coup_fourre_btn") == null and mb_node.has_method("_ready"):
+			mb_node._ready()
 		var cf_btn: Button = mb_node.get("coup_fourre_btn")
 		_check(cf_btn != null, "Mille Bornes: CoupFourreButton reactivo instanciado")
 		mb_node.set("hazards", {1: "Luz Verde (Siga)", 2: "Luz Verde (Siga)"})

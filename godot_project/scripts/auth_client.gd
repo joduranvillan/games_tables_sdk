@@ -88,7 +88,7 @@ static func is_valid_uuid_v4(candidate: String) -> bool:
 	var clean := candidate.strip_edges().to_lower()
 	if clean.length() != 36:
 		return false
-	var parts: String = clean.split("-")
+	var parts: PackedStringArray = clean.split("-")
 	if parts.size() != 5:
 		return false
 	if parts[0].length() != 8 or parts[1].length() != 4 or parts[2].length() != 4 or parts[3].length() != 4 or parts[4].length() != 12:

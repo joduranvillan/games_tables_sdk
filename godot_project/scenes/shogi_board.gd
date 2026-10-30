@@ -327,7 +327,7 @@ func _setup_hand_panels() -> void:
 	add_child(_hand_p2)
 
 func _update_hand_display(player: int, pieces: Array) -> void:
-	var panel: bool = _hand_p1 if player == 1 else _hand_p2
+	var panel: VBoxContainer = _hand_p1 if player == 1 else _hand_p2
 	if panel == null:
 		return
 	for child in panel.get_children():
@@ -966,7 +966,7 @@ func _draw() -> void:
 		var offset: float = float(i) * CELL_SIZE
 		var x = BOARD_ORIGIN_X + offset
 		var y = BOARD_ORIGIN_Y + offset
-		var w_line: bool = 2.5 if (i == 0 or i == BOARD_SIZE) else 2.0
+		var w_line: float = 2.5 if (i == 0 or i == BOARD_SIZE) else 2.0
 		draw_line(Vector2(x, BOARD_ORIGIN_Y), Vector2(x, BOARD_ORIGIN_Y + board_px), line_col, w_line)
 		draw_line(Vector2(BOARD_ORIGIN_X, y), Vector2(BOARD_ORIGIN_X + board_px, y), line_col, w_line)
 

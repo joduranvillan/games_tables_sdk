@@ -50,6 +50,13 @@ for dirpath, _, filenames in os.walk(root):
                             unsafe_walrus.append(f"{rel}:{i}: {line.strip()}")
                         elif re.search(r":=.*(\.get\(|\.call\(|bridge\.|parser\.data|\bin\b)", code_part):
                             unsafe_walrus.append(f"{rel}:{i}: {line.strip()}")
+                    mt = re.match(r"^\s*var\s+([A-Za-z0-9_]+)\s*:\s*([A-Za-z0-9_]+)\s*=\s*(.+)$", code_part)
+                    if mt:
+                        vn, vt, rhs = mt.groups()
+                        if ".split(" in rhs and not re.search(r"\.split\([^)]*\)\s*\[", rhs) and vt not in ("PackedStringArray", "Array"):
+                            unsafe_walrus.append(f"{rel}:{i}: Tipo inválido {vt} para .split() (debe ser PackedStringArray)")
+                        if " if " in rhs and " else " in rhs and vt == "bool" and not re.search(r"\b(true|false|==|!=|<=|>=|<|>|\band\b|\bor\b|\bnot\b|step_replay)\b", rhs.split(" if ")[0]):
+                            unsafe_walrus.append(f"{rel}:{i}: Tipo inválido bool en expresión ternaria: {line.strip()}")
 
 dups = {k: v for k, v in class_names.items() if len(v) > 1}
 if dups:

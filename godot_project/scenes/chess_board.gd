@@ -581,7 +581,7 @@ func _on_reject_draw_pressed() -> void:
 
 func _send_chess_move(from_r: int, from_c: int, to_r: int, to_c: int) -> void:
 	var promo = null
-	var moving_piece = piece_sprites[from_r][from_c]
+	var moving_piece = piece_sprites[from_r][from_c] if (piece_sprites.size() > from_r and piece_sprites[from_r].size() > from_c) else null
 	if moving_piece != null and moving_piece.has_meta("kind") and moving_piece.get_meta("kind") == "Pawn":
 		if to_r == 0 or to_r == BOARD_SIZE - 1:
 			if not OS.has_feature("headless") and promotion_panel != null:

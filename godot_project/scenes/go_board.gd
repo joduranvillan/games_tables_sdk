@@ -567,7 +567,7 @@ func _handle_local_place_stone(row: int, col: int) -> void:
 		return
 
 	board[row][col] = current
-	var enemy: bool = P_WHITE if current == P_BLACK else P_BLACK
+	var enemy: int = P_WHITE if current == P_BLACK else P_BLACK
 	var captured_coords: Array = []
 	for dir in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
 		var nr: int = row + dir.x
@@ -669,7 +669,7 @@ func _get_group_and_liberties(start_r: int, start_c: int) -> Dictionary:
 	return {"group": group, "liberties": liberties_map.size()}
 
 func _remove_captured_groups_around(placed_r: int, placed_c: int, player: int) -> Array:
-	var enemy: bool = P_WHITE if player == P_BLACK else P_BLACK
+	var enemy: int = P_WHITE if player == P_BLACK else P_BLACK
 	var captured: Array = []
 	for dir in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
 		var nr: int = placed_r + dir.x
@@ -848,7 +848,7 @@ func _on_event_json(json_str: String) -> void:
 						if pair is Array and pair.size() >= 2:
 							cap_coords.append(Vector2i(int(pair[1]), int(pair[0])))
 				var cap_player = int(event.get("player", current))
-				var enemy: bool = P_WHITE if cap_player == P_BLACK else P_BLACK
+				var enemy: int = P_WHITE if cap_player == P_BLACK else P_BLACK
 				if cap_coords.is_empty():
 					cap_coords = _find_all_zero_liberty_groups(enemy)
 				var count = int(event.get("count", cap_coords.size()))
@@ -1045,7 +1045,7 @@ func _update_status() -> void:
 	else:
 		var who = "Negro (1)" if current == P_BLACK else "Blanco (2)"
 		var p_col = COL_BLACK_STONE if current == P_BLACK else COL_WHITE_STONE
-		var pass_note: bool = " [1 Pase]" if consecutive_passes == 1 else ""
+		var pass_note: String = " [1 Pase]" if consecutive_passes == 1 else ""
 		status.text = "Turno: %s (Go %dx%d)%s" % [who, BOARD_SIZE, BOARD_SIZE, pass_note]
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, who, p_col)
