@@ -132,18 +132,23 @@ func _on_layout_changed(_layout: int) -> void:
 	var side_x := 640.0
 	if mode_option_button != null:
 		mode_option_button.position = Vector2(side_x, 24)
+		mode_option_button.visible = false
+	# Zona Superior: Turno y Reloj
 	if turn_indicator != null:
-		turn_indicator.position = Vector2(side_x, 80)
+		turn_indicator.position = Vector2(side_x, 20)
 	if status != null:
-		status.position = Vector2(side_x, 165)
+		status.position = Vector2(side_x, 74)
+	# Zona Inferior: Aviso de acción del turno (Captura obligatoria)
+	if mandatory_label != null:
+		mandatory_label.position = Vector2(side_x, 530)
 
 func _setup_ui_layers() -> void:
 	var side_x := 640.0
-	# Mandatory capture banner in right panel
+	# Mandatory capture banner in bottom zone (Acción del turno actual)
 	mandatory_label = Label.new()
 	mandatory_label.name = "MandatoryCaptureLabel"
 	mandatory_label.text = "¡Captura obligatoria!"
-	mandatory_label.position = Vector2(side_x, 290)
+	mandatory_label.position = Vector2(side_x, 530)
 	mandatory_label.size = Vector2(560, 40)
 	mandatory_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	mandatory_label.add_theme_font_size_override("font_size", 22)
@@ -165,6 +170,7 @@ func _setup_ui_layers() -> void:
 	mode_option_button.name = "ModeOptionButton"
 	mode_option_button.position = Vector2(side_x, 24)
 	mode_option_button.custom_minimum_size = Vector2(360, 36)
+	mode_option_button.visible = false
 	mode_option_button.add_item("Hotseat (2 jugadores)")
 	mode_option_button.add_item("vs IA (Humano J1 - Rojo)")
 	mode_option_button.add_item("vs IA (Humano J2 - Negro, IA inicia)")
@@ -173,17 +179,18 @@ func _setup_ui_layers() -> void:
 
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 80)
+	turn_indicator.position = Vector2(side_x, 20)
 	add_child(turn_indicator)
 
 	if status != null:
-		status.position = Vector2(side_x, 165)
+		status.position = Vector2(side_x, 74)
 
 	var tutorial_btn := Button.new()
 	tutorial_btn.name = "CheckersTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
 	tutorial_btn.position = Vector2(side_x, 225)
 	tutorial_btn.custom_minimum_size = Vector2(140, 36)
+	tutorial_btn.visible = false
 	tutorial_btn.pressed.connect(start_checkers_tutorial)
 	add_child(tutorial_btn)
 
@@ -192,6 +199,7 @@ func _setup_ui_layers() -> void:
 	btn_rules.text = "📖 Reglas"
 	btn_rules.position = Vector2(side_x + 155, 225)
 	btn_rules.custom_minimum_size = Vector2(120, 36)
+	btn_rules.visible = false
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("checkers"))
 	add_child(btn_rules)
 

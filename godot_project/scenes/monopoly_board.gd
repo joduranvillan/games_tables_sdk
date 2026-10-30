@@ -119,6 +119,7 @@ var dashboard_vbox: VBoxContainer
 var players_hud_hbox: BoxContainer
 var simple_turn_banner: PanelContainer
 var simple_turn_lbl: Label
+var mode_option_button: OptionButton = null
 
 # UI Components
 var player_tokens = {P1: null, P2: null}
@@ -359,11 +360,13 @@ func _setup_ui() -> void:
 	btn_rules.text = "📖 Reglas"
 	btn_rules.custom_minimum_size = Vector2(78, 30)
 	btn_rules.add_theme_font_size_override("font_size", 12)
+	btn_rules.visible = false
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("monopoly"))
 	top_bar.add_child(btn_rules)
 
 	var mode_opt := OptionButton.new()
 	mode_opt.name = "ModeOptionButton"
+	mode_option_button = mode_opt
 	mode_opt.custom_minimum_size = Vector2(105, 30)
 	mode_opt.add_theme_font_size_override("font_size", 12)
 	mode_opt.add_item("👥 Hotseat", 0)
@@ -375,6 +378,7 @@ func _setup_ui() -> void:
 		mode_opt.selected = 1 if hp == P1 else 2
 	else:
 		mode_opt.selected = 0
+	mode_opt.visible = false
 	mode_opt.item_selected.connect(_on_mode_selected)
 	top_bar.add_child(mode_opt)
 

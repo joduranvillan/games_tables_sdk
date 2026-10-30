@@ -170,54 +170,57 @@ func _setup_ui() -> void:
 		status = Label.new()
 		status.name = "Status"
 		add_child(status)
-	status.position = Vector2(780, 160)
+	# Zona Superior: Turno, Reloj y Estado del Cubo de Doblaje
+	status.position = Vector2(780, 72)
 
-	# Mode Option Button
+	# Mode Option Button (integrado en GameAppMenu / Opciones)
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
 	mode_option_button.position = Vector2(780, 40)
 	mode_option_button.custom_minimum_size = Vector2(360, 34)
+	mode_option_button.visible = false
 	mode_option_button.add_item("Hotseat (2 jugadores)")
 	mode_option_button.add_item("vs IA (Humano Rojo - J1)")
 	mode_option_button.add_item("vs IA (Humano Azul - J2, IA inicia)")
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	add_child(mode_option_button)
 
+	# Zona Inferior: Acciones del Turno (Tirar Dados y Doblar Apuesta)
 	roll_btn = Button.new()
-	roll_btn.position = Vector2(620, 260)
-	roll_btn.custom_minimum_size = Vector2(130, 45)
+	roll_btn.position = Vector2(780, 495)
+	roll_btn.custom_minimum_size = Vector2(135, 44)
 	roll_btn.text = "🎲 Tirar Dados"
 	roll_btn.add_theme_font_size_override("font_size", 15)
 	roll_btn.pressed.connect(_on_roll_pressed)
 	add_child(roll_btn)
 	
 	dice_label = Label.new()
-	dice_label.position = Vector2(620, 315)
-	dice_label.size = Vector2(130, 40)
+	dice_label.position = Vector2(780, 445)
+	dice_label.size = Vector2(160, 36)
 	dice_label.text = "Dados: -"
-	dice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	dice_label.add_theme_font_size_override("font_size", 16)
 	add_child(dice_label)
 
 	dice_widget = DiceWidget.new()
-	dice_widget.position = Vector2(610, 360)
+	dice_widget.position = Vector2(780, 385)
 	add_child(dice_widget)
 
-	# Doubling Cube Panel & Controls (Prompt 504)
+	# Doubling Cube Panel (Zona Superior) & Action Button (Zona Inferior)
 	cube_label = Label.new()
 	cube_label.name = "CubeLabel"
-	cube_label.position = Vector2(610, 420)
-	cube_label.size = Vector2(150, 26)
+	cube_label.position = Vector2(780, 112)
+	cube_label.size = Vector2(220, 26)
 	cube_label.text = "Cubo: ×1 (Centro)"
-	cube_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cube_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	cube_label.add_theme_font_size_override("font_size", 14)
 	cube_label.add_theme_color_override("font_color", Color(0.98, 0.90, 0.60))
 	add_child(cube_label)
 
 	double_btn = Button.new()
 	double_btn.name = "OfferDoubleButton"
-	double_btn.position = Vector2(610, 450)
-	double_btn.custom_minimum_size = Vector2(150, 36)
+	double_btn.position = Vector2(925, 495)
+	double_btn.custom_minimum_size = Vector2(155, 44)
 	double_btn.text = "🎲×2 Doblar Apuesta"
 	double_btn.add_theme_font_size_override("font_size", 13)
 	double_btn.pressed.connect(func():
@@ -261,12 +264,13 @@ func _setup_ui() -> void:
 	double_modal.add_child(dm_vbox)
 	add_child(double_modal)
 
-	# Rules Button
+	# Rules Button (integrado en GameAppMenu / Opciones)
 	var rules_btn = Button.new()
 	rules_btn.name = "RulesButton"
 	rules_btn.text = "📖 Reglas"
 	rules_btn.position = Vector2(900, 210)
 	rules_btn.custom_minimum_size = Vector2(110, 36)
+	rules_btn.visible = false
 	rules_btn.pressed.connect(func(): rules_popup.show_for_game("backgammon"))
 	add_child(rules_btn)
 
@@ -275,6 +279,7 @@ func _setup_ui() -> void:
 	tutorial_btn.text = "🎓 Tutorial"
 	tutorial_btn.position = Vector2(780, 210)
 	tutorial_btn.custom_minimum_size = Vector2(110, 36)
+	tutorial_btn.visible = false
 	tutorial_btn.pressed.connect(start_backgammon_tutorial)
 	add_child(tutorial_btn)
 
@@ -283,10 +288,10 @@ func _setup_ui() -> void:
 	rules_popup.position = Vector2(80, 100)
 	add_child(rules_popup)
 
-	# Turn Indicator Widget
+	# Turn Indicator Widget (Zona Superior)
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(780, 90)
+	turn_indicator.position = Vector2(780, 20)
 	add_child(turn_indicator)
 
 func start_backgammon_tutorial() -> void:

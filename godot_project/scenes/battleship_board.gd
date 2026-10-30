@@ -309,9 +309,20 @@ func _setup_ui() -> void:
 	top_menu_spacer.custom_minimum_size = Vector2(126, 32)
 	header_top_hbox.add_child(top_menu_spacer)
 
-	# Row 2: Mode selector + Orientation + Auto-Fleet + Reset Fleet
+	# Two Grids Container (Horizontal on Desktop/Landscape, Vertical on Mobile/Portrait)
+	grids_container = BoxContainer.new()
+	grids_container.name = "GridsContainer"
+	grids_container.vertical = false
+	grids_container.add_theme_constant_override("separation", 28)
+	grids_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	grids_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grids_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_vbox.add_child(grids_container)
+
+	# --- ZONA INFERIOR: Acciones de turno (Orientación, Auto-Flota y Limpiar Flota) ---
 	controls_flow = HFlowContainer.new()
-	controls_flow.add_theme_constant_override("h_separation", 8)
+	controls_flow.alignment = FlowContainer.ALIGNMENT_CENTER
+	controls_flow.add_theme_constant_override("h_separation", 10)
 	controls_flow.add_theme_constant_override("v_separation", 6)
 	main_vbox.add_child(controls_flow)
 
@@ -321,6 +332,7 @@ func _setup_ui() -> void:
 	mode_option_button.add_item("Hotseat (2 jugadores)")
 	mode_option_button.add_item("vs IA (Humano J1)")
 	mode_option_button.add_item("vs IA (Humano J2, IA inicia)")
+	mode_option_button.visible = false
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	controls_flow.add_child(mode_option_button)
 
@@ -342,9 +354,9 @@ func _setup_ui() -> void:
 
 	clear_fleet_btn = Button.new()
 	clear_fleet_btn.name = "ClearFleetButton"
-	clear_fleet_btn.text = "🗑️ Reiniciar"
+	clear_fleet_btn.text = "🗑️ Limpiar Flota"
 	clear_fleet_btn.tooltip_text = "Limpiar los barcos colocados y volver a empezar"
-	clear_fleet_btn.custom_minimum_size = Vector2(105, 34)
+	clear_fleet_btn.custom_minimum_size = Vector2(120, 34)
 	clear_fleet_btn.pressed.connect(_on_clear_fleet_pressed)
 	controls_flow.add_child(clear_fleet_btn)
 
@@ -353,6 +365,7 @@ func _setup_ui() -> void:
 	extra_turn_check.text = "🔥 Racha al impactar"
 	extra_turn_check.tooltip_text = "Si aciertas un disparo, conservas el turno para volver a disparar"
 	extra_turn_check.button_pressed = extra_turn_on_hit_enabled
+	extra_turn_check.visible = false
 	extra_turn_check.toggled.connect(_on_extra_turn_toggled)
 	controls_flow.add_child(extra_turn_check)
 
@@ -361,18 +374,9 @@ func _setup_ui() -> void:
 	rematch_btn.text = "🔁 Revancha"
 	rematch_btn.tooltip_text = "Iniciar una revancha rápida manteniendo el modo actual"
 	rematch_btn.custom_minimum_size = Vector2(110, 34)
+	rematch_btn.visible = false
 	rematch_btn.pressed.connect(_on_rematch_pressed)
 	controls_flow.add_child(rematch_btn)
-
-	# Two Grids Container (Horizontal on Desktop/Landscape, Vertical on Mobile/Portrait)
-	grids_container = BoxContainer.new()
-	grids_container.name = "GridsContainer"
-	grids_container.vertical = false
-	grids_container.add_theme_constant_override("separation", 28)
-	grids_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	grids_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	grids_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_vbox.add_child(grids_container)
 
 	# --- Panel 1: Own Grid (Mi Flota) ---
 	own_vbox = VBoxContainer.new()

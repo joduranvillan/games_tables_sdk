@@ -123,12 +123,13 @@ func _ready() -> void:
 	_update_status()
 	_request_board_redraw()
 
-	# --- Botón de reglas ---
+	# --- Botón de reglas (integrado en GameAppMenu / Opciones) ---
 	var btn_rules: Button = Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.position = Vector2(820, 230)
 	btn_rules.custom_minimum_size = Vector2(120, 36)
+	btn_rules.visible = false
 	btn_rules.pressed.connect(func(): _rules_popup.show_for_game("shogi"))
 	add_child(btn_rules)
 
@@ -198,7 +199,8 @@ func _setup_ui() -> void:
 		status = Label.new()
 		status.name = "Status"
 		add_child(status)
-	status.position = Vector2(side_x, 180)
+	# Zona Superior: Turno, Reloj y Capturas Gote (P2)
+	status.position = Vector2(side_x, 70)
 	status.custom_minimum_size = Vector2(560, 36)
 
 	# 9x9 GridContainer for structural compatibility; visual grid is drawn crisply via _draw()
@@ -221,51 +223,53 @@ func _setup_ui() -> void:
 
 	_ensure_board_containers()
 			
-	# Right Side Panel for Gote Hand (P2)
+	# Zona Superior: Gote Hand / Capturas del Oponente (P2)
 	var gote_label = Label.new()
 	gote_label.text = "Gote (P2) Mano (Komadai):"
-	gote_label.position = Vector2(side_x, 285)
+	gote_label.position = Vector2(side_x, 114)
 	add_child(gote_label)
 	
 	gote_hand_panel = VBoxContainer.new()
-	gote_hand_panel.position = Vector2(side_x, 315)
-	gote_hand_panel.custom_minimum_size = Vector2(240, 180)
+	gote_hand_panel.position = Vector2(side_x, 142)
+	gote_hand_panel.custom_minimum_size = Vector2(240, 175)
 	add_child(gote_hand_panel)
 	
-	# Right Side Panel for Sente Hand (P1)
+	# Zona Inferior: Sente Hand / Piezas Propias para Drop en el Turno (P1)
 	var sente_label = Label.new()
-	sente_label.text = "Sente (P1) Mano (Komadai):"
-	sente_label.position = Vector2(side_x + 280, 285)
+	sente_label.text = "Sente (P1) Mano (Komadai — Selecciona para Drop):"
+	sente_label.position = Vector2(side_x, 420)
 	add_child(sente_label)
 	
 	sente_hand_panel = VBoxContainer.new()
-	sente_hand_panel.position = Vector2(side_x + 280, 315)
+	sente_hand_panel.position = Vector2(side_x, 448)
 	sente_hand_panel.custom_minimum_size = Vector2(240, 180)
 	add_child(sente_hand_panel)
 
-	# Mode Option Button
+	# Mode Option Button (integrado en GameAppMenu / Opciones)
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
 	mode_option_button.position = Vector2(side_x, 24)
 	mode_option_button.custom_minimum_size = Vector2(360, 36)
+	mode_option_button.visible = false
 	mode_option_button.add_item("Hotseat (2 jugadores)")
 	mode_option_button.add_item("vs IA (Humano Sente - J1)")
 	mode_option_button.add_item("vs IA (Humano Gote - J2, IA inicia)")
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	add_child(mode_option_button)
 
-	# Turn Indicator Widget
+	# Turn Indicator Widget (Zona Superior)
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 80)
+	turn_indicator.position = Vector2(side_x, 20)
 	add_child(turn_indicator)
 
-	# Botón Tutorial Interactivo de Shogi (5 pasos)
+	# Botón Tutorial Interactivo de Shogi (integrado en GameAppMenu / Opciones)
 	var tutorial_btn: Button = Button.new()
 	tutorial_btn.name = "ShogiTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
 	tutorial_btn.position = Vector2(side_x, 230)
 	tutorial_btn.custom_minimum_size = Vector2(145, 36)
+	tutorial_btn.visible = false
 	tutorial_btn.pressed.connect(start_shogi_tutorial)
 	add_child(tutorial_btn)
 
@@ -316,13 +320,13 @@ func _setup_ui() -> void:
 func _setup_hand_panels() -> void:
 	_hand_p1 = VBoxContainer.new()
 	_hand_p1.name = "HandP1"
-	_hand_p1.position = Vector2(940, 500)
+	_hand_p1.position = Vector2(920, 448)
 	_hand_p1.custom_minimum_size = Vector2(120, 140)
 	add_child(_hand_p1)
 
 	_hand_p2 = VBoxContainer.new()
 	_hand_p2.name = "HandP2"
-	_hand_p2.position = Vector2(660, 500)
+	_hand_p2.position = Vector2(920, 142)
 	_hand_p2.custom_minimum_size = Vector2(120, 140)
 	add_child(_hand_p2)
 

@@ -104,12 +104,13 @@ func _ready() -> void:
 	_start_or_reset_match()
 	_on_layout_changed(gm.get_layout() if gm != null else 0)
 
-	# --- Botón de reglas ---
+	# --- Botón de reglas (integrado en GameAppMenu / Opciones) ---
 	var btn_rules: Button = Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.position = Vector2(930, 310)
 	btn_rules.custom_minimum_size = Vector2(110, 36)
+	btn_rules.visible = false
 	btn_rules.pressed.connect(func(): _rules_popup.show_for_game("go"))
 	add_child(btn_rules)
 
@@ -138,7 +139,8 @@ func _setup_ui() -> void:
 		status = Label.new()
 		status.name = "Status"
 		add_child(status)
-	status.position = Vector2(side_x, 185)
+	# Zona Superior: Turno, Reloj y Capturas
+	status.position = Vector2(side_x, 70)
 
 	stones_container = Node2D.new()
 	stones_container.name = "StonesContainer"
@@ -149,6 +151,7 @@ func _setup_ui() -> void:
 	mode_option_button.name = "ModeOptionButton"
 	mode_option_button.position = Vector2(side_x, 18)
 	mode_option_button.custom_minimum_size = Vector2(360, 34)
+	mode_option_button.visible = false
 	mode_option_button.add_item("Hotseat (2 jugadores)")
 	mode_option_button.add_item("vs IA (Humano Negras - J1)")
 	mode_option_button.add_item("vs IA (Humano Blancas - J2, IA inicia)")
@@ -159,26 +162,27 @@ func _setup_ui() -> void:
 	size_option_button.name = "BoardSizeOptionButton"
 	size_option_button.position = Vector2(side_x, 60)
 	size_option_button.custom_minimum_size = Vector2(360, 34)
+	size_option_button.visible = false
 	size_option_button.add_item("Tablero 9x9 (Rápido)")
 	size_option_button.add_item("Tablero 13x13 (Intermedio)")
 	size_option_button.add_item("Tablero 19x19 (Estándar / Oficial)")
 	size_option_button.item_selected.connect(_on_size_selected)
 	add_child(size_option_button)
 
-	# Board Info & Komi Label in right sidebar
+	# Board Info & Komi Label (Zona Superior)
 	captured_score_label = Label.new()
 	captured_score_label.name = "CapturedScoreLabel"
-	captured_score_label.position = Vector2(side_x, 220)
+	captured_score_label.position = Vector2(side_x, 108)
 	captured_score_label.size = Vector2(420, 28)
 	captured_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	captured_score_label.add_theme_font_size_override("font_size", 15)
 	captured_score_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
 	add_child(captured_score_label)
 
-	# Captured Stones Counters in right sidebar
+	# Captured Stones Counters (Zona Superior)
 	var captures_container = HBoxContainer.new()
 	captures_container.name = "CapturesContainer"
-	captures_container.position = Vector2(side_x, 252)
+	captures_container.position = Vector2(side_x, 140)
 	captures_container.size = Vector2(420, 30)
 	captures_container.add_theme_constant_override("separation", 28)
 	add_child(captures_container)
@@ -208,44 +212,47 @@ func _setup_ui() -> void:
 	drag_layer.set_process_input(false)
 	drag_layer.set_process_unhandled_input(false)
 
-	# Turn Indicator Widget
+	# Turn Indicator Widget (Zona Superior)
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 108)
+	turn_indicator.position = Vector2(side_x, 20)
 	add_child(turn_indicator)
 
-	# Botón Pasar Turno (PassCommand)
+	# Zona Inferior: Acciones del turno actual (Pasar Turno y Conteo de Territorio)
 	var pass_btn: Button = Button.new()
 	pass_btn.name = "PassTurnButton"
-	pass_btn.text = "⏭️ Pasar"
-	pass_btn.position = Vector2(side_x, 310)
-	pass_btn.custom_minimum_size = Vector2(120, 36)
+	pass_btn.text = "⏭️ Pasar Turno"
+	pass_btn.position = Vector2(side_x, 536)
+	pass_btn.custom_minimum_size = Vector2(180, 42)
 	pass_btn.pressed.connect(_on_pass_pressed)
 	add_child(pass_btn)
 
-	# Botón Tutorial Interactivo de Go (5 pasos)
+	# Botón Tutorial Interactivo de Go (integrado en GameAppMenu / Opciones)
 	var tutorial_btn: Button = Button.new()
 	tutorial_btn.name = "GoTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(side_x + 135, 310)
+	tutorial_btn.position = Vector2(side_x + 195, 536)
 	tutorial_btn.custom_minimum_size = Vector2(140, 36)
+	tutorial_btn.visible = false
 	tutorial_btn.pressed.connect(start_go_tutorial)
 	add_child(tutorial_btn)
 
-	# Botón Exportar Partida (SGF)
+	# Botón Exportar Partida (SGF) — integrado en GameAppMenu / Opciones
 	export_game_button = Button.new()
 	export_game_button.name = "ExportGameButton"
 	export_game_button.text = "Exportar Partida"
 	export_game_button.position = Vector2(side_x, 360)
 	export_game_button.custom_minimum_size = Vector2(170, 36)
+	export_game_button.visible = false
 	export_game_button.pressed.connect(_on_export_game_pressed)
 	add_child(export_game_button)
 
-	# Selector de Handicap Inicial (PlaceHandicapCommand: 0, 2, 3, 4 piedras Hoshi)
+	# Selector de Handicap Inicial — integrado en GameAppMenu / Opciones
 	handicap_option_button = OptionButton.new()
 	handicap_option_button.name = "HandicapOptionButton"
 	handicap_option_button.position = Vector2(side_x + 180, 360)
 	handicap_option_button.custom_minimum_size = Vector2(210, 36)
+	handicap_option_button.visible = false
 	handicap_option_button.add_item("Handicap: 0 piedras")
 	handicap_option_button.add_item("Handicap: 2 piedras (Hoshi)")
 	handicap_option_button.add_item("Handicap: 3 piedras (Hoshi)")
@@ -253,10 +260,10 @@ func _setup_ui() -> void:
 	handicap_option_button.item_selected.connect(_on_handicap_selected)
 	add_child(handicap_option_button)
 
-	# Banner de Fase de Conteo con Puntaje Parcial en Vivo + ConfirmDeadButton
+	# Banner de Fase de Conteo con Puntaje Parcial en Vivo + ConfirmDeadButton (Zona Inferior)
 	scoring_phase_banner = PanelContainer.new()
 	scoring_phase_banner.name = "ScoringPhaseBanner"
-	scoring_phase_banner.position = Vector2(side_x, 404)
+	scoring_phase_banner.position = Vector2(side_x, 430)
 	scoring_phase_banner.visible = false
 	var sb_style: StyleBoxFlat = StyleBoxFlat.new()
 	sb_style.bg_color = Color(0.11, 0.14, 0.20, 0.96)
@@ -290,7 +297,7 @@ func _setup_ui() -> void:
 	export_toast_label.name = "ExportToastLabel"
 	export_toast_label.text = ""
 	export_toast_label.visible = false
-	export_toast_label.position = Vector2(side_x, 495)
+	export_toast_label.position = Vector2(side_x, 588)
 	export_toast_label.add_theme_font_size_override("font_size", 14)
 	export_toast_label.add_theme_color_override("font_color", Color(0.45, 0.95, 0.55))
 	add_child(export_toast_label)

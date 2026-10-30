@@ -244,7 +244,7 @@ func _setup_ui_layers() -> void:
 		status = Label.new()
 		status.name = "Status"
 		add_child(status)
-	status.position = Vector2(side_x, 225)
+	status.position = Vector2(side_x, 74)
 
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
@@ -253,6 +253,7 @@ func _setup_ui_layers() -> void:
 	mode_option_button.add_item("Hotseat (Local)")
 	mode_option_button.add_item("vs IA (Humano J1 - Rojo)")
 	mode_option_button.add_item("vs IA (Humano J2 - Azul, IA inicia)")
+	mode_option_button.visible = false
 	mode_option_button.item_selected.connect(func(_idx):
 		if mode_option_button.selected > 0:
 			num_players = 2
@@ -262,10 +263,11 @@ func _setup_ui_layers() -> void:
 	)
 	add_child(mode_option_button)
 
-	# Selector de número de jugadores (2 a 6)
+	# Selector de número de jugadores (2 a 6) — gestionado desde el menú Opciones
 	player_select_box = HBoxContainer.new()
 	player_select_box.position = Vector2(side_x, 72)
 	player_select_box.add_theme_constant_override("separation", 8)
+	player_select_box.visible = false
 	add_child(player_select_box)
 
 	var lbl = Label.new()
@@ -287,9 +289,10 @@ func _setup_ui_layers() -> void:
 	)
 	player_select_box.add_child(player_count_option)
 
+	# --- ZONA SUPERIOR: Turno, reloj y estado ---
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 125)
+	turn_indicator.position = Vector2(side_x, 20)
 	add_child(turn_indicator)
 
 	var btn_rules = Button.new()
@@ -297,6 +300,7 @@ func _setup_ui_layers() -> void:
 	btn_rules.text = "📖 Reglas"
 	btn_rules.position = Vector2(side_x, 275)
 	btn_rules.custom_minimum_size = Vector2(120, 40)
+	btn_rules.visible = false
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("chinese_checkers"))
 	add_child(btn_rules)
 

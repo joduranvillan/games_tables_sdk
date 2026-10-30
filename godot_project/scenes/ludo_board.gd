@@ -162,7 +162,7 @@ func _setup_ui() -> void:
 		status = Label.new()
 		status.name = "Status"
 		add_child(status)
-	status.position = Vector2(side_x, 150)
+	status.position = Vector2(side_x, 74)
 
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
@@ -171,28 +171,24 @@ func _setup_ui() -> void:
 	mode_option_button.add_item("Hotseat (2 jugadores)")
 	mode_option_button.add_item("vs IA (Humano Rojo - J1)")
 	mode_option_button.add_item("vs IA (Humano Azul - J2, IA inicia)")
+	mode_option_button.visible = false
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	add_child(mode_option_button)
 
-	# Turn Indicator Widget
+	# --- ZONA SUPERIOR: Turno, reloj y estado ---
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 76)
+	turn_indicator.position = Vector2(side_x, 20)
 	add_child(turn_indicator)
 
-	# Dice Roll Button
-	dice_button = Button.new()
-	dice_button.position = Vector2(side_x, 195)
-	dice_button.custom_minimum_size = Vector2(150, 54)
-	dice_button.text = "Tirar Dado"
-	dice_button.add_theme_font_size_override("font_size", 18)
-	dice_button.pressed.connect(_on_roll_dice_pressed)
-	add_child(dice_button)
-	
-	# Dice Result Display
+	# --- ZONA INFERIOR: Acciones de turno (Tirar Dado y resultado) ---
+	dice_widget = DiceWidget.new()
+	dice_widget.position = Vector2(side_x, 385)
+	add_child(dice_widget)
+
 	dice_label = Label.new()
 	dice_label.name = "DiceLabel"
-	dice_label.position = Vector2(side_x, 260)
+	dice_label.position = Vector2(side_x + 150, 380)
 	dice_label.size = Vector2(150, 90)
 	dice_label.pivot_offset = Vector2(75, 45)
 	dice_label.text = "🎲 -"
@@ -201,24 +197,30 @@ func _setup_ui() -> void:
 	dice_label.add_theme_font_size_override("font_size", 48)
 	add_child(dice_label)
 
-	dice_widget = DiceWidget.new()
-	dice_widget.position = Vector2(side_x, 360)
-	add_child(dice_widget)
+	dice_button = Button.new()
+	dice_button.position = Vector2(side_x, 495)
+	dice_button.custom_minimum_size = Vector2(170, 52)
+	dice_button.text = "🎲 Tirar Dado"
+	dice_button.add_theme_font_size_override("font_size", 18)
+	dice_button.pressed.connect(_on_roll_dice_pressed)
+	add_child(dice_button)
 
 	var tutorial_btn := Button.new()
 	tutorial_btn.name = "LudoTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
 	tutorial_btn.position = Vector2(side_x, 450)
 	tutorial_btn.custom_minimum_size = Vector2(130, 36)
+	tutorial_btn.visible = false
 	tutorial_btn.pressed.connect(start_ludo_tutorial)
 	add_child(tutorial_btn)
 
-	# Rules Button
+	# Rules Button (Oculto: accesible desde el menú Opciones)
 	var rules_btn = Button.new()
 	rules_btn.name = "RulesButton"
 	rules_btn.text = "📖 Reglas"
 	rules_btn.position = Vector2(side_x + 145, 450)
 	rules_btn.custom_minimum_size = Vector2(115, 36)
+	rules_btn.visible = false
 	rules_btn.pressed.connect(func(): rules_popup.show_for_game("ludo"))
 	add_child(rules_btn)
 

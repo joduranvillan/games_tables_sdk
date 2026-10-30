@@ -141,6 +141,41 @@ func _initialize() -> void:
 		get_root().remove_child(mb_node)
 		mb_node.free()
 
+	# 6. GameAppMenu (scenes/game_app_menu.gd): Menú unificado de Opciones (Exportar/Importar, Configuración, Guardar/Cargar, Tablas/Rendirse)
+	var menu_script: Script = load("res://scenes/game_app_menu.gd") as Script
+	_check(menu_script != null, "game_app_menu.gd carga sin errores de parseo en modo Redot strict")
+	if menu_script != null and go_script != null:
+		var go_board_test: Node = go_script.new()
+		get_root().add_child(go_board_test)
+		if go_board_test.get("handicap_option_button") == null and go_board_test.has_method("_ready"):
+			go_board_test._ready()
+		var app_menu: Node = menu_script.new()
+		app_menu.set("board_node", go_board_test)
+		get_root().add_child(app_menu)
+		if app_menu.get("export_item_btn") == null and app_menu.has_method("_ready"):
+			app_menu._ready()
+		app_menu.call("sync_board_buttons")
+		_check(app_menu.get("export_item_btn") != null, "GameAppMenu: Botón Exportar Partida (PGN/SGF/JSON) integrado en el menú Opciones")
+		_check(app_menu.get("import_item_btn") != null, "GameAppMenu: Botón Importar Partida / Posición integrado en el menú Opciones")
+		_check(app_menu.get("save_load_item_btn") != null, "GameAppMenu: Botón Guardar / Cargar Partida integrado en el menú Opciones")
+		_check(app_menu.get("save_replay_item_btn") != null, "GameAppMenu: Botón Guardar Replay (.otr) integrado en el menú Opciones")
+		_check(app_menu.get("offer_draw_item_btn") != null, "GameAppMenu: Botón Ofrecer Tablas integrado en el menú Opciones")
+		_check(app_menu.get("resign_item_btn") != null, "GameAppMenu: Botón Rendirse integrado en el menú Opciones")
+		var mode_opt_menu: OptionButton = app_menu.get("mode_menu_option") as OptionButton
+		var size_opt_menu: OptionButton = app_menu.get("size_menu_option") as OptionButton
+		var handi_opt_menu: OptionButton = app_menu.get("handicap_menu_option") as OptionButton
+		_check(mode_opt_menu != null and mode_opt_menu.item_count >= 2, "GameAppMenu: Selector de Modo/IA sincronizado en el menú Opciones")
+		_check(size_opt_menu != null and size_opt_menu.item_count == 3, "GameAppMenu: Selector de Tamaño de Tablero sincronizado en el menú Opciones")
+		_check(handi_opt_menu != null and handi_opt_menu.item_count >= 2, "GameAppMenu: Selector de Handicap sincronizado en el menú Opciones")
+		var go_exp_btn: Control = go_board_test.get("export_game_button") as Control
+		var go_mode_btn: Control = go_board_test.get("mode_option_button") as Control
+		_check(go_exp_btn != null and go_exp_btn.visible == false, "HUD Equilibrado: Botón Exportar oculto en el lienzo y trasladado al menú Opciones")
+		_check(go_mode_btn != null and go_mode_btn.visible == false, "HUD Equilibrado: Selector de Modo oculto en el lienzo y trasladado al menú Opciones")
+		get_root().remove_child(app_menu)
+		app_menu.free()
+		get_root().remove_child(go_board_test)
+		go_board_test.free()
+
 	if _failures == 0:
 		print("=== RESULTADO: TODO OK (canonical_rules_ui_smoke.gd) ===")
 		quit(0)

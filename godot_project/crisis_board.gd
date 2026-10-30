@@ -749,6 +749,7 @@ func _setup_ui() -> void:
 		mode_opt.selected = 1 if hp == 1 else 2
 	else:
 		mode_opt.selected = 0
+	mode_opt.visible = false
 	mode_opt.item_selected.connect(_on_mode_selected)
 	header_hbox.add_child(mode_opt)
 
@@ -756,9 +757,15 @@ func _setup_ui() -> void:
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.custom_minimum_size = Vector2(86, 32)
+	btn_rules.visible = false
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("crisis"))
 	btn_rules_node = btn_rules
 	header_hbox.add_child(btn_rules)
+
+	var top_menu_spacer: Control = Control.new()
+	top_menu_spacer.name = "TopMenuSpacer"
+	top_menu_spacer.custom_minimum_size = Vector2(126, 32)
+	header_hbox.add_child(top_menu_spacer)
 
 	# 3. Superimposed Floating Tactical Control Panel (Right Side on Desktop, Collapsible Bottom Drawer on Mobile)
 	sidebar_panel = Panel.new()

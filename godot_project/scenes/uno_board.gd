@@ -353,6 +353,7 @@ func _setup_ui() -> void:
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.custom_minimum_size = Vector2(105, 36)
+	btn_rules.visible = false
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("uno"))
 	top_bar.add_child(btn_rules)
 
@@ -360,6 +361,7 @@ func _setup_ui() -> void:
 	tutorial_btn.name = "UnoTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
 	tutorial_btn.custom_minimum_size = Vector2(110, 36)
+	tutorial_btn.visible = false
 	tutorial_btn.pressed.connect(start_uno_tutorial)
 	top_bar.add_child(tutorial_btn)
 
@@ -370,8 +372,14 @@ func _setup_ui() -> void:
 	mode_option_button.add_item("🤖 vs IA (J1)", 1)
 	mode_option_button.add_item("🤖 vs IA (J2)", 2)
 	mode_option_button.selected = 1
+	mode_option_button.visible = false
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	top_bar.add_child(mode_option_button)
+
+	var top_menu_spacer: Control = Control.new()
+	top_menu_spacer.name = "TopMenuSpacer"
+	top_menu_spacer.custom_minimum_size = Vector2(126, 36)
+	top_bar.add_child(top_menu_spacer)
 
 	# 3. Turn Indicator Bar (Full width inside table mat so buttons never overflow)
 	turn_indicator = TurnIndicator.new()

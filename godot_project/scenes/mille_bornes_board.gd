@@ -71,6 +71,7 @@ var opponent_tableau: Panel
 var draw_button: Button
 var discard_mode: CheckBox
 var coup_fourre_btn: Button = null
+var mode_option_button: OptionButton = null
 var selected_card_idx: int = -1
 
 # Hazard & Status HUD overlays
@@ -280,11 +281,13 @@ func _setup_ui() -> void:
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
 	btn_rules.custom_minimum_size = Vector2(90, 36)
+	btn_rules.visible = false
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("mille_bornes"))
 	top_bar.add_child(btn_rules)
 
 	var mode_opt: OptionButton = OptionButton.new()
 	mode_opt.name = "ModeOptionButton"
+	mode_option_button = mode_opt
 	mode_opt.add_item("👥 Hotseat", 0)
 	mode_opt.add_item("🤖 vs IA (J1)", 1)
 	mode_opt.add_item("🤖 vs IA (J2)", 2)
@@ -294,12 +297,13 @@ func _setup_ui() -> void:
 		mode_opt.selected = 1 if hp == P1 else 2
 	else:
 		mode_opt.selected = 0
+	mode_opt.visible = false
 	mode_opt.item_selected.connect(_on_mode_selected)
 	top_bar.add_child(mode_opt)
 
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(50, 75)
+	turn_indicator.position = Vector2(50, 72)
 	add_child(turn_indicator)
 
 	# Local Player Tableau (Left side)

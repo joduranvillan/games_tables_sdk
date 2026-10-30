@@ -180,7 +180,7 @@ func _setup_ui_layout() -> void:
 	table_mat_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(table_mat_panel)
 
-	# Barra de controles en el panel lateral derecho
+	# Barra de controles (integrados en GameAppMenu / Opciones)
 	top_bar = HBoxContainer.new()
 	top_bar.name = "TopBar"
 	top_bar.position = Vector2(side_x, 24)
@@ -188,43 +188,46 @@ func _setup_ui_layout() -> void:
 	top_bar.add_theme_constant_override("separation", 10)
 	add_child(top_bar)
 
-	# Selector de modo
+	# Selector de modo (integrado en GameAppMenu / Opciones)
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
 	mode_option_button.custom_minimum_size = Vector2(280, 34)
+	mode_option_button.visible = false
 	mode_option_button.add_item("Hotseat (2 jugadores)")
 	mode_option_button.add_item("vs IA (Humano Rojo - J1)")
 	mode_option_button.add_item("vs IA (Humano Negro - J2, IA inicia)")
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	top_bar.add_child(mode_option_button)
 
-	# Botón de Reglas
+	# Botón de Reglas (integrado en GameAppMenu / Opciones)
 	rules_button = Button.new()
 	rules_button.name = "RulesButton"
 	rules_button.text = "📖 Reglas"
 	rules_button.custom_minimum_size = Vector2(105, 34)
+	rules_button.visible = false
 	rules_button.pressed.connect(_on_rules_pressed)
 	top_bar.add_child(rules_button)
 
-	# Botón de Reiniciar
+	# Botón de Reiniciar (integrado en GameAppMenu / Opciones)
 	reset_button = Button.new()
 	reset_button.name = "ResetButton"
 	reset_button.text = "🔄 Reiniciar"
 	reset_button.custom_minimum_size = Vector2(110, 34)
+	reset_button.visible = false
 	reset_button.pressed.connect(_on_reset_pressed)
 	top_bar.add_child(reset_button)
 
-	# Indicador de Turno en el panel lateral derecho
+	# Zona Superior: Indicador de Turno, Reloj y Bandejas de Capturas
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 80)
+	turn_indicator.position = Vector2(side_x, 20)
 	turn_indicator.custom_minimum_size = Vector2(260, 40)
 	add_child(turn_indicator)
 
-	# Banner de eventos / anuncios en el panel lateral derecho
+	# Zona Inferior: Banner de acción y eventos del turno actual
 	event_banner = PanelContainer.new()
 	event_banner.name = "EventBanner"
-	event_banner.position = Vector2(side_x, 160)
+	event_banner.position = Vector2(side_x, 545)
 	event_banner.size = Vector2(580, 44)
 	var ev_style = StyleBoxFlat.new()
 	ev_style.bg_color = Color(0.12, 0.14, 0.18, 0.88)
@@ -247,30 +250,30 @@ func _setup_ui_layout() -> void:
 	event_label.add_theme_font_size_override("font_size", 14)
 	event_banner.add_child(event_label)
 
-	# Bandeja lateral para capturas Negras (capturadas por Rojo)
+	# Zona Superior: Bandeja para capturas Negras (capturadas por Rojo)
 	var black_tray_lbl = Label.new()
 	black_tray_lbl.text = "Capturas Negras:"
-	black_tray_lbl.position = Vector2(side_x, 225)
+	black_tray_lbl.position = Vector2(side_x, 76)
 	black_tray_lbl.add_theme_font_size_override("font_size", 13)
 	black_tray_lbl.add_theme_color_override("font_color", Color(0.82, 0.82, 0.82))
 	add_child(black_tray_lbl)
 
 	captured_black_box = HBoxContainer.new()
-	captured_black_box.position = Vector2(side_x, 250)
+	captured_black_box.position = Vector2(side_x, 100)
 	captured_black_box.size = Vector2(580, 90)
 	captured_black_box.add_theme_constant_override("separation", 6)
 	add_child(captured_black_box)
 
-	# Bandeja lateral para capturas Rojas (capturadas por Negro)
+	# Zona Superior: Bandeja para capturas Rojas (capturadas por Negro)
 	var red_tray_lbl = Label.new()
 	red_tray_lbl.text = "Capturas Rojas:"
-	red_tray_lbl.position = Vector2(side_x, 360)
+	red_tray_lbl.position = Vector2(side_x, 205)
 	red_tray_lbl.add_theme_font_size_override("font_size", 13)
 	red_tray_lbl.add_theme_color_override("font_color", Color(0.82, 0.82, 0.82))
 	add_child(red_tray_lbl)
 
 	captured_red_box = HBoxContainer.new()
-	captured_red_box.position = Vector2(side_x, 385)
+	captured_red_box.position = Vector2(side_x, 229)
 	captured_red_box.size = Vector2(580, 90)
 	captured_red_box.add_theme_constant_override("separation", 6)
 	add_child(captured_red_box)
