@@ -177,6 +177,23 @@ func _on_layout_changed(_layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 	_restore_piece_label_fonts()
+	var vp_size: Vector2 = Vector2(1280, 720)
+	if is_inside_tree() and get_viewport() != null:
+		var visible_sz: Vector2 = get_viewport().get_visible_rect().size
+		if visible_sz.x > 0 and visible_sz.y > 0:
+			vp_size = visible_sz
+	if _layout == 2 and vp_size.x >= 1000.0:
+		vp_size = Vector2(375, 667)
+	var min_x: float = 36.0
+	var min_y: float = -64.0
+	var design_w: float = 602.0
+	var design_h: float = 788.0
+	var s: float = clampf(minf((vp_size.x - 40.0) / design_w, (vp_size.y - 24.0) / design_h), 0.30, 1.0)
+	scale = Vector2(s, s)
+	position = Vector2(
+		(vp_size.x - design_w * s) * 0.5 - min_x * s,
+		(vp_size.y - design_h * s) * 0.5 - min_y * s
+	)
 
 func _ensure_board_containers() -> void:
 	if pieces_container == null or not is_instance_valid(pieces_container):
@@ -192,16 +209,15 @@ func _ensure_board_containers() -> void:
 		add_child(board_overlay)
 
 func _setup_ui() -> void:
-	var side_x: float = 660.0
 	if status == null:
 		status = get_node_or_null("Status")
 	if status == null:
 		status = Label.new()
 		status.name = "Status"
 		add_child(status)
-	# Zona Superior: Turno, Reloj y Capturas Gote (P2)
-	status.position = Vector2(side_x, 70)
-	status.custom_minimum_size = Vector2(560, 36)
+	# Zona Superior Centrada: Turno, Reloj y Capturas Gote (P2)
+	status.position = Vector2(310, -54)
+	status.custom_minimum_size = Vector2(324, 34)
 
 	# 9x9 GridContainer for structural compatibility; visual grid is drawn crisply via _draw()
 	grid_container = GridContainer.new()
@@ -223,32 +239,32 @@ func _setup_ui() -> void:
 
 	_ensure_board_containers()
 			
-	# Zona Superior: Gote Hand / Capturas del Oponente (P2)
+	# Zona Superior Centrada: Gote Hand / Capturas del Oponente (P2)
 	var gote_label = Label.new()
 	gote_label.text = "Gote (P2) Mano (Komadai):"
-	gote_label.position = Vector2(side_x, 114)
+	gote_label.position = Vector2(40, -14)
 	add_child(gote_label)
 	
 	gote_hand_panel = VBoxContainer.new()
-	gote_hand_panel.position = Vector2(side_x, 142)
-	gote_hand_panel.custom_minimum_size = Vector2(240, 175)
+	gote_hand_panel.position = Vector2(235, -18)
+	gote_hand_panel.custom_minimum_size = Vector2(210, 44)
 	add_child(gote_hand_panel)
 	
-	# Zona Inferior: Sente Hand / Piezas Propias para Drop en el Turno (P1)
+	# Zona Inferior Centrada: Sente Hand / Piezas Propias para Drop en el Turno (P1)
 	var sente_label = Label.new()
 	sente_label.text = "Sente (P1) Mano (Komadai — Selecciona para Drop):"
-	sente_label.position = Vector2(side_x, 420)
+	sente_label.position = Vector2(40, 642)
 	add_child(sente_label)
 	
 	sente_hand_panel = VBoxContainer.new()
-	sente_hand_panel.position = Vector2(side_x, 448)
-	sente_hand_panel.custom_minimum_size = Vector2(240, 180)
+	sente_hand_panel.position = Vector2(40, 666)
+	sente_hand_panel.custom_minimum_size = Vector2(240, 52)
 	add_child(sente_hand_panel)
 
 	# Mode Option Button (integrado en GameAppMenu / Opciones)
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
-	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.position = Vector2(150, -56)
 	mode_option_button.custom_minimum_size = Vector2(360, 36)
 	mode_option_button.visible = false
 	mode_option_button.add_item("Hotseat (2 jugadores)")
@@ -257,26 +273,26 @@ func _setup_ui() -> void:
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	add_child(mode_option_button)
 
-	# Turn Indicator Widget (Zona Superior)
+	# Turn Indicator Widget (Zona Superior Centrada)
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 20)
+	turn_indicator.position = Vector2(40, -58)
 	add_child(turn_indicator)
 
 	# Botón Tutorial Interactivo de Shogi (integrado en GameAppMenu / Opciones)
 	var tutorial_btn: Button = Button.new()
 	tutorial_btn.name = "ShogiTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(side_x, 230)
+	tutorial_btn.position = Vector2(260, 642)
 	tutorial_btn.custom_minimum_size = Vector2(145, 36)
 	tutorial_btn.visible = false
 	tutorial_btn.pressed.connect(start_shogi_tutorial)
 	add_child(tutorial_btn)
 
-	# Diálogo Modal Estilizado de Promoción Opcional FESA (PromotionDialogPanel)
+	# Diálogo Modal Estilizado de Promoción Opcional FESA (PromotionDialogPanel en Zona Inferior Centrada)
 	promotion_dialog_panel = PanelContainer.new()
 	promotion_dialog_panel.name = "PromotionDialogPanel"
-	promotion_dialog_panel.position = Vector2(125, 225)
+	promotion_dialog_panel.position = Vector2(155, 644)
 	promotion_dialog_panel.z_index = 25
 	promotion_dialog_panel.visible = false
 	var shogi_promo_style: StyleBoxFlat = StyleBoxFlat.new()
@@ -320,14 +336,14 @@ func _setup_ui() -> void:
 func _setup_hand_panels() -> void:
 	_hand_p1 = VBoxContainer.new()
 	_hand_p1.name = "HandP1"
-	_hand_p1.position = Vector2(920, 448)
-	_hand_p1.custom_minimum_size = Vector2(120, 140)
+	_hand_p1.position = Vector2(360, 666)
+	_hand_p1.custom_minimum_size = Vector2(120, 52)
 	add_child(_hand_p1)
 
 	_hand_p2 = VBoxContainer.new()
 	_hand_p2.name = "HandP2"
-	_hand_p2.position = Vector2(920, 142)
-	_hand_p2.custom_minimum_size = Vector2(120, 140)
+	_hand_p2.position = Vector2(465, -18)
+	_hand_p2.custom_minimum_size = Vector2(120, 44)
 	add_child(_hand_p2)
 
 func _update_hand_display(player: int, pieces: Array) -> void:
@@ -525,7 +541,7 @@ func _event_to_board_pos(event_pos: Vector2, is_mouse: bool = true) -> Vector2:
 		if is_mouse:
 			return get_local_mouse_position()
 		return make_canvas_position_local(event_pos)
-	return event_pos - position
+	return event_pos
 
 func _input(event: InputEvent) -> void:
 	if winner != -1:

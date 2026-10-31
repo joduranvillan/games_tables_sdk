@@ -703,12 +703,12 @@ func _setup_ui() -> void:
 		add_child(lbl)
 		territory_labels[i] = lbl
 
-	# 2. Superimposed Top HUD Bar
+	# 2. Superimposed Centered Top HUD Bar
 	top_bar_panel = Panel.new()
 	top_bar_panel.name = "TopBarPanel"
-	top_bar_panel.position = Vector2(16, 12)
-	top_bar_panel.custom_minimum_size = Vector2(1248, 52)
-	top_bar_panel.size = Vector2(1248, 52)
+	top_bar_panel.position = Vector2(180, 10)
+	top_bar_panel.custom_minimum_size = Vector2(920, 48)
+	top_bar_panel.size = Vector2(920, 48)
 	add_child(top_bar_panel)
 
 	var header_hbox = HBoxContainer.new()
@@ -762,18 +762,13 @@ func _setup_ui() -> void:
 	btn_rules_node = btn_rules
 	header_hbox.add_child(btn_rules)
 
-	var top_menu_spacer: Control = Control.new()
-	top_menu_spacer.name = "TopMenuSpacer"
-	top_menu_spacer.custom_minimum_size = Vector2(126, 32)
-	header_hbox.add_child(top_menu_spacer)
-
-	# 3. Superimposed Floating Tactical Control Panel (Right Side on Desktop, Collapsible Bottom Drawer on Mobile)
+	# 3. Superimposed Centered Bottom Tactical Control Panel
 	sidebar_panel = Panel.new()
 	sidebar_panel.name = "SidebarPanel"
 	sidebar_panel.clip_contents = true
-	sidebar_panel.position = Vector2(912, 74)
-	sidebar_panel.custom_minimum_size = Vector2(352, 632)
-	sidebar_panel.size = Vector2(352, 632)
+	sidebar_panel.position = Vector2(180, 524)
+	sidebar_panel.custom_minimum_size = Vector2(920, 184)
+	sidebar_panel.size = Vector2(920, 184)
 	add_child(sidebar_panel)
 
 	var sidebar_vbox = VBoxContainer.new()
@@ -1120,15 +1115,15 @@ func _apply_sidebar_layout() -> void:
 			sidebar_panel.position = Vector2(6, 375)
 			sidebar_panel.custom_minimum_size = Vector2(363, 284)
 			sidebar_panel.size = Vector2(363, 284)
-	else: # DESKTOP / TABLET: Floating right tactical panel
+	else: # DESKTOP / TABLET: Centered Bottom Tactical Bar
 		if sidebar_collapsed:
-			sidebar_panel.position = Vector2(1004, 74)
-			sidebar_panel.custom_minimum_size = Vector2(260, 56)
-			sidebar_panel.size = Vector2(260, 56)
+			sidebar_panel.position = Vector2(460, 656)
+			sidebar_panel.custom_minimum_size = Vector2(360, 52)
+			sidebar_panel.size = Vector2(360, 52)
 		else:
-			sidebar_panel.position = Vector2(912, 74)
-			sidebar_panel.custom_minimum_size = Vector2(352, 632)
-			sidebar_panel.size = Vector2(352, 632)
+			sidebar_panel.position = Vector2(180, 524)
+			sidebar_panel.custom_minimum_size = Vector2(920, 184)
+			sidebar_panel.size = Vector2(920, 184)
 
 func _on_layout_changed(layout: int) -> void:
 	current_layout = layout
@@ -1151,14 +1146,14 @@ func _on_layout_changed(layout: int) -> void:
 		if btn_rules_node:
 			btn_rules_node.text = "📖"
 			btn_rules_node.custom_minimum_size = Vector2(36, 28)
-	else: # DESKTOP or TABLET — Fullscreen Map (1280x720) with superimposed HUD
+	else: # DESKTOP or TABLET — Fullscreen Map (1280x720) with centered top and bottom HUD bars
 		map_panel.position = Vector2(0, 0)
 		map_panel.custom_minimum_size = Vector2(1280, 720)
 		map_panel.size = Vector2(1280, 720)
 		if top_bar_panel:
-			top_bar_panel.position = Vector2(16, 12)
-			top_bar_panel.custom_minimum_size = Vector2(1248, 52)
-			top_bar_panel.size = Vector2(1248, 52)
+			top_bar_panel.position = Vector2(180, 10)
+			top_bar_panel.custom_minimum_size = Vector2(920, 48)
+			top_bar_panel.size = Vector2(920, 48)
 		if title_label_node:
 			title_label_node.text = "🌍 CRISIS — TEG"
 			title_label_node.add_theme_font_size_override("font_size", 18)
@@ -1182,15 +1177,11 @@ func _on_layout_changed(layout: int) -> void:
 			vp_size = visible_sz
 
 	var design_sz: Vector2 = map_panel.size if map_panel != null else Vector2(1280, 720)
-	if vp_size.x < design_sz.x or vp_size.y < design_sz.y:
-		var scale_x: float = (vp_size.x - 8.0) / design_sz.x
-		var scale_y: float = (vp_size.y - 8.0) / design_sz.y
-		var s: float = clampf(minf(scale_x, scale_y), 0.25, 1.0)
-		scale = Vector2(s, s)
-		position = Vector2(maxf(0.0, (vp_size.x - design_sz.x * s) * 0.5), maxf(0.0, (vp_size.y - design_sz.y * s) * 0.5))
-	else:
-		scale = Vector2.ONE
-		position = Vector2.ZERO
+	var scale_x: float = vp_size.x / design_sz.x
+	var scale_y: float = vp_size.y / design_sz.y
+	var s: float = clampf(minf(scale_x, scale_y), 0.25, 1.0)
+	scale = Vector2(s, s)
+	position = Vector2((vp_size.x - design_sz.x * s) * 0.5, (vp_size.y - design_sz.y * s) * 0.5)
 
 func _on_viewport_size_changed() -> void:
 	_on_layout_changed(current_layout)
@@ -1209,12 +1200,13 @@ func _get_map_transform() -> Dictionary:
 		)
 		return { "scale": sm, "offset": off_m }
 
-	# Fullscreen canvas (1280x720) with territories centered in the visible map viewport
-	var usable_left: float = 14.0
-	var usable_top: float = 68.0
-	var right_reserved: float = 24.0 if sidebar_collapsed else 372.0
+	# Fullscreen canvas (1280x720) with territories centered between TopBarPanel and bottom SidebarPanel
+	var usable_left: float = 20.0
+	var usable_top: float = 62.0
+	var right_reserved: float = 20.0
+	var bottom_reserved_d: float = 68.0 if sidebar_collapsed else 200.0
 	var usable_w: float = maxf(canvas_size.x - usable_left - right_reserved, 720.0)
-	var usable_h: float = maxf(canvas_size.y - usable_top - 16.0, 560.0)
+	var usable_h: float = maxf(canvas_size.y - usable_top - bottom_reserved_d, 440.0)
 	var scale_x: float = usable_w / 875.0
 	var scale_y: float = usable_h / 545.0
 	var s: float = minf(scale_x, scale_y)

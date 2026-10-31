@@ -150,48 +150,66 @@ func _on_layout_changed(_layout: int) -> void:
 	if is_inside_tree() and has_node("/root/ThemeManager"):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
-	var side_x: float = 640.0
 	if mode_option_button != null:
-		mode_option_button.position = Vector2(side_x, 24)
+		mode_option_button.position = Vector2(114, -52)
 		mode_option_button.visible = false
 	if opening_option_button != null:
-		opening_option_button.position = Vector2(side_x, 72)
+		opening_option_button.position = Vector2(114, -52)
 		opening_option_button.visible = false
-	# Zona Superior: Turno y Reloj
+	# Zona Superior Centrada: Turno y Reloj
 	if turn_indicator != null:
-		turn_indicator.position = Vector2(side_x, 20)
+		turn_indicator.position = Vector2(12, -52)
 	if status != null:
-		status.position = Vector2(side_x, 72)
+		status.position = Vector2(280, -48)
 	if export_game_button != null:
-		export_game_button.position = Vector2(side_x, 270)
+		export_game_button.position = Vector2(224, 616)
 		export_game_button.visible = false
 	var tut_btn = get_node_or_null("ChessTutorialButton")
 	if tut_btn != null:
-		tut_btn.position = Vector2(side_x + 175, 270)
+		tut_btn.position = Vector2(224, 616)
 		tut_btn.visible = false
 	var rules_btn = get_node_or_null("RulesButton")
 	if rules_btn != null:
-		rules_btn.position = Vector2(side_x + 350, 270)
+		rules_btn.position = Vector2(224, 616)
 		rules_btn.visible = false
 	if offer_draw_btn != null:
-		offer_draw_btn.position = Vector2(side_x, 316)
+		offer_draw_btn.position = Vector2(224, 616)
 		offer_draw_btn.visible = false
-	# Zona Inferior: Acciones de turno / Respuesta a Tablas y Notificaciones
+	# Zona Inferior Centrada: Acciones de turno / Respuesta a Tablas y Notificaciones
 	if draw_offer_banner != null:
-		draw_offer_banner.position = Vector2(side_x, 495)
+		draw_offer_banner.position = Vector2(124, 616)
+	if promotion_panel != null:
+		promotion_panel.position = Vector2(64, 614)
 	if export_toast_label != null:
-		export_toast_label.position = Vector2(side_x, 555)
+		export_toast_label.position = Vector2(184, 658)
+
+	var vp_size: Vector2 = Vector2(1280, 720)
+	if is_inside_tree() and get_viewport() != null:
+		var visible_sz: Vector2 = get_viewport().get_visible_rect().size
+		if visible_sz.x > 0 and visible_sz.y > 0:
+			vp_size = visible_sz
+	if _layout == 2 and vp_size.x >= 1000.0:
+		vp_size = Vector2(375, 667)
+	var min_x: float = 0.0
+	var min_y: float = -58.0
+	var design_w: float = float(BOARD_SIZE * CELL_SIZE)
+	var design_h: float = 736.0
+	var s: float = clampf(minf((vp_size.x - 40.0) / design_w, (vp_size.y - 24.0) / design_h), 0.30, 1.0)
+	scale = Vector2(s, s)
+	position = Vector2(
+		(vp_size.x - design_w * s) * 0.5 - min_x * s,
+		(vp_size.y - design_h * s) * 0.5 - min_y * s
+	)
 
 func _setup_ui() -> void:
-	var side_x: float = 640.0
 	if status == null:
 		status = get_node_or_null("Status")
 	if status == null:
 		status = Label.new()
 		status.name = "Status"
 		add_child(status)
-	status.position = Vector2(side_x, 72)
-	status.custom_minimum_size = Vector2(580, 40)
+	status.position = Vector2(280, -48)
+	status.custom_minimum_size = Vector2(320, 36)
 
 	grid_container = GridContainer.new()
 	grid_container.name = "GridContainer"
@@ -237,16 +255,16 @@ func _setup_ui() -> void:
 	drag_layer.set_process_input(false)
 	drag_layer.set_process_unhandled_input(false)
 	
-	# Turn Indicator Widget (Zona Superior)
+	# Turn Indicator Widget (Zona Superior Centrada)
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 20)
+	turn_indicator.position = Vector2(12, -52)
 	add_child(turn_indicator)
 
 	# Game Mode Selector (integrado en GameAppMenu / Opciones)
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
-	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.position = Vector2(114, -52)
 	mode_option_button.custom_minimum_size = Vector2(380, 36)
 	mode_option_button.visible = false
 	mode_option_button.add_item("Hotseat (2 jugadores)")
@@ -260,7 +278,7 @@ func _setup_ui() -> void:
 	# Opening Practice Selector (integrado en GameAppMenu / Opciones)
 	opening_option_button = OptionButton.new()
 	opening_option_button.name = "OpeningOptionButton"
-	opening_option_button.position = Vector2(side_x, 72)
+	opening_option_button.position = Vector2(114, -52)
 	opening_option_button.custom_minimum_size = Vector2(380, 36)
 	opening_option_button.visible = false
 	opening_option_button.add_item("Partida libre (Sin apertura)")
@@ -277,7 +295,7 @@ func _setup_ui() -> void:
 	export_game_button = Button.new()
 	export_game_button.name = "ExportGameButton"
 	export_game_button.text = "Exportar Partida"
-	export_game_button.position = Vector2(side_x, 270)
+	export_game_button.position = Vector2(224, 616)
 	export_game_button.custom_minimum_size = Vector2(160, 36)
 	export_game_button.visible = false
 	export_game_button.pressed.connect(_on_export_game_pressed)
@@ -287,7 +305,7 @@ func _setup_ui() -> void:
 	var tutorial_btn: Button = Button.new()
 	tutorial_btn.name = "ChessTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(side_x + 175, 270)
+	tutorial_btn.position = Vector2(224, 616)
 	tutorial_btn.custom_minimum_size = Vector2(160, 36)
 	tutorial_btn.visible = false
 	tutorial_btn.pressed.connect(start_chess_tutorial)
@@ -297,7 +315,7 @@ func _setup_ui() -> void:
 	export_toast_label.name = "ExportToastLabel"
 	export_toast_label.text = ""
 	export_toast_label.visible = false
-	export_toast_label.position = Vector2(side_x, 555)
+	export_toast_label.position = Vector2(184, 658)
 	export_toast_label.add_theme_font_size_override("font_size", 14)
 	export_toast_label.add_theme_color_override("font_color", Color(0.45, 0.95, 0.55))
 	add_child(export_toast_label)
@@ -306,7 +324,7 @@ func _setup_ui() -> void:
 	offer_draw_btn = Button.new()
 	offer_draw_btn.name = "OfferDrawButton"
 	offer_draw_btn.text = "🤝 Ofrecer Tablas"
-	offer_draw_btn.position = Vector2(side_x, 316)
+	offer_draw_btn.position = Vector2(224, 616)
 	offer_draw_btn.custom_minimum_size = Vector2(165, 36)
 	offer_draw_btn.visible = false
 	offer_draw_btn.pressed.connect(_on_offer_draw_pressed)
@@ -314,7 +332,7 @@ func _setup_ui() -> void:
 
 	draw_offer_banner = PanelContainer.new()
 	draw_offer_banner.name = "DrawOfferBanner"
-	draw_offer_banner.position = Vector2(side_x, 495)
+	draw_offer_banner.position = Vector2(124, 616)
 	draw_offer_banner.visible = false
 	var draw_style: StyleBoxFlat = StyleBoxFlat.new()
 	draw_style.bg_color = Color(0.12, 0.16, 0.22, 0.96)
@@ -347,7 +365,7 @@ func _setup_ui() -> void:
 
 	promotion_panel = PanelContainer.new()
 	promotion_panel.name = "PromotionSelectorPanel"
-	promotion_panel.position = Vector2(74, 210)
+	promotion_panel.position = Vector2(64, 614)
 	promotion_panel.z_index = 25
 	promotion_panel.visible = false
 	var promo_style: StyleBoxFlat = StyleBoxFlat.new()

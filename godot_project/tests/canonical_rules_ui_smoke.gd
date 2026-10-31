@@ -176,6 +176,31 @@ func _initialize() -> void:
 		get_root().remove_child(go_board_test)
 		go_board_test.free()
 
+	# 7. Layout Centrado Superior / Tablero / Inferior en los juegos
+	var centered_boards: Array = [
+		"res://go_board.gd",
+		"res://chess_board.gd",
+		"res://checkers_board.gd",
+		"res://shogi_board.gd",
+		"res://xiangqi_board.gd",
+		"res://backgammon_board.gd",
+		"res://ludo_board.gd",
+		"res://chinese_checkers_board.gd"
+	]
+	for script_path in centered_boards:
+		var b_script: Script = load(str(script_path)) as Script
+		if b_script != null:
+			var b_node: Node2D = b_script.new() as Node2D
+			get_root().add_child(b_node)
+			if b_node.get("turn_indicator") == null and b_node.has_method("_ready"):
+				b_node._ready()
+			_check(b_node.position.x > 100.0, "%s: Tablero centrado horizontalmente en escena (x=%.1f)" % [str(script_path), b_node.position.x])
+			var ti: Control = b_node.get("turn_indicator") as Control
+			if ti != null:
+				_check(ti.position.y < 30.0 and ti.position.x < 500.0, "%s: TurnIndicator en barra superior centrada (pos=%s)" % [str(script_path), str(ti.position)])
+			get_root().remove_child(b_node)
+			b_node.free()
+
 	if _failures == 0:
 		print("=== RESULTADO: TODO OK (canonical_rules_ui_smoke.gd) ===")
 		quit(0)

@@ -463,17 +463,7 @@ func _setup_ui() -> void:
 	turn_indicator.visible = false
 	add_child(turn_indicator)
 
-	# 3. Narrow External Control Dashboard (Simple Turn Banner, 1-Line Player Summaries, Space Inspector, Actions)
-	control_dashboard = PanelContainer.new()
-	control_dashboard.name = "ControlDashboard"
-	add_child(control_dashboard)
-
-	dashboard_vbox = VBoxContainer.new()
-	dashboard_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	dashboard_vbox.add_theme_constant_override("separation", 6)
-	control_dashboard.add_child(dashboard_vbox)
-
-	# Simple Turn Banner (no Undo/Redo buttons or wide progress bar)
+	# 3. Zona Superior Centrada: Simple Turn Banner y Tarjetas de Resumen de Jugadores (J1 / J2)
 	simple_turn_banner = PanelContainer.new()
 	simple_turn_banner.name = "SimpleTurnBanner"
 	simple_turn_banner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -495,19 +485,29 @@ func _setup_ui() -> void:
 	simple_turn_lbl.add_theme_font_size_override("font_size", 12)
 	simple_turn_lbl.add_theme_color_override("font_color", Color(0.98, 0.94, 0.78))
 	simple_turn_banner.add_child(simple_turn_lbl)
-	dashboard_vbox.add_child(simple_turn_banner)
+	top_bar.add_child(simple_turn_banner)
 
-	# Players HUD: Stacked 1-Line Summary Cards (compact width ~230px)
-	players_hud_hbox = VBoxContainer.new()
+	# Players HUD: Horizontal 1-Line Summary Cards centered above the board
+	players_hud_hbox = HBoxContainer.new()
 	players_hud_hbox.name = "PlayersHudContainer"
-	players_hud_hbox.add_theme_constant_override("separation", 4)
-	dashboard_vbox.add_child(players_hud_hbox)
+	players_hud_hbox.add_theme_constant_override("separation", 8)
+	add_child(players_hud_hbox)
 
 	p1_hud = _create_player_hud_card(P1, "▲ J1")
 	players_hud_hbox.add_child(p1_hud)
 
 	p2_hud = _create_player_hud_card(P2, "● J2")
 	players_hud_hbox.add_child(p2_hud)
+
+	# Zona Inferior Centrada: Control Dashboard (Inspector de Casilla y Gestión de Propiedades)
+	control_dashboard = PanelContainer.new()
+	control_dashboard.name = "ControlDashboard"
+	add_child(control_dashboard)
+
+	dashboard_vbox = VBoxContainer.new()
+	dashboard_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dashboard_vbox.add_theme_constant_override("separation", 4)
+	control_dashboard.add_child(dashboard_vbox)
 
 	# Interactive Space Inspector Card (updates on tap/click or player movement)
 	_setup_space_inspector()
@@ -1508,88 +1508,50 @@ func _on_layout_changed(layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
-	var vp_size := Vector2(800, 600)
+	var vp_size := Vector2(1280, 720)
 	if is_inside_tree() and get_viewport() != null:
 		var visible_sz = get_viewport().get_visible_rect().size
 		if visible_sz.x > 0 and visible_sz.y > 0:
 			vp_size = visible_sz
+	if layout == 2 and vp_size.x >= 1000.0:
+		vp_size = Vector2(375, 667)
 
 	var is_portrait_or_phone: bool = (layout == 2) or (vp_size.x < 700.0) or (vp_size.y > vp_size.x)
+	var b_size: float = 340.0 if is_portrait_or_phone else 420.0
+	var bx: float = 16.0
+	var by: float = 78.0
 
-	if is_portrait_or_phone:
-		# Mobile / Portrait / Compact Vertical Stack Layout:
-		var avail_w = clampf(vp_size.x - 20.0, 310.0, 420.0)
-		var b_size = clampf(avail_w, 320.0, 390.0)
-		if layout == 2:
-			b_size = 340.0
-		var bx = maxf(10.0, (vp_size.x - b_size) * 0.5) if vp_size.x < 680.0 else 14.0
-		var by = 46.0
+	board_rect = Rect2(bx, by, b_size, b_size)
+	corner_size = roundf(b_size * 0.125)
 
-		board_rect = Rect2(bx, by, b_size, b_size)
-		corner_size = roundf(b_size * 0.13)
+	if top_bar:
+		top_bar.position = Vector2(bx, 6.0)
+		top_bar.size = Vector2(b_size, 32.0)
+	if title_lbl:
+		title_lbl.text = "🎩 MONOPOLY"
+		title_lbl.add_theme_font_size_override("font_size", 15 if is_portrait_or_phone else 16)
+	if players_hud_hbox:
+		players_hud_hbox.position = Vector2(bx, 42.0)
+		players_hud_hbox.size = Vector2(b_size, 30.0)
 
-		if top_bar:
-			top_bar.position = Vector2(bx, 8.0)
-			top_bar.size = Vector2(b_size, 34.0)
-		if title_lbl:
-			title_lbl.text = "🎩 MONOPOLY"
-			title_lbl.add_theme_font_size_override("font_size", 15)
+	if control_dashboard:
+		control_dashboard.position = Vector2(bx, board_rect.end.y + 8.0)
+		control_dashboard.size = Vector2(b_size, 152.0)
 
-		if control_dashboard:
-			control_dashboard.position = Vector2(bx, board_rect.end.y + 8.0)
-			control_dashboard.size = Vector2(b_size, 225.0)
+	if logo_lbl:
+		logo_lbl.add_theme_font_size_override("font_size", 14 if is_portrait_or_phone else 16)
+	if dice_display_lbl:
+		dice_display_lbl.add_theme_font_size_override("font_size", 12 if is_portrait_or_phone else 14)
+	if roll_button:
+		roll_button.custom_minimum_size = Vector2(115, 32)
+		roll_button.add_theme_font_size_override("font_size", 12)
+	if pay_jail_btn:
+		pay_jail_btn.custom_minimum_size = Vector2(96, 32)
+		pay_jail_btn.add_theme_font_size_override("font_size", 11)
 
-		if logo_lbl:
-			logo_lbl.add_theme_font_size_override("font_size", 14)
-		if dice_display_lbl:
-			dice_display_lbl.add_theme_font_size_override("font_size", 12)
-		if roll_button:
-			roll_button.custom_minimum_size = Vector2(105, 30)
-			roll_button.add_theme_font_size_override("font_size", 12)
-		if pay_jail_btn:
-			pay_jail_btn.custom_minimum_size = Vector2(90, 30)
-			pay_jail_btn.add_theme_font_size_override("font_size", 11)
-
-		if status != null:
-			status.position = Vector2(bx, board_rect.end.y + 240.0)
-			status.add_theme_font_size_override("font_size", 13)
-	else:
-		# Landscape / Desktop / Tablet Side-by-Side Compact Layout:
-		# Total width ~ 16 + 420 + 12 + 265 = 713px (fits comfortably inside 750px-1280px windows without clipping)
-		var b_size = clampf(minf(vp_size.y - 84.0, vp_size.x - 310.0), 390.0, 430.0)
-		var bx = 16.0
-		var by = 48.0
-
-		board_rect = Rect2(bx, by, b_size, b_size)
-		corner_size = roundf(b_size * 0.125)
-
-		if top_bar:
-			top_bar.position = Vector2(bx, 8.0)
-			top_bar.size = Vector2(b_size, 34.0)
-		if title_lbl:
-			title_lbl.text = "🎩 MONOPOLY"
-			title_lbl.add_theme_font_size_override("font_size", 16)
-
-		var dash_x = board_rect.end.x + 12.0
-		var dash_w = clampf(vp_size.x - dash_x - 16.0, 250.0, 280.0)
-		if control_dashboard:
-			control_dashboard.position = Vector2(dash_x, by)
-			control_dashboard.size = Vector2(dash_w, 260.0)
-
-		if logo_lbl:
-			logo_lbl.add_theme_font_size_override("font_size", 16)
-		if dice_display_lbl:
-			dice_display_lbl.add_theme_font_size_override("font_size", 14)
-		if roll_button:
-			roll_button.custom_minimum_size = Vector2(120, 34)
-			roll_button.add_theme_font_size_override("font_size", 13)
-		if pay_jail_btn:
-			pay_jail_btn.custom_minimum_size = Vector2(100, 34)
-			pay_jail_btn.add_theme_font_size_override("font_size", 11)
-
-		if status != null:
-			status.position = Vector2(bx, board_rect.end.y + 8.0)
-			status.add_theme_font_size_override("font_size", 14)
+	if status != null:
+		status.position = Vector2(bx, board_rect.end.y + 164.0)
+		status.add_theme_font_size_override("font_size", 13)
 
 	# Keep CenterPanel strictly inside the inner hole of the board (never overlapping perimeter tiles)
 	if center_panel:
@@ -1607,17 +1569,18 @@ func _on_layout_changed(layout: int) -> void:
 	_center_modal_over_board(auction_modal)
 	_update_token_positions()
 
-	var total_w: float = (board_rect.end.x + 16.0) if is_portrait_or_phone else (control_dashboard.position.x + control_dashboard.size.x + 16.0 if control_dashboard != null else 720.0)
-	var total_h: float = (board_rect.end.y + 265.0) if is_portrait_or_phone else (board_rect.end.y + 36.0)
-	if vp_size.x < total_w or vp_size.y < total_h:
-		var sx: float = (vp_size.x - 8.0) / total_w
-		var sy: float = (vp_size.y - 8.0) / total_h
-		var s: float = clampf(minf(sx, sy), 0.3, 1.0)
-		scale = Vector2(s, s)
-		position = Vector2(maxf(0.0, (vp_size.x - total_w * s) * 0.5), maxf(0.0, (vp_size.y - total_h * s) * 0.5))
-	else:
-		scale = Vector2.ONE
-		position = Vector2.ZERO
+	var min_x: float = bx
+	var min_y: float = 6.0
+	var total_w: float = b_size
+	var total_h: float = (board_rect.end.y + 164.0) - min_y
+	var sx: float = (vp_size.x - 24.0) / total_w
+	var sy: float = (vp_size.y - 16.0) / total_h
+	var s: float = clampf(minf(sx, sy), 0.3, 1.0)
+	scale = Vector2(s, s)
+	position = Vector2(
+		(vp_size.x - total_w * s) * 0.5 - min_x * s,
+		(vp_size.y - total_h * s) * 0.5 - min_y * s
+	)
 
 	queue_redraw()
 

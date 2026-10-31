@@ -144,29 +144,29 @@ func _on_layout_changed(_layout: int) -> void:
 			vp_size = visible_sz
 	if _layout == 2 and vp_size.x >= 1000.0:
 		vp_size = Vector2(375, 667)
-	var design_w := 1016.0
-	var design_h := 640.0
-	if _layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
-		var s := clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.30, 1.0)
-		scale = Vector2(s, s)
-		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
-	else:
-		scale = Vector2.ONE
-		position = Vector2.ZERO
+	var min_x := 20.0
+	var min_y := -42.0
+	var design_w := 560.0
+	var design_h := 696.0
+	var s := clampf(minf((vp_size.x - 40.0) / design_w, (vp_size.y - 24.0) / design_h), 0.30, 1.0)
+	scale = Vector2(s, s)
+	position = Vector2(
+		(vp_size.x - design_w * s) * 0.5 - min_x * s,
+		(vp_size.y - design_h * s) * 0.5 - min_y * s
+	)
 
 func _setup_ui() -> void:
-	var side_x := 640.0
 	if status == null:
 		status = get_node_or_null("Status")
 	if status == null:
 		status = Label.new()
 		status.name = "Status"
 		add_child(status)
-	status.position = Vector2(side_x, 74)
+	status.position = Vector2(290, -32)
 
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
-	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.position = Vector2(120, -36)
 	mode_option_button.custom_minimum_size = Vector2(360, 36)
 	mode_option_button.add_item("Hotseat (2 jugadores)")
 	mode_option_button.add_item("vs IA (Humano Rojo - J1)")
@@ -175,30 +175,30 @@ func _setup_ui() -> void:
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	add_child(mode_option_button)
 
-	# --- ZONA SUPERIOR: Turno, reloj y estado ---
+	# --- ZONA SUPERIOR CENTRADA: Turno, reloj y estado ---
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 20)
+	turn_indicator.position = Vector2(20, -36)
 	add_child(turn_indicator)
 
-	# --- ZONA INFERIOR: Acciones de turno (Tirar Dado y resultado) ---
+	# --- ZONA INFERIOR CENTRADA: Acciones de turno (Tirar Dado y resultado) ---
 	dice_widget = DiceWidget.new()
-	dice_widget.position = Vector2(side_x, 385)
+	dice_widget.position = Vector2(95, 592)
 	add_child(dice_widget)
 
 	dice_label = Label.new()
 	dice_label.name = "DiceLabel"
-	dice_label.position = Vector2(side_x + 150, 380)
-	dice_label.size = Vector2(150, 90)
-	dice_label.pivot_offset = Vector2(75, 45)
+	dice_label.position = Vector2(215, 584)
+	dice_label.size = Vector2(120, 64)
+	dice_label.pivot_offset = Vector2(60, 32)
 	dice_label.text = "🎲 -"
 	dice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dice_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	dice_label.add_theme_font_size_override("font_size", 48)
+	dice_label.add_theme_font_size_override("font_size", 42)
 	add_child(dice_label)
 
 	dice_button = Button.new()
-	dice_button.position = Vector2(side_x, 495)
+	dice_button.position = Vector2(345, 590)
 	dice_button.custom_minimum_size = Vector2(170, 52)
 	dice_button.text = "🎲 Tirar Dado"
 	dice_button.add_theme_font_size_override("font_size", 18)
@@ -208,7 +208,7 @@ func _setup_ui() -> void:
 	var tutorial_btn := Button.new()
 	tutorial_btn.name = "LudoTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(side_x, 450)
+	tutorial_btn.position = Vector2(235, 590)
 	tutorial_btn.custom_minimum_size = Vector2(130, 36)
 	tutorial_btn.visible = false
 	tutorial_btn.pressed.connect(start_ludo_tutorial)
@@ -218,7 +218,7 @@ func _setup_ui() -> void:
 	var rules_btn = Button.new()
 	rules_btn.name = "RulesButton"
 	rules_btn.text = "📖 Reglas"
-	rules_btn.position = Vector2(side_x + 145, 450)
+	rules_btn.position = Vector2(235, 590)
 	rules_btn.custom_minimum_size = Vector2(115, 36)
 	rules_btn.visible = false
 	rules_btn.pressed.connect(func(): rules_popup.show_for_game("ludo"))
@@ -358,7 +358,7 @@ func _on_token_pressed(p: int, token_idx: int) -> void:
 
 func _animate_dice_roll(val: int) -> void:
 	last_dice_val = val
-	var orig_pos = Vector2(640, 220)
+	var orig_pos = Vector2(215, 584)
 	var tween = create_tween()
 	
 	# 0.4s vibration shake

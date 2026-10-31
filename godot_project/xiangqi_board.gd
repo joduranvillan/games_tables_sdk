@@ -170,7 +170,6 @@ func _on_theme_changed(theme: BoardTheme) -> void:
 	queue_redraw()
 
 func _setup_ui_layout() -> void:
-	var side_x := 640.0
 	# Panel de base para el tapete del tablero (z_index negativo para NO tapar _draw())
 	table_mat_panel = Panel.new()
 	table_mat_panel.name = "TableMatPanel"
@@ -183,8 +182,8 @@ func _setup_ui_layout() -> void:
 	# Barra de controles (integrados en GameAppMenu / Opciones)
 	top_bar = HBoxContainer.new()
 	top_bar.name = "TopBar"
-	top_bar.position = Vector2(side_x, 24)
-	top_bar.size = Vector2(600, 38)
+	top_bar.position = Vector2(32, -68)
+	top_bar.size = Vector2(584, 38)
 	top_bar.add_theme_constant_override("separation", 10)
 	add_child(top_bar)
 
@@ -217,18 +216,18 @@ func _setup_ui_layout() -> void:
 	reset_button.pressed.connect(_on_reset_pressed)
 	top_bar.add_child(reset_button)
 
-	# Zona Superior: Indicador de Turno, Reloj y Bandejas de Capturas
+	# Zona Superior Centrada: Indicador de Turno, Reloj y Bandejas de Capturas
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 20)
+	turn_indicator.position = Vector2(32, -68)
 	turn_indicator.custom_minimum_size = Vector2(260, 40)
 	add_child(turn_indicator)
 
-	# Zona Inferior: Banner de acción y eventos del turno actual
+	# Zona Inferior Centrada: Banner de acción y eventos del turno actual
 	event_banner = PanelContainer.new()
 	event_banner.name = "EventBanner"
-	event_banner.position = Vector2(side_x, 545)
-	event_banner.size = Vector2(580, 44)
+	event_banner.position = Vector2(32, 678)
+	event_banner.size = Vector2(584, 42)
 	var ev_style = StyleBoxFlat.new()
 	ev_style.bg_color = Color(0.12, 0.14, 0.18, 0.88)
 	ev_style.border_width_left = 1
@@ -250,32 +249,32 @@ func _setup_ui_layout() -> void:
 	event_label.add_theme_font_size_override("font_size", 14)
 	event_banner.add_child(event_label)
 
-	# Zona Superior: Bandeja para capturas Negras (capturadas por Rojo)
+	# Zona Superior Centrada: Bandeja para capturas Negras (capturadas por Rojo)
 	var black_tray_lbl = Label.new()
 	black_tray_lbl.text = "Capturas Negras:"
-	black_tray_lbl.position = Vector2(side_x, 76)
-	black_tray_lbl.add_theme_font_size_override("font_size", 13)
+	black_tray_lbl.position = Vector2(304, -64)
+	black_tray_lbl.add_theme_font_size_override("font_size", 12)
 	black_tray_lbl.add_theme_color_override("font_color", Color(0.82, 0.82, 0.82))
 	add_child(black_tray_lbl)
 
 	captured_black_box = HBoxContainer.new()
-	captured_black_box.position = Vector2(side_x, 100)
-	captured_black_box.size = Vector2(580, 90)
-	captured_black_box.add_theme_constant_override("separation", 6)
+	captured_black_box.position = Vector2(304, -46)
+	captured_black_box.size = Vector2(312, 34)
+	captured_black_box.add_theme_constant_override("separation", 4)
 	add_child(captured_black_box)
 
-	# Zona Superior: Bandeja para capturas Rojas (capturadas por Negro)
+	# Zona Superior Centrada: Bandeja para capturas Rojas (capturadas por Negro)
 	var red_tray_lbl = Label.new()
 	red_tray_lbl.text = "Capturas Rojas:"
-	red_tray_lbl.position = Vector2(side_x, 205)
-	red_tray_lbl.add_theme_font_size_override("font_size", 13)
+	red_tray_lbl.position = Vector2(32, -22)
+	red_tray_lbl.add_theme_font_size_override("font_size", 12)
 	red_tray_lbl.add_theme_color_override("font_color", Color(0.82, 0.82, 0.82))
 	add_child(red_tray_lbl)
 
 	captured_red_box = HBoxContainer.new()
-	captured_red_box.position = Vector2(side_x, 229)
-	captured_red_box.size = Vector2(580, 90)
-	captured_red_box.add_theme_constant_override("separation", 6)
+	captured_red_box.position = Vector2(142, -26)
+	captured_red_box.size = Vector2(474, 34)
+	captured_red_box.add_theme_constant_override("separation", 4)
 	add_child(captured_red_box)
 
 	if status != null:
@@ -470,10 +469,10 @@ func _input(event: InputEvent) -> void:
 	var click_pos = Vector2.ZERO
 	var handled = false
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		click_pos = event.position
+		click_pos = get_local_mouse_position() if (is_inside_tree() and not OS.has_feature("headless")) else event.position
 		handled = true
 	elif event is InputEventScreenTouch and event.pressed:
-		click_pos = event.position
+		click_pos = to_local(event.position) if (is_inside_tree() and not OS.has_feature("headless")) else event.position
 		handled = true
 
 	if handled:
@@ -834,6 +833,24 @@ func _on_layout_changed(_layout: int) -> void:
 	if table_mat_panel != null:
 		table_mat_panel.position = Vector2(32, 20)
 		table_mat_panel.size = Vector2(584, 650)
+
+	var vp_size: Vector2 = Vector2(1280, 720)
+	if is_inside_tree() and get_viewport() != null:
+		var visible_sz: Vector2 = get_viewport().get_visible_rect().size
+		if visible_sz.x > 0 and visible_sz.y > 0:
+			vp_size = visible_sz
+	if _layout == 2 and vp_size.x >= 1000.0:
+		vp_size = Vector2(375, 667)
+	var min_x: float = 32.0
+	var min_y: float = -74.0
+	var design_w: float = 584.0
+	var design_h: float = 804.0
+	var s: float = clampf(minf((vp_size.x - 40.0) / design_w, (vp_size.y - 24.0) / design_h), 0.30, 1.0)
+	scale = Vector2(s, s)
+	position = Vector2(
+		(vp_size.x - design_w * s) * 0.5 - min_x * s,
+		(vp_size.y - design_h * s) * 0.5 - min_y * s
+	)
 
 	_update_piece_node_positions()
 	queue_redraw()

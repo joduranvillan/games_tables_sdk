@@ -306,24 +306,26 @@ func _setup_ui() -> void:
 	turn_indicator.position = Vector2(50, 72)
 	add_child(turn_indicator)
 
-	# Local Player Tableau (Left side)
-	local_tableau = Panel.new()
-	local_tableau.name = "LocalTableau"
-	local_tableau.position = Vector2(50, 130)
-	local_tableau.size = Vector2(400, 310)
-	add_child(local_tableau)
-
-	# Opponent Tableau (Right side)
+	# Top Zone: Opponent Tableau (Centered above main board)
 	opponent_tableau = Panel.new()
 	opponent_tableau.name = "OpponentTableau"
-	opponent_tableau.position = Vector2(480, 130)
-	opponent_tableau.size = Vector2(270, 310)
+	opponent_tableau.position = Vector2(50, 114)
+	opponent_tableau.size = Vector2(700, 136)
 	add_child(opponent_tableau)
 
-	# Deck Draw Button & Discard toggle
+	# Center Board Zone: Local Player Tableau (Centered)
+	local_tableau = Panel.new()
+	local_tableau.name = "LocalTableau"
+	local_tableau.position = Vector2(50, 258)
+	local_tableau.size = Vector2(700, 206)
+	add_child(local_tableau)
+
+	# Bottom Zone: Deck Draw Button, Discard toggle & Coup Fourré (Centered below board)
 	var controls_hbox = HBoxContainer.new()
-	controls_hbox.position = Vector2(50, 460)
-	controls_hbox.size = Vector2(700, 45)
+	controls_hbox.name = "ControlsHBox"
+	controls_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	controls_hbox.position = Vector2(50, 472)
+	controls_hbox.size = Vector2(700, 44)
 	controls_hbox.add_theme_constant_override("separation", 20)
 	add_child(controls_hbox)
 
@@ -350,15 +352,16 @@ func _setup_ui() -> void:
 	coup_fourre_btn.pressed.connect(_on_coup_fourre_pressed)
 	controls_hbox.add_child(coup_fourre_btn)
 
-	# Hand Container & Panel (Bottom)
+	# Bottom Zone: Hand Container & Panel (Centered at bottom)
 	hand_panel = Panel.new()
 	hand_panel.name = "HandPanel"
-	hand_panel.position = Vector2(50, 520)
+	hand_panel.position = Vector2(50, 524)
 	hand_panel.size = Vector2(700, 140)
 	add_child(hand_panel)
 
 	hand_container = HBoxContainer.new()
 	hand_container.name = "HandContainer"
+	hand_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	hand_container.position = Vector2(12, 10)
 	hand_container.size = Vector2(676, 120)
 	hand_container.add_theme_constant_override("separation", 10)
@@ -379,14 +382,14 @@ func _on_layout_changed(layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 
-	top_bar.position = Vector2(50, 20)
-	top_bar.size = Vector2(700, 45)
-	turn_indicator.position = Vector2(50, 75)
-	local_tableau.position = Vector2(50, 130)
-	local_tableau.size = Vector2(400, 310)
-	opponent_tableau.position = Vector2(480, 130)
-	opponent_tableau.size = Vector2(270, 310)
-	hand_panel.position = Vector2(50, 520)
+	top_bar.position = Vector2(50, 16)
+	top_bar.size = Vector2(700, 40)
+	turn_indicator.position = Vector2(50, 62)
+	opponent_tableau.position = Vector2(50, 114)
+	opponent_tableau.size = Vector2(700, 136)
+	local_tableau.position = Vector2(50, 258)
+	local_tableau.size = Vector2(700, 206)
+	hand_panel.position = Vector2(50, 524)
 	hand_panel.size = Vector2(700, 140)
 	hand_container.size = Vector2(676, 120)
 
@@ -400,13 +403,9 @@ func _on_layout_changed(layout: int) -> void:
 
 	var design_w: float = 800.0
 	var design_h: float = 680.0
-	if layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
-		var s: float = clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.35, 1.0)
-		scale = Vector2(s, s)
-		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
-	else:
-		scale = Vector2.ONE
-		position = Vector2.ZERO
+	var s: float = clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.35, 1.0)
+	scale = Vector2(s, s)
+	position = Vector2((vp_size.x - design_w * s) * 0.5, (vp_size.y - design_h * s) * 0.5)
 
 # -------------------------------------------------------------------------
 # CARD PARSING & VISUAL RENDERING (a)
@@ -905,18 +904,19 @@ func _update_tableaus() -> void:
 	var p1_vbox = VBoxContainer.new()
 	p1_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
 	p1_vbox.offset_left = 12
-	p1_vbox.offset_top = 10
+	p1_vbox.offset_top = 8
 	p1_vbox.offset_right = -12
-	p1_vbox.offset_bottom = -10
-	p1_vbox.add_theme_constant_override("separation", 8)
+	p1_vbox.offset_bottom = -8
+	p1_vbox.add_theme_constant_override("separation", 5)
 	local_tableau.add_child(p1_vbox)
 
 	var p1_header = HBoxContainer.new()
+	p1_header.add_theme_constant_override("separation", 12)
 	p1_vbox.add_child(p1_header)
 
 	var lbl_title = Label.new()
 	lbl_title.text = "🚗 Mi Vehículo (Jugador 1)"
-	lbl_title.add_theme_font_size_override("font_size", 17)
+	lbl_title.add_theme_font_size_override("font_size", 16)
 	lbl_title.add_theme_color_override("font_color", Color(0.4, 0.9, 0.5))
 	lbl_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	p1_header.add_child(lbl_title)
@@ -928,8 +928,8 @@ func _update_tableaus() -> void:
 	p1_banner_style.set_corner_radius_all(6)
 	p1_banner_style.content_margin_left = 8
 	p1_banner_style.content_margin_right = 8
-	p1_banner_style.content_margin_top = 3
-	p1_banner_style.content_margin_bottom = 3
+	p1_banner_style.content_margin_top = 2
+	p1_banner_style.content_margin_bottom = 2
 
 	p1_hazard_label = Label.new()
 	p1_hazard_label.add_theme_font_size_override("font_size", 12)
@@ -938,7 +938,6 @@ func _update_tableaus() -> void:
 		p1_banner_style.bg_color = Color(0.85, 0.2, 0.2, 0.95)
 		p1_hazard_label.text = "⛔ DETENIDO: %s" % hazards[P1]
 		p1_hazard_label.add_theme_color_override("font_color", Color.WHITE)
-		# Pulse flash tween
 		var tw = p1_hazard_banner.create_tween().set_loops()
 		tw.tween_property(p1_hazard_banner, "modulate:a", 0.6, 0.5)
 		tw.tween_property(p1_hazard_banner, "modulate:a", 1.0, 0.5)
@@ -949,15 +948,15 @@ func _update_tableaus() -> void:
 
 	p1_hazard_banner.add_theme_stylebox_override("panel", p1_banner_style)
 	p1_hazard_banner.add_child(p1_hazard_label)
-	p1_vbox.add_child(p1_hazard_banner)
+	p1_header.add_child(p1_hazard_banner)
 
 	p1_dist_label = Label.new()
 	p1_dist_label.text = "Distancia Recorrida: %d / 1000 km" % distance[P1]
-	p1_dist_label.add_theme_font_size_override("font_size", 14)
+	p1_dist_label.add_theme_font_size_override("font_size", 13)
 	p1_vbox.add_child(p1_dist_label)
 
 	p1_prog_bar = ProgressBar.new()
-	p1_prog_bar.custom_minimum_size = Vector2(0, 22)
+	p1_prog_bar.custom_minimum_size = Vector2(0, 18)
 	p1_prog_bar.max_value = 1000
 	p1_prog_bar.value = distance[P1]
 	p1_vbox.add_child(p1_prog_bar)
@@ -973,19 +972,20 @@ func _update_tableaus() -> void:
 	# ----------------- OPPONENT TABLEAU (P2) -----------------
 	var p2_vbox = VBoxContainer.new()
 	p2_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	p2_vbox.offset_left = 10
-	p2_vbox.offset_top = 10
-	p2_vbox.offset_right = -10
-	p2_vbox.offset_bottom = -10
-	p2_vbox.add_theme_constant_override("separation", 8)
+	p2_vbox.offset_left = 12
+	p2_vbox.offset_top = 6
+	p2_vbox.offset_right = -12
+	p2_vbox.offset_bottom = -6
+	p2_vbox.add_theme_constant_override("separation", 4)
 	opponent_tableau.add_child(p2_vbox)
 
 	var p2_header = HBoxContainer.new()
+	p2_header.add_theme_constant_override("separation", 12)
 	p2_vbox.add_child(p2_header)
 
 	var opp_title = Label.new()
 	opp_title.text = "🏎️ Rival (Jugador 2)"
-	opp_title.add_theme_font_size_override("font_size", 16)
+	opp_title.add_theme_font_size_override("font_size", 15)
 	opp_title.add_theme_color_override("font_color", Color(0.95, 0.5, 0.5))
 	opp_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	p2_header.add_child(opp_title)
@@ -997,8 +997,8 @@ func _update_tableaus() -> void:
 	p2_banner_style.set_corner_radius_all(6)
 	p2_banner_style.content_margin_left = 8
 	p2_banner_style.content_margin_right = 8
-	p2_banner_style.content_margin_top = 3
-	p2_banner_style.content_margin_bottom = 3
+	p2_banner_style.content_margin_top = 2
+	p2_banner_style.content_margin_bottom = 2
 
 	p2_hazard_label = Label.new()
 	p2_hazard_label.add_theme_font_size_override("font_size", 12)
@@ -1017,22 +1017,22 @@ func _update_tableaus() -> void:
 
 	p2_hazard_banner.add_theme_stylebox_override("panel", p2_banner_style)
 	p2_hazard_banner.add_child(p2_hazard_label)
-	p2_vbox.add_child(p2_hazard_banner)
+	p2_header.add_child(p2_hazard_banner)
 
 	p2_dist_label = Label.new()
 	p2_dist_label.text = "Distancia: %d / 1000 km" % distance[P2]
-	p2_dist_label.add_theme_font_size_override("font_size", 13)
+	p2_dist_label.add_theme_font_size_override("font_size", 12)
 	p2_vbox.add_child(p2_dist_label)
 
 	p2_prog_bar = ProgressBar.new()
-	p2_prog_bar.custom_minimum_size = Vector2(0, 18)
+	p2_prog_bar.custom_minimum_size = Vector2(0, 14)
 	p2_prog_bar.max_value = 1000
 	p2_prog_bar.value = distance[P2]
 	p2_vbox.add_child(p2_prog_bar)
 
 	p2_safeties_label = Label.new()
 	p2_safeties_label.text = "🛡️ Safeties: %s" % (", ".join(safeties[P2]) if safeties[P2].size() > 0 else "Ninguna")
-	p2_safeties_label.add_theme_font_size_override("font_size", 12)
+	p2_safeties_label.add_theme_font_size_override("font_size", 11)
 	p2_vbox.add_child(p2_safeties_label)
 	p2_vbox.add_child(_create_safety_shields_hbox(P2))
 

@@ -129,28 +129,44 @@ func _on_layout_changed(_layout: int) -> void:
 	if (is_inside_tree() and has_node("/root/ThemeManager")):
 		get_node("/root/ThemeManager").apply_font_scale_to_board(self)
 	
-	var side_x := 640.0
 	if mode_option_button != null:
-		mode_option_button.position = Vector2(side_x, 24)
+		mode_option_button.position = Vector2(124, -52)
 		mode_option_button.visible = false
-	# Zona Superior: Turno y Reloj
+	# Zona Superior Centrada: Turno y Reloj
 	if turn_indicator != null:
-		turn_indicator.position = Vector2(side_x, 20)
+		turn_indicator.position = Vector2(12, -52)
 	if status != null:
-		status.position = Vector2(side_x, 74)
-	# Zona Inferior: Aviso de acción del turno (Captura obligatoria)
+		status.position = Vector2(280, -48)
+	# Zona Inferior Centrada: Aviso de acción del turno (Captura obligatoria)
 	if mandatory_label != null:
-		mandatory_label.position = Vector2(side_x, 530)
+		mandatory_label.position = Vector2(24, 616)
+
+	var vp_size: Vector2 = Vector2(1280, 720)
+	if is_inside_tree() and get_viewport() != null:
+		var visible_sz: Vector2 = get_viewport().get_visible_rect().size
+		if visible_sz.x > 0 and visible_sz.y > 0:
+			vp_size = visible_sz
+	if _layout == 2 and vp_size.x >= 1000.0:
+		vp_size = Vector2(375, 667)
+	var min_x: float = 0.0
+	var min_y: float = -58.0
+	var design_w: float = float(BOARD * CELL)
+	var design_h: float = 724.0
+	var s: float = clampf(minf((vp_size.x - 40.0) / design_w, (vp_size.y - 24.0) / design_h), 0.30, 1.0)
+	scale = Vector2(s, s)
+	position = Vector2(
+		(vp_size.x - design_w * s) * 0.5 - min_x * s,
+		(vp_size.y - design_h * s) * 0.5 - min_y * s
+	)
 
 func _setup_ui_layers() -> void:
-	var side_x := 640.0
 	# Mandatory capture banner in bottom zone (Acción del turno actual)
 	mandatory_label = Label.new()
 	mandatory_label.name = "MandatoryCaptureLabel"
 	mandatory_label.text = "¡Captura obligatoria!"
-	mandatory_label.position = Vector2(side_x, 530)
+	mandatory_label.position = Vector2(24, 616)
 	mandatory_label.size = Vector2(560, 40)
-	mandatory_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	mandatory_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	mandatory_label.add_theme_font_size_override("font_size", 22)
 	mandatory_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2))
 	mandatory_label.hide()
@@ -168,7 +184,7 @@ func _setup_ui_layers() -> void:
 
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
-	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.position = Vector2(124, -52)
 	mode_option_button.custom_minimum_size = Vector2(360, 36)
 	mode_option_button.visible = false
 	mode_option_button.add_item("Hotseat (2 jugadores)")
@@ -179,16 +195,16 @@ func _setup_ui_layers() -> void:
 
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 20)
+	turn_indicator.position = Vector2(12, -52)
 	add_child(turn_indicator)
 
 	if status != null:
-		status.position = Vector2(side_x, 74)
+		status.position = Vector2(280, -48)
 
 	var tutorial_btn := Button.new()
 	tutorial_btn.name = "CheckersTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(side_x, 225)
+	tutorial_btn.position = Vector2(234, 616)
 	tutorial_btn.custom_minimum_size = Vector2(140, 36)
 	tutorial_btn.visible = false
 	tutorial_btn.pressed.connect(start_checkers_tutorial)
@@ -197,7 +213,7 @@ func _setup_ui_layers() -> void:
 	var btn_rules = Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
-	btn_rules.position = Vector2(side_x + 155, 225)
+	btn_rules.position = Vector2(234, 616)
 	btn_rules.custom_minimum_size = Vector2(120, 36)
 	btn_rules.visible = false
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("checkers"))

@@ -317,11 +317,12 @@ func _setup_ui() -> void:
 	table_mat_panel.size = Vector2(1200, 692)
 	add_child(table_mat_panel)
 
-	# 2. Top Control Bar (Title, Card Counts, Rules, Tutorial, Mode)
+	# 2. Top Control Bar (Centered above play area)
 	top_bar = HBoxContainer.new()
 	top_bar.name = "TopBar"
-	top_bar.position = Vector2(70, 24)
-	top_bar.size = Vector2(1140, 40)
+	top_bar.position = Vector2(190, 20)
+	top_bar.size = Vector2(900, 38)
+	top_bar.alignment = BoxContainer.ALIGNMENT_CENTER
 	top_bar.add_theme_constant_override("separation", 14)
 	add_child(top_bar)
 
@@ -376,17 +377,12 @@ func _setup_ui() -> void:
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	top_bar.add_child(mode_option_button)
 
-	var top_menu_spacer: Control = Control.new()
-	top_menu_spacer.name = "TopMenuSpacer"
-	top_menu_spacer.custom_minimum_size = Vector2(126, 36)
-	top_bar.add_child(top_menu_spacer)
-
-	# 3. Turn Indicator Bar (Full width inside table mat so buttons never overflow)
+	# 3. Turn Indicator Bar (Centered above opponent hand)
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(70, 70)
-	turn_indicator.custom_minimum_size = Vector2(1140, 38)
-	turn_indicator.size = Vector2(1140, 38)
+	turn_indicator.position = Vector2(190, 64)
+	turn_indicator.custom_minimum_size = Vector2(900, 38)
+	turn_indicator.size = Vector2(900, 38)
 	add_child(turn_indicator)
 	if turn_indicator.label != null:
 		turn_indicator.label.custom_minimum_size = Vector2(220, 28)
@@ -2229,19 +2225,19 @@ func _on_layout_changed(layout: int) -> void:
 
 	table_mat_panel.position = Vector2(40, 14)
 	table_mat_panel.size = Vector2(1200, 692)
-	top_bar.position = Vector2(70, 24)
-	top_bar.size = Vector2(1140, 40)
-	turn_indicator.position = Vector2(70, 70)
-	turn_indicator.custom_minimum_size = Vector2(1140, 38)
-	turn_indicator.size = Vector2(1140, 38)
-	opp_vbox.position = Vector2(190, 110)
+	top_bar.position = Vector2(190, 20)
+	top_bar.size = Vector2(900, 38)
+	turn_indicator.position = Vector2(190, 64)
+	turn_indicator.custom_minimum_size = Vector2(900, 38)
+	turn_indicator.size = Vector2(900, 38)
+	opp_vbox.position = Vector2(190, 108)
 	opp_vbox.size = Vector2(900, 74)
-	event_banner_panel.position = Vector2(240, 190)
+	event_banner_panel.position = Vector2(240, 188)
 	event_banner_panel.size = Vector2(800, 34)
-	center_play_area.position = Vector2(190, 230)
+	center_play_area.position = Vector2(190, 228)
 	center_play_area.size = Vector2(900, 200)
 	if action_buttons_bar != null:
-		action_buttons_bar.position = Vector2(240, 436)
+		action_buttons_bar.position = Vector2(240, 434)
 		action_buttons_bar.size = Vector2(800, 36)
 	hand_container.position = Vector2(90, 476)
 	hand_container.size = Vector2(1100, 215)
@@ -2256,13 +2252,9 @@ func _on_layout_changed(layout: int) -> void:
 
 	var design_w := 1280.0
 	var design_h := 720.0
-	if layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
-		var s := clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.28, 1.0)
-		scale = Vector2(s, s)
-		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
-	else:
-		scale = Vector2.ONE
-		position = Vector2.ZERO
+	var s := clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.28, 1.0)
+	scale = Vector2(s, s)
+	position = Vector2((vp_size.x - design_w * s) * 0.5, (vp_size.y - design_h * s) * 0.5)
 
 	_update_ui()
 	_restore_fixed_fonts(self)

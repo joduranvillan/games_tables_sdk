@@ -277,24 +277,23 @@ func _setup_ui() -> void:
 	main_vbox.add_theme_constant_override("separation", 6)
 	main_margin.add_child(main_vbox)
 
-	# Row 1: Status + Turn Indicator + Rules (Rules oculto: agrupado en GameAppMenu superior derecho)
+	# Row 1: Zona Superior Centrada (Turn Indicator + Status)
 	header_top_hbox = HBoxContainer.new()
-	header_top_hbox.add_theme_constant_override("separation", 10)
+	header_top_hbox.add_theme_constant_override("separation", 18)
 	header_top_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	main_vbox.add_child(header_top_hbox)
+
+	turn_indicator = TurnIndicator.new()
+	turn_indicator.name = "TurnIndicator"
+	turn_indicator.custom_minimum_size = Vector2(220, 32)
+	header_top_hbox.add_child(turn_indicator)
 
 	status_label = Label.new()
 	status_label.name = "BattleStatusLabel"
 	status_label.text = "Batalla Naval - Colocación de flota"
-	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.add_theme_font_size_override("font_size", 17)
-	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header_top_hbox.add_child(status_label)
-
-	turn_indicator = TurnIndicator.new()
-	turn_indicator.name = "TurnIndicator"
-	turn_indicator.custom_minimum_size = Vector2(180, 32)
-	header_top_hbox.add_child(turn_indicator)
 
 	btn_rules = Button.new()
 	btn_rules.name = "RulesButton"
@@ -303,11 +302,6 @@ func _setup_ui() -> void:
 	btn_rules.visible = false
 	btn_rules.pressed.connect(_on_rules_pressed)
 	header_top_hbox.add_child(btn_rules)
-
-	var top_menu_spacer: Control = Control.new()
-	top_menu_spacer.name = "TopMenuSpacer"
-	top_menu_spacer.custom_minimum_size = Vector2(126, 32)
-	header_top_hbox.add_child(top_menu_spacer)
 
 	# Two Grids Container (Horizontal on Desktop/Landscape, Vertical on Mobile/Portrait)
 	grids_container = BoxContainer.new()

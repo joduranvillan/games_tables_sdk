@@ -132,15 +132,14 @@ func _on_quit_to_menu() -> void:
 			get_tree().change_scene_to_file("res://main.tscn")
 
 func _setup_ui() -> void:
-	var side_x: float = 640.0
 	if status == null:
 		status = get_node_or_null("Status")
 	if status == null:
 		status = Label.new()
 		status.name = "Status"
 		add_child(status)
-	# Zona Superior: Turno, Reloj y Capturas
-	status.position = Vector2(side_x, 70)
+	# Zona Superior Centrada: Turno, Reloj y Capturas
+	status.position = Vector2(288, -70)
 
 	stones_container = Node2D.new()
 	stones_container.name = "StonesContainer"
@@ -149,7 +148,7 @@ func _setup_ui() -> void:
 
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
-	mode_option_button.position = Vector2(side_x, 18)
+	mode_option_button.position = Vector2(126, -70)
 	mode_option_button.custom_minimum_size = Vector2(360, 34)
 	mode_option_button.visible = false
 	mode_option_button.add_item("Hotseat (2 jugadores)")
@@ -160,7 +159,7 @@ func _setup_ui() -> void:
 
 	size_option_button = OptionButton.new()
 	size_option_button.name = "BoardSizeOptionButton"
-	size_option_button.position = Vector2(side_x, 60)
+	size_option_button.position = Vector2(126, -34)
 	size_option_button.custom_minimum_size = Vector2(360, 34)
 	size_option_button.visible = false
 	size_option_button.add_item("Tablero 9x9 (Rápido)")
@@ -169,35 +168,35 @@ func _setup_ui() -> void:
 	size_option_button.item_selected.connect(_on_size_selected)
 	add_child(size_option_button)
 
-	# Board Info & Komi Label (Zona Superior)
+	# Board Info & Komi Label (Zona Superior Centrada)
 	captured_score_label = Label.new()
 	captured_score_label.name = "CapturedScoreLabel"
-	captured_score_label.position = Vector2(side_x, 108)
-	captured_score_label.size = Vector2(420, 28)
+	captured_score_label.position = Vector2(4, -32)
+	captured_score_label.size = Vector2(312, 26)
 	captured_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	captured_score_label.add_theme_font_size_override("font_size", 15)
+	captured_score_label.add_theme_font_size_override("font_size", 14)
 	captured_score_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
 	add_child(captured_score_label)
 
-	# Captured Stones Counters (Zona Superior)
+	# Captured Stones Counters (Zona Superior Centrada)
 	var captures_container = HBoxContainer.new()
 	captures_container.name = "CapturesContainer"
-	captures_container.position = Vector2(side_x, 140)
-	captures_container.size = Vector2(420, 30)
-	captures_container.add_theme_constant_override("separation", 28)
+	captures_container.position = Vector2(324, -32)
+	captures_container.size = Vector2(284, 26)
+	captures_container.add_theme_constant_override("separation", 18)
 	add_child(captures_container)
 
 	captures_label_n = Label.new()
 	captures_label_n.name = "CapturesLabelN"
 	captures_label_n.text = "● Capturas N: 0"
-	captures_label_n.add_theme_font_size_override("font_size", 16)
+	captures_label_n.add_theme_font_size_override("font_size", 15)
 	captures_label_n.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
 	captures_container.add_child(captures_label_n)
 
 	captures_label_b = Label.new()
 	captures_label_b.name = "CapturesLabelB"
 	captures_label_b.text = "○ Capturas B: 0"
-	captures_label_b.add_theme_font_size_override("font_size", 16)
+	captures_label_b.add_theme_font_size_override("font_size", 15)
 	captures_label_b.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
 	captures_container.add_child(captures_label_b)
 
@@ -212,17 +211,17 @@ func _setup_ui() -> void:
 	drag_layer.set_process_input(false)
 	drag_layer.set_process_unhandled_input(false)
 
-	# Turn Indicator Widget (Zona Superior)
+	# Turn Indicator Widget (Zona Superior Centrada)
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 20)
+	turn_indicator.position = Vector2(12, -74)
 	add_child(turn_indicator)
 
-	# Zona Inferior: Acciones del turno actual (Pasar Turno y Conteo de Territorio)
+	# Zona Inferior Centrada: Acciones del turno actual (Pasar Turno y Conteo de Territorio)
 	var pass_btn: Button = Button.new()
 	pass_btn.name = "PassTurnButton"
 	pass_btn.text = "⏭️ Pasar Turno"
-	pass_btn.position = Vector2(side_x, 536)
+	pass_btn.position = Vector2((GOBAN_PIXEL_SPAN - 180.0) * 0.5, GOBAN_PIXEL_SPAN + 10.0)
 	pass_btn.custom_minimum_size = Vector2(180, 42)
 	pass_btn.pressed.connect(_on_pass_pressed)
 	add_child(pass_btn)
@@ -231,7 +230,7 @@ func _setup_ui() -> void:
 	var tutorial_btn: Button = Button.new()
 	tutorial_btn.name = "GoTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(side_x + 195, 536)
+	tutorial_btn.position = Vector2(216, 622)
 	tutorial_btn.custom_minimum_size = Vector2(140, 36)
 	tutorial_btn.visible = false
 	tutorial_btn.pressed.connect(start_go_tutorial)
@@ -241,7 +240,7 @@ func _setup_ui() -> void:
 	export_game_button = Button.new()
 	export_game_button.name = "ExportGameButton"
 	export_game_button.text = "Exportar Partida"
-	export_game_button.position = Vector2(side_x, 360)
+	export_game_button.position = Vector2(216, 622)
 	export_game_button.custom_minimum_size = Vector2(170, 36)
 	export_game_button.visible = false
 	export_game_button.pressed.connect(_on_export_game_pressed)
@@ -250,7 +249,7 @@ func _setup_ui() -> void:
 	# Selector de Handicap Inicial — integrado en GameAppMenu / Opciones
 	handicap_option_button = OptionButton.new()
 	handicap_option_button.name = "HandicapOptionButton"
-	handicap_option_button.position = Vector2(side_x + 180, 360)
+	handicap_option_button.position = Vector2(216, 622)
 	handicap_option_button.custom_minimum_size = Vector2(210, 36)
 	handicap_option_button.visible = false
 	handicap_option_button.add_item("Handicap: 0 piedras")
@@ -260,10 +259,10 @@ func _setup_ui() -> void:
 	handicap_option_button.item_selected.connect(_on_handicap_selected)
 	add_child(handicap_option_button)
 
-	# Banner de Fase de Conteo con Puntaje Parcial en Vivo + ConfirmDeadButton (Zona Inferior)
+	# Banner de Fase de Conteo con Puntaje Parcial en Vivo + ConfirmDeadButton (Zona Inferior Centrada)
 	scoring_phase_banner = PanelContainer.new()
 	scoring_phase_banner.name = "ScoringPhaseBanner"
-	scoring_phase_banner.position = Vector2(side_x, 430)
+	scoring_phase_banner.position = Vector2(86, GOBAN_PIXEL_SPAN + 56.0)
 	scoring_phase_banner.visible = false
 	var sb_style: StyleBoxFlat = StyleBoxFlat.new()
 	sb_style.bg_color = Color(0.11, 0.14, 0.20, 0.96)
@@ -297,7 +296,7 @@ func _setup_ui() -> void:
 	export_toast_label.name = "ExportToastLabel"
 	export_toast_label.text = ""
 	export_toast_label.visible = false
-	export_toast_label.position = Vector2(side_x, 588)
+	export_toast_label.position = Vector2(186, GOBAN_PIXEL_SPAN + 58.0)
 	export_toast_label.add_theme_font_size_override("font_size", 14)
 	export_toast_label.add_theme_color_override("font_color", Color(0.45, 0.95, 0.55))
 	add_child(export_toast_label)
@@ -526,15 +525,16 @@ func _on_layout_changed(_layout: int) -> void:
 			vp_size = visible_sz
 	if _layout == 2 and vp_size.x >= 1000.0:
 		vp_size = Vector2(375, 667)
-	var design_w: float = 1060.0
-	var design_h: float = 620.0
-	if _layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
-		var s: float = clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.30, 1.0)
-		scale = Vector2(s, s)
-		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
-	else:
-		scale = Vector2.ONE
-		position = Vector2.ZERO
+	var min_x: float = 0.0
+	var min_y: float = -80.0
+	var design_w: float = GOBAN_PIXEL_SPAN
+	var design_h: float = 768.0
+	var s: float = clampf(minf((vp_size.x - 40.0) / design_w, (vp_size.y - 24.0) / design_h), 0.30, 1.0)
+	scale = Vector2(s, s)
+	position = Vector2(
+		(vp_size.x - design_w * s) * 0.5 - min_x * s,
+		(vp_size.y - design_h * s) * 0.5 - min_y * s
+	)
 
 func cell_to_pixel(cell: Vector2i) -> Vector2:
 	return Vector2(cell.x * CELL_SIZE, cell.y * CELL_SIZE)
@@ -737,10 +737,10 @@ func _input(event: InputEvent) -> void:
 	var click_pos = Vector2.ZERO
 	var handled = false
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		click_pos = get_local_mouse_position() if (is_inside_tree() and not OS.has_feature("headless")) else to_local(event.position)
+		click_pos = get_local_mouse_position() if (is_inside_tree() and not OS.has_feature("headless")) else event.position
 		handled = true
 	elif event is InputEventScreenTouch and event.pressed:
-		click_pos = to_local(event.position)
+		click_pos = to_local(event.position) if (is_inside_tree() and not OS.has_feature("headless")) else event.position
 		handled = true
 		
 	if handled:

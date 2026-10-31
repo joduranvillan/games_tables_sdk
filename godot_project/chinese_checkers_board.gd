@@ -104,15 +104,16 @@ func _on_layout_changed(_layout: int) -> void:
 			vp_size = visible_sz
 	if _layout == 2 and vp_size.x >= 1000.0:
 		vp_size = Vector2(375, 667)
-	var design_w := 1040.0
-	var design_h := 680.0
-	if _layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
-		var s := clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.30, 1.0)
-		scale = Vector2(s, s)
-		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
-	else:
-		scale = Vector2.ONE
-		position = Vector2.ZERO
+	var min_x := 45.0
+	var min_y := 0.0
+	var design_w := 590.0
+	var design_h := 665.0
+	var s := clampf(minf((vp_size.x - 40.0) / design_w, (vp_size.y - 20.0) / design_h), 0.30, 1.0)
+	scale = Vector2(s, s)
+	position = Vector2(
+		(vp_size.x - design_w * s) * 0.5 - min_x * s,
+		(vp_size.y - design_h * s) * 0.5 - min_y * s
+	)
 
 func _rotate_60(p: Vector2i, times: int) -> Vector2i:
 	var curr = p
@@ -237,18 +238,17 @@ func start_match(p_count: int = 2) -> void:
 	queue_redraw()
 
 func _setup_ui_layers() -> void:
-	var side_x := 660.0
 	if status == null:
 		status = get_node_or_null("Status")
 	if status == null:
 		status = Label.new()
 		status.name = "Status"
 		add_child(status)
-	status.position = Vector2(side_x, 74)
+	status.position = Vector2(325, 12)
 
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
-	mode_option_button.position = Vector2(side_x, 24)
+	mode_option_button.position = Vector2(160, 8)
 	mode_option_button.custom_minimum_size = Vector2(360, 36)
 	mode_option_button.add_item("Hotseat (Local)")
 	mode_option_button.add_item("vs IA (Humano J1 - Rojo)")
@@ -265,7 +265,7 @@ func _setup_ui_layers() -> void:
 
 	# Selector de número de jugadores (2 a 6) — gestionado desde el menú Opciones
 	player_select_box = HBoxContainer.new()
-	player_select_box.position = Vector2(side_x, 72)
+	player_select_box.position = Vector2(160, 8)
 	player_select_box.add_theme_constant_override("separation", 8)
 	player_select_box.visible = false
 	add_child(player_select_box)
@@ -289,16 +289,16 @@ func _setup_ui_layers() -> void:
 	)
 	player_select_box.add_child(player_count_option)
 
-	# --- ZONA SUPERIOR: Turno, reloj y estado ---
+	# --- ZONA SUPERIOR CENTRADA: Turno, reloj y estado ---
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(side_x, 20)
+	turn_indicator.position = Vector2(55, 6)
 	add_child(turn_indicator)
 
 	var btn_rules = Button.new()
 	btn_rules.name = "RulesButton"
 	btn_rules.text = "📖 Reglas"
-	btn_rules.position = Vector2(side_x, 275)
+	btn_rules.position = Vector2(280, 620)
 	btn_rules.custom_minimum_size = Vector2(120, 40)
 	btn_rules.visible = false
 	btn_rules.pressed.connect(func(): rules_popup.show_for_game("chinese_checkers"))

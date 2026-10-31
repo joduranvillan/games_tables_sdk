@@ -137,15 +137,16 @@ func _on_layout_changed(_layout: int) -> void:
 			vp_size = visible_sz
 	if _layout == 2 and vp_size.x >= 1000.0:
 		vp_size = Vector2(375, 667)
-	var design_w := 1150.0
-	var design_h := 600.0
-	if _layout == 2 or vp_size.x < design_w or vp_size.y < design_h:
-		var s := clampf(minf(vp_size.x / design_w, vp_size.y / design_h), 0.28, 1.0)
-		scale = Vector2(s, s)
-		position = Vector2(maxf(0.0, (vp_size.x - design_w * s) * 0.5), maxf(0.0, (vp_size.y - design_h * s) * 0.5))
-	else:
-		scale = Vector2.ONE
-		position = Vector2.ZERO
+	var min_x := 40.0
+	var min_y := -26.0
+	var design_w := 720.0
+	var design_h := 616.0
+	var s := clampf(minf((vp_size.x - 40.0) / design_w, (vp_size.y - 24.0) / design_h), 0.28, 1.0)
+	scale = Vector2(s, s)
+	position = Vector2(
+		(vp_size.x - design_w * s) * 0.5 - min_x * s,
+		(vp_size.y - design_h * s) * 0.5 - min_y * s
+	)
 
 func _init_board_state() -> void:
 	points = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
@@ -170,13 +171,13 @@ func _setup_ui() -> void:
 		status = Label.new()
 		status.name = "Status"
 		add_child(status)
-	# Zona Superior: Turno, Reloj y Estado del Cubo de Doblaje
-	status.position = Vector2(780, 72)
+	# Zona Superior Centrada: Turno, Reloj y Estado del Cubo de Doblaje
+	status.position = Vector2(310, -14)
 
 	# Mode Option Button (integrado en GameAppMenu / Opciones)
 	mode_option_button = OptionButton.new()
 	mode_option_button.name = "ModeOptionButton"
-	mode_option_button.position = Vector2(780, 40)
+	mode_option_button.position = Vector2(220, -18)
 	mode_option_button.custom_minimum_size = Vector2(360, 34)
 	mode_option_button.visible = false
 	mode_option_button.add_item("Hotseat (2 jugadores)")
@@ -185,9 +186,9 @@ func _setup_ui() -> void:
 	mode_option_button.item_selected.connect(_on_mode_selected)
 	add_child(mode_option_button)
 
-	# Zona Inferior: Acciones del Turno (Tirar Dados y Doblar Apuesta)
+	# Zona Inferior Centrada: Acciones del Turno (Tirar Dados y Doblar Apuesta)
 	roll_btn = Button.new()
-	roll_btn.position = Vector2(780, 495)
+	roll_btn.position = Vector2(390, 532)
 	roll_btn.custom_minimum_size = Vector2(135, 44)
 	roll_btn.text = "🎲 Tirar Dados"
 	roll_btn.add_theme_font_size_override("font_size", 15)
@@ -195,31 +196,31 @@ func _setup_ui() -> void:
 	add_child(roll_btn)
 	
 	dice_label = Label.new()
-	dice_label.position = Vector2(780, 445)
-	dice_label.size = Vector2(160, 36)
+	dice_label.position = Vector2(250, 538)
+	dice_label.size = Vector2(130, 36)
 	dice_label.text = "Dados: -"
-	dice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	dice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dice_label.add_theme_font_size_override("font_size", 16)
 	add_child(dice_label)
 
 	dice_widget = DiceWidget.new()
-	dice_widget.position = Vector2(780, 385)
+	dice_widget.position = Vector2(135, 530)
 	add_child(dice_widget)
 
-	# Doubling Cube Panel (Zona Superior) & Action Button (Zona Inferior)
+	# Doubling Cube Panel (Zona Superior Centrada) & Action Button (Zona Inferior Centrada)
 	cube_label = Label.new()
 	cube_label.name = "CubeLabel"
-	cube_label.position = Vector2(780, 112)
-	cube_label.size = Vector2(220, 26)
+	cube_label.position = Vector2(580, -14)
+	cube_label.size = Vector2(180, 26)
 	cube_label.text = "Cubo: ×1 (Centro)"
-	cube_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	cube_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	cube_label.add_theme_font_size_override("font_size", 14)
 	cube_label.add_theme_color_override("font_color", Color(0.98, 0.90, 0.60))
 	add_child(cube_label)
 
 	double_btn = Button.new()
 	double_btn.name = "OfferDoubleButton"
-	double_btn.position = Vector2(925, 495)
+	double_btn.position = Vector2(540, 532)
 	double_btn.custom_minimum_size = Vector2(155, 44)
 	double_btn.text = "🎲×2 Doblar Apuesta"
 	double_btn.add_theme_font_size_override("font_size", 13)
@@ -231,7 +232,7 @@ func _setup_ui() -> void:
 
 	double_modal = PanelContainer.new()
 	double_modal.name = "DoubleOfferModal"
-	double_modal.position = Vector2(180, 210)
+	double_modal.position = Vector2(250, 220)
 	double_modal.custom_minimum_size = Vector2(300, 120)
 	double_modal.visible = false
 	var dm_vbox := VBoxContainer.new()
@@ -268,7 +269,7 @@ func _setup_ui() -> void:
 	var rules_btn = Button.new()
 	rules_btn.name = "RulesButton"
 	rules_btn.text = "📖 Reglas"
-	rules_btn.position = Vector2(900, 210)
+	rules_btn.position = Vector2(390, 532)
 	rules_btn.custom_minimum_size = Vector2(110, 36)
 	rules_btn.visible = false
 	rules_btn.pressed.connect(func(): rules_popup.show_for_game("backgammon"))
@@ -277,7 +278,7 @@ func _setup_ui() -> void:
 	var tutorial_btn := Button.new()
 	tutorial_btn.name = "BackgammonTutorialButton"
 	tutorial_btn.text = "🎓 Tutorial"
-	tutorial_btn.position = Vector2(780, 210)
+	tutorial_btn.position = Vector2(390, 532)
 	tutorial_btn.custom_minimum_size = Vector2(110, 36)
 	tutorial_btn.visible = false
 	tutorial_btn.pressed.connect(start_backgammon_tutorial)
@@ -288,10 +289,10 @@ func _setup_ui() -> void:
 	rules_popup.position = Vector2(80, 100)
 	add_child(rules_popup)
 
-	# Turn Indicator Widget (Zona Superior)
+	# Turn Indicator Widget (Zona Superior Centrada)
 	turn_indicator = TurnIndicator.new()
 	turn_indicator.name = "TurnIndicator"
-	turn_indicator.position = Vector2(780, 20)
+	turn_indicator.position = Vector2(40, -20)
 	add_child(turn_indicator)
 
 func start_backgammon_tutorial() -> void:
@@ -349,10 +350,10 @@ func _input(event: InputEvent) -> void:
 	var click_pos = Vector2.ZERO
 	var handled = false
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		click_pos = to_local(event.position)
+		click_pos = get_local_mouse_position() if (is_inside_tree() and not OS.has_feature("headless")) else event.position
 		handled = true
 	elif event is InputEventScreenTouch and event.pressed:
-		click_pos = to_local(event.position)
+		click_pos = to_local(event.position) if (is_inside_tree() and not OS.has_feature("headless")) else event.position
 		handled = true
 		
 	if handled:
