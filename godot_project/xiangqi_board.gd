@@ -116,6 +116,7 @@ func _ready() -> void:
 
 	_setup_ui_layout()
 	_init_board_state()
+	_on_layout_changed(gm.get_layout() if gm != null and gm.has_method("get_layout") else 0)
 
 	bridge = OpenTableBridge.new()
 	bridge.name = "Bridge"
