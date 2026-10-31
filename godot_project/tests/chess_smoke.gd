@@ -124,6 +124,23 @@ func _initialize() -> void:
 	click_square.call(5, 5)
 	results.append(["ChessBoard vs IA Turno 3 (Ng1->f3): caballo avanza a f3 y la IA responde devolviendo turno a J1", chess_node.current == 1 and chess_node.piece_sprites[7][6] == null])
 
+	# 6. Verificar atajos de subpromoción 1-4 y rechazo de AcceptDrawCommand sin oferta previa
+	chess_node.call("handle_promotion_shortcut", 2)
+	var promo_rook: bool = str(chess_node.get("selected_promotion_kind")) == "Rook"
+	chess_node.call("handle_promotion_shortcut", 3)
+	var promo_bishop: bool = str(chess_node.get("selected_promotion_kind")) == "Bishop"
+	chess_node.call("handle_promotion_shortcut", 1)
+	var promo_queen: bool = str(chess_node.get("selected_promotion_kind")) == "Queen"
+	results.append(["Atajos de coronación 1, 2 y 3 seleccionan Dama, Torre y Alfil respectivamente", promo_queen and promo_rook and promo_bishop])
+
+	move_rejected_reasons.clear()
+	bridge.send_command_json(1, JSON.stringify({
+		"command_type": "chess_game::AcceptDrawCommand",
+		"player": 1
+	}))
+	results.append(["AcceptDrawCommand sin oferta previa genera rechazo move_rejected", move_rejected_reasons.size() > 0])
+	results.append(["ChessBoard centrado horizontalmente con GameAppMenu activo", chess_node.position.x > 100.0 and chess_node.get_node_or_null("GameAppMenu") != null])
+
 	root.remove_child(chess_node)
 	chess_node.free()
 
@@ -136,3 +153,4 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+

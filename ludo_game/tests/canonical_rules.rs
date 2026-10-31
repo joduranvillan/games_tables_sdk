@@ -169,3 +169,53 @@ fn canonical_turno_extra_por_captura_y_meta_y_casillas_estrella() {
     );
     assert_eq!(session.current_player(), P1);
 }
+
+#[test]
+fn canonical_reinicio_contador_seises_y_meta_exacta() {
+    let mut session = new_ludo_session(SessionId(518_207), 1, vec![P1, P2]);
+    session
+        .world_mut()
+        .resource_mut::<ConsecutiveSixesResource>()
+        .count
+        .insert(P1, 2);
+    {
+        let mut t = session.world_mut().resource_mut::<TokensResource>();
+        t.tokens.get_mut(&P1).unwrap()[0] = 1;
+        t.tokens.get_mut(&P1).unwrap()[1] = MAX_STEPS - 2;
+    }
+
+    // Buscar una seed que saque un número distinto de 6
+    let seed_non6 = (0..100u64)
+        .find(|&s| {
+            let mut rng = RandomService::from_seed(s);
+            rng.roll_die(6) != 6
+        })
+        .expect("debe existir seed que no saque 6");
+    session.world_mut().resource_mut::<RandomResource>().0 = RandomService::from_seed(seed_non6);
+
+    session
+        .process_command(P1, Box::new(RollDiceCommand { player: P1 }))
+        .expect("tirada válida");
+    assert_eq!(
+        session.world().resource::<ConsecutiveSixesResource>().count[&P1],
+        0,
+        "sacar un número distinto de 6 tras 2 seises reinicia el contador a 0"
+    );
+
+    // Si una ficha está a 2 pasos de la meta y el dado pendiente es 4, exceder MAX_STEPS se rechaza
+    session
+        .world_mut()
+        .resource_mut::<PendingRollResource>()
+        .pending
+        .insert(P1, 4);
+    assert!(session
+        .process_command(
+            P1,
+            Box::new(MoveTokenCommand {
+                player: P1,
+                token_index: 1,
+            }),
+        )
+        .is_err());
+}
+

@@ -1,7 +1,7 @@
 use open_table_engine::prelude::*;
 use shogi_game::{
-    new_shogi_session, new_shogi_session_fesa, BoardResource, GameOverEvent, MovePieceCommand,
-    Piece, PieceKind,
+    new_shogi_session, new_shogi_session_fesa, BoardResource, DropPieceCommand, GameOverEvent,
+    MovePieceCommand, Piece, PieceKind,
 };
 
 const SENTE: PlayerId = PlayerId(1);
@@ -200,3 +200,77 @@ fn canonical_fesa_promocion_opcional_y_obligatoria() {
         )
         .expect("Caballo en fila 1 con promote: true es válido");
 }
+
+#[test]
+fn canonical_captura_pieza_promocionada_vuelve_a_mano_sin_promocionar_y_drop() {
+    let mut session = new_shogi_session_fesa(SessionId(518_202), 0, SENTE, GOTE);
+    {
+        let mut board = session.world_mut().resource_mut::<BoardResource>();
+        board.squares.clear();
+        board.squares.insert(
+            (4, 8),
+            Piece {
+                kind: PieceKind::King,
+                owner: SENTE,
+            },
+        );
+        board.squares.insert(
+            (4, 0),
+            Piece {
+                kind: PieceKind::King,
+                owner: GOTE,
+            },
+        );
+        board.squares.insert(
+            (3, 5),
+            Piece {
+                kind: PieceKind::Gold,
+                owner: SENTE,
+            },
+        );
+        board.squares.insert(
+            (3, 4),
+            Piece {
+                kind: PieceKind::PromotedSilver,
+                owner: GOTE,
+            },
+        );
+    }
+
+    // Sente captura PromotedSilver de Gote -> pasa a la mano de Sente como Silver sin promocionar
+    session
+        .process_command(
+            SENTE,
+            Box::new(MovePieceCommand {
+                player: SENTE,
+                from: (3, 5),
+                to: (3, 4),
+                promote: false,
+            }),
+        )
+        .expect("captura válida");
+
+    assert!(session.world().resource::<BoardResource>().hands[&SENTE].contains(&PieceKind::Silver));
+
+    force_turn!(session, SENTE);
+    session
+        .process_command(
+            SENTE,
+            Box::new(DropPieceCommand {
+                player: SENTE,
+                piece: PieceKind::Silver,
+                to: (5, 5),
+            }),
+        )
+        .expect("reingreso de Silver desde la mano debe ser válido");
+    assert_eq!(
+        session
+            .world()
+            .resource::<BoardResource>()
+            .squares
+            .get(&(5, 5))
+            .map(|p| p.kind),
+        Some(PieceKind::Silver)
+    );
+}
+

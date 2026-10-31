@@ -79,6 +79,23 @@ func _initialize() -> void:
 	var started_ai = bridge.start_local_match_backgammon_vs_ai(1, 2)
 	results.append(["start_local_match_backgammon_vs_ai inicia correctamente", started_ai == true])
 
+	# 6. Probar OfferDoubleCommand y AcceptDoubleCommand en partida local y HUD centrado
+	bridge.start_local_match_backgammon(1, 2)
+	move_rejected_reasons.clear()
+	bridge.send_command_json(1, JSON.stringify({"command_type": "OfferDoubleCommand", "player": 1}))
+	bridge.send_command_json(2, JSON.stringify({"command_type": "AcceptDoubleCommand", "player": 2}))
+	results.append(["OfferDoubleCommand y AcceptDoubleCommand se procesan sin rechazo antes de tirar dados", move_rejected_reasons.size() == 0])
+
+	var bg_script: Script = load("res://backgammon_board.gd") as Script
+	if bg_script != null:
+		var bg_node: Node2D = bg_script.new() as Node2D
+		root.add_child(bg_node)
+		if bg_node.get("turn_indicator") == null and bg_node.has_method("_ready"):
+			bg_node._ready()
+		results.append(["BackgammonBoard inicia centrado con GameAppMenu activo", bg_node.position.x > 100.0 and bg_node.get_node_or_null("GameAppMenu") != null])
+		root.remove_child(bg_node)
+		bg_node.free()
+
 	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
@@ -88,3 +105,4 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+

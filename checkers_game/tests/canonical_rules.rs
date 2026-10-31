@@ -152,3 +152,59 @@ fn canonical_tablas_por_40_turnos_sin_captura_ni_coronacion() {
         &WinnerResource(None)
     );
 }
+
+#[test]
+fn canonical_reinicio_reloj_tablas_y_captura_obligatoria() {
+    let mut session = new_checkers_session(SessionId(518_200), 1, P1, P2);
+    {
+        let mut board = session.world_mut().resource_mut::<BoardResource>();
+        for r in 0..8u8 {
+            for c in 0..8u8 {
+                board.set(pos(r, c), None);
+            }
+        }
+        board.set(
+            pos(2, 1),
+            Some(Piece {
+                owner: P1,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(3, 2),
+            Some(Piece {
+                owner: P2,
+                is_king: false,
+            }),
+        );
+        board.set(
+            pos(7, 0),
+            Some(Piece {
+                owner: P2,
+                is_king: true,
+            }),
+        );
+    }
+    session
+        .world_mut()
+        .resource_mut::<DrawClockResource>()
+        .half_moves_without_capture_or_promotion = 35;
+
+    // Si existe captura obligatoria ((2,1) -> (4,3)), intentar movimiento simple ((2,1) -> (3,0)) se rechaza
+    assert!(session
+        .process_command(P1, move_cmd(P1, pos(2, 1), pos(3, 0)))
+        .is_err());
+
+    // Al ejecutar la captura obligatoria, el reloj de 40 turnos se reinicia a 0
+    session
+        .process_command(P1, move_cmd(P1, pos(2, 1), pos(4, 3)))
+        .expect("captura obligatoria válida");
+    assert_eq!(
+        session
+            .world()
+            .resource::<DrawClockResource>()
+            .half_moves_without_capture_or_promotion,
+        0
+    );
+}
+

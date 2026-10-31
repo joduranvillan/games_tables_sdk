@@ -1,8 +1,8 @@
 use open_table_engine::prelude::*;
 use uno_game::{
     new_uno_session, CallUnoCommand, Card, CardColor, CardValue, CatchUnoFailureCommand,
-    ChallengeWildDrawFourCommand, PlayCardCommand, UnoCalledEvent, UnoPenaltyEvent, UnoState,
-    WildDrawFourChallengedEvent,
+    ChallengeWildDrawFourCommand, InterceptCommand, InterceptedEvent, PlayCardCommand,
+    UnoCalledEvent, UnoPenaltyEvent, UnoState, WildDrawFourChallengedEvent,
 };
 
 const P1: PlayerId = PlayerId(1);
@@ -131,3 +131,47 @@ fn canonical_challenge_wild_draw_four_bluff_y_legal() {
     assert_eq!(ch2.cards_drawn, 6);
     assert_eq!(session2.current_player(), P1);
 }
+
+#[test]
+fn canonical_jump_in_intercept_carta_identica_y_rechazo_no_identica() {
+    let mut session = new_uno_session(SessionId(518_210), 0, vec![P1, P2]);
+    {
+        let mut state = session.world_mut().resource_mut::<UnoState>();
+        state.discard_pile = vec![Card::new(CardColor::Green, CardValue::Number(7))];
+        state.active_color = CardColor::Green;
+        let hand_p2 = state.hands.get_mut(&P2).unwrap();
+        hand_p2.clear();
+        hand_p2.push(Card::new(CardColor::Green, CardValue::Number(5)));
+        hand_p2.push(Card::new(CardColor::Green, CardValue::Number(7)));
+        hand_p2.push(Card::new(CardColor::Blue, CardValue::Number(1)));
+    }
+
+    // CallUnoCommand con 3 cartas debe rechazarse
+    assert!(session
+        .process_command(P2, Box::new(CallUnoCommand { player: P2 }))
+        .is_err());
+
+    // InterceptCommand con carta de distinto valor (Green 5 vs Green 7) se rechaza
+    assert!(session
+        .process_command(
+            P2,
+            Box::new(InterceptCommand {
+                player: P2,
+                card_index: 0,
+            }),
+        )
+        .is_err());
+
+    // InterceptCommand fuera de turno con carta idéntica (Green 7) tiene éxito y emite InterceptedEvent
+    let ev_int = session
+        .process_command(
+            P2,
+            Box::new(InterceptCommand {
+                player: P2,
+                card_index: 1,
+            }),
+        )
+        .expect("Jump-In con carta exactamente idéntica debe aceptarse");
+    assert!(ev_int[0].as_any().is::<InterceptedEvent>());
+}
+

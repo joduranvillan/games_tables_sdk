@@ -148,6 +148,11 @@ func _initialize() -> void:
 		results.append(["En modo vs IA de TEG, la IA ejecuta su turno al instante y devuelve turno a J1", tick_after > tick_before + 3 and board_inst.current_player_id == 1])
 		results.append(["El turno de la IA no abre popups bloqueantes (dice_popup oculto)", not board_inst.dice_popup.visible])
 
+		var crisis_menu: Node = board_inst.get_node_or_null("GameAppMenu")
+		if crisis_menu == null:
+			crisis_menu = board_inst.find_child("GameAppMenu", true, false)
+		results.append(["crisis_board integra GameAppMenu en esquina superior derecha", crisis_menu != null])
+
 		root.remove_child(board_inst)
 		board_inst.free()
 
@@ -160,3 +165,4 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+

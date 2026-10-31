@@ -1,5 +1,7 @@
 use backgammon_game::{
-    new_backgammon_session, BoardResource, MoveCheckerCommand, PendingDiceResource, Sides, POINTS,
+    new_backgammon_session, AcceptDoubleCommand, BoardResource, DoublingCubeResource,
+    MatchStateResource, MoveCheckerCommand, OfferDoubleCommand, PendingDiceResource,
+    RejectDoubleCommand, Sides, POINTS,
 };
 use open_table_engine::prelude::*;
 
@@ -102,3 +104,50 @@ fn canonical_obligacion_de_usar_ambos_dados_si_existe_secuencia_completa() {
         .expect("2 -> 5 completa la tirada");
     assert_eq!(session.current_player(), P2);
 }
+
+#[test]
+fn canonical_cubo_doblaje_y_regla_crawford() {
+    let mut session = new_backgammon_session(SessionId(518_205), 1, P1, P2);
+
+    // En juego Crawford está prohibido ofrecer el dado de doblaje
+    session
+        .world_mut()
+        .resource_mut::<MatchStateResource>()
+        .crawford_game = true;
+    assert!(session
+        .process_command(P1, Box::new(OfferDoubleCommand { player: P1 }))
+        .is_err());
+
+    // Fuera de Crawford, P1 ofrece doblaje y P2 acepta -> valor = 2, dueño = P2
+    session
+        .world_mut()
+        .resource_mut::<MatchStateResource>()
+        .crawford_game = false;
+    session
+        .process_command(P1, Box::new(OfferDoubleCommand { player: P1 }))
+        .expect("OfferDoubleCommand válido antes de tirar dados");
+    session
+        .process_command(P2, Box::new(AcceptDoubleCommand { player: P2 }))
+        .expect("AcceptDoubleCommand válido por el oponente");
+
+    let cube = session.world().resource::<DoublingCubeResource>();
+    assert_eq!(cube.value, 2);
+    assert_eq!(cube.owner, Some(P2));
+
+    // P1 ya no es dueño del cubo y no puede redoblar
+    assert!(session
+        .process_command(P1, Box::new(OfferDoubleCommand { player: P1 }))
+        .is_err());
+
+    // Si en turno de P2 ofrece redoble y P1 rechaza, P2 gana inmediatamente
+    force_turn!(session, P2);
+    session
+        .process_command(P2, Box::new(OfferDoubleCommand { player: P2 }))
+        .expect("P2 posee el cubo y puede redoblar");
+    session
+        .process_command(P1, Box::new(RejectDoubleCommand { player: P1 }))
+        .expect("RejectDoubleCommand concede la partida");
+    assert!(session.world().resource::<GameOverResource>().0);
+    assert_eq!(session.world().resource::<WinnerResource>().0, Some(P2));
+}
+

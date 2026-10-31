@@ -154,6 +154,16 @@ func _initialize() -> void:
 		var blue_card_playable: bool = board_inst._is_card_playable({"color": "Blue", "value": "7"})
 		results.append(["Tras jugar comodín +4/+2 y saltar turno, carta del color elegido es jugable sin obligar a robar", blue_card_playable])
 
+		# 12. Verificar que Jump-In (_is_card_interceptable) rechaza comodines y cartas distintas, y que GameAppMenu está presente
+		board_inst.discard_pile = [{"color": "Red", "value": "9"}]
+		var match_ok: bool = bool(board_inst._is_card_interceptable({"color": "Red", "value": "9"}))
+		var diff_rej: bool = not bool(board_inst._is_card_interceptable({"color": "Blue", "value": "9"}))
+		var wild_rej: bool = not bool(board_inst._is_card_interceptable({"color": "Wild", "value": "Wild"}))
+		var uno_menu: Node = board_inst.get_node_or_null("GameAppMenu")
+		if uno_menu == null:
+			uno_menu = board_inst.find_child("GameAppMenu", true, false)
+		results.append(["Jump-In solo acepta carta idéntica en color y valor, rechaza Wild y posee GameAppMenu", match_ok and diff_rej and wild_rej and uno_menu != null])
+
 		root.remove_child(board_inst)
 		board_inst.free()
 
@@ -166,3 +176,4 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+

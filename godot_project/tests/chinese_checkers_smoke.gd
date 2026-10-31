@@ -95,6 +95,27 @@ func _initialize() -> void:
 		bridge.start_local_match_chinese_checkers_n_players(2)
 		results.append(["start_local_match_chinese_checkers_n_players(2) inicializa sesión de 2 jugadores", bridge.current_player() == 1])
 
+	# 5. Verificar ChineseCheckersBoard centrado y rechazo de salto sin pivote
+	move_rejected_reasons.clear()
+	bridge.send_command_json(1, JSON.stringify({
+		"command_type": "MovePegCommand",
+		"player": 1,
+		"from": {"q": -5, "r": 1},
+		"to": {"q": -3, "r": 1},
+		"path": [{"q": -3, "r": 1}]
+	}))
+	results.append(["Salto de 2 casillas sobre casilla vacía genera rechazo move_rejected", move_rejected_reasons.size() > 0])
+
+	var cc_script: Script = load("res://chinese_checkers_board.gd") as Script
+	if cc_script != null:
+		var cc_node: Node2D = cc_script.new() as Node2D
+		root.add_child(cc_node)
+		if cc_node.get("turn_indicator") == null and cc_node.has_method("_ready"):
+			cc_node._ready()
+		results.append(["ChineseCheckersBoard inicia centrado con GameAppMenu activo", cc_node.position.x > 100.0 and cc_node.get_node_or_null("GameAppMenu") != null])
+		root.remove_child(cc_node)
+		cc_node.free()
+
 	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
@@ -104,4 +125,5 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+
 

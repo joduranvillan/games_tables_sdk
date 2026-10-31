@@ -91,7 +91,22 @@ func _initialize() -> void:
 		var path_back = board.get_path_from_to(10, 0, 1, 0)
 		results.append(["get_path_from_to(10, 0) devuelve 1 posición (retorno a base)", path_back.size() == 1])
 
+		root.add_child(board)
+		if board.get("turn_indicator") == null and board.has_method("_ready"):
+			board._ready()
+		results.append(["LudoBoard inicia centrado horizontalmente con GameAppMenu", board.position.x > 100.0 and board.get_node_or_null("GameAppMenu") != null])
+		root.remove_child(board)
 		board.free()
+
+	# 5. Probar SetLudoRulesCommand (casillas estrella seguras, bono captura/meta, 3 seises)
+	move_rejected_reasons.clear()
+	bridge.send_command_json(1, JSON.stringify({
+		"command_type": "ludo_game::SetLudoRulesCommand",
+		"star_safe_squares": true,
+		"bonus_roll_on_capture_and_goal": true,
+		"three_sixes_penalty": true
+	}))
+	results.append(["SetLudoRulesCommand procesado sin rechazo en el bridge de Ludo", move_rejected_reasons.size() == 0])
 
 	var ok: bool = true
 	for r in results:
@@ -102,3 +117,4 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+

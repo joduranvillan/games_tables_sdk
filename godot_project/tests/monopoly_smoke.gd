@@ -137,6 +137,19 @@ func _initialize() -> void:
 		var inspector_updated = board_inst.inspector_title_lbl != null and "Paseo Tablado" in board_inst.inspector_title_lbl.text
 		results.append(["monopoly_board muestra detalles de propiedad al seleccionar casilla", inspector_updated])
 
+		# 10. Verificar rechazo de BuildHouseCommand sin poseer monopolio del grupo y presencia de GameAppMenu
+		move_rejected_reasons.clear()
+		bridge.send_command_json(1, JSON.stringify({
+			"command_type": "BuildHouseCommand",
+			"player": 1,
+			"space": 1
+		}))
+		results.append(["BuildHouseCommand sin poseer el grupo de color completo genera rechazo move_rejected", move_rejected_reasons.size() > 0])
+		var mono_menu: Node = board_inst.get_node_or_null("GameAppMenu")
+		if mono_menu == null:
+			mono_menu = board_inst.find_child("GameAppMenu", true, false)
+		results.append(["monopoly_board integra GameAppMenu en esquina superior derecha", mono_menu != null])
+
 		root.remove_child(board_inst)
 		board_inst.free()
 
@@ -149,3 +162,4 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+

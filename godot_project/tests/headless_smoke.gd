@@ -60,6 +60,12 @@ func _initialize() -> void:
 	board_node._on_game_over(0)
 	results.append(["fin de partida por tablas actualiza winner == 0 y limpia multi_capture_cell", board_node.winner == 0 and board_node.multi_capture_cell == null])
 
+	# Verificar rechazo de movimiento en casilla inválida/ocupada y HUD centrado con GameAppMenu
+	var rej_before: int = rejected.size()
+	bridge.send_move(2, 5, 0, 5, 1)
+	results.append(["movimiento ortogonal ilegal en Damas emite señal move_rejected", rejected.size() > rej_before])
+	results.append(["CheckersBoard centrado horizontalmente con GameAppMenu en esquina superior derecha", board_node.position.x > 100.0 and board_node.get_node_or_null("GameAppMenu") != null])
+
 	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
@@ -71,3 +77,4 @@ func _initialize() -> void:
 	board_node.free()
 	bridge.free()
 	quit(0 if ok else 1)
+

@@ -99,6 +99,20 @@ func _initialize() -> void:
 	make_click.call(7, 5)
 	results.append(["Tercer turno UI: Plata Sente avanza de (8,6) a (7,5) con fluidez", shogi_ui.current == 2 and shogi_ui.board[7][5] != null and shogi_ui.board[8][6] == null])
 
+	# Verificar obligatoriedad FESA y rechazo de DropPieceCommand con pieza inexistente en mano
+	var fesa_lance_row0: bool = bool(shogi_ui.call("_is_promotion_mandatory_fesa", "Lance", 0, 1))
+	var fesa_gold_row0: bool = bool(shogi_ui.call("_is_promotion_mandatory_fesa", "Gold", 0, 1))
+	results.append(["Regla FESA: Lanza en fila 0 obliga promoción y Oro nunca promociona", fesa_lance_row0 == true and fesa_gold_row0 == false])
+
+	move_rejected_reasons.clear()
+	bridge.send_command_json(1, JSON.stringify({
+		"command_type": "shogi_game::DropPieceCommand",
+		"player": 1,
+		"piece": "Pawn",
+		"to": [4, 4]
+	}))
+	results.append(["DropPieceCommand sin la pieza en mano genera rechazo move_rejected", move_rejected_reasons.size() > 0])
+
 	shogi_ui.free()
 
 	var ok: bool = true
@@ -110,4 +124,5 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+
 

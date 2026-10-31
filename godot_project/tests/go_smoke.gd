@@ -126,6 +126,15 @@ func _initialize() -> void:
 		go_ui._on_pass_pressed() # Negro pasa -> doble pase cierra partida automáticamente
 		results.append(["Doble pase consecutivo en GoBoard calcula territorio y cierra la partida", go_ui.winner != -1])
 
+		# Verificar rechazo de SetKomiCommand tras colocar piedras
+		go_ui.set_board_size(9)
+		go_ui._on_cell_clicked(Vector2i(4, 4))
+		move_rejected_reasons.clear()
+		bridge.start_local_match_go(1, 2)
+		bridge.send_command_json(1, JSON.stringify({"command_type": "go_game::PlaceStoneCommand", "player": 1, "x": 4, "y": 4}))
+		bridge.send_command_json(2, JSON.stringify({"command_type": "go_game::SetKomiCommand", "player": 2, "komi_half_points": 15}))
+		results.append(["SetKomiCommand tras iniciar jugadas en el tablero genera rechazo move_rejected", move_rejected_reasons.size() > 0])
+
 		go_ui.free()
 
 	var ok: bool = true
@@ -137,4 +146,5 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+
 

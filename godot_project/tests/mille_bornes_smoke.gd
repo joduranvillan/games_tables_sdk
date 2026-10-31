@@ -71,6 +71,29 @@ func _initialize() -> void:
 
 	results.append(["5 rondas jugadas y bridge.get_distance(1) incrementa correctamente a %d km" % total_expected, distance_increments_ok])
 
+	# 4. Probar límite canónico de máximo 2 cartas de 200 km por jugador
+	bridge.send_command_json(1, JSON.stringify({"command_type": "PlayDistanceCommand", "player": 1, "distance": 200}))
+	bridge.send_command_json(2, JSON.stringify({"command_type": "PlayDistanceCommand", "player": 2, "distance": 25}))
+	bridge.send_command_json(1, JSON.stringify({"command_type": "PlayDistanceCommand", "player": 1, "distance": 200}))
+	bridge.send_command_json(2, JSON.stringify({"command_type": "PlayDistanceCommand", "player": 2, "distance": 25}))
+	move_rejected_reasons.clear()
+	bridge.send_command_json(1, JSON.stringify({"command_type": "PlayDistanceCommand", "player": 1, "distance": 200}))
+	results.append(["Intentar jugar una 3ª carta de 200 km genera rechazo move_rejected", move_rejected_reasons.size() > 0])
+
+	# 5. Verificar MilleBornesBoard con controlador de 4 escudos y GameAppMenu
+	var mb_script: Script = load("res://mille_bornes_board.gd") as Script
+	if mb_script != null:
+		var mb_node: Node2D = mb_script.new() as Node2D
+		root.add_child(mb_node)
+		if mb_node.get("coup_fourre_btn") == null and mb_node.has_method("_ready"):
+			mb_node._ready()
+		var gm_menu: Node = mb_node.get_node_or_null("GameAppMenu")
+		if gm_menu == null:
+			gm_menu = mb_node.find_child("GameAppMenu", true, false)
+		results.append(["MilleBornesBoard instancia CoupFourreButton y GameAppMenu", mb_node.get("coup_fourre_btn") != null and gm_menu != null])
+		root.remove_child(mb_node)
+		mb_node.free()
+
 	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
@@ -80,3 +103,4 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+

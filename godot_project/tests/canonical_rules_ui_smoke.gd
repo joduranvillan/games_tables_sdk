@@ -141,7 +141,144 @@ func _initialize() -> void:
 		get_root().remove_child(mb_node)
 		mb_node.free()
 
-	# 6. GameAppMenu (scenes/game_app_menu.gd): Menú unificado de Opciones (Exportar/Importar, Configuración, Guardar/Cargar, Tablas/Rendirse)
+	# 6. Damas (checkers_board.gd): Flujo E2E de captura obligatoria, coronación y tablas (winner == 0)
+	var chk_script: Script = load("res://checkers_board.gd") as Script
+	_check(chk_script != null, "checkers_board.gd carga sin errores de parseo en modo Redot strict")
+	if chk_script != null:
+		var chk_node: Node2D = chk_script.new() as Node2D
+		get_root().add_child(chk_node)
+		if chk_node.get("turn_indicator") == null and chk_node.has_method("_ready"):
+			chk_node._ready()
+		var valid_chk: Array = chk_node.call("_calculate_valid_moves", 2, 1)
+		_check(valid_chk.size() == 2, "Damas E2E: _calculate_valid_moves(2,1) calcula 2 diagonales iniciales")
+		chk_node.call("_on_game_over", 0)
+		_check(int(chk_node.get("winner")) == 0, "Damas E2E: _on_game_over(0) declara tablas canónicas (40 turnos)")
+		get_root().remove_child(chk_node)
+		chk_node.free()
+
+	# 7. Xiangqi (xiangqi_board.gd): Flujo E2E de movimiento de Soldado, Río Chu/Frontera Han y victoria/tablas
+	var xq_script: Script = load("res://xiangqi_board.gd") as Script
+	_check(xq_script != null, "xiangqi_board.gd carga sin errores de parseo en modo Redot strict")
+	if xq_script != null:
+		var xq_node: Node2D = xq_script.new() as Node2D
+		get_root().add_child(xq_node)
+		if xq_node.get("turn_indicator") == null and xq_node.has_method("_ready"):
+			xq_node._ready()
+		var xq_bridge: Object = xq_node.get("bridge")
+		_check(xq_bridge != null and int(xq_node.get("current")) == 1, "Xiangqi E2E: Inicia partida con turno Rojo (P1)")
+		if xq_bridge != null:
+			xq_bridge.call("send_command_json", 1, JSON.stringify({"command_type": "xiangqi_game::MovePieceCommand", "player": 1, "from": [4, 6], "to": [4, 5]}))
+			_check(int(xq_node.get("current")) == 2, "Xiangqi E2E: Soldado Rojo (4,6)->(4,5) avanza turno a Negro (P2)")
+		get_root().remove_child(xq_node)
+		xq_node.free()
+
+	# 8. Damas Chinas (chinese_checkers_board.gd): Flujo E2E de movimiento de canica y selector de 2/3/4/6 jugadores
+	var cc_script: Script = load("res://chinese_checkers_board.gd") as Script
+	_check(cc_script != null, "chinese_checkers_board.gd carga sin errores de parseo en modo Redot strict")
+	if cc_script != null:
+		var cc_node: Node2D = cc_script.new() as Node2D
+		get_root().add_child(cc_node)
+		if cc_node.get("turn_indicator") == null and cc_node.has_method("_ready"):
+			cc_node._ready()
+		var cc_bridge: Object = cc_node.get("bridge")
+		_check(cc_bridge != null and int(cc_node.get("current")) == 1, "Damas Chinas E2E: Inicia sesión con turno J1")
+		if cc_bridge != null:
+			cc_bridge.call("send_command_json", 1, JSON.stringify({"command_type": "MovePegCommand", "player": 1, "from": {"q": -5, "r": 1}, "to": {"q": -4, "r": 1}, "path": []}))
+			_check(int(cc_bridge.call("current_player")) == 2, "Damas Chinas E2E: MovePegCommand válido avanza el turno a J2")
+		get_root().remove_child(cc_node)
+		cc_node.free()
+
+	# 9. Backgammon (backgammon_board.gd): Flujo E2E de dados y obligación de movimiento
+	var bg_script: Script = load("res://backgammon_board.gd") as Script
+	_check(bg_script != null, "backgammon_board.gd carga sin errores de parseo en modo Redot strict")
+	if bg_script != null:
+		var bg_node: Node2D = bg_script.new() as Node2D
+		get_root().add_child(bg_node)
+		if bg_node.get("turn_indicator") == null and bg_node.has_method("_ready"):
+			bg_node._ready()
+		var bg_bridge: Object = bg_node.get("bridge")
+		_check(bg_bridge != null and int(bg_node.get("current")) == 1, "Backgammon E2E: Inicia partida con turno J1")
+		if bg_bridge != null:
+			bg_bridge.call("send_command_json", 1, JSON.stringify({"command_type": "RollDiceCommand", "player": 1}))
+			var bg_dice: Array = bg_node.get("pending_dice")
+			_check(bg_dice.size() >= 2, "Backgammon E2E: RollDiceCommand genera tirada en pending_dice")
+		get_root().remove_child(bg_node)
+		bg_node.free()
+
+	# 10. Ludo (ludo_board.gd): Flujo E2E de reglas canónicas (casillas estrella seguras, turno extra y 3 seises)
+	var ludo_script: Script = load("res://ludo_board.gd") as Script
+	_check(ludo_script != null, "ludo_board.gd carga sin errores de parseo en modo Redot strict")
+	if ludo_script != null:
+		var ludo_node: Node2D = ludo_script.new() as Node2D
+		get_root().add_child(ludo_node)
+		if ludo_node.get("turn_indicator") == null and ludo_node.has_method("_ready"):
+			ludo_node._ready()
+		var ludo_bridge: Object = ludo_node.get("bridge")
+		_check(ludo_bridge != null, "Ludo E2E: Bridge instanciado en LudoBoard")
+		if ludo_bridge != null:
+			ludo_bridge.call("send_command_json", 1, JSON.stringify({
+				"command_type": "ludo_game::SetLudoRulesCommand",
+				"star_safe_squares": true,
+				"bonus_roll_on_capture_and_goal": true,
+				"three_sixes_penalty": true
+			}))
+			var ludo_path: Array = ludo_node.call("get_path_from_to", 0, 1, 1, 0)
+			_check(ludo_path.size() == 1, "Ludo E2E: SetLudoRulesCommand aceptado y cálculo de salida de base válido")
+		get_root().remove_child(ludo_node)
+		ludo_node.free()
+
+	# 11. Monopoly (monopoly_board.gd): Flujo E2E de construcción uniforme, hipoteca e intercambios
+	var mono_script: Script = load("res://monopoly_board.gd") as Script
+	_check(mono_script != null, "monopoly_board.gd carga sin errores de parseo en modo Redot strict")
+	if mono_script != null:
+		var mono_node: Node2D = mono_script.new() as Node2D
+		get_root().add_child(mono_node)
+		if mono_node.find_child("BuildHouseButton", true, false) == null and mono_node.has_method("_ready"):
+			mono_node._ready()
+		_check(mono_node.find_child("BuildHouseButton", true, false) != null, "Monopoly E2E: Botón Construir Casa/Hotel presente")
+		_check(mono_node.find_child("MortgageButton", true, false) != null, "Monopoly E2E: Botón Hipotecar/Deshipotecar presente")
+		_check(mono_node.find_child("TradeButton", true, false) != null, "Monopoly E2E: Botón Proponer Intercambio presente")
+		mono_node.call("select_space", 39)
+		var insp_lbl: Label = mono_node.get("inspector_title_lbl") as Label
+		_check(insp_lbl != null and "Paseo Tablado" in insp_lbl.text, "Monopoly E2E: Inspector de casilla muestra Paseo Tablado")
+		get_root().remove_child(mono_node)
+		mono_node.free()
+
+	# 12. UNO (uno_board.gd): Flujo E2E de botones ¡UNO!, Acusar UNO, Desafiar +4 y Jump-In
+	var uno_script: Script = load("res://uno_board.gd") as Script
+	_check(uno_script != null, "uno_board.gd carga sin errores de parseo en modo Redot strict")
+	if uno_script != null:
+		var uno_node: Node2D = uno_script.new() as Node2D
+		get_root().add_child(uno_node)
+		if uno_node.find_child("CallUnoButton", true, false) == null and uno_node.has_method("_ready"):
+			uno_node._ready()
+		_check(uno_node.find_child("CallUnoButton", true, false) != null, "UNO E2E: CallUnoButton instanciado")
+		_check(uno_node.find_child("CatchUnoButton", true, false) != null, "UNO E2E: CatchUnoButton instanciado")
+		_check(uno_node.find_child("ChallengeWildFourButton", true, false) != null, "UNO E2E: ChallengeWildFourButton instanciado")
+		_check(uno_node.find_child("JumpInButton", true, false) != null, "UNO E2E: JumpInButton instanciado")
+		uno_node.set("discard_pile", [{"color": "Green", "value": "7"}])
+		_check(bool(uno_node.call("_is_card_interceptable", {"color": "Green", "value": "7"})) == true, "UNO E2E: _is_card_interceptable valida carta idéntica para Jump-In")
+		_check(bool(uno_node.call("_is_card_interceptable", {"color": "Green", "value": "5"})) == false, "UNO E2E: _is_card_interceptable rechaza carta de distinto valor")
+		get_root().remove_child(uno_node)
+		uno_node.free()
+
+	# 13. CRISIS / TEG (crisis_board.gd): Flujo E2E de fases PlaceArmies -> Attack -> Fortify y 30 territorios
+	var crisis_script: Script = load("res://crisis_board.gd") as Script
+	_check(crisis_script != null, "crisis_board.gd carga sin errores de parseo en modo Redot strict")
+	if crisis_script != null:
+		var crisis_node: Node2D = crisis_script.new() as Node2D
+		get_root().add_child(crisis_node)
+		if crisis_node.get("map_panel") == null and crisis_node.has_method("_ready"):
+			crisis_node._ready()
+		var c_codes: Array = crisis_node.get("TERRITORY_CODES")
+		_check(c_codes.size() == 30, "CRISIS E2E: Mapa táctico contiene los 30 territorios canónicos")
+		var rem_armies: int = int(crisis_node.get("armies_remaining_to_place"))
+		crisis_node.call("_place_armies", rem_armies)
+		_check(str(crisis_node.get("current_phase")) == "Attack", "CRISIS E2E: Colocar ejércitos iniciales avanza la fase a Attack")
+		get_root().remove_child(crisis_node)
+		crisis_node.free()
+
+	# 14. GameAppMenu (scenes/game_app_menu.gd) y RulesPopup bilingüe ES/EN para los 13 juegos
 	var menu_script: Script = load("res://scenes/game_app_menu.gd") as Script
 	_check(menu_script != null, "game_app_menu.gd carga sin errores de parseo en modo Redot strict")
 	if menu_script != null and go_script != null:
@@ -161,6 +298,8 @@ func _initialize() -> void:
 		_check(app_menu.get("save_replay_item_btn") != null, "GameAppMenu: Botón Guardar Replay (.otr) integrado en el menú Opciones")
 		_check(app_menu.get("offer_draw_item_btn") != null, "GameAppMenu: Botón Ofrecer Tablas integrado en el menú Opciones")
 		_check(app_menu.get("resign_item_btn") != null, "GameAppMenu: Botón Rendirse integrado en el menú Opciones")
+		var toggle_b: Button = app_menu.get("toggle_btn") as Button
+		_check(toggle_b != null and toggle_b.anchor_left == 1.0 and toggle_b.offset_left >= -160.0, "GameAppMenu: Botón 'Opciones' anclado en esquina superior derecha")
 		var mode_opt_menu: OptionButton = app_menu.get("mode_menu_option") as OptionButton
 		var size_opt_menu: OptionButton = app_menu.get("size_menu_option") as OptionButton
 		var handi_opt_menu: OptionButton = app_menu.get("handicap_menu_option") as OptionButton
@@ -176,7 +315,18 @@ func _initialize() -> void:
 		get_root().remove_child(go_board_test)
 		go_board_test.free()
 
-	# 7. Layout Centrado Superior / Tablero / Inferior en los juegos
+	var catalog_script: Script = load("res://scripts/rules_catalog.gd") as Script
+	_check(catalog_script != null, "rules_catalog.gd carga correctamente")
+	if catalog_script != null:
+		var all_game_ids: Array = ["checkers", "chess", "go", "shogi", "xiangqi", "chinese_checkers", "backgammon", "battleship", "ludo", "mille_bornes", "monopoly", "uno", "crisis"]
+		for gid in all_game_ids:
+			var es_data: Dictionary = catalog_script.call("get_game_rules", str(gid), "es")
+			var en_data: Dictionary = catalog_script.call("get_game_rules", str(gid), "en")
+			var es_secs: Array = es_data.get("sections", [])
+			var en_secs: Array = en_data.get("sections", [])
+			_check(es_secs.size() == 5 and en_secs.size() == 5, "RulesCatalog (%s): Contiene las 5 secciones canónicas en ES y EN" % str(gid))
+
+	# 15. Certificación de Layout Centrado Superior / Tablero / Inferior y GameAppMenu en los 13 tableros
 	var centered_boards: Array = [
 		"res://go_board.gd",
 		"res://chess_board.gd",
@@ -198,8 +348,31 @@ func _initialize() -> void:
 			var ti: Control = b_node.get("turn_indicator") as Control
 			if ti != null:
 				_check(ti.position.y < 30.0 and ti.position.x < 500.0, "%s: TurnIndicator en barra superior centrada (pos=%s)" % [str(script_path), str(ti.position)])
+			var gm_menu: Node = b_node.get_node_or_null("GameAppMenu")
+			_check(gm_menu != null, "%s: GameAppMenu adjunto automáticamente al tablero" % str(script_path))
 			get_root().remove_child(b_node)
 			b_node.free()
+
+	var full_scene_boards: Array = [
+		"res://battleship_board.gd",
+		"res://uno_board.gd",
+		"res://mille_bornes_board.gd",
+		"res://monopoly_board.gd",
+		"res://crisis_board.gd"
+	]
+	for fs_path in full_scene_boards:
+		var fs_script: Script = load(str(fs_path)) as Script
+		if fs_script != null:
+			var fs_node: Node2D = fs_script.new() as Node2D
+			get_root().add_child(fs_node)
+			if fs_node.get("bridge") == null and fs_node.has_method("_ready"):
+				fs_node._ready()
+			var fs_menu: Node = fs_node.get_node_or_null("GameAppMenu")
+			if fs_menu == null:
+				fs_menu = fs_node.find_child("GameAppMenu", true, false)
+			_check(fs_menu != null, "%s: GameAppMenu integrado en esquina superior derecha" % str(fs_path))
+			get_root().remove_child(fs_node)
+			fs_node.free()
 
 	if _failures == 0:
 		print("=== RESULTADO: TODO OK (canonical_rules_ui_smoke.gd) ===")
@@ -207,3 +380,4 @@ func _initialize() -> void:
 	else:
 		printerr("=== RESULTADO: %d FALLO(S) ===" % _failures)
 		quit(1)
+

@@ -1,6 +1,6 @@
 use chess_game::{
-    new_chess_session, BoardResource, GameOverEvent, HalfMoveClockResource, MovePieceCommand,
-    Piece, PieceKind, PieceMovedEvent, Position,
+    new_chess_session, AcceptDrawCommand, BoardResource, GameOverEvent, HalfMoveClockResource,
+    MovePieceCommand, OfferDrawCommand, Piece, PieceKind, PieceMovedEvent, Position,
 };
 use open_table_engine::prelude::*;
 
@@ -78,3 +78,74 @@ fn canonical_enroque_en_passant_y_tablas_50_movimientos() {
         .expect("debe declararse tablas al alcanzar 100 medios movimientos");
     assert_eq!(go.winner, None);
 }
+
+#[test]
+fn canonical_subpromocion_y_rechazo_tablas_sin_oferta() {
+    for (idx, kind) in [PieceKind::Rook, PieceKind::Bishop, PieceKind::Knight]
+        .into_iter()
+        .enumerate()
+    {
+        let mut session = new_chess_session(SessionId(518_61 + idx as u64), 1, WHITE, BLACK);
+        {
+            let mut board = session.world_mut().resource_mut::<BoardResource>();
+            board.pieces.clear();
+            board.pieces.insert(
+                pos(0, 4),
+                Piece {
+                    owner: WHITE,
+                    kind: PieceKind::King,
+                },
+            );
+            board.pieces.insert(
+                pos(7, 7),
+                Piece {
+                    owner: BLACK,
+                    kind: PieceKind::King,
+                },
+            );
+            board.pieces.insert(
+                pos(6, 0),
+                Piece {
+                    owner: WHITE,
+                    kind: PieceKind::Pawn,
+                },
+            );
+        }
+
+        let events = session
+            .process_command(
+                WHITE,
+                Box::new(MovePieceCommand {
+                    player: WHITE,
+                    from: pos(6, 0),
+                    to: pos(7, 0),
+                    promote_to: Some(kind),
+                }),
+            )
+            .expect("subpromoción válida");
+        let moved = events[0]
+            .as_any()
+            .downcast_ref::<PieceMovedEvent>()
+            .unwrap();
+        assert_eq!(moved.promoted_to, Some(kind));
+        assert_eq!(
+            session
+                .world()
+                .resource::<BoardResource>()
+                .pieces
+                .get(&pos(7, 0))
+                .map(|p| p.kind),
+            Some(kind)
+        );
+    }
+
+    // Rechazo de AcceptDrawCommand sin oferta previa y OfferDrawCommand fuera de turno
+    let mut session = new_chess_session(SessionId(518_65), 1, WHITE, BLACK);
+    assert!(session
+        .process_command(WHITE, Box::new(AcceptDrawCommand { player: WHITE }))
+        .is_err());
+    assert!(session
+        .process_command(BLACK, Box::new(OfferDrawCommand { player: BLACK }))
+        .is_err());
+}
+

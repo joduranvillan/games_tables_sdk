@@ -114,6 +114,21 @@ func _initialize() -> void:
 		board_inst._on_layout_changed(2)
 		results.append(["Layout móvil (layout=2) apila verticalmente Mi Flota y Radar", board_inst.grids_container != null and board_inst.grids_container.vertical == true])
 
+		# Probar SetBattleshipRulesCommand y rechazo de flota con barcos tocándose en diagonal
+		move_rejected_reasons.clear()
+		bridge.send_command_json(2, JSON.stringify({
+			"command_type": "PlaceFleetCommand",
+			"player": 2,
+			"ships": [
+				[{"row": 0, "col": 0}, {"row": 0, "col": 1}, {"row": 0, "col": 2}, {"row": 0, "col": 3}, {"row": 0, "col": 4}],
+				[{"row": 1, "col": 5}, {"row": 1, "col": 6}, {"row": 1, "col": 7}, {"row": 1, "col": 8}],
+				[{"row": 4, "col": 0}, {"row": 4, "col": 1}, {"row": 4, "col": 2}],
+				[{"row": 6, "col": 0}, {"row": 6, "col": 1}, {"row": 6, "col": 2}],
+				[{"row": 8, "col": 0}, {"row": 8, "col": 1}]
+			]
+		}))
+		results.append(["Barcos tocándose en diagonal ((0,4) y (1,5)) generan rechazo move_rejected", move_rejected_reasons.size() > 0])
+
 		root.remove_child(board_inst)
 		board_inst.free()
 	else:
@@ -128,3 +143,4 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+

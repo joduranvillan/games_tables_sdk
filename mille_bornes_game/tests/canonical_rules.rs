@@ -1,6 +1,7 @@
 use mille_bornes_game::{
     new_mille_bornes_session, Card, CoupFourreCommand, DeckResource, DiscardCardCommand,
-    DistancePlayedEvent, Hazard, PlayCardCommand, PlayHazardCommand, Safety, SafetyPlayedEvent,
+    DistancePlayedEvent, Hazard, PlayCardCommand, PlayDistanceCommand, PlayHazardCommand, Safety,
+    SafetyPlayedEvent,
 };
 use open_table_engine::prelude::*;
 
@@ -109,3 +110,39 @@ fn canonical_coup_fourre_con_safety_anula_peligro_y_suma_100_km() {
     assert_eq!(deck.hazard[&P2], Some(Hazard::Accident));
     assert!(deck.safeties_played[&P1].contains(&Safety::DrivingAce));
 }
+
+#[test]
+fn canonical_safety_cura_hazard_activo_y_limite_dos_cartas_200km() {
+    let mut session = new_mille_bornes_session(SessionId(518_208), 1, P1, P2);
+    {
+        let mut deck = session.world_mut().resource_mut::<DeckResource>();
+        deck.hazard.insert(P1, Some(Hazard::OutOfGas));
+        deck.hands.get_mut(&P1).unwrap()[0] = Card::Safety(Safety::ExtraTank);
+        deck.cards_200_played.insert(P1, 2);
+    }
+
+    // Jugar ExtraTank en turno propio cura OutOfGas inmediatamente y conserva el turno
+    session
+        .process_command(
+            P1,
+            Box::new(PlayCardCommand {
+                player: P1,
+                card_index: 0,
+            }),
+        )
+        .expect("Safety debe curar el peligro correspondiente");
+    assert_eq!(session.world().resource::<DeckResource>().hazard[&P1], None);
+    assert_eq!(session.current_player(), P1);
+
+    // Intentar jugar una 3ª carta de 200 km debe ser rechazado
+    assert!(session
+        .process_command(
+            P1,
+            Box::new(PlayDistanceCommand {
+                player: P1,
+                distance: 200,
+            }),
+        )
+        .is_err());
+}
+

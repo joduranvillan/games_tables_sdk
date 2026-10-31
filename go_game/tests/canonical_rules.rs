@@ -113,3 +113,45 @@ fn canonical_set_komi_modifica_komi_antes_de_jugar() {
         15
     );
 }
+
+#[test]
+fn canonical_rechazo_set_komi_tardio_y_marcado_antes_de_doble_pase() {
+    let mut session = new_go_session(SessionId(518_201), 0, P1, P2);
+
+    // Antes del doble pase, MarkDeadCommand y ConfirmDeadCommand deben rechazarse
+    assert!(session
+        .process_command(
+            P1,
+            Box::new(MarkDeadCommand {
+                player: P1,
+                positions: vec![(0, 0)],
+            }),
+        )
+        .is_err());
+    assert!(session
+        .process_command(P1, Box::new(ConfirmDeadCommand { player: P1 }))
+        .is_err());
+
+    // Tras colocar una piedra en el tablero, SetKomiCommand debe rechazarse
+    session
+        .process_command(
+            P1,
+            Box::new(PlaceStoneCommand {
+                player: P1,
+                x: 4,
+                y: 4,
+            }),
+        )
+        .expect("primera piedra válida");
+
+    assert!(session
+        .process_command(
+            P2,
+            Box::new(SetKomiCommand {
+                player: P2,
+                komi_half_points: 11,
+            }),
+        )
+        .is_err());
+}
+

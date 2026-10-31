@@ -50,6 +50,27 @@ func _initialize() -> void:
 	results.append(["P2 mueve soldado -> turno pasa a P1", bridge.current_player() == 1])
 	results.append(["Se recibieron 2 eventos PieceMovedEvent", events_received.size() == 2])
 
+	# 4. Verificar rechazo de Caballo con pata bloqueada (pata en [1,8] ocupada o fuera de movimiento legal)
+	move_rejected_reasons.clear()
+	bridge.send_command_json(1, JSON.stringify({
+		"command_type": "xiangqi_game::MovePieceCommand",
+		"player": 1,
+		"from": [1, 9],
+		"to": [3, 8]
+	}))
+	results.append(["Caballo con pata bloqueada horizontalmente en [2,9] genera rechazo move_rejected", move_rejected_reasons.size() > 0])
+
+	# 5. Verificar XiangqiBoard centrado y GameAppMenu activo
+	var xq_script: Script = load("res://xiangqi_board.gd") as Script
+	if xq_script != null:
+		var xq_node: Node2D = xq_script.new() as Node2D
+		root.add_child(xq_node)
+		if xq_node.get("turn_indicator") == null and xq_node.has_method("_ready"):
+			xq_node._ready()
+		results.append(["XiangqiBoard inicia centrado horizontalmente con GameAppMenu", xq_node.position.x > 100.0 and xq_node.get_node_or_null("GameAppMenu") != null])
+		root.remove_child(xq_node)
+		xq_node.free()
+
 	var ok: bool = true
 	for r in results:
 		print(("PASS  " if r[1] else "FAIL  ") + r[0])
@@ -59,3 +80,4 @@ func _initialize() -> void:
 	print("=== RESULTADO: %s ===" % ("TODO OK" if ok else "HAY FALLOS"))
 	bridge.free()
 	quit(0 if ok else 1)
+
