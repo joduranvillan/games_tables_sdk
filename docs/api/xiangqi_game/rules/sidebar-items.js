@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["all_legal_moves_for","build_xiangqi_rules"]};
+window.SIDEBAR_ITEMS = {"fn":["all_legal_moves_for","build_xiangqi_rules"],"struct":["XiangqiLegalMoveGenerator"]};

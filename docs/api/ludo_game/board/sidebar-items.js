@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["BOARD_STEPS","HOME_STRETCH_LEN","MAX_STEPS","TOKENS_PER_PLAYER","TRACK_LEN","WIN_STEPS"],"fn":["next_step_for"],"struct":["PendingRollResource","TokensResource"],"type":["Steps"]};
+window.SIDEBAR_ITEMS = {"constant":["BOARD_STEPS","HOME_STRETCH_LEN","MAX_STEPS","TOKENS_PER_PLAYER","TRACK_LEN","WIN_STEPS"],"fn":["next_step_for"],"struct":["ConsecutiveSixesResource","LudoRulesConfigResource","PendingRollResource","TokensResource"],"type":["Steps"]};

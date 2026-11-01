@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["MovePegCommand"]};
+window.SIDEBAR_ITEMS = {"struct":["MovePegCommand","ResignCommand"]};

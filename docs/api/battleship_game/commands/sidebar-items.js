@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["FireShotCommand","PlaceFleetCommand","RematchCommand"]};
+window.SIDEBAR_ITEMS = {"struct":["FireShotCommand","PlaceFleetCommand","RematchCommand","ResignCommand","SetBattleshipRulesCommand"]};

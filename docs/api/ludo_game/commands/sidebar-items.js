@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["MoveTokenCommand","RollDiceCommand"]};
+window.SIDEBAR_ITEMS = {"struct":["MoveTokenCommand","ResignCommand","RollDiceCommand","SetLudoRulesCommand"]};

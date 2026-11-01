@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["PieceKind"],"struct":["BoardResource","Piece"]};
+window.SIDEBAR_ITEMS = {"enum":["PieceKind"],"struct":["BoardResource","Piece","ShogiHistoryResource","ShogiRulesConfigResource"]};

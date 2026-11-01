@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["build_chinese_checkers_rules"]};
+window.SIDEBAR_ITEMS = {"fn":["build_chinese_checkers_rules"],"struct":["ChineseCheckersLegalMoveGenerator"]};

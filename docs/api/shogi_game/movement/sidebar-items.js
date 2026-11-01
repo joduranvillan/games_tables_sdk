@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["can_promote","find_king","has_any_legal_move","is_checkmate","is_in_check","is_legal_drop","is_legal_move","must_promote"]};
+window.SIDEBAR_ITEMS = {"fn":["can_promote","find_king","has_any_legal_move","is_checkmate","is_in_check","is_legal_drop","is_legal_move","must_promote","must_promote_fesa"]};

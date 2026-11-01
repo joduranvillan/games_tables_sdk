@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["initial_board"],"struct":["BoardResource","MultiCaptureResource","Sides"]};
+window.SIDEBAR_ITEMS = {"fn":["initial_board"],"struct":["BoardResource","DrawClockResource","MultiCaptureResource","Sides"]};

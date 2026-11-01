@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["parse_checkers_command","parse_checkers_pos","parse_chess_command","parse_chess_pos"],"struct":["AntiCheatSession"]};
+window.SIDEBAR_ITEMS = {"constant":["SUPPORTED_GAME_IDS"],"fn":["normalize_game_id"],"struct":["AntiCheatSession"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["global_metrics"],"static":["GLOBAL_METRICS"],"struct":["RelayMetrics"]};
+window.SIDEBAR_ITEMS = {"fn":["global_metrics"],"struct":["RelayMetrics"]};

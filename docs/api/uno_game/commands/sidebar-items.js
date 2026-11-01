@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["DrawCardCommand","InterceptCommand","PlayCardCommand"]};
+window.SIDEBAR_ITEMS = {"struct":["CallUnoCommand","CatchUnoFailureCommand","ChallengeWildDrawFourCommand","ChooseWildColorCommand","DrawCardCommand","InterceptCommand","PlayCardCommand"]};
