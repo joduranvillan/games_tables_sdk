@@ -12,6 +12,8 @@ func _init() -> void:
 	_generate_dice_textures()
 
 func _ready() -> void:
+	if not dice_rects.is_empty():
+		return
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color(0.12, 0.12, 0.15, 0.85)
 	style.border_width_left = 1
@@ -94,6 +96,8 @@ func _generate_dice_textures() -> void:
 func show_roll(values: Array) -> void:
 	if values.is_empty():
 		return
+	if dice_rects.is_empty():
+		_ready()
 	is_rolling = true
 	var count = min(values.size(), 3)
 	for i in range(dice_rects.size()):
@@ -102,22 +106,26 @@ func show_roll(values: Array) -> void:
 	var total_frames = 15 # 15 frames at 30fps = 0.5s
 	var frame_delay = 0.5 / total_frames
 
-	if is_inside_tree():
+	if is_inside_tree() and not OS.has_feature("headless"):
 		for f in range(total_frames):
 			for i in range(count):
 				var rand_val = randi() % 6
-				dice_rects[i].texture = dice_textures[rand_val]
+				if i < dice_rects.size() and rand_val < dice_textures.size():
+					dice_rects[i].texture = dice_textures[rand_val]
 			await get_tree().create_timer(frame_delay).timeout
 
 	for i in range(count):
 		var v = int(values[i])
 		var idx = clamp(v - 1, 0, 5)
-		dice_rects[i].texture = dice_textures[idx]
+		if i < dice_rects.size() and idx < dice_textures.size():
+			dice_rects[i].texture = dice_textures[idx]
 
 	is_rolling = false
 	animation_done.emit()
 
 func roll_animation(val: int, duration: float = 0.4, steps: int = 3) -> void:
+	if dice_rects.is_empty():
+		_ready()
 	is_rolling = true
 	if dice_rects.size() > 0:
 		dice_rects[0].visible = true
@@ -125,7 +133,7 @@ func roll_animation(val: int, duration: float = 0.4, steps: int = 3) -> void:
 		dice_rects[i].visible = false
 
 	var step_delay = duration / float(max(1, steps))
-	if is_inside_tree():
+	if is_inside_tree() and not OS.has_feature("headless"):
 		for s in range(steps):
 			var rand_val = randi() % 6
 			if dice_textures.size() > rand_val and dice_rects.size() > 0:

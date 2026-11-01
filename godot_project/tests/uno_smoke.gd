@@ -155,6 +155,9 @@ func _initialize() -> void:
 		results.append(["Tras jugar comodín +4/+2 y saltar turno, carta del color elegido es jugable sin obligar a robar", blue_card_playable])
 
 		# 12. Verificar que Jump-In (_is_card_interceptable) rechaza comodines y cartas distintas, y que GameAppMenu está presente
+		board_inst.local_player = 1
+		board_inst.current = 2
+		board_inst._is_playing_ai_sequence = false
 		board_inst.discard_pile = [{"color": "Red", "value": "9"}]
 		var match_ok: bool = bool(board_inst._is_card_interceptable({"color": "Red", "value": "9"}))
 		var diff_rej: bool = not bool(board_inst._is_card_interceptable({"color": "Blue", "value": "9"}))

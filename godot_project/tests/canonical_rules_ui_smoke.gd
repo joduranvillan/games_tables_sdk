@@ -200,8 +200,9 @@ func _initialize() -> void:
 		_check(bg_bridge != null and int(bg_node.get("current")) == 1, "Backgammon E2E: Inicia partida con turno J1")
 		if bg_bridge != null:
 			bg_bridge.call("send_command_json", 1, JSON.stringify({"command_type": "RollDiceCommand", "player": 1}))
-			var bg_dice: Array = bg_node.get("pending_dice")
-			_check(bg_dice.size() >= 2, "Backgammon E2E: RollDiceCommand genera tirada en pending_dice")
+			var bg_dice_val = bg_node.get("rolled_dice")
+			var bg_dice: Array = bg_dice_val if bg_dice_val is Array else []
+			_check(bg_dice.size() >= 2, "Backgammon E2E: RollDiceCommand genera tirada en rolled_dice")
 		get_root().remove_child(bg_node)
 		bg_node.free()
 
@@ -256,6 +257,9 @@ func _initialize() -> void:
 		_check(uno_node.find_child("CatchUnoButton", true, false) != null, "UNO E2E: CatchUnoButton instanciado")
 		_check(uno_node.find_child("ChallengeWildFourButton", true, false) != null, "UNO E2E: ChallengeWildFourButton instanciado")
 		_check(uno_node.find_child("JumpInButton", true, false) != null, "UNO E2E: JumpInButton instanciado")
+		uno_node.set("local_player", 1)
+		uno_node.set("current", 2)
+		uno_node.set("_is_playing_ai_sequence", false)
 		uno_node.set("discard_pile", [{"color": "Green", "value": "7"}])
 		_check(bool(uno_node.call("_is_card_interceptable", {"color": "Green", "value": "7"})) == true, "UNO E2E: _is_card_interceptable valida carta idéntica para Jump-In")
 		_check(bool(uno_node.call("_is_card_interceptable", {"color": "Green", "value": "5"})) == false, "UNO E2E: _is_card_interceptable rechaza carta de distinto valor")

@@ -42,7 +42,13 @@ var app_menu: Node = null
 func _init() -> void:
 	custom_minimum_size = Vector2(180, 34)
 	add_theme_constant_override("separation", 10)
-	
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PARENTED or what == NOTIFICATION_ENTER_TREE:
+		if timer_bar == null:
+			_setup_nodes()
+		_ensure_game_app_menu()
+
 func _ready() -> void:
 	if timer_bar == null:
 		_setup_nodes()

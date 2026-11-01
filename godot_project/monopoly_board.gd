@@ -1753,6 +1753,8 @@ func _get_group_symbol(grp: String) -> String:
 		_: return ""
 
 func _update_status() -> void:
+	if turn_indicator != null and turn_indicator.has_method("_ensure_game_app_menu"):
+		turn_indicator._ensure_game_app_menu()
 	if status == null:
 		return
 	if winner != -1:
