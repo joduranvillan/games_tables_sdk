@@ -13,7 +13,7 @@ const COLOR_NORMAL_BAR := Color(0.30, 0.82, 0.55, 1.0)
 const COLOR_WARNING_AMBER := Color(1.0, 0.72, 0.15, 1.0)
 const COLOR_WARNING_RED := Color(1.0, 0.22, 0.20, 1.0)
 
-@export var timer_enabled: bool = false
+@export var timer_enabled: bool = true
 @export var duration_seconds: float = 30.0
 
 var time_left: float = 30.0
@@ -33,8 +33,8 @@ var game_over_overlay_ref: Node = null
 
 func _init() -> void:
 	name = "TurnTimerHud"
-	custom_minimum_size = Vector2(170, 28)
-	add_theme_constant_override("separation", 8)
+	custom_minimum_size = Vector2(68, 26)
+	add_theme_constant_override("separation", 6)
 	_ensure_ui()
 
 func _ready() -> void:
@@ -47,12 +47,13 @@ func _ensure_ui() -> void:
 		if progress_bar == null:
 			progress_bar = ProgressBar.new()
 			progress_bar.name = "TimerProgressBar"
-			progress_bar.custom_minimum_size = Vector2(100, 18)
+			progress_bar.custom_minimum_size = Vector2(54, 8)
 			progress_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			progress_bar.show_percentage = false
 			progress_bar.min_value = 0.0
 			progress_bar.max_value = maxf(duration_seconds, 1.0)
 			progress_bar.value = time_left
+			progress_bar.visible = false
 			add_child(progress_bar)
 
 	if time_label == null:
@@ -60,10 +61,20 @@ func _ensure_ui() -> void:
 		if time_label == null:
 			time_label = Label.new()
 			time_label.name = "TimeLabel"
-			time_label.custom_minimum_size = Vector2(56, 24)
+			time_label.custom_minimum_size = Vector2(64, 24)
 			time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			time_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			time_label.add_theme_font_size_override("font_size", 15)
+			time_label.add_theme_font_size_override("font_size", 14)
+			var badge_style := StyleBoxFlat.new()
+			badge_style.bg_color = Color(0.12, 0.15, 0.22, 0.88)
+			badge_style.border_color = Color(0.32, 0.42, 0.58, 0.75)
+			badge_style.set_border_width_all(1)
+			badge_style.set_corner_radius_all(6)
+			badge_style.content_margin_left = 8
+			badge_style.content_margin_right = 8
+			badge_style.content_margin_top = 2
+			badge_style.content_margin_bottom = 2
+			time_label.add_theme_stylebox_override("normal", badge_style)
 			time_label.text = format_mm_ss(time_left)
 			add_child(time_label)
 

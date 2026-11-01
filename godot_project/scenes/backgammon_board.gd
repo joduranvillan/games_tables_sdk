@@ -690,7 +690,7 @@ func _update_status() -> void:
 	else:
 		var p_name = "Rojo (P1)" if current == P1 else "Azul (P2)"
 		var col = PLAYER_COLORS[current]
-		status.text = "Turno: Jugador %s (Backgammon)" % p_name
+		status.text = ""
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, p_name, col)
 			turn_indicator.set_active(true)

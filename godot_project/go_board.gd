@@ -1058,8 +1058,8 @@ func _update_status() -> void:
 	else:
 		var who = "Negro (1)" if current == P_BLACK else "Blanco (2)"
 		var p_col = COL_BLACK_STONE if current == P_BLACK else COL_WHITE_STONE
-		var pass_note: String = " [1 Pase]" if consecutive_passes == 1 else ""
-		status.text = "Turno: %s (Go %dx%d)%s" % [who, BOARD_SIZE, BOARD_SIZE, pass_note]
+		var pass_note: String = "[1 Pase]" if consecutive_passes == 1 else ""
+		status.text = pass_note
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, who, p_col)
 			turn_indicator.set_active(true)

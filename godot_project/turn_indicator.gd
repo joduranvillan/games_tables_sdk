@@ -118,7 +118,7 @@ func _setup_nodes() -> void:
 	# 1. Color avatar box
 	color_rect = ColorRect.new()
 	color_rect.name = "PlayerColor"
-	color_rect.custom_minimum_size = Vector2(28, 28)
+	color_rect.custom_minimum_size = Vector2(22, 22)
 	color_rect.size_flags_vertical = SIZE_SHRINK_CENTER
 	color_rect.color = Color.WHITE
 	add_child(color_rect)
@@ -127,21 +127,23 @@ func _setup_nodes() -> void:
 	label = Label.new()
 	label.name = "PlayerLabel"
 	label.text = "Turno: Jugador 1"
-	label.size_flags_horizontal = SIZE_EXPAND_FILL
+	label.size_flags_horizontal = SIZE_SHRINK_BEGIN
 	label.size_flags_vertical = SIZE_SHRINK_CENTER
 	label.add_theme_font_size_override("font_size", 16)
 	add_child(label)
 	
-	# 3. Timer ProgressBar & TurnTimerHud (MM:SS)
+	# 3. Timer ProgressBar (oculto para evitar barra ancha estática) & TurnTimerHud compacto (MM:SS)
 	timer_bar = ProgressBar.new()
 	timer_bar.name = "TurnTimer"
-	timer_bar.custom_minimum_size = Vector2(100, 20)
+	timer_bar.custom_minimum_size = Vector2(60, 8)
 	timer_bar.size_flags_vertical = SIZE_SHRINK_CENTER
 	timer_bar.show_percentage = false
 	timer_bar.value = 100.0
+	timer_bar.visible = false
 	add_child(timer_bar)
 
 	turn_timer_hud = TurnTimerHudScript.new()
+	turn_timer_hud.timer_enabled = true
 	turn_timer_hud.size_flags_vertical = SIZE_SHRINK_CENTER
 	turn_timer_hud.progress_bar.visible = false
 	add_child(turn_timer_hud)
@@ -220,7 +222,7 @@ func _start_pulse_animation() -> void:
 		pulse_tween.kill()
 	if color_rect == null:
 		return
-	color_rect.pivot_offset = Vector2(14, 14)
+	color_rect.pivot_offset = Vector2(11, 11)
 	pulse_tween = create_tween().set_loops()
 	pulse_tween.tween_property(color_rect, "scale", Vector2(1.05, 1.05), 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	pulse_tween.tween_property(color_rect, "scale", Vector2(1.0, 1.0), 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -229,11 +231,11 @@ func _animate_label_slide() -> void:
 	if label == null:
 		return
 	var orig_pos = label.position
-	label.position.x = orig_pos.x + 30.0
+	label.position.x = orig_pos.x + 12.0
 	label.modulate.a = 0.0
 	var tween = create_tween().set_parallel(true)
-	tween.tween_property(label, "position:x", orig_pos.x, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_property(label, "modulate:a", 1.0, 0.3)
+	tween.tween_property(label, "position:x", orig_pos.x, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "modulate:a", 1.0, 0.25)
 
 func start_timer(seconds: float) -> void:
 	if timer_bar == null:
@@ -244,6 +246,7 @@ func start_timer(seconds: float) -> void:
 	if timer_bar != null:
 		timer_bar.value = 100.0
 	if turn_timer_hud != null:
+		turn_timer_hud.timer_enabled = true
 		turn_timer_hud.start_turn_timer(current_player_id, seconds)
 
 func stop_timer() -> void:

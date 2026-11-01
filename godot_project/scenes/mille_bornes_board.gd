@@ -1133,14 +1133,22 @@ func _on_move_rejected(reason: String) -> void:
 		status.text = "Movimiento inválido: %s" % reason
 
 func _update_status() -> void:
-	if turn_indicator != null and turn_indicator.has_method("_ensure_game_app_menu"):
-		turn_indicator._ensure_game_app_menu()
+	if turn_indicator != null:
+		if turn_indicator.has_method("_ensure_game_app_menu"):
+			turn_indicator._ensure_game_app_menu()
+		if winner != -1:
+			turn_indicator.stop_timer()
+			turn_indicator.set_active(false)
+		else:
+			var p_col: Color = Color(0.90, 0.25, 0.25) if current == P1 else Color(0.25, 0.55, 0.95)
+			turn_indicator.set_turn(current, "Jugador %s" % current, p_col)
+			turn_indicator.set_active(true)
 	if status == null:
 		return
 	if winner != -1:
 		status.text = "¡Alcanzó 1000 Millas! Ganó el jugador %s (Mille Bornes)" % winner
 	else:
-		status.text = "Turno: Jugador %s (Mil Millas / Mille Bornes)" % current
+		status.text = ""
 
 # --- Conexión de eventos sonoros procedurales (AudioManager) ---
 func _sfx_piece_slide() -> void:

@@ -1411,11 +1411,11 @@ func _update_status() -> void:
 			msg = "Práctica: %s | Esperado: %s" % [op_data.get("name", "Apertura"), expected.get("notation", "")]
 		else:
 			if opening_moves.size() > 0 and opening_step_index >= opening_moves.size():
-				msg = "¡Apertura completada! Continúa en partida libre (Turno: P%s)" % current
+				msg = "¡Apertura completada! Continúa en partida libre"
 			elif opening_moves.size() > 0:
-				msg = "Desviado de apertura. Partida libre (Turno: P%s)" % current
+				msg = "Desviado de apertura. Partida libre"
 			else:
-				msg = "Turno: Jugador %s (Ajedrez)" % current
+				msg = ""
 		if status != null:
 			status.text = msg
 

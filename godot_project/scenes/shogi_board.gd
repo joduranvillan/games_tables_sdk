@@ -1034,8 +1034,8 @@ func _update_status() -> void:
 	else:
 		var p_name = "Sente (P1)" if current == P_SENTE else "Gote (P2)"
 		var col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)] as Color)
-		var hand_sel_text = " (Mano: %s)" % selected_hand_piece if selected_hand_piece != "" else ""
-		status.text = "Turno: Jugador %s (Shogi)%s" % [p_name, hand_sel_text]
+		var hand_sel_text = "Mano: %s" % selected_hand_piece if selected_hand_piece != "" else ""
+		status.text = hand_sel_text
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, p_name, col)
 			turn_indicator.set_active(true)

@@ -605,7 +605,7 @@ func _update_status() -> void:
 	else:
 		var curr_name = PLAYER_NAMES.get(current, "Jugador %s" % current)
 		var p_col = _get_peg_color(current)
-		status.text = "Turno: %s (Damas Chinas — %d jugadores)" % [curr_name, num_players]
+		status.text = ""
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, curr_name, p_col)
 			turn_indicator.set_active(true)

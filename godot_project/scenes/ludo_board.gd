@@ -636,7 +636,7 @@ func _update_status() -> void:
 		var p_name = "Jugador %s" % current_p
 		var col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current_p) - 1, 6)] as Color)
 		if status != null:
-			status.text = "Turno: Jugador %s (Ludo)" % current_p
+			status.text = ""
 		if turn_indicator != null:
 			turn_indicator.set_turn(current_p, p_name, col)
 

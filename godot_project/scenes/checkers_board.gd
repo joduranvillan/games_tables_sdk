@@ -855,7 +855,7 @@ func _update_status() -> void:
 	else:
 		var who: String = "Jugador 1" if current == P_TOP else "Jugador 2"
 		var p_col = ([Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW, Color.PURPLE, Color.ORANGE][posmod(int(current) - 1, 6)] as Color)
-		status.text = "Turno: %s" % who
+		status.text = ""
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, who, p_col)
 			turn_indicator.set_active(true)

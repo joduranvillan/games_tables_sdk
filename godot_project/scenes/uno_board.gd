@@ -2269,7 +2269,7 @@ func _update_status() -> void:
 			turn_indicator.stop_timer()
 	else:
 		if status != null:
-			status.text = "Turno: %s (UNO)" % p_name
+			status.text = ""
 		if turn_indicator != null:
 			turn_indicator.set_turn(current, p_name, p_col)
 
