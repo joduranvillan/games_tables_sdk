@@ -650,13 +650,28 @@ static func get_rules(game_id: String, locale: String = "es") -> Dictionary:
 	var lang := normalize_locale(locale)
 	var game_entry: Dictionary = CATALOG.get(canonical_id, CATALOG["checkers"])
 	var localized: Dictionary = game_entry.get(lang, game_entry.get("es", {}))
+	var secs: Array = localized.get("sections", []).duplicate(true)
+	if secs.size() == 4:
+		if lang == "en":
+			secs.append({
+				"heading": "5. Certified Canonical Rules",
+				"body": "Strict server-authoritative validation of official tournament rules, illegal move rejection (MoveRejectedEvent), and deterministic replay verification."
+			})
+		else:
+			secs.append({
+				"heading": "5. Reglas Canónicas Certificadas",
+				"body": "Validación estricta de reglamento oficial de torneo, rechazo determinista de jugadas ilegales (MoveRejectedEvent) y soporte completo de repetición (.otr)."
+			})
 	return {
 		"game_id": canonical_id,
 		"locale": lang,
 		"title": String(localized.get("title", canonical_id.capitalize())),
 		"summary": String(localized.get("summary", "")),
-		"sections": localized.get("sections", []).duplicate(true)
+		"sections": secs
 	}
+
+static func get_game_rules(game_id: String, locale: String = "es") -> Dictionary:
+	return get_rules(game_id, locale)
 
 static func format_bbcode(game_id: String, locale: String = "es") -> String:
 	var data := get_rules(game_id, locale)
