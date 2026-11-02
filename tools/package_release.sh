@@ -56,8 +56,8 @@ if [[ -d "${ROOT_DIR}/godot_project/assets" ]]; then
     cp -r "${ROOT_DIR}/godot_project/assets/." "${WINDOWS_PKG_DIR}/assets/"
 fi
 
-cp -f "${ROOT_DIR}/README.md" "${LINUX_PKG_DIR}/"
-cp -f "${ROOT_DIR}/README.md" "${WINDOWS_PKG_DIR}/"
+cp -f "${ROOT_DIR}/README.md" "${ROOT_DIR}/LICENSE" "${ROOT_DIR}/THIRD_PARTY_LICENSES.md" "${LINUX_PKG_DIR}/"
+cp -f "${ROOT_DIR}/README.md" "${ROOT_DIR}/LICENSE" "${ROOT_DIR}/THIRD_PARTY_LICENSES.md" "${WINDOWS_PKG_DIR}/"
 
 echo "=== [4/5] Exportando proyecto Godot/Redot (si el binario está disponible) ==="
 if command -v "${REDOT_BIN}" >/dev/null 2>&1; then
