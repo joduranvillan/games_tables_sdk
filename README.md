@@ -3,43 +3,40 @@
 [![CI](https://github.com/joduranvillan/games_tables_sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/joduranvillan/games_tables_sdk/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/joduranvillan/games_tables_sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/joduranvillan/games_tables_sdk)
 [![Crates.io](https://img.shields.io/crates/v/open_table_core.svg)](https://crates.io/crates/open_table_core)
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3_or_later-blue.svg)](./LICENSE)
 [![Juegos Implementados](https://img.shields.io/badge/juegos-13%2F13-brightgreen.svg)](#juegos-de-referencia-y-reglas)
 
-Para el diseño completo (diagrama de capas, detalle por crate, flujo de
-una jugada de punta a punta, matriz de estado) ver
-**[`ARCHITECTURE.md`](./ARCHITECTURE.md)**. Este documento es más bien
-un resumen de estado + cómo correr cada parte.
+Para el diseño completo del motor (diagrama de capas, detalle de los 22 crates y flujo de eventos) consulta **[`ARCHITECTURE.md`](./ARCHITECTURE.md)**.
+Para expandir el motor, crear un juego nuevo desde cero o añadir un transporte de red con ejemplos completos, consulta **[`DEVELOPER_GUIDE.md`](./DEVELOPER_GUIDE.md)** y **[`docs/SDK_QUICKSTART.md`](./docs/SDK_QUICKSTART.md)**.
 
-## Nivel de confianza distinto según la parte
+## Estado de los 13 Juegos de la Suite (100% Reglas Canónicas + IA + UI Godot)
 
-### Juegos de referencia y reglas
-Cada uno con su propio `Command`/`Event`/`Resource`, reglas reales registradas en el `RuleEngine`, y referencia de reglas documentada (ver **[`PROMPTS13.md`](./PROMPTS13.md)** para el cierre del 100% de reglas canónicas de torneo y su cableado en UI):
+Cada uno de los **13 juegos** cuenta con su propio crate en Rust (`*_game`), reglas oficiales de torneo validadas en `tests/canonical_rules.rs`, generador de jugadas legales (`LegalMoveGenerator`), oponente de IA local con 4 niveles y tablero completo en Godot/Redot con HUD compacto (`TurnIndicator` + `TurnTimerHud` + `GameAppMenu`):
 
-| Juego | Reglas Básicas | Reglas en Motor Rust | Pendiente Canónico / UI (`PROMPTS13.md`) | Tests Rust | Test Godot | UI Godot | Documentación |
-|---|:---:|:---:|---|:---:|:---:|:---:|---|
-| **Ajedrez** (`chess_game`) | ✅ | ✅ (enroque, al paso, promoción, 50 mov, triple rep, mat. insuf., tablas) | ⚠️ UI: selector visual de pieza al coronar y botones de oferta/aceptación de tablas en tablero | ✅ | ✅ | ✅ | [`chess.md`](./docs/games/chess.md) |
-| **Damas** (`checkers_game`) | ✅ | ✅ (captura obligatoria, saltos múltiples encadenados, dama 4 diag.) | ⚠️ Motor: victoria por bloqueo total sin jugadas legales del rival y tablas por 40 turnos sin captura | ✅ | ✅ | ✅ | [`checkers.md`](./docs/games/checkers.md) |
-| **Go** (`go_game`) | ✅ | ✅ (Ko, Superko posicional, suicidio prohibido, Handicap, marcado de muertas) | ⚠️ Motor/UI: Komi (6.5) + prisioneros en score final; botones `Pass`, `MarkDead` y `ConfirmDead` en `go_board.gd` | ✅ | ✅ | ✅ | [`go.md`](./docs/games/go.md) |
-| **Shogi** (`shogi_game`) | ✅ | ✅ (drops con despromoción, Nifu, Uchifuzume, Fuzumi/Todome) | ⚠️ Motor/UI: promoción opcional vs obligatoria por fila exacta, Sennichite (repetición ×4) y modal de promoción en UI | ✅ | ✅ | ✅ | [`shogi.md`](./docs/games/shogi.md) |
-| **Xiangqi** (`xiangqi_game`) | ✅ | ✅ (General Volador, ojo de elefante, pata de caballo, río, palacio, cañón) | ⚠️ Motor: derrota por ahogado (*Kunbi*), `LegalMoveGenerator` en `RuleEngine` y regla de repetición | ✅ | ✅ | ✅ | [`xiangqi.md`](./docs/games/xiangqi.md) |
-| **Damas Chinas** (`chinese_checkers_game`) | ✅ | ✅ (estrella oficial de 121 casillas, 2/3/4/6 jugadores, saltos encadenados `path`) | ⚠️ Motor: regla oficial anti-bloqueo en punta de meta (*home-camp spoiling*), `ResignCommand` y `LegalMoveGenerator` | ✅ | ✅ | ✅ | [`chinese_checkers.md`](./docs/games/chinese_checkers.md) |
-| **Backgammon** (`backgammon_game`) | ✅ | ✅ (dobles = 4 movs, Doubling Cube, regla Crawford, bear-off exacto, Gammon/Backgammon) | ⚠️ Motor/UI: obligación de usar ambos dados (o el mayor) y botones de `Offer/Accept/RejectDouble` en `backgammon_board.gd` | ✅ | ✅ | ✅ | [`backgammon.md`](./docs/games/backgammon.md) |
-| **Batalla naval** (`battleship_game`) | ✅ | ✅ (tablero 10×10, 5 barcos `[5,4,3,3,2]`, separación 8 dir., `RematchCommand`) | ⚠️ Motor/UI: variante configurable de turno extra al acertar (`extra_turn_on_hit`), `ResignCommand` y botón Revancha en UI | ✅ | ✅ | ✅ | [`battleship.md`](./docs/games/battleship.md) |
-| **Ludo** (`ludo_game`) | ✅ | ✅ (track de 52 casillas + 5 meta, salida/turno extra con 6, casillas seguras, barreras) | ⚠️ Motor: anulación de turno por 3 seises seguidos, tiro extra por captura/meta y 4 casillas seguras de estrella (`+8`) | ✅ | ✅ | ✅ | [`ludo.md`](./docs/games/ludo.md) |
-| **Mil Millas** (`mille_bornes_game`) | ✅ | ✅ (meta 1000 km con extensión, límite 2×200 km, rebarajado, `RightOfWay`, `CoupFourre`) | ⚠️ Motor/UI: las 3 cartas de seguridad restantes (`ExtraTank`, `PunctureProof`, `DrivingAce`), turno extra por Safety y botón Coup Fourré en UI | ✅ | ✅ | ✅ | [`mille_bornes.md`](./docs/games/mille_bornes.md) |
-| **Monopoly** (`monopoly_game`) | ✅ | ✅ (tablero 40 casillas, 10 Suerte + 10 Arca, Cárcel, Subastas, renta doble grupo, quiebra) | ⚠️ Motor/UI: construcción de Casas/Hoteles, Hipotecas, 3 dobles seguidos a la cárcel, retención de carta salir de cárcel e Intercambios | ✅ | ✅ | ✅ | [`monopoly.md`](./docs/games/monopoly.md) |
-| **Uno** (`uno_game`) | ✅ | ✅ (mazo 108 cartas, stacking `+2`/`+4`, validación `+4` legal, robo/juego inmediato, `InterceptCommand`) | ⚠️ Motor/UI: grito/penalización de `"¡UNO!"` (+2 cartas), desafío formal de `+4` (`ChallengeWildDrawFour`) y botón Jump-In en `uno_board.gd` | ✅ | ✅ | ✅ | [`uno.md`](./docs/games/uno.md) |
-| **Crisis / TEG** (`crisis_game`) | ✅ | ✅ (30 territorios, 6 continentes, objetivos secretos, combate 3v3, canje de tarjetas y fortificación) | ⚠️ Motor: robo automático de 1 `TerritoryCard` al conquistar al menos un país en el turno y bono de +2 ejércitos por tarjeta de país propio | ✅ | ✅ | ✅ | [`teg.md`](./docs/games/teg.md) |
+| Juego | Reglas Básicas | Reglas Canónicas en Motor Rust | Controles Canónicos en UI Godot | Tests Rust | Test Godot | UI Godot | Documentación |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| **Ajedrez** (`chess_game`) | ✅ | ✅ (enroque, al paso, subpromoción, 50 mov, triple rep, mat. insuf., tablas) | ✅ (`PromotionSelectorPanel`, `OfferDrawButton`, `AcceptDrawButton`) | ✅ | ✅ | ✅ | [`chess.md`](./docs/games/chess.md) |
+| **Damas** (`checkers_game`) | ✅ | ✅ (captura obligatoria, saltos múltiples encadenados, dama 4 diag., bloqueo, 40 turnos) | ✅ (`MandatoryCaptureLabel`, resaltado multicaptura, `GameAppMenu`) | ✅ | ✅ | ✅ | [`checkers.md`](./docs/games/checkers.md) |
+| **Go** (`go_game`) | ✅ | ✅ (Ko, Superko posicional, suicidio prohibido, Handicap, Komi 6.5, piedras muertas) | ✅ (`HandicapOptionButton`, `PassTurnButton`, marcado `✕` y `ConfirmDeadButton`) | ✅ | ✅ | ✅ | [`go.md`](./docs/games/go.md) |
+| **Shogi** (`shogi_game`) | ✅ | ✅ (drops con despromoción, Nifu, Uchifuzume, promoción FESA, Sennichite ×4) | ✅ (`PromotionDialogPanel`, bandejas Komadai interactivas) | ✅ | ✅ | ✅ | [`shogi.md`](./docs/games/shogi.md) |
+| **Xiangqi** (`xiangqi_game`) | ✅ | ✅ (General Volador, bloqueo caballo/elefante, río, palacio, cañón, Kunbi) | ✅ (Bandejas de capturas, alerta de jaque, `EventBanner`) | ✅ | ✅ | ✅ | [`xiangqi.md`](./docs/games/xiangqi.md) |
+| **Damas Chinas** (`chinese_checkers_game`) | ✅ | ✅ (estrella de 121 casillas, 2/3/4/6 jugadores, saltos en cadena, anti-bloqueo) | ✅ (Selector 2–6 jugadores en menú Opciones, resaltado de saltos) | ✅ | ✅ | ✅ | [`chinese_checkers.md`](./docs/games/chinese_checkers.md) |
+| **Backgammon** (`backgammon_game`) | ✅ | ✅ (dobles = 4 movs, obligación de usar ambos/mayor dado, Doubling Cube, Crawford) | ✅ (`OfferDouble`, `AcceptDouble`, `RejectDouble`, `DiceWidget`) | ✅ | ✅ | ✅ | [`backgammon.md`](./docs/games/backgammon.md) |
+| **Batalla Naval** (`battleship_game`) | ✅ | ✅ (tablero 10×10, 5 barcos `[5,4,3,3,2]`, ráfaga `extra_turn_on_hit`, `RematchCommand`) | ✅ (Rotación `R`/clic der., `ExtraTurnCheckBox`, `RematchButton`) | ✅ | ✅ | ✅ | [`battleship.md`](./docs/games/battleship.md) |
+| **Ludo** (`ludo_game`) | ✅ | ✅ (circuito 52 + 5 meta, tres 6 seguidos, 8 casillas seguras/estrellas, bono captura/meta) | ✅ (`DiceWidget`, recorrido animado, casillas estrella) | ✅ | ✅ | ✅ | [`ludo.md`](./docs/games/ludo.md) |
+| **Mil Millas** (`mille_bornes_game`) | ✅ | ✅ (meta 1000/1200 km, máx 2×200 km, 4 Safeties con turno extra, Coup Fourré) | ✅ (`CoupFourreButton`, tableau de 4 escudos e iconos SVG) | ✅ | ✅ | ✅ | [`mille_bornes.md`](./docs/games/mille_bornes.md) |
+| **Monopoly** (`monopoly_game`) | ✅ | ✅ (40 casillas, Suerte/Arca, Subastas, Casas/Hoteles uniformes, Hipotecas, Trueques) | ✅ (Paneles de Subasta, Construcción, Hipoteca y Trade) | ✅ | ✅ | ✅ | [`monopoly.md`](./docs/games/monopoly.md) |
+| **Uno** (`uno_game`) | ✅ | ✅ (mazo 108 cartas, grito/castigo `¡UNO!`, desafío `Wild +4`, intercepción Jump-In) | ✅ (`UnoCallButton`, `ChallengeW4Button`, `JumpInButton`, selector de color) | ✅ | ✅ | ✅ | [`uno.md`](./docs/games/uno.md) |
+| **Crisis / TEG** (`crisis_game`) | ✅ | ✅ (30 territorios, 6 continentes, objetivos secretos, combate 3v3, tarjeta + bono `+2`) | ✅ (Mapa interactivo 30 países, modal de tarjetas/canje y dados 3v3) | ✅ | ✅ | ✅ | [`teg.md`](./docs/games/teg.md) |
 
 **`open_table_godot/` (bridge de Godot/Redot): compila, carga y está
-verificado en runtime.** Corre en Redot 26.2 (= Godot 4.5.2 por dentro).
+verificado en runtime.** Corre en Redot 4.x / Godot 4.x.
 Un único nodo `OpenTableBridge` soporta modos local, vs IA, host/cliente TCP,
 Relay WebSocket y P2P móvil — ver `open_table_godot/BRIDGE_USAGE.md`.
 
-## Quick Start / Guía de Integración
+## Quick Start / Guía de Expansión para Desarrolladores
 
-> 🚀 **[Guía Rápida de 15 Minutos (`docs/SDK_QUICKSTART.md`)](./docs/SDK_QUICKSTART.md)**: Aprende a crear tu propio juego de mesa desde cero (ejemplo completo de *Tres en Línea / Tic-Tac-Toe* en menos de 100 líneas de Rust con `GameEngine`, `State`, `Action`, `PlayerId`, registro en `open_table_engine::Session` y señales en Godot).
+> 🚀 **[Guía del Desarrollador (`DEVELOPER_GUIDE.md`)](./DEVELOPER_GUIDE.md)** y **[Guía Rápida de 15 Minutos (`docs/SDK_QUICKSTART.md`)](./docs/SDK_QUICKSTART.md)**: Aprende a crear tu propio juego de mesa desde cero, añadir variantes configurables o integrar un nuevo transporte `RawByteLink`.
 
 Para integrar OpenTable SDK en un proyecto externo de Rust o en Godot Engine, consulta también la **[`Guía de Integración`](./docs/integration_guide.md)** con ejemplos completos de código para Rust y GDScript.
 

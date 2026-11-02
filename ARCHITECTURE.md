@@ -1,376 +1,135 @@
-# Arquitectura — OpenTable SDK
+# Arquitectura del Motor — OpenTable SDK & Suite (v4.0.0)
 
-Documento de referencia de cómo está armado el SDK y cómo se integran
-sus piezas. Para pasos de setup y la lista de prioridades de lo que
-falta, ver [`NEXT_STEPS.md`](./NEXT_STEPS.md).
+Documento técnico de referencia de la arquitectura del motor determinista **OpenTable SDK** y de la colección de **13 juegos clásicos de mesa y cartas**.
+- Para crear un juego nuevo paso a paso o extender el motor con código ejecutable, consulta **[`DEVELOPER_GUIDE.md`](./DEVELOPER_GUIDE.md)**.
+- Para el ejemplo mínimo en 15 minutos, consulta **[`docs/SDK_QUICKSTART.md`](./docs/SDK_QUICKSTART.md)**.
 
-## Principio de diseño
+---
 
-**Cada capa solo conoce a la que tiene debajo.** `Session` no sabe si el
-`Transport` es TCP o Nearby Connections. Un juego no sabe que existe
-Godot. El bridge de Godot no sabe las reglas de damas, solo traduce
-`Event` → señal. Esto es lo que permite, por ejemplo, agregar Bluetooth
-como transporte nuevo sin tocar una línea de `checkers_game` ni de
-`open_table_engine`.
+## 1. Principio de Diseño: Anillos Desacoplados y Autoridad Determinista
 
-## Diagrama de capas
+**Cada capa solo conoce a la capa inmediatamente inferior.**
+- `Session` (`open_table_engine`) procesa comandos sobre un `bevy_ecs::World` sin saber si el transporte es memoria local, TCP LAN, WebSocket TLS (`open_table_relay`) o P2P móvil (`Nearby Connections` / `MultipeerConnectivity`).
+- Los **13 crates de juegos** (`*_game`) contienen el 100% de las reglas oficiales de torneo, generadores de movimientos legales (`LegalMoveGenerator`) y motores de IA (`src/ai.rs`), sin depender de Godot ni de sockets de red.
+- El puente nativo `OpenTableBridge` (`open_table_godot`) traduce intenciones de la vista a `Command` y convierte cada `Event` emitido por el motor en señales de Godot/Redot.
 
 ```
-                         ┌─────────────────────┐
-                         │   open_table_core    │  IDs, Command/Event,
-                         │                       │  Visibility, Transport (trait)
-                         └───────────┬───────────┘
-                                     │
-                         ┌───────────▼───────────┐
-                         │  open_table_engine     │  bevy_ecs + RuleEngine +
-                         │                        │  Session (turnos, replay,
-                         │                        │  resync, identidad)
-                         └───────────┬───────────┘
-                                     │
-              ┌──────────────────────┼──────────────────────┐
-              │                      │                      │
-    ┌─────────▼────────┐   ┌─────────▼────────┐   ┌─────────▼────────┐
-    │  8 juegos de      │   │ open_table_macros │   │  open_table_qr    │
-    │  referencia        │   │  (derives)         │   │  (join code + QR) │
-    └────────────────────┘   └────────────────────┘   └────────────────────┘
-
-    Transporte (implementan Transport, intercambiables sin tocar Session):
-    ┌────────────────────────┐   ┌────────────────────────┐   ┌──────────────────────────────────────┐
-    │ open_table_transport_  │   │ open_table_transport_  │   │ open_table_transport_native_bridge   │
-    │ tcp (desktop, probado) │   │ websocket (WS probado) │   │ (Nearby/Multipeer, protocolo probado, │
-    │                        │   │                        │   │  falta el RawByteLink real)          │
-    └────────────────────────┘   └────────────────────────┘   └──────────────────────────────────────┘
-
-    Vista:
-    ┌─────────────────────────────────────────────────────────┐
-    │ open_table_godot (gdext) — expone Session como nodo con  │
-    │ señales; platform_plugins/{android,ios} — implementan     │
-    │ RawByteLink sobre las APIs nativas de cada plataforma     │
-    └─────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 1. NÚCLEO DETERMINISTA (open_table_core + open_table_macros + qr)          │
+│    • Traits puros: Command, Event (typetag JSON), Visibility, Transport    │
+│    • Servicios deterministas: RandomService (ChaCha8), GameClock           │
+└─────────────────────────────────────┬──────────────────────────────────────┘
+                                      │
+┌─────────────────────────────────────▼──────────────────────────────────────┐
+│ 2. MOTOR AUTORITATIVO ECS (open_table_engine)                              │
+│    • bevy_ecs::World + RuleEngine (validadores + LegalMoveGenerator)       │
+│    • Session: control de turnos, ActionHistory (.otr), snapshots, ELO      │
+└─────────────────┬───────────────────┴───────────────────┬──────────────────┘
+                  │                                       │
+┌─────────────────▼───────────────────┐ ┌─────────────────▼──────────────────┐
+│ 3A. 13 MOTORES DE JUEGO (*_game)    │ │ 3B. CAPA DE RED Y RELAY            │
+│  • Reglas canónicas 100% en Rust    │ │  • transport_tcp (LAN + Reconnect) │
+│  • IA local con 4 niveles           │ │  • transport_websocket (TLS/WSS)   │
+│  • Cero dependencia de UI o red     │ │  • transport_native_bridge (P2P)   │
+│  • Tests unitarios + canónicos      │ │  • open_table_relay (Auth + AntiCh)│
+└─────────────────┬───────────────────┘ └─────────────────┬──────────────────┘
+                  └───────────────────┬───────────────────┘
+                                      ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 4. PUENTE NATIVO Y CLIENTE VISUAL (open_table_godot + godot_project)       │
+│    • Clase única GDExtension: OpenTableBridge (Local / Host / Client)      │
+│    • 13 Tableros GDScript + TurnIndicator compacto + GameAppMenu + Audio   │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Diagramas Mermaid de Arquitectura
+---
 
-### 1. Diagrama de Componentes (20 Crates del Workspace)
+## 2. Mapa de los 22 Crates del Workspace
 
-```mermaid
-graph TD
-    classDef core fill:#2b4c7e,stroke:#4a7bb0,color:#fff
-    classDef transport fill:#3b6e4e,stroke:#5c9c72,color:#fff
-    classDef game fill:#6b3b7e,stroke:#9c5c9e,color:#fff
-    classDef bridge fill:#7e5b2b,stroke:#b0844a,color:#fff
+### Motor Base y Utilidades (4 Crates)
+| Crate | Responsabilidad Principal |
+| :--- | :--- |
+| **`open_table_core`** | Primitivas base: `PlayerId`, `SessionId`, traits `Command` y `Event` serializables vía `typetag`, `EventVisibility` (`Public`, `OnlyPlayer`, `Hidden`), `RandomService` determinista (`ChaCha8Rng`), `GameClock` y trait `Transport`. |
+| **`open_table_engine`** | Motor de sesión autoritativo sobre `bevy_ecs::World`: `RuleEngine`, `Session`, `TurnManager`, `ActionHistory` (replays `.otr`), `SnapshotManager`, deshacer/rehacer (`undo`/`redo`) y cálculo de rating ELO FIDE (`elo.rs`). |
+| **`open_table_macros`** | Macros procedimentales `#[game_command]`, `#[game_event]`, `#[derive(GameResource, GameComponent)]` que automatizan el registro de `typetag` y traits ECS. |
+| **`open_table_qr`** | Codificación compacta de invitaciones de sala (`JoinTicket` en Base64/JSON) y renderizado de códigos QR en matriz SVG/PNG para unión rápida desde móvil o escritorio. |
 
-    subgraph CoreEngine [Motor Base]
-        OTC[open_table_core]:::core
-        OTE[open_table_engine]:::core
-        OTM[open_table_macros]:::core
-        OTQ[open_table_qr]:::core
-    end
+### Capa de Transporte y Servidor Autoritativo (4 Crates)
+| Crate | Responsabilidad Principal |
+| :--- | :--- |
+| **`open_table_transport_tcp`** | Transporte Host/Client sobre sockets TCP con framing length-prefixed, tokens de sesión CSPRNG y reconexión automática preservando la partida. |
+| **`open_table_transport_websocket`** | Transporte asíncrono sobre WebSockets (`tokio-tungstenite`) compatible con proxies HTTP/WSS y el servidor Relay. |
+| **`open_table_transport_native_bridge`** | Protocolo completo de apretón de manos, identidad y reconexión abstraído sobre el trait mínimo `RawByteLink` para Bluetooth / Nearby Connections (Android) y MultipeerConnectivity (iOS). |
+| **`open_table_relay`** | Servidor dedicado de producción con salas de 6 caracteres, TLS/WSS (`rustls`), autenticación JWT (`HS256`), rate-limiting por IP/sala, validación anti-cheat autoritativa para los 13 juegos, modo espectador (hasta 10 por sala) y métricas Prometheus (`/metrics`). |
 
-    subgraph Transports [Capa de Transporte]
-        OTT[open_table_transport_tcp]:::transport
-        OTW[open_table_transport_websocket]:::transport
-        OTN[open_table_transport_native_bridge]:::transport
-    end
+### Puente Nativo con Godot / Redot (1 Crate)
+| Crate | Responsabilidad Principal |
+| :--- | :--- |
+| **`open_table_godot`** | Biblioteca dinámica `GDExtension` (`cdylib`) que expone la clase unificada `OpenTableBridge` a GDScript. Gestiona sesiones locales, partidas contra IA, hosting/cliente TCP, conexión al Relay y `GodotRawByteLink`. |
 
-    subgraph Games [13 Juegos de Referencia]
-        CG1[checkers_game]:::game
-        CG2[chess_game]:::game
-        CG3[backgammon_game]:::game
-        CG4[battleship_game]:::game
-        CG5[chinese_checkers_game]:::game
-        CG6[crisis_game]:::game
-        CG7[go_game]:::game
-        CG8[ludo_game]:::game
-        CG9[mille_bornes_game]:::game
-        CG10[monopoly_game]:::game
-        CG11[shogi_game]:::game
-        CG12[uno_game]:::game
-        CG13[xiangqi_game]:::game
-    end
+### Los 13 Motores de Juego (`*_game`) (13 Crates)
+Todos los juegos implementan sus reglas canónicas oficiales, validación determinista de jugadas ilegales (`MoveRejected`), generador de movimientos legales (`LegalMoveGenerator`) y oponente de IA local con 4 niveles de dificultad:
 
-    subgraph Integrations [Integración y Vistas]
-        OTG[open_table_godot]:::bridge
-    end
+| # | Juego | Crate | Arquitectura de Estado y Reglas Canónicas Destacadas |
+| :-: | :--- | :--- | :--- |
+| 1 | **Damas** | `checkers_game` | Tablero 8×8, captura obligatoria, saltos múltiples encadenados (`multi_capture`), coronación a Dama de 4 diagonales, victoria por bloqueo total y tablas por 40 medios turnos sin captura. |
+| 2 | **Ajedrez** | `chess_game` | Tablero 8×8, enroque corto/largo, captura al paso (*en passant*), subpromoción (`Queen`, `Rook`, `Bishop`, `Knight`), oferta/aceptación de tablas, triple repetición, regla de 50 movimientos e insuficiencia de material. |
+| 3 | **Go (Weiqi / Baduk)** | `go_game` | Tableros 9×9, 13×13 y 19×19, cálculo de libertades por grupo, prohibición de suicidio, Superko Posicional (historial de hashes Zobrist/estado), Handicap inicial Hoshi, fase de marcado/acuerdo de piedras muertas y Komi configurable (`6.5`). |
+| 4 | **Shogi** | `shogi_game` | Tablero 9×9 con reserva de capturas (*Komadai*), reingreso (*Drop*), prohibición de *Nifu* (dos peones en la misma columna) y *Uchifuzume* (mate por drop de peón), promoción opcional vs obligatoria FESA y *Sennichite* (repetición ×4). |
+| 5 | **Xiangqi** | `xiangqi_game` | Intersecciones 9×10 con Río Central y Palacios 3×3, bloqueo de Caballo y Elefante, captura con pantalla del Cañón, regla del General Volador, victoria por ahogado (*Kunbi*) y prohibición de jaque perpetuo. |
+| 6 | **Damas Chinas** | `chinese_checkers_game` | Estrella hexagonal de 121 casillas en coordenadas axiales `(q, r)` para 2, 3, 4 o 6 jugadores, saltos encadenados sin captura y regla oficial anti-bloqueo (*Home-Camp Spoiling*). |
+| 7 | **Backgammon** | `backgammon_game` | 24 picos con conteo con signo, barra central, *bearing off* exacto o superior desde el pico más lejano, obligación de usar ambos dados (o el mayor), Cubo de Doblaje (`2..64`), regla Crawford y puntuación Simple/Gammon/Backgammon. |
+| 8 | **Batalla Naval** | `battleship_game` | Información oculta real (`EventVisibility::OnlyPlayer`), fase de despliegue de 5 buques (`[5,4,3,3,2]`) en grilla 10×10, variante configurable de ráfaga (`extra_turn_on_hit`) y revancha inmediata (`RematchCommand`). |
+| 9 | **Ludo** | `ludo_game` | Circuito de 52 casillas + pasillo de meta de 5 pasos para 2–4 jugadores, salida con 6, penalización por tres 6 consecutivos, 8 casillas seguras (4 salidas + 4 estrellas) y tirada extra por captura o llegada exacta a meta. |
+| 10 | **Mille Bornes** | `mille_bornes_game` | Carrera de cartas a 1000 km (con extensión opcional a 1200 km), límite de 2 cartas de 200 km, Peligros/Remedios, las 4 Cartas de Seguridad (*Safeties*) con turno extra e intercepción reactiva *Coup Fourré* (+300 pts). |
+| 11 | **Monopoly** | `monopoly_game` | Circuito oficial de 40 casillas, mazos de Suerte y Arca Comunal, subastas cuando no se compra un solar, construcción uniforme de casas/hoteles por grupo de color, hipotecas (+10% al levantar), cárcel por 3 dobles e intercambios comerciales. |
+| 12 | **UNO** | `uno_game` | Mazo oficial de 108 cartas, cartas de acción (`Skip`, `Reverse` = `Skip` en 2J, `+2`, `Wild`, `Wild +4`), grito y penalización de `"¡UNO!"` (+2 cartas), desafío formal de `Wild +4` (+4 o +6 cartas) e intercepción fuera de turno (*Jump-In*). |
+| 13 | **Crisis (T.E.G.)** | `crisis_game` | Mapa geopolítico de 30 territorios y 6 continentes, objetivos secretos + conquista global, fases de Incorporación, Ataque con dados (hasta 3v3, empate favorece al defensor) y Reagrupamiento, robo de tarjeta por conquista y bono `+2` en país propio. |
 
-    OTE --> OTC
-    OTM --> OTC
-    OTQ --> OTC
-    OTT --> OTC
-    OTN --> OTC
+---
 
-    CG1 --> OTE
-    CG2 --> OTE
-    CG3 --> OTE
-    CG4 --> OTE
-    CG5 --> OTE
-    CG6 --> OTE
-    CG7 --> OTE
-    CG8 --> OTE
-    CG9 --> OTE
-    CG10 --> OTE
-    CG11 --> OTE
-    CG12 --> OTE
-    CG13 --> OTE
-
-    OTG --> OTE
-    OTG --> OTT
-    OTG --> OTN
-```
-
-### 2. Diagrama de Secuencia: Flujo Host → Command → Event → Client con Reconexión
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Client as Cliente (Jugador B)
-    participant Transport as Transport TCP/Native
-    participant Host as Host Session
-    participant Engine as RuleEngine (ECS)
-
-    Note over Client, Host: Flujo de Jugada Normal
-    Client->>Transport: send_command(MovePieceCommand)
-    Transport->>Host: poll_received() -> CommandEnvelope
-    Host->>Engine: process_command(player_b, command)
-    alt Comando Válido
-        Engine-->>Host: Vec<Event> (e.g. PieceMovedEvent)
-        Host->>Transport: broadcast(Event)
-        Transport-->>Client: poll_received() -> PieceMovedEvent
-        Client->>Client: Emitir señal GDScript
-    else Comando Inválido
-        Engine-->>Host: Err(EngineError::InvalidCommand)
-        Host-->>Client: CommandRejectedEvent
-    end
-
-    Note over Client, Host: Flujo de Desconexión y Reconexión
-    Client-xTransport: Desconexión de Red (Drop)
-    Transport->>Host: poll_connection_events() -> Disconnected { player_b }
-    Host->>Host: Marcar Jugador B como Desconectado
-    Client->>Transport: reconnect(session_id, player_b, auth_token)
-    Transport->>Host: poll_connection_events() -> Reconnected { player_b }
-    Host->>Client: Envío de Resync / History Replay
-    Client->>Client: Reconstruir estado local
-```
-
-### 3. Diagrama de Estado de `Session`
-
-```mermaid
-stateDiagram-v2
-    [*] --> Idle : Session::new_with_metadata()
-    
-    state Idle {
-        [*] --> EsperandoJugadores
-        EsperandoJugadores --> SetupInicial : Todos los jugadores conectados / SetupDeck
-    }
-
-    Idle --> Playing : Start Match / Primer Comando
-
-    state Playing {
-        [*] --> TurnoActivo
-        TurnoActivo --> EvaluandoReglas : process_command()
-        EvaluandoReglas --> TurnoActivo : Comando procesado / Siguiente turno
-        EvaluandoReglas --> DecisionPendiente : Decisión intermedia (e.g. Subasta Monopoly)
-        DecisionPendiente --> TurnoActivo : Respuesta recibida
-    }
-
-    Playing --> Paused : Jugador desconectado
-    Paused --> Playing : Jugador reconectado con token válido
-
-    Playing --> GameOver : Condición de victoria alcanzada
-    Paused --> GameOver : Timeout de reconexión expirado / Abandono
-
-    state GameOver {
-        [*] --> PartidaFinalizada
-        PartidaFinalizada --> Idle : RematchCommand / Reinicio
-    }
-
-    GameOver --> [*]
-```
-
-## Las capas en detalle
-
-### `open_table_core`
-Tipos fundamentales: IDs (`PlayerId`, `SessionId`), `Command`/`Event`
-como trait objects serializables (`typetag` + JSON) con visibilidad por
-evento (para info oculta como manos de cartas o tableros privados),
-`Component`/`Resource` al estilo ECS, `RandomService` determinista,
-`GameClock`, y el trait `Transport` que toda capa de red implementa.
-
-### `open_table_engine`
-`bevy_ecs` real + `RuleEngine` + `Session`. `Session` maneja turnos
-(`players()`/`peek_next()`), valida identidad de quién manda cada
-comando, soporta replay/resync para reconexión, y expone `world_mut()`
-para que cada juego arme su setup inicial.
-
-### `open_table_macros`
-`#[derive(GameCommand/GameEvent/GameResource/GameComponent)]` — reduce
-el boilerplate de registrar tipos en el ECS/serialización.
-
-### `open_table_qr`
-Código de invitación (join code) + generación de QR.
-
-### 8 juegos de referencia
-Cada uno con su propio `Command`/`Event`/`Resource` y reglas reales
-registradas en el `RuleEngine`:
-
-| Juego | Crate | Tests | Qué ejercita del SDK que los demás no |
-|---|---|---|---|
-| Damas | `checkers_game` | 7 | El primero: turnos, captura, coronación |
-| Batalla naval | `battleship_game` | 5 | Información oculta real (2 tableros privados), fase de setup sin turnos |
-| Ludo | `ludo_game` | 6 | 2-4 jugadores (no solo 2), patrón "tirada pendiente" |
-| Mil Millas | `mille_bornes_game` | 6 | Manos de cartas privadas, comando de sistema (`SetupDeckCommand`) para barajar de forma reproducible |
-| Backgammon | `backgammon_game` | 6 | Tablero de "conteo con signo" en vez de grilla, barra/bear-off |
-| Damas chinas | `chinese_checkers_game` | 5 | Coordenadas hexagonales axiales, saltar sin capturar |
-| Monopoly | `monopoly_game` | 6 | Decisión de jugador que suspende el avance de turno |
-| Ajedrez | `chess_game` | 7 | Validación de movimiento completa + detección de jaque/jaque mate por simulación |
-
-Simplificaciones deliberadas de cada uno (no son bugs): ver el `lib.rs`
-de cada crate, o el resumen en `README.md` raíz.
-
-### Transportes (`Transport` trait, intercambiables)
-
-- **`open_table_transport_tcp`** — sockets TCP reales, con reconexión
-  autenticada (token CSPRNG, timeout configurable). Es el que usa
-  `open_table_godot` hoy.
-- **`open_table_transport_websocket`** — transporte sobre WebSockets usando
-  `tokio-tungstenite` (`WsHostTransport` y `WsClientTransport`), con las mismas
-  interfaces `send_command` / `poll_events` e ideal para clientes web o entornos
-  detrás de proxies/firewalls HTTP/WS.
-- **`open_table_transport_native_bridge`** — mismo protocolo de
-  identidad/reconexión que `_tcp` (handshake `Join`/`Reconnect`,
-  tokens, `ConnectionEvent::{Joined, Reconnected, Disconnected,
-  TimedOut}`), pero generalizado sobre un trait mínimo:
-
-  ```rust
-  pub trait RawByteLink: Send {
-      fn send_raw(&mut self, peer_tag: &str, bytes: &[u8]) -> EngineResult<()>;
-      fn broadcast_raw(&mut self, bytes: &[u8]) -> EngineResult<()>;
-      fn poll_raw_received(&mut self) -> Vec<(String, Vec<u8>)>;
-      fn poll_link_events(&mut self) -> Vec<RawLinkEvent>;
-  }
-  ```
-
-  Cualquier cosa que mueva bytes hacia/desde un `peer_tag` opaco (el
-  `endpointId` de Nearby Connections, el `MCPeerID` de Multipeer) se
-  envuelve en `NativeHostTransport<L>`/`NativeClientTransport<L>` y
-  hereda gratis todo el protocolo de identidad/reconexión. Probado con
-  un `FakeRawByteLink` en memoria (5 tests); falta implementarlo sobre
-  el plugin nativo real (ver sección de `platform_plugins` abajo).
-
-### `open_table_godot` — bridge de Godot/Redot
-
-Expone el motor como un único nodo Godot, `CheckersBridge`, con **tres
-modos internos** manejados por un enum (`BridgeMode`):
-
-| Modo | Uso | Métodos clave |
-|---|---|---|
-| `Local` | Hotseat, un solo proceso, sin red | `start_local_match(top_id, bottom_id)`, `send_move(player, ...)` |
-| `Host` | Crea `Session` real + `TcpHostTransport`, acepta N clientes | `start_hosting(port, top_id, bottom_id)`, `send_move(player, ...)`, `poll_events()` |
-| `Client` | Se conecta a un host, sin `Session` propia | `connect_to_host(host, port, name)`, `send_move_client(...)`, `my_player_id()`, `poll_events()` |
-
-Los tres modos comparten las mismas señales (`piece_moved`,
-`game_over`, `move_rejected`, más `peer_joined`/`peer_disconnected` en
-Host y `connected`/`disconnected` en Client) — GDScript nunca necesita
-saber si está jugando local o en red.
-
-**Por qué es una sola clase y no dos o tres:** gdext 0.2.4 (la versión
-de `godot-rust` usada acá) **no registra en el runtime de Godot más de
-un `#[derive(GodotClass)]` por extensión**. Ambas clases compilan y
-quedan en el `.so`, pero Godot solo ve la primera (`Identifier "X" not
-declared in the current scope"`). El diseño original tenía
-`CheckersBridgeHost` + `CheckersBridgeClient` separadas; se fusionaron
-en una sola clase con dispatch por enum para evitar el bug. Detalle
-completo de la investigación y por qué no hizo falta actualizar gdext
-ni usar dos `.so` separados: `open_table_godot/GDEXT_INVESTIGATION.md`.
-Esta limitación aplica a **cualquier clase nueva** que se agregue de
-cara a Godot en este SDK — no solo a `CheckersBridge`.
-
-Binding contra Redot (fork de Godot con hashes de función distintos):
-ver `open_table_godot/GODOT_SETUP.md` para el detalle del feature
-`api-custom` + el shim de versión.
-
-### `platform_plugins/{android,ios}` — plugins nativos móviles
-
-Cada plugin es un "caño de bytes tonto": no tiene lógica de
-identidad/reconexión (eso ya vive en `open_table_transport_native_bridge`),
-solo traduce entre la API nativa de la plataforma y bytes puros.
+## 3. Ciclo de Vida de un Comando y Visibilidad de Eventos
 
 ```
-open_table_transport_native_bridge (Rust)
-         ↓
-    RawByteLink (trait)
-         ↓
-  ┌──────┴──────┐
-  ↓             ↓
-Android       iOS
-Nearby        Multipeer
-Connections   Connectivity
+[Input en Godot] ──► OpenTableBridge::send_command_json(player_id, json)
+                            │
+                            ▼
+             Session::process_command(player_id, Box<dyn Command>)
+                            │
+        ┌───────────────────┴───────────────────┐
+        ▼ (1. Validación de Turno y Reglas)     ▼ (En caso de error)
+RuleEngine::validate(&mut World, player, cmd)   Emite MoveRejectedEvent(reason)
+        │                                               │
+        ▼ (2. Mutación del World ECS)                   ▼
+Retorna Vec<Box<dyn Event>> con EventVisibility  Señal `move_rejected` en Godot
+        │
+        ├─► ActionHistory::record()  (Guarda para Undo/Redo y Replay .otr)
+        ├─► Transport::broadcast()   (Filtra eventos privados según PlayerId)
+        └─► OpenTableBridge          (Emite señales GDScript: piece_moved, event_json, game_over)
 ```
 
-- **Android**: `OpenTableNearbyPlugin.kt` escrito, estructura Gradle
-  completa, no compilado (necesita Android Studio local). Detalle:
-  `platform_plugins/README.md`, `platform_plugins/SETUP_LOCAL.md`.
-- **iOS**: no hay estructura todavía (necesita macOS + Xcode).
+### Filtrado de Información Oculta (`EventVisibility`)
+Para evitar trampas en red (como inspeccionar las cartas del rival o la posición de sus barcos en memoria):
+- `EventVisibility::Public`: Se transmite a todos los jugadores y espectadores.
+- `EventVisibility::OnlyPlayer(PlayerId)`: El Host/Relay solo envía el payload real a ese `PlayerId` específico.
+- `EventVisibility::Hidden`: Uso interno del servidor/motor.
 
-Lo que falta para cerrar el círculo es puramente mecánico: escribir un
-`NearbyLink`/`MultipeerLink` en `open_table_godot` que implemente
-`RawByteLink` reenviando llamadas al plugin vía gdext (ver
-`open_table_transport_native_bridge/README.md`, sección "Cómo
-conectarlo a un plugin nativo real").
+---
 
-## El flujo de una jugada, de punta a punta
+## 4. Arquitectura de la Interfaz en Godot / Redot (`godot_project`)
 
-1. El jugador toca una casilla en Godot → GDScript llama
-   `bridge.send_move(player, from_row, from_col, to_row, to_col)`
-   (modo Local/Host) o `bridge.send_move_client(...)` (modo Client).
-2. **En Local/Host**: el bridge arma el `Command`, lo pasa a
-   `Session::process_command()`, que lo valida contra el `RuleEngine`
-   real del juego. Si es válido, devuelve `Event`s.
-3. El bridge traduce cada `Event` a una señal de Godot (`piece_moved`,
-   `game_over`) para la UI local, y en modo Host además los manda por
-   la red (`Transport::broadcast`) a los demás jugadores.
-4. **En cada cliente**: el bridge recibe esos bytes por
-   `Transport::poll_received()` (llamado desde `poll_events()`, que
-   hay que invocar cada frame desde GDScript), los deserializa, y
-   dispara las MISMAS señales — así GDScript nunca necesita saber si
-   está hablando con una `Session` local o remota.
+Todos los tableros siguen un contrato visual y estructural uniforme:
+1. **Zona Superior Compacta (`TurnIndicator` + `TurnTimerHud` + `GameAppMenu`)**:
+   - `TurnIndicator` (`res://turn_indicator.gd`): Muestra el color del jugador activo, su nombre (`Turno: Jugador X`) y el badge regresivo compacto `TurnTimerHud` (`00:30` en formato `MM:SS`, con alerta visual ámbar/roja y pulso sonoro en los últimos 10 segundos).
+   - `GameAppMenu` (`res://scenes/game_app_menu.gd`): Botón desplegable `☰ Opciones ▾` anclado en la esquina superior derecha que centraliza el selector de Modo/IA, tamaño/variante, Reglas del juego (`RulesPopup` alimentado por `RulesCatalog` en ES/EN), Guardar/Cargar partida, Guardar Replay (`.otr`), Ofrecer Tablas y Rendirse.
+2. **Zona Central (Lienzo del Tablero)**:
+   - Escalado adaptativo (`_on_layout_changed`) que centra el tablero automáticamente en resoluciones Desktop (`1280×720` a `4K`), Steam Deck (`1280×800`) y Móvil vertical (`375×667`).
+   - Paridad estricta 1:1 entre `godot_project/<juego>_board.gd` y `godot_project/scenes/<juego>_board.gd`, verificada automáticamente por `tools/run_godot_tests.sh`.
+3. **Zona Inferior (Acciones del Turno y Avisos)**:
+   - Controles propios de la jugada activa (ej. `🎲 Tirar Dados`, `⏭️ Pasar Turno`, `⚡ ¡Coup Fourré!`, `🔥 ¡UNO!`) y mensajes de estado o rechazo de jugada.
 
-Este flujo está verificado en runtime (no solo compilación) con Redot
-26.2 headless: `godot_project/tests/bridge_smoke.gd` para el modo
-Local, `godot_project/test_tcp_bridge.tscn` para Host+Client sobre TCP
-real. Ver `open_table_godot/BRIDGE_USAGE.md` para ejemplos de GDScript.
+---
 
-## Estado por componente
+## 5. Licenciamiento (`GPL-3.0-or-later`)
 
-| Parte | Estado |
-|---|---|
-| `open_table_core`, `open_table_engine`, `open_table_macros`, `open_table_qr` | ✅ Probado |
-| `open_table_transport_tcp` (con reconexión) | ✅ Probado, incluso con sockets TCP reales |
-| `open_table_transport_native_bridge` (protocolo, sin plugin real) | ✅ Probado con `FakeRawByteLink` |
-| 8 juegos de referencia | ✅ Probado (68 tests) |
-| `open_table_godot` (bridge gdext, clase única `CheckersBridge`) | ✅ Compila, carga y corre en Redot 26.2 headless — modos Local y Host/Client (TCP) verificados en runtime |
-| Escena real de Godot (`main.tscn` + `checkers_board.gd`) | ✅ Existe y corre (modo Local); falta cablearla a Host/Client para jugar en red de verdad |
-| `platform_plugins/android` | ✅ Estructura Gradle completa; código Kotlin listo; no compilado (necesita Android Studio) |
-| `platform_plugins/ios` | ❌ No hay estructura todavía (necesita macOS + Xcode) |
-| `RawByteLink` real (Android/iOS ↔ `open_table_godot`) | ❌ Pendiente — mecánico, ver sección de arriba |
-
-## Registros de Decisiones de Arquitectura (ADR)
-
-* [`docs/adr/ADR-001-bevy-ecs-como-motor-de-estado.md`](./docs/adr/ADR-001-bevy-ecs-como-motor-de-estado.md) — Bevy ECS como motor de estado central.
-* [`docs/adr/ADR-002-gdext-para-godot-bridge.md`](./docs/adr/ADR-002-gdext-para-godot-bridge.md) — Uso de GDExtension (`gdext`) para el bridge con Godot / Redot.
-* [`docs/adr/ADR-003-teg-en-lugar-de-monopoly-para-crisis.md`](./docs/adr/ADR-003-teg-en-lugar-de-monopoly-para-crisis.md) — Reescritura de `crisis_game` con reglas de TEG.
-
-## Ver también
-
-- [`NEXT_STEPS.md`](./NEXT_STEPS.md) — setup exacto de máquina y lista
-  de prioridades de lo que falta.
-- [`open_table_godot/GDEXT_INVESTIGATION.md`](./open_table_godot/GDEXT_INVESTIGATION.md)
-  — investigación completa del bug de registro múltiple de clases en gdext.
-- [`open_table_godot/BRIDGE_USAGE.md`](./open_table_godot/BRIDGE_USAGE.md)
-  — ejemplos de GDScript para los tres modos del bridge.
-- [`open_table_godot/GODOT_SETUP.md`](./open_table_godot/GODOT_SETUP.md)
-  — binding contra Redot, feature `api-custom`.
-- [`open_table_transport_native_bridge/README.md`](./open_table_transport_native_bridge/README.md)
-  — trait `RawByteLink` en detalle.
-- [`platform_plugins/README.md`](./platform_plugins/README.md) —
-  plugins nativos Android/iOS.
+Todo el código fuente de **OpenTable SDK & Suite** (los 22 crates de Rust y el proyecto Godot/Redot) se distribuye bajo la licencia **GNU General Public License v3.0 or later (`GPL-3.0-or-later`)** (ver [`LICENSE`](./LICENSE)), incluyendo la excepción explícita de enlace con el runtime de Godot/Redot y SDKs de plataforma (Steamworks, Android Nearby Connections, Apple MultipeerConnectivity).

@@ -2,7 +2,7 @@
 name = "open_table_core"
 version = "1.0.0"
 authors = ["joduranvillan"]
-license = "MIT"
+license = "GPL-3.0-or-later"
 description = "Core traits and types for turn-based board game engines"
 repository = "https://github.com/joduranvillan/games_tables_sdk"
 keywords = ["board-game", "game-engine", "sdk", "chess", "go"]

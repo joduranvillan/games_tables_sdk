@@ -168,3 +168,11 @@ func _on_game_over(winner_id: int) -> void:
 func _on_move_rejected(reason: String) -> void:
     print("Movimiento rechazado: ", reason)
 ```
+
+---
+
+## 5. Siguientes Pasos y Expansión Avanzada
+
+- **[`DEVELOPER_GUIDE.md`](../DEVELOPER_GUIDE.md)**: Guía paso a paso con ejemplos completos para crear un juego con `LegalMoveGenerator`, oponente de IA en `src/ai.rs`, integración en `OpenTableBridge`, tablero visual con `TurnIndicator` + `GameAppMenu` y adaptadores de red `RawByteLink`.
+- **[`ARCHITECTURE.md`](../ARCHITECTURE.md)**: Mapa completo de los 22 crates del workspace, los 13 motores de juegos incluidos y el ciclo de vida de eventos con visibilidad (`Public` / `OnlyPlayer`).
+- **Licencia**: Todo el proyecto se distribuye bajo **GNU GPL v3.0 or later (`GPL-3.0-or-later`)** (ver [`LICENSE`](../LICENSE)).

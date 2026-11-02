@@ -30,10 +30,13 @@ Interfaz y Runtime: Godot 4 / Redot 4.5
   • Crisis (TEG)
   • Damas Chinas (Chinese Checkers)
 
-Licencia del SDK: MIT
+Licencia del SDK y Suite: GNU GPL v3.0 or later (GPL-3.0-or-later)
 """
 
-const FALLBACK_OSS_LICENSES_TEXT := """[b]Licencias Open Source de Terceros (MIT / Apache-2.0 / MPL-2.0)[/b]
+const FALLBACK_OSS_LICENSES_TEXT := """[b]Licencia del Proyecto Principal:[/b]
+• [b]OpenTable SDK & 13 Classic Games Suite[/b] — GNU General Public License v3.0 or later (`GPL-3.0-or-later`)
+
+[b]Licencias Open Source de Terceros (MIT / Apache-2.0 / MPL-2.0)[/b]
 
 • [b]Godot Engine & Redot Engine[/b] — MIT License
   Copyright (c) 2014-present Godot Engine contributors, Juan Linietsky, Ariel Manzur.
