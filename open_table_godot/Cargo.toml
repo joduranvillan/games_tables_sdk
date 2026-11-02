@@ -55,4 +55,6 @@ ludo_game = { path = "../ludo_game", version = "0.1.0" }
 
 battleship_game = { path = "../battleship_game", version = "0.1.0" }
 
+goose_game = { path = "../goose_game", version = "0.1.0" }
+
 serde_json = "1.0"

@@ -33,6 +33,7 @@ members = [
     "go_game",
     "uno_game",
     "crisis_game",
+    "goose_game",
 ]
 
 [workspace.package]

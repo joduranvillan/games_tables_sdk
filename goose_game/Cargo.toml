@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "goose_game"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+description = "El Juego de la Oca clásico de 63 casillas para 2 o más jugadores sobre OpenTable Engine."
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+open_table_core = { version = "1.0.0", path = "../open_table_core" }
+open_table_engine = { version = "1.0.0", path = "../open_table_engine" }
+open_table_macros = { version = "1.0.0", path = "../open_table_macros" }

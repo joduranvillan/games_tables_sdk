@@ -18,7 +18,8 @@ const CANONICAL_GAMES: Array[String] = [
 	"uno",
 	"crisis",
 	"chinese_checkers",
-	"battleship"
+	"battleship",
+	"goose"
 ]
 
 const CATALOG: Dictionary = {
@@ -619,6 +620,52 @@ const CATALOG: Dictionary = {
 				}
 			]
 		}
+	},
+	"goose": {
+		"es": {
+			"title": "El Juego de la Oca",
+			"summary": "Carrera clásica de 2 a 4 jugadores a lo largo de una espiral de 63 casillas con Ocas, Puentes, Posada, Pozo, Laberinto, Cárcel, Dados, Calavera y rebote exacto.",
+			"sections": [
+				{
+					"heading": "1. Objetivo",
+					"body": "Ser el primer jugador en alcanzar con tirada exacta el Jardín de la Oca en la casilla central 63."
+				},
+				{
+					"heading": "2. Desarrollo del Turno",
+					"body": "En tu turno lanzas el dado de 6 caras (`RollDiceCommand`) y avanzas tu ficha (`MoveTokenCommand`) a lo largo de la espiral aplicando inmediatamente el efecto de la casilla de destino."
+				},
+				{
+					"heading": "3. Reglas Especiales",
+					"body": "• Ocas (5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59): «De oca a oca y tiro porque me toca» (saltas a la siguiente oca y vuelves a tirar).\n• Puentes (6 y 12) y Dados (26 y 53): Saltas a la casilla pareja y obtienes un turno extra inmediato.\n• Penalizaciones de Espera: Posada (19) pierde 1 turno; Pozo (31) pierde 2 turnos (o sales antes si otro jugador cae en el Pozo); Cárcel (52) pierde 3 turnos.\n• Retrocesos: Laberinto (42) retrocede a la casilla 30; Calavera (58) regresa a la casilla 1.\n• Rebote Exacto en 63: Si tu tirada supera la casilla 63, retrocedes desde 63 las casillas sobrantes."
+				},
+				{
+					"heading": "4. Condición de Victoria",
+					"body": "Gana el jugador que aterriza exactamente en la casilla 63 (o llega a ella desde la Oca 59)."
+				}
+			]
+		},
+		"en": {
+			"title": "Game of the Goose",
+			"summary": "Classic 63-square spiral race for 2 to 4 players featuring Geese, Bridges, Inn, Well, Labyrinth, Prison, Dice, Skull, and exact bounce on square 63.",
+			"sections": [
+				{
+					"heading": "1. Objective",
+					"body": "Be the first player to land by exact count on the central Garden of the Goose at square 63."
+				},
+				{
+					"heading": "2. Turn Structure",
+					"body": "Roll the 6-sided die (`RollDiceCommand`) and advance your token (`MoveTokenCommand`) along the spiral track, resolving any special square effect."
+				},
+				{
+					"heading": "3. Special Rules",
+					"body": "• Geese (5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59): Jump to the next Goose and roll again.\n• Bridges (6 & 12) and Dice (26 & 53): Jump to the paired square and roll again.\n• Turn Penalties: Inn (19) waits 1 turn; Well (31) waits 2 turns (or until another player lands on 31); Prison (52) waits 3 turns.\n• Setbacks: Labyrinth (42) goes back to 30; Skull (58) returns to square 1.\n• Exact Bounce on 63: Overshooting square 63 bounces your token backward by the excess points."
+				},
+				{
+					"heading": "4. Victory Condition",
+					"body": "The first player to reach square 63 by exact count (or via Goose 59) wins."
+				}
+			]
+		}
 	}
 }
 
@@ -632,6 +679,8 @@ static func normalize_game_id(game_id: String) -> String:
 		return "chess"
 	if key == "parchis":
 		return "ludo"
+	if key == "oca" or key == "juego_de_la_oca":
+		return "goose"
 	if CATALOG.has(key):
 		return key
 	return "checkers"

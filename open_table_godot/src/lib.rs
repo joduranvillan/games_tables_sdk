@@ -31,6 +31,7 @@ use crisis_game::{
     PhaseChangedEvent, PlayerEliminatedEvent, TegGameOverEvent, TerritoryConqueredEvent,
 };
 use go_game::new_go_session;
+use goose_game::new_goose_session;
 use ludo_game::new_ludo_session;
 use mille_bornes_game::new_mille_bornes_session;
 use monopoly_game::new_monopoly_session;
@@ -183,6 +184,7 @@ fn get_session_init_params(
             monopoly_game::build_monopoly_rules(),
         ),
         "ludo" => (id, seed, vec![p1, p2], ludo_game::build_ludo_rules()),
+        "goose" | "oca" => (id, seed, vec![p1, p2], goose_game::build_goose_rules()),
         "battleship" => (
             id,
             seed,
@@ -217,6 +219,7 @@ fn create_session_for_players(game_type: &str, p1: PlayerId, p2: PlayerId) -> Op
         "backgammon" => Some(new_backgammon_session(id, seed, p1, p2)),
         "monopoly" => Some(new_monopoly_session(id, seed, p1, p2)),
         "ludo" => Some(new_ludo_session(id, seed, vec![p1, p2])),
+        "goose" | "oca" => Some(new_goose_session(id, seed, vec![p1, p2])),
         "battleship" => Some(new_battleship_session(id, seed, p1, p2)),
         _ => None,
     }
@@ -244,6 +247,7 @@ fn create_initial_session(game_type: &str) -> Option<Session> {
         "backgammon" => Some(new_backgammon_session(id, seed, p1, p2)),
         "monopoly" => Some(new_monopoly_session(id, seed, p1, p2)),
         "ludo" => Some(new_ludo_session(id, seed, vec![p1, p2])),
+        "goose" | "oca" => Some(new_goose_session(id, seed, vec![p1, p2])),
         "battleship" => Some(new_battleship_session(id, seed, p1, p2)),
         _ => None,
     }
@@ -293,6 +297,7 @@ fn parse_command_json(
                         "uno_game::",
                         "crisis_game::",
                         "ludo_game::",
+                        "goose_game::",
                         "chinese_checkers_game::",
                         "mille_bornes_game::",
                         "monopoly_game::",
@@ -1142,6 +1147,63 @@ impl OpenTableBridge {
         };
 
         let session = new_ludo_session(SessionId(1), 1, vec![p1, p2]);
+        let current_p = session.current_player().0 as i64;
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: Some(p_ai),
+        };
+
+        self.base_mut()
+            .emit_signal("turn_changed", &[Variant::from(current_p)]);
+
+        self.process_ai_turn_if_needed();
+
+        true
+    }
+
+    #[func]
+    fn start_local_match_goose(&mut self, p1: i64, p2: i64) {
+        self.current_game_type = "goose".to_string();
+        let session = new_goose_session(
+            SessionId(1),
+            1,
+            vec![PlayerId(p1 as u32), PlayerId(p2 as u32)],
+        );
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
+    }
+
+    #[func]
+    fn start_local_match_goose_n_players(&mut self, num_players: i64) {
+        self.current_game_type = "goose".to_string();
+        let count = num_players.clamp(2, 6) as u32;
+        let players: Vec<PlayerId> = (1..=count).map(PlayerId).collect();
+        let session = new_goose_session(SessionId(1), 1, players);
+        self.mode = BridgeMode::Local {
+            session,
+            ai_player: None,
+        };
+    }
+
+    #[func]
+    fn start_local_match_goose_vs_ai(&mut self, human: i64, ai: i64) -> bool {
+        if human == ai || human <= 0 || ai <= 0 {
+            return false;
+        }
+
+        self.current_game_type = "goose".to_string();
+        let p_human = PlayerId(human as u32);
+        let p_ai = PlayerId(ai as u32);
+
+        let (p1, p2) = if human < ai {
+            (p_human, p_ai)
+        } else {
+            (p_ai, p_human)
+        };
+
+        let session = new_goose_session(SessionId(1), 1, vec![p1, p2]);
         let current_p = session.current_player().0 as i64;
         self.mode = BridgeMode::Local {
             session,
@@ -4049,6 +4111,28 @@ impl OpenTableBridge {
                 );
             }
 
+            if let Some(g_moved) = event
+                .as_any()
+                .downcast_ref::<goose_game::GooseMovedEvent>()
+            {
+                self.emit_bridge_signal(
+                    "token_moved",
+                    &[
+                        Variant::from(g_moved.player.0 as i64),
+                        Variant::from(0_i64),
+                        Variant::from(g_moved.from_square as i64),
+                        Variant::from(g_moved.to_square as i64),
+                        Variant::from(g_moved.finished),
+                    ],
+                );
+            }
+
+            if let Some(g_over) = event.as_any().downcast_ref::<goose_game::GameOverEvent>() {
+                let winner_id = g_over.winner.0 as i64;
+                self.emit_bridge_signal("game_over", &[Variant::from(winner_id)]);
+                self.check_advance_tournament(winner_id);
+            }
+
             if let Some(c_moved) = event
                 .as_any()
                 .downcast_ref::<backgammon_game::CheckerMovedEvent>()
@@ -4476,6 +4560,20 @@ impl OpenTableBridge {
                                         as Box<dyn Command>)
                                 } else {
                                     ludo_game::ai::best_move(session, *ai_p, self.ai_difficulty)
+                                        .map(|c| Box::new(c) as Box<dyn Command>)
+                                }
+                            }
+                            "goose" | "oca" if is_ai_turn => {
+                                let has_pending = session
+                                    .world()
+                                    .get_resource::<goose_game::PendingRollResource>()
+                                    .and_then(|p| p.pending.get(ai_p))
+                                    .is_some();
+                                if !has_pending {
+                                    Some(Box::new(goose_game::RollDiceCommand { player: *ai_p })
+                                        as Box<dyn Command>)
+                                } else {
+                                    goose_game::ai::best_move(session, *ai_p, self.ai_difficulty)
                                         .map(|c| Box::new(c) as Box<dyn Command>)
                                 }
                             }

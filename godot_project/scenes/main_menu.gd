@@ -36,7 +36,8 @@ const GAMES = [
 	{ "id": "backgammon", "name": "Backgammon", "method": "start_local_match_backgammon", "ai_method": "start_local_match_backgammon_vs_ai", "scene": "res://backgammon_board.tscn", "color": Color(0.75, 0.45, 0.25) },
 	{ "id": "monopoly", "name": "Monopoly", "method": "start_local_match_monopoly", "ai_method": "start_local_match_monopoly_vs_ai", "scene": "res://monopoly_board.tscn", "color": Color(0.25, 0.65, 0.85) },
 	{ "id": "ludo", "name": "Ludo", "method": "start_local_match_ludo", "ai_method": "start_local_match_ludo_vs_ai", "scene": "res://ludo_board.tscn", "color": Color(0.85, 0.85, 0.25) },
-	{ "id": "battleship", "name": "Batalla Naval", "method": "start_local_match_battleship", "ai_method": "start_local_match_battleship_vs_ai", "scene": "res://battleship_board.tscn", "color": Color(0.25, 0.45, 0.85) }
+	{ "id": "battleship", "name": "Batalla Naval", "method": "start_local_match_battleship", "ai_method": "start_local_match_battleship_vs_ai", "scene": "res://battleship_board.tscn", "color": Color(0.25, 0.45, 0.85) },
+	{ "id": "goose", "name": "Juego de la Oca", "method": "start_local_match_goose", "ai_method": "start_local_match_goose_vs_ai", "scene": "res://goose_board.tscn", "color": Color(0.92, 0.68, 0.16) }
 ]
 
 @onready var grid_container: GridContainer = get_node_or_null("GridContainer")
