@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TurnOrder {
     players: Vec<PlayerId>,
-    current: usize,
+    #[serde(rename = "current")]
+    current_index: usize,
     turn_number: u32,
     direction: i32,
 }
@@ -26,14 +27,18 @@ impl TurnOrder {
         );
         Self {
             players,
-            current: 0,
+            current_index: 0,
             turn_number: 0,
             direction: 1,
         }
     }
 
     pub fn current_player(&self) -> PlayerId {
-        self.players[self.current]
+        self.players[self.current_index]
+    }
+
+    pub fn current(&self) -> PlayerId {
+        self.current_player()
     }
 
     /// Todos los jugadores de la partida, en el orden de turno. Útil
@@ -53,13 +58,13 @@ impl TurnOrder {
     /// naval calculando a quién le está disparando el jugador actual).
     pub fn peek_next(&self) -> PlayerId {
         let n = self.players.len() as i32;
-        let next = (self.current as i32 + self.direction).rem_euclid(n);
+        let next = (self.current_index as i32 + self.direction).rem_euclid(n);
         self.players[next as usize]
     }
 
     pub fn peek_next_n(&self, steps: i32) -> PlayerId {
         let n = self.players.len() as i32;
-        let next = (self.current as i32 + self.direction * steps).rem_euclid(n);
+        let next = (self.current_index as i32 + self.direction * steps).rem_euclid(n);
         self.players[next as usize]
     }
 
@@ -79,14 +84,15 @@ impl TurnOrder {
 
     pub fn advance_n(&mut self, steps: i32) -> PlayerId {
         let n = self.players.len() as i32;
-        self.current = (self.current as i32 + self.direction * steps).rem_euclid(n) as usize;
+        self.current_index =
+            (self.current_index as i32 + self.direction * steps).rem_euclid(n) as usize;
         self.turn_number += 1;
         self.current_player()
     }
 
     pub fn set_current_player(&mut self, player: PlayerId) {
         if let Some(pos) = self.players.iter().position(|&p| p == player) {
-            self.current = pos;
+            self.current_index = pos;
         }
     }
 }
