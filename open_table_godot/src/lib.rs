@@ -2091,11 +2091,7 @@ impl OpenTableBridge {
         let Some(raw_pid) = command_parts else {
             return;
         };
-        let player_id = if raw_pid.0 <= 1 {
-            PlayerId(2)
-        } else {
-            raw_pid
-        };
+        let player_id = if raw_pid.0 <= 1 { PlayerId(2) } else { raw_pid };
 
         let command: Box<dyn Command> = Box::new(MovePieceCommand {
             player: player_id,
