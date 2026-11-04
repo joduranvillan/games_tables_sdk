@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["new_goose_session"],"mod":["ai","board","commands","events","rules"]};
