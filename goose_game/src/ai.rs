@@ -13,19 +13,26 @@ pub struct GooseMoveGenerator;
 
 impl GooseMoveGenerator {
     pub fn legal_moves(&self, session: &Session, player: PlayerId) -> Vec<Box<dyn Command>> {
-        if session.current_player() != player {
+        self.generate(session.world(), player)
+    }
+}
+
+impl LegalMoveGenerator for GooseMoveGenerator {
+    fn generate(&self, world: &BevyWorld, player: PlayerId) -> Vec<Box<dyn Command>> {
+        if world
+            .get_resource::<TurnResource>()
+            .is_none_or(|t| !t.0.is_current(player))
+        {
             return Vec::new();
         }
-        if session
-            .world()
+        if world
             .get_resource::<GooseBoardResource>()
             .and_then(|b| b.winner)
             .is_some()
         {
             return Vec::new();
         }
-        let has_pending = session
-            .world()
+        let has_pending = world
             .get_resource::<PendingRollResource>()
             .and_then(|p| p.pending.get(&player))
             .is_some();

@@ -409,6 +409,26 @@ for g in GAMES:
                     "reproduce": f"cargo check -p {crate}",
                     "fix": f"Añadir `{req_dep}` en la sección `[dependencies]` de `games_tables_sdk/{cargo_toml_rel}` (`typetag = \"0.2\"`, `bevy_ecs = \"0.20\"`).",
                 })
+    # Audit Rust sources in crate for private TurnOrder.current() field access (E0599)
+    crate_src_abs = os.path.join(sdk_root, crate, "src")
+    if os.path.isdir(crate_src_abs):
+        for r_root, _, r_files in os.walk(crate_src_abs):
+            for r_fname in sorted(r_files):
+                if not r_fname.endswith(".rs"):
+                    continue
+                r_abs = os.path.join(r_root, r_fname)
+                r_rel = os.path.relpath(r_abs, sdk_root)
+                with open(r_abs, "r", encoding="utf-8", errors="replace") as rf:
+                    for l_idx, r_line in enumerate(rf, start=1):
+                        if "TurnResource" in r_line and ".0.current()" in r_line:
+                            errors.append({
+                                "id": f"ERR-RUST-TURNORDER-CURRENT-{gid.upper()}-{l_idx}",
+                                "severity": "CRITICAL",
+                                "location": f"{r_rel}:{l_idx}",
+                                "summary": f"Llamada inválida a `.0.current()` sobre `TurnResource` (`TurnOrder::current` es un campo privado `usize`; causa error E0599).",
+                                "reproduce": f"cargo check -p {crate}",
+                                "fix": f"Reemplazar `.0.current()` por `.0.current_player()` en `games_tables_sdk/{r_rel}:{l_idx}`.",
+                            })
     tests_info = scan_crate_tests(crate)
     u_cnt = len(tests_info["unit"])
     r_cnt = len(tests_info["rules"])

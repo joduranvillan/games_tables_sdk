@@ -15,6 +15,16 @@ fn invalid(reason: impl Into<String>) -> EngineError {
     }
 }
 
+fn ensure_goose_resources(world: &mut BevyWorld) {
+    if !world.contains_resource::<GooseBoardResource>() {
+        let players = world.resource::<TurnResource>().0.players().to_vec();
+        world.insert_resource(GooseBoardResource::new(&players));
+    }
+    if !world.contains_resource::<PendingRollResource>() {
+        world.insert_resource(PendingRollResource::default());
+    }
+}
+
 /// Avanza el turno al siguiente jugador disponible, descontando automáticamente
 /// turnos de penalización (Posada, Pozo, Cárcel) si el jugador entrante está retenido.
 fn advance_turn_skipping_penalized(world: &mut BevyWorld, events: &mut Vec<Box<dyn Event>>) {
@@ -22,7 +32,7 @@ fn advance_turn_skipping_penalized(world: &mut BevyWorld, events: &mut Vec<Box<d
     world.resource_mut::<TurnResource>().0.advance();
 
     for _ in 0..(player_count * 4) {
-        let candidate = world.resource::<TurnResource>().0.current();
+        let candidate = world.resource::<TurnResource>().0.current_player();
         let wait = world
             .resource::<GooseBoardResource>()
             .wait_turns_of(candidate);
@@ -46,6 +56,8 @@ pub fn build_goose_rules() -> RuleEngine {
     let mut rules = RuleEngine::new();
 
     rules.register::<RollDiceCommand, _>(|cmd, world| {
+        ensure_goose_resources(world);
+
         if world.resource::<GooseBoardResource>().winner.is_some() {
             return Err(invalid("la partida ya ha terminado"));
         }
@@ -81,6 +93,8 @@ pub fn build_goose_rules() -> RuleEngine {
     });
 
     rules.register::<MoveTokenCommand, _>(|cmd, world| {
+        ensure_goose_resources(world);
+
         if world.resource::<GooseBoardResource>().winner.is_some() {
             return Err(invalid("la partida ya ha terminado"));
         }
@@ -158,6 +172,8 @@ pub fn build_goose_rules() -> RuleEngine {
     });
 
     rules.register::<ResignCommand, _>(|cmd, world| {
+        ensure_goose_resources(world);
+
         let players = world.resource::<TurnResource>().0.players().to_vec();
         if !players.contains(&cmd.player) {
             return Err(invalid("no sos un jugador de esta partida"));

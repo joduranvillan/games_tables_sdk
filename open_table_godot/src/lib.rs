@@ -2800,6 +2800,12 @@ impl OpenTableBridge {
                 monopoly_game::build_monopoly_rules(),
             ),
             "ludo" => (SessionId(1), 1, vec![p1, p2], ludo_game::build_ludo_rules()),
+            "goose" | "oca" => (
+                SessionId(1),
+                1,
+                vec![p1, p2],
+                goose_game::build_goose_rules(),
+            ),
             "battleship" => (
                 SessionId(1),
                 1,

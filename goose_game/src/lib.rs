@@ -39,11 +39,14 @@ pub fn new_goose_session(session_id: SessionId, seed: u64, players: Vec<PlayerId
         players.clone(),
         build_goose_rules(),
     );
-    session
-        .world_mut()
-        .insert_resource(GooseBoardResource::new(&players));
-    session
-        .world_mut()
-        .insert_resource(PendingRollResource::default());
+    let setup = move |world: &mut BevyWorld| {
+        world.insert_resource(GooseBoardResource::new(&players));
+        world.insert_resource(PendingRollResource::default());
+        world.insert_resource(LegalMoveGeneratorResource(std::sync::Arc::new(
+            GooseMoveGenerator,
+        )));
+    };
+    setup(session.world_mut());
+    session.set_initial_setup(setup);
     session
 }
