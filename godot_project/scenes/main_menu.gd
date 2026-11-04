@@ -610,7 +610,8 @@ func _show_mode_popup(game: Dictionary) -> void:
 		current_popup_overlay = null
 
 	# Dim background
-	grid_container.modulate.a = 0.5
+	if grid_container != null:
+		grid_container.modulate.a = 0.5
 	if has_node("Title"):
 		get_node("Title").modulate.a = 0.5
 
@@ -868,7 +869,8 @@ func _close_mode_popup() -> void:
 		current_popup_overlay.queue_free()
 		current_popup_overlay = null
 
-	grid_container.modulate.a = 1.0
+	if grid_container != null:
+		grid_container.modulate.a = 1.0
 	if has_node("Title"):
 		get_node("Title").modulate.a = 1.0
 
