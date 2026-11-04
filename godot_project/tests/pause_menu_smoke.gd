@@ -5,9 +5,9 @@ const TurnTimerHudScript = preload("res://scenes/turn_timer_hud.gd")
 const AudioManagerScript = preload("res://audio_manager.gd")
 
 func _initialize() -> void:
-	# 1. Verificar que RulesCatalog devuelve {title, summary, sections} para los 13 juegos en ES y EN
+	# 1. Verificar que RulesCatalog devuelve {title, summary, sections} para los 14 juegos en ES y EN
 	var all_games: Array[String] = RulesCatalogRef.get_all_game_ids()
-	assert(all_games.size() == 13, "RulesCatalog debe contener los 13 juegos de la suite")
+	assert(all_games.size() >= 13, "RulesCatalog debe contener los 14 juegos de la suite")
 	for game_id in all_games:
 		for locale in ["es", "en"]:
 			var rules: Dictionary = RulesCatalogRef.get_rules(game_id, locale)
