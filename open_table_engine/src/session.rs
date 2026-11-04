@@ -600,6 +600,7 @@ impl Session {
             .world
             .get_resource::<GameOverResource>()
             .is_some_and(|r| r.0)
+            && !command.typetag_name().ends_with("RematchCommand")
         {
             return Err(EngineError::GameAlreadyOver);
         }
