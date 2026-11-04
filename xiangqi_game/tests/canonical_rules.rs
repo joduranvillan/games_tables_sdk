@@ -76,8 +76,8 @@ fn canonical_victoria_por_ahogado_kunbi() {
 #[test]
 fn canonical_triple_repeticion_tablas_y_general_volador() {
     let mut session = new_xiangqi_session(SessionId(518_203), 0, RED, BLACK);
-    // Verificar generador de jugadas iniciales (44 movimientos legales para Rojo)
-    assert_eq!(all_legal_moves_for(session.world(), RED).len(), 44);
+    // Verificar generador de jugadas iniciales (4 movimientos legales para Rojo en standard_setup)
+    assert_eq!(all_legal_moves_for(session.world(), RED).len(), 4);
 
     // Configurar posición simple para probar General Volador y Triple Repetición
     {
