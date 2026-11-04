@@ -207,6 +207,7 @@ pub fn build_backgammon_rules() -> RuleEngine {
         cube_mut.offered = false;
         cube_mut.offered_by = None;
         world.insert_resource(GameOverResource(true));
+        world.insert_resource(WinnerResource(Some(offerer)));
 
         let events: Vec<Box<dyn Event>> = vec![
             Box::new(DoubleRejectedEvent {
@@ -446,6 +447,7 @@ pub fn build_backgammon_rules() -> RuleEngine {
                 score,
             }));
             world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(Some(cmd.player)));
         }
 
         if !remaining_dice.is_empty() {

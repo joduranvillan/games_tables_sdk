@@ -60,7 +60,8 @@ fn test_bridge_and_dice_jumps_grant_bonus_turn() {
     );
     assert_eq!(session.current_player(), P1);
 
-    // Dados 26 -> 53
+    // Dados 26 (DICE_A) -> 53 (DICE_B)
+    assert_eq!(22 + 4, DICE_A);
     session
         .world_mut()
         .resource_mut::<GooseBoardResource>()

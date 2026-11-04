@@ -163,6 +163,8 @@ pub fn build_goose_rules() -> RuleEngine {
         })];
 
         if finished {
+            world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(Some(cmd.player)));
             events.push(Box::new(GameOverEvent { winner: cmd.player }));
         } else if !resolution.bonus_turn {
             advance_turn_skipping_penalized(world, &mut events);
@@ -184,6 +186,8 @@ pub fn build_goose_rules() -> RuleEngine {
             .unwrap_or(cmd.player);
 
         world.resource_mut::<GooseBoardResource>().winner = Some(opponent);
+        world.insert_resource(GameOverResource(true));
+        world.insert_resource(WinnerResource(Some(opponent)));
         Ok(vec![Box::new(GameOverEvent { winner: opponent })])
     });
 

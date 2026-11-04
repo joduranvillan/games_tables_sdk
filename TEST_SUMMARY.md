@@ -377,7 +377,7 @@ Cada subsección incluye las rutas exactas, funciones del puente GDExtension, co
 - **Inventario de Tests en Rust (`archivo:línea`)**:
   - *Unitarios (`src/`) *: `test_goose_ai_pick_move_with_pending_roll` (`goose_game/src/ai.rs:98`)
   - *Reglas (`tests/game_rules.rs`)*: `test_initial_session_and_roll_then_move` (`goose_game/tests/game_rules.rs:14`), `test_reject_move_without_rolling_and_out_of_turn` (`goose_game/tests/game_rules.rs:52`), `test_legal_moves_ai_and_resign` (`goose_game/tests/game_rules.rs:63`)
-  - *Canónicos (`tests/canonical_rules.rs`)*: `test_goose_to_goose_grants_bonus_turn` (`goose_game/tests/canonical_rules.rs:16`), `test_bridge_and_dice_jumps_grant_bonus_turn` (`goose_game/tests/canonical_rules.rs:42`), `test_labyrinth_and_skull_setbacks` (`goose_game/tests/canonical_rules.rs:88`), `test_inn_well_and_prison_penalties_and_well_rescue` (`goose_game/tests/canonical_rules.rs:138`), `test_exact_bounce_and_victory_on_63` (`goose_game/tests/canonical_rules.rs:222`)
+  - *Canónicos (`tests/canonical_rules.rs`)*: `test_goose_to_goose_grants_bonus_turn` (`goose_game/tests/canonical_rules.rs:16`), `test_bridge_and_dice_jumps_grant_bonus_turn` (`goose_game/tests/canonical_rules.rs:42`), `test_labyrinth_and_skull_setbacks` (`goose_game/tests/canonical_rules.rs:89`), `test_inn_well_and_prison_penalties_and_well_rescue` (`goose_game/tests/canonical_rules.rs:139`), `test_exact_bounce_and_victory_on_63` (`goose_game/tests/canonical_rules.rs:223`)
 - **Funciones y Aserciones en Smoke Test Godot (`godot_project/tests/goose_smoke.gd`)**:
   - *Puntos de entrada*: `_init()` (línea 5)
   - *Total de aserciones/chequeos en `goose_smoke.gd`*: **5** verificaciones (ej. líneas 14, 27, 36, 45, 51)

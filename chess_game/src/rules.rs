@@ -250,9 +250,11 @@ pub fn build_chess_rules() -> RuleEngine {
             };
             events.push(Box::new(GameOverEvent { winner }));
             world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(winner));
         } else if is_threefold || is_fifty_moves || insufficient_material {
             events.push(Box::new(GameOverEvent { winner: None }));
             world.insert_resource(GameOverResource(true));
+            world.insert_resource(WinnerResource(None));
         }
 
         world.resource_mut::<TurnResource>().0.advance();
@@ -294,6 +296,7 @@ pub fn build_chess_rules() -> RuleEngine {
                     draw_offered.0 = None;
                 }
                 world.insert_resource(GameOverResource(true));
+                world.insert_resource(WinnerResource(None));
                 Ok(vec![Box::new(GameOverEvent { winner: None })])
             }
             _ => Err(invalid("no hay una oferta de tablas pendiente para ti")),
