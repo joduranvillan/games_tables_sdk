@@ -160,9 +160,13 @@ func _ready() -> void:
 		if not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
 			get_viewport().size_changed.connect(_on_viewport_size_changed)
 
-	bridge = OpenTableBridge.new()
-	bridge.name = "Bridge"
-	add_child(bridge)
+	var has_net_bridge: bool = (gm != null and gm.has_method("has_active_network_bridge") and bool(gm.call("has_active_network_bridge")))
+	if has_net_bridge:
+		bridge = gm.call("claim_network_bridge", self)
+	else:
+		bridge = OpenTableBridge.new()
+		bridge.name = "Bridge"
+		add_child(bridge)
 
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
@@ -185,8 +189,13 @@ func _ready() -> void:
 	# En ejecución interactiva, si GameManager no especificó modo explícito o está en vs_ai,
 	# arrancamos contra la IA (J1 humano vs J2 IA) para que el oponente juegue desde el inicio.
 	var gm_mode: String = str(gm.get_game_mode()) if (gm != null and gm.has_method("get_game_mode")) else "vs_ai"
-	var start_vs_ai: bool = (gm_mode == "vs_ai") or (not OS.has_feature("headless") and gm_mode == "hotseat")
-	if start_vs_ai:
+	var start_vs_ai: bool = (not has_net_bridge) and ((gm_mode == "vs_ai") or (not OS.has_feature("headless") and gm_mode == "hotseat"))
+	if has_net_bridge:
+		is_vs_ai = false
+		local_player = int(gm.call("get_network_local_player_id")) if gm.has_method("get_network_local_player_id") else P1
+		if mode_option_button != null:
+			mode_option_button.selected = 0
+	elif start_vs_ai:
 		var human_p: int = int(gm.get_human_player_id()) if (gm != null and gm.has_method("get_human_player_id")) else P1
 		var diff: int = int(gm.get_ai_difficulty()) if (gm != null and gm.has_method("get_ai_difficulty")) else 1
 		is_vs_ai = true
@@ -879,7 +888,8 @@ func _normalize_card_dict(raw_card: Dictionary) -> Dictionary:
 func _sync_uno_state_from_bridge(preserve_active_color: bool = false) -> void:
 	if bridge == null or not bridge.has_method("get_uno_state"):
 		return
-	var target_p: int = local_player if is_vs_ai else current
+	var is_net_active: bool = (bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")))
+	var target_p: int = local_player if (is_vs_ai or is_net_active) else current
 	var st = bridge.get_uno_state(target_p)
 	if not (st is Dictionary) or st.is_empty():
 		return

@@ -17,8 +17,13 @@ const PLAYER_COLORS: Array[Color] = [
 ]
 
 var active_game_type: String = ""
-var game_mode: String = "hotseat" # "hotseat" or "vs_ai"
+var active_game: String = ""
+var game_mode: String = "hotseat" # "hotseat", "vs_ai", or "network"
 var human_player_id: int = 1 # 1 (Inicia Humano) or 2 (Inicia IA)
+var active_network_bridge: Node = null
+var network_mode: String = "" # "", "host", or "client"
+var local_network_player_id: int = 1
+var open_qr_scanner_on_lobby_ready: bool = false
 var ai_difficulty: int = 1 # 0=Easy, 1=Normal, 2=Hard, 3=Expert
 var chess_ai_depth: int = 2
 var sfx_enabled: bool = true
@@ -45,9 +50,60 @@ func is_online_features_enabled() -> bool:
 
 func set_game_mode(mode: String) -> void:
 	game_mode = mode
+	if mode != "network" and mode != "host" and mode != "client":
+		network_mode = ""
 
 func get_game_mode() -> String:
 	return game_mode
+
+func register_network_bridge(bridge_node: Node, mode_str: String, local_pid: int, game_id: String = "") -> void:
+	if bridge_node == null or not is_instance_valid(bridge_node):
+		return
+	if active_network_bridge != null and is_instance_valid(active_network_bridge) and active_network_bridge != bridge_node:
+		if active_network_bridge.get_parent() == self:
+			remove_child(active_network_bridge)
+		active_network_bridge.queue_free()
+	var prev_parent: Node = bridge_node.get_parent()
+	if prev_parent != null and prev_parent != self:
+		prev_parent.remove_child(bridge_node)
+	if bridge_node.get_parent() == null:
+		add_child(bridge_node)
+	active_network_bridge = bridge_node
+	network_mode = mode_str
+	local_network_player_id = 2 if local_pid == 2 else 1
+	human_player_id = local_network_player_id
+	game_mode = "network"
+	if not game_id.is_empty():
+		set_active_game(game_id)
+
+func has_active_network_bridge() -> bool:
+	return active_network_bridge != null and is_instance_valid(active_network_bridge)
+
+func claim_network_bridge(target_parent: Node = null) -> Node:
+	if not has_active_network_bridge():
+		return null
+	var b: Node = active_network_bridge
+	if target_parent != null and is_instance_valid(target_parent):
+		var prev_parent: Node = b.get_parent()
+		if prev_parent != null and prev_parent != target_parent:
+			prev_parent.remove_child(b)
+		if b.get_parent() == null:
+			target_parent.add_child(b)
+	return b
+
+func get_network_local_player_id() -> int:
+	return local_network_player_id
+
+func is_network_match() -> bool:
+	return game_mode == "network" or not network_mode.is_empty()
+
+func clear_network_bridge() -> void:
+	if active_network_bridge != null and is_instance_valid(active_network_bridge):
+		if active_network_bridge.get_parent() == self:
+			remove_child(active_network_bridge)
+		active_network_bridge.queue_free()
+	active_network_bridge = null
+	network_mode = ""
 
 func set_human_player_id(pid: int) -> void:
 	human_player_id = 2 if pid == 2 else 1
@@ -220,9 +276,10 @@ func load_saved_settings() -> void:
 
 func set_active_game(game_type: String) -> void:
 	active_game_type = game_type
+	active_game = game_type
 
 func get_active_game() -> String:
-	return active_game_type
+	return active_game_type if not active_game_type.is_empty() else active_game
 
 static func get_player_color(player_id: int) -> Color:
 	if PLAYER_COLORS.is_empty():

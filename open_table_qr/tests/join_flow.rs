@@ -55,3 +55,26 @@ fn el_qr_generado_es_un_svg_valido_y_decodifica_al_mismo_payload() {
     assert_eq!(decoded, payload);
     assert_eq!(decoded.join_code, join_code);
 }
+
+#[test]
+fn el_qr_lan_incluye_ip_puerto_y_se_extrae_desde_svg() {
+    let payload = open_table_qr::LanJoinPayload {
+        session_id: SessionId(1),
+        join_code: "K7M9P2".to_string(),
+        host_name: "HostOffline".to_string(),
+        game_type: "goose".to_string(),
+        ip: "192.168.1.42".to_string(),
+        port: 9090,
+    };
+
+    let svg = open_table_qr::generate_lan_join_qr_svg(&payload).expect("genera QR LAN");
+    assert!(svg.contains("<svg"));
+
+    let extracted = open_table_qr::extract_qr_payload_json(&svg).expect("extrae JSON del SVG");
+    let decoded =
+        open_table_qr::parse_lan_join_payload(&extracted).expect("decodifica payload LAN");
+    assert_eq!(decoded, payload);
+    assert_eq!(decoded.ip, "192.168.1.42");
+    assert_eq!(decoded.port, 9090);
+    assert_eq!(decoded.game_type, "goose");
+}

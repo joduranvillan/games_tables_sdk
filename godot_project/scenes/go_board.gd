@@ -74,9 +74,13 @@ func _ready() -> void:
 	_setup_ui()
 	_init_board()
 	
-	bridge = OpenTableBridge.new()
-	bridge.name = "Bridge"
-	add_child(bridge)
+	var has_net_bridge: bool = (gm != null and gm.has_method("has_active_network_bridge") and bool(gm.call("has_active_network_bridge")))
+	if has_net_bridge:
+		bridge = gm.call("claim_network_bridge", self)
+	else:
+		bridge = OpenTableBridge.new()
+		bridge.name = "Bridge"
+		add_child(bridge)
 
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
@@ -442,24 +446,28 @@ func _start_or_reset_match() -> void:
 	var diff: int = gm.get_ai_difficulty() if (gm != null and gm.has_method("get_ai_difficulty")) else 1
 
 	if bridge != null:
+		var is_net_active: bool = (bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")))
 		var has_set_size: bool = bridge.has_method("set_go_board_size")
-		match mode_idx:
-			1:
-				var ai_param: int = diff if (BOARD_SIZE == 9 or has_set_size) else BOARD_SIZE
-				bridge.start_local_match_go_vs_ai(P_BLACK, P_WHITE, ai_param)
-				if has_set_size and BOARD_SIZE != 9:
-					bridge.call("set_go_board_size", BOARD_SIZE)
-			2:
-				var ai_param: int = diff if (BOARD_SIZE == 9 or has_set_size) else BOARD_SIZE
-				bridge.start_local_match_go_vs_ai(P_WHITE, P_BLACK, ai_param)
-				if has_set_size and BOARD_SIZE != 9:
-					bridge.call("set_go_board_size", BOARD_SIZE)
-			_:
-				bridge.start_local_match_go(P_BLACK, P_WHITE)
-				if has_set_size and BOARD_SIZE != 9:
-					bridge.call("set_go_board_size", BOARD_SIZE)
-				elif BOARD_SIZE != 9:
-					_local_oversize_hotseat = true
+		if is_net_active:
+			_local_oversize_hotseat = false
+		else:
+			match mode_idx:
+				1:
+					var ai_param: int = diff if (BOARD_SIZE == 9 or has_set_size) else BOARD_SIZE
+					bridge.start_local_match_go_vs_ai(P_BLACK, P_WHITE, ai_param)
+					if has_set_size and BOARD_SIZE != 9:
+						bridge.call("set_go_board_size", BOARD_SIZE)
+				2:
+					var ai_param: int = diff if (BOARD_SIZE == 9 or has_set_size) else BOARD_SIZE
+					bridge.start_local_match_go_vs_ai(P_WHITE, P_BLACK, ai_param)
+					if has_set_size and BOARD_SIZE != 9:
+						bridge.call("set_go_board_size", BOARD_SIZE)
+				_:
+					bridge.start_local_match_go(P_BLACK, P_WHITE)
+					if has_set_size and BOARD_SIZE != 9:
+						bridge.call("set_go_board_size", BOARD_SIZE)
+					elif BOARD_SIZE != 9:
+						_local_oversize_hotseat = true
 
 	current = bridge.current_player() if (bridge != null and not _local_oversize_hotseat) else P_BLACK
 	_update_status()

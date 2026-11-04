@@ -816,6 +816,39 @@ func _show_mode_popup(game: Dictionary) -> void:
 
 	vbox.add_child(ai_btn)
 
+	# Botones de Red Local / Código QR (Offline sin servidor) dentro del popup de cada juego
+	var qr_net_hbox = HBoxContainer.new()
+	qr_net_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	qr_net_hbox.add_theme_constant_override("separation", 10)
+	vbox.add_child(qr_net_hbox)
+
+	var host_qr_btn = Button.new()
+	host_qr_btn.name = "HostQrPopupButton"
+	host_qr_btn.text = "📡 Crear Partida QR / LAN"
+	host_qr_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	host_qr_btn.custom_minimum_size = Vector2(185, 42)
+	host_qr_btn.add_theme_font_size_override("font_size", 14)
+	_apply_button_theme(host_qr_btn, Color(0.22, 0.52, 0.68))
+	var popup_game_id: String = str(game["id"])
+	host_qr_btn.pressed.connect(func():
+		_close_mode_popup()
+		_launch_host_lobby(popup_game_id, false)
+	)
+	qr_net_hbox.add_child(host_qr_btn)
+
+	var scan_qr_btn = Button.new()
+	scan_qr_btn.name = "ScanQrPopupButton"
+	scan_qr_btn.text = "📷 Escanear QR / Unirse"
+	scan_qr_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scan_qr_btn.custom_minimum_size = Vector2(185, 42)
+	scan_qr_btn.add_theme_font_size_override("font_size", 14)
+	_apply_button_theme(scan_qr_btn, Color(0.28, 0.58, 0.36))
+	scan_qr_btn.pressed.connect(func():
+		_close_mode_popup()
+		_on_join_pressed(popup_game_id)
+	)
+	qr_net_hbox.add_child(scan_qr_btn)
+
 	# Cancel Button
 	var cancel_btn = Button.new()
 	cancel_btn.text = "Cancelar"
@@ -846,6 +879,8 @@ func _launch_game(game: Dictionary, mode: String, difficulty_level: int = 1, hum
 
 	if is_inside_tree() and has_node("/root/GameManager"):
 		var gm = get_node("/root/GameManager")
+		if gm.has_method("clear_network_bridge"):
+			gm.call("clear_network_bridge")
 		gm.set_active_game(game["id"])
 		gm.set_game_mode(mode)
 		if gm.has_method("set_human_player_id"):
@@ -920,14 +955,13 @@ func _setup_multiplayer_row() -> void:
 
 	var host_btn := Button.new()
 	host_btn.name = "HostNetworkButton"
-	host_btn.text = "🌐 Crear partida en red"
+	host_btn.text = "🌐 Crear partida (QR / Red)"
 	host_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	host_btn.custom_minimum_size = Vector2(180, 42)
 	host_btn.add_theme_font_size_override("font_size", 14)
 	_apply_button_theme(host_btn, Color(0.25, 0.45, 0.75))
 	host_btn.pressed.connect(_on_host_pressed)
 	multiplayer_hbox.add_child(host_btn)
-	online_action_buttons.append(host_btn)
 
 	var join_code_btn := Button.new()
 	join_code_btn.name = "JoinCodeButton"
@@ -947,9 +981,8 @@ func _setup_multiplayer_row() -> void:
 	join_btn.custom_minimum_size = Vector2(170, 42)
 	join_btn.add_theme_font_size_override("font_size", 14)
 	_apply_button_theme(join_btn, Color(0.35, 0.55, 0.35))
-	join_btn.pressed.connect(_on_join_pressed)
+	join_btn.pressed.connect(func(): _on_join_pressed("checkers"))
 	multiplayer_hbox.add_child(join_btn)
-	online_action_buttons.append(join_btn)
 
 	var about_btn := Button.new()
 	about_btn.text = "ℹ️ Acerca de"
@@ -967,8 +1000,6 @@ func _setup_multiplayer_row() -> void:
 	multiplayer_hbox.add_child(about_btn)
 
 func _on_host_pressed() -> void:
-	if not is_online_mode_allowed():
-		return
 	_show_game_selector_for_network()
 
 func _on_join_code_pressed() -> void:
@@ -1000,21 +1031,38 @@ func _on_join_code_pressed() -> void:
 	)
 	dialog.open(bridge)
 
-func _on_join_pressed() -> void:
+func _on_join_pressed(default_game_id: String = "checkers") -> void:
 	var scanner := QRScanner.new()
+	scanner.auto_connect_on_scan = false
 	scanner.setup(bridge)
-	scanner.connect("qr_scanned", func(ip: String, port: int):
+	scanner.qr_payload_decoded.connect(func(payload: Dictionary):
+		var ip: String = str(payload.get("ip", "127.0.0.1"))
+		var port: int = int(payload.get("port", 9090))
+		var target_game: String = str(payload.get("game_type", ""))
+		if target_game.is_empty():
+			target_game = default_game_id if not default_game_id.is_empty() else "checkers"
 		scanner.close()
 		scanner.queue_free()
-		bridge.call("connect_to_host", ip, port, 2)
+		if bridge != null and bridge.has_method("connect_to_host"):
+			bridge.call("connect_to_host", ip, port, "Jugador2")
+		elif bridge != null and bridge.has_method("connect_as_client"):
+			bridge.call("connect_as_client", ip, port)
+		if is_inside_tree() and has_node("/root/GameManager"):
+			var gm = get_node("/root/GameManager")
+			if gm.has_method("register_network_bridge"):
+				gm.call("register_network_bridge", bridge, "client", 2, target_game)
+		var scene_path: String = "res://%s_board.tscn" % target_game
+		if not ResourceLoader.exists(scene_path):
+			scene_path = "res://checkers_board.tscn"
 		if (is_inside_tree() and has_node("/root/SceneManager")):
-			get_node("/root/SceneManager").transition_to("res://checkers_board.tscn")
+			get_node("/root/SceneManager").transition_to(scene_path)
 		else:
 			if is_inside_tree():
-				get_tree().change_scene_to_file("res://checkers_board.tscn")
+				get_tree().change_scene_to_file(scene_path)
 	)
 	scanner.connect("closed", func():
-		scanner.queue_free()
+		if is_instance_valid(scanner):
+			scanner.queue_free()
 	)
 	add_child(scanner)
 	scanner.open(bridge)
@@ -1077,13 +1125,13 @@ func _show_game_selector_for_network() -> void:
 	cancel.pressed.connect(func(): overlay.queue_free())
 	vbox.add_child(cancel)
 
-func _launch_host_lobby(game_id: String) -> void:
-	if not is_online_mode_allowed():
+func _launch_host_lobby(game_id: String, require_online: bool = false) -> void:
+	if require_online and not is_online_mode_allowed():
 		return
 	if is_inside_tree() and has_node("/root/GameManager"):
-		get_node("/root/GameManager").set_active_game(game_id)
-	if is_inside_tree() and has_node("/root/GameManager"):
-		get_node("/root/GameManager").set_game_mode("host")
+		var gm = get_node("/root/GameManager")
+		gm.set_active_game(game_id)
+		gm.set_game_mode("host")
 	if (is_inside_tree() and has_node("/root/SceneManager")):
 		get_node("/root/SceneManager").transition_to("res://host_lobby.tscn")
 	else:

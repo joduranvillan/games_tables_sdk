@@ -90,9 +90,13 @@ func _ready() -> void:
 	_init_board()
 	_setup_ui_layers()
 
-	bridge = OpenTableBridge.new()
-	bridge.name = "Bridge"
-	add_child(bridge)
+	var has_net_bridge: bool = (gm != null and gm.has_method("has_active_network_bridge") and bool(gm.call("has_active_network_bridge")))
+	if has_net_bridge:
+		bridge = gm.call("claim_network_bridge", self)
+	else:
+		bridge = OpenTableBridge.new()
+		bridge.name = "Bridge"
+		add_child(bridge)
 
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
@@ -111,7 +115,10 @@ func _ready() -> void:
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
 
-	if gm != null and gm.get_game_mode() == "vs_ai":
+	if has_net_bridge:
+		if mode_option_button != null:
+			mode_option_button.selected = 0
+	elif gm != null and gm.get_game_mode() == "vs_ai":
 		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P_TOP
 		var ai_p: int = P_BOTTOM if human_p == P_TOP else P_TOP
 		bridge.start_local_match_checkers_vs_ai(42, human_p, ai_p)

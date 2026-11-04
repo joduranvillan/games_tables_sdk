@@ -492,9 +492,13 @@ func _ready() -> void:
 	if get_viewport() != null and not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
 		get_viewport().size_changed.connect(_on_viewport_size_changed)
 
-	bridge = OpenTableBridge.new()
-	bridge.name = "Bridge"
-	add_child(bridge)
+	var has_net_bridge: bool = (gm != null and gm.has_method("has_active_network_bridge") and bool(gm.call("has_active_network_bridge")))
+	if has_net_bridge:
+		bridge = gm.call("claim_network_bridge", self)
+	else:
+		bridge = OpenTableBridge.new()
+		bridge.name = "Bridge"
+		add_child(bridge)
 
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
@@ -529,20 +533,27 @@ func _ready() -> void:
 	if bridge.has_signal("turn_changed"):
 		bridge.connect("turn_changed", _on_turn_changed)
 
-	is_vs_ai = (gm != null and gm.has_method("get_game_mode") and str(gm.get_game_mode()) == "vs_ai")
-	if is_vs_ai:
-		human_player_id = int(gm.get_human_player_id()) if (gm != null and gm.has_method("get_human_player_id")) else 1
+	if has_net_bridge:
+		is_vs_ai = false
+		human_player_id = int(gm.call("get_network_local_player_id")) if gm.has_method("get_network_local_player_id") else 1
 		ai_player_id = 2 if human_player_id == 1 else 1
-		var diff: int = int(gm.get_ai_difficulty()) if (gm != null and gm.has_method("get_ai_difficulty")) else 1
-		bridge.start_local_match_crisis_vs_ai(human_player_id, ai_player_id, diff)
-		if mode_option_button != null:
-			mode_option_button.selected = 1 if human_player_id == 1 else 2
-	else:
-		human_player_id = 1
-		ai_player_id = 2
-		bridge.start_local_match_crisis(42, [1, 2])
 		if mode_option_button != null:
 			mode_option_button.selected = 0
+	else:
+		is_vs_ai = (gm != null and gm.has_method("get_game_mode") and str(gm.get_game_mode()) == "vs_ai")
+		if is_vs_ai:
+			human_player_id = int(gm.get_human_player_id()) if (gm != null and gm.has_method("get_human_player_id")) else 1
+			ai_player_id = 2 if human_player_id == 1 else 1
+			var diff: int = int(gm.get_ai_difficulty()) if (gm != null and gm.has_method("get_ai_difficulty")) else 1
+			bridge.start_local_match_crisis_vs_ai(human_player_id, ai_player_id, diff)
+			if mode_option_button != null:
+				mode_option_button.selected = 1 if human_player_id == 1 else 2
+		else:
+			human_player_id = 1
+			ai_player_id = 2
+			bridge.start_local_match_crisis(42, [1, 2])
+			if mode_option_button != null:
+				mode_option_button.selected = 0
 	current_player_id = bridge.current_player()
 
 	_sync_all_from_bridge()

@@ -100,9 +100,13 @@ func _ready() -> void:
 	_init_grids()
 	_setup_ui()
 
-	bridge = OpenTableBridge.new()
-	bridge.name = "Bridge"
-	add_child(bridge)
+	var has_net_bridge: bool = (gm != null and gm.has_method("has_active_network_bridge") and bool(gm.call("has_active_network_bridge")))
+	if has_net_bridge:
+		bridge = gm.call("claim_network_bridge", self)
+	else:
+		bridge = OpenTableBridge.new()
+		bridge.name = "Bridge"
+		add_child(bridge)
 
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
@@ -122,8 +126,14 @@ func _ready() -> void:
 	bridge.connect("move_rejected", _on_move_rejected)
 
 	var gm_mode: String = str(gm.get_game_mode()) if (gm != null and gm.has_method("get_game_mode")) else "hotseat"
-	var start_vs_ai: bool = (gm_mode == "vs_ai") or (not OS.has_feature("headless") and gm_mode == "hotseat")
-	if start_vs_ai:
+	var start_vs_ai: bool = (not has_net_bridge) and ((gm_mode == "vs_ai") or (not OS.has_feature("headless") and gm_mode == "hotseat"))
+	if has_net_bridge:
+		is_vs_ai = false
+		local_player = int(gm.call("get_network_local_player_id")) if gm.has_method("get_network_local_player_id") else P1
+		phase = Phase.PLACEMENT_P1 if local_player == P1 else Phase.PLACEMENT_P2
+		if mode_option_button != null:
+			mode_option_button.selected = 0
+	elif start_vs_ai:
 		var human_p: int = gm.get_human_player_id() if (gm != null and gm.has_method("get_human_player_id")) else P1
 		var ai_p: int = P2 if human_p == P1 else P1
 		var diff: int = gm.get_ai_difficulty() if (gm != null and gm.has_method("get_ai_difficulty")) else 1

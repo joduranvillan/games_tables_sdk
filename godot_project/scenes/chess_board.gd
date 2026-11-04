@@ -80,9 +80,13 @@ func _ready() -> void:
 	_setup_ui()
 	_init_board_state()
 	
-	bridge = OpenTableBridge.new()
-	bridge.name = "Bridge"
-	add_child(bridge)
+	var has_net_bridge: bool = (gm != null and gm.has_method("has_active_network_bridge") and bool(gm.call("has_active_network_bridge")))
+	if has_net_bridge:
+		bridge = gm.call("claim_network_bridge", self)
+	else:
+		bridge = OpenTableBridge.new()
+		bridge.name = "Bridge"
+		add_child(bridge)
 
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
@@ -101,7 +105,10 @@ func _ready() -> void:
 	bridge.connect("event_json", _on_event_json)
 	bridge.connect("piece_moved", _on_piece_moved_signal)
 	
-	if gm != null and gm.get_game_mode() == "vs_ai":
+	if has_net_bridge:
+		if mode_option_button != null:
+			mode_option_button.selected = 0
+	elif gm != null and gm.get_game_mode() == "vs_ai":
 		var diff: int = gm.get_ai_difficulty() if gm.has_method("get_ai_difficulty") else clampi(gm.get_chess_ai_depth() - 1, 0, 3)
 		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P1
 		var ai_p: int = P2 if human_p == P1 else P1

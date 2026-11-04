@@ -70,9 +70,13 @@ func _ready() -> void:
 	_init_board_state()
 	_setup_ui()
 	
-	bridge = OpenTableBridge.new()
-	bridge.name = "Bridge"
-	add_child(bridge)
+	var has_net_bridge: bool = (gm != null and gm.has_method("has_active_network_bridge") and bool(gm.call("has_active_network_bridge")))
+	if has_net_bridge:
+		bridge = gm.call("claim_network_bridge", self)
+	else:
+		bridge = OpenTableBridge.new()
+		bridge.name = "Bridge"
+		add_child(bridge)
 	
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
@@ -90,7 +94,10 @@ func _ready() -> void:
 					hud.bind_bridge(bridge)
 				add_child(hud)
 
-	if gm != null and gm.get_game_mode() == "vs_ai":
+	if has_net_bridge:
+		if mode_option_button != null:
+			mode_option_button.selected = 0
+	elif gm != null and gm.get_game_mode() == "vs_ai":
 		var human_p: int = gm.get_human_player_id() if gm.has_method("get_human_player_id") else P1
 		var ai_p: int = P2 if human_p == P1 else P1
 		bridge.start_local_match_backgammon_vs_ai(human_p, ai_p)

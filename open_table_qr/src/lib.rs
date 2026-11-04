@@ -47,6 +47,18 @@ pub struct JoinPayload {
     pub game_type: String,
 }
 
+/// Payload extendido para partidas en red local (LAN / Hotspot offline) que
+/// incluye dirección IP y puerto TCP además de los metadatos de la sala.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LanJoinPayload {
+    pub session_id: SessionId,
+    pub join_code: String,
+    pub host_name: String,
+    pub game_type: String,
+    pub ip: String,
+    pub port: u16,
+}
+
 /// Genera un código corto, legible, para mostrar junto al QR. Usa
 /// `RandomService` (el mismo que ya usa el motor para dados/barajado) en
 /// vez de una fuente de aleatoriedad nueva, para no introducir una
@@ -67,12 +79,29 @@ pub fn generate_join_qr_svg(payload: &JoinPayload) -> Result<String, QrError> {
     let json = serde_json::to_string(payload)?;
     let code = QrCode::new(json.as_bytes())?;
 
-    let svg = code
+    let mut svg = code
         .render::<svg::Color>()
         .min_dimensions(240, 240)
         .quiet_zone(true)
         .build();
 
+    svg.push_str(&format!("<!--OPENTABLE_QR_JSON:{json}-->"));
+    Ok(svg)
+}
+
+/// Genera un código QR SVG con los datos completos de conexión LAN offline
+/// (`ip`, `port`, `game_type`, `join_code`, `host_name`).
+pub fn generate_lan_join_qr_svg(payload: &LanJoinPayload) -> Result<String, QrError> {
+    let json = serde_json::to_string(payload)?;
+    let code = QrCode::new(json.as_bytes())?;
+
+    let mut svg = code
+        .render::<svg::Color>()
+        .min_dimensions(240, 240)
+        .quiet_zone(true)
+        .build();
+
+    svg.push_str(&format!("<!--OPENTABLE_QR_JSON:{json}-->"));
     Ok(svg)
 }
 
@@ -80,4 +109,25 @@ pub fn generate_join_qr_svg(payload: &JoinPayload) -> Result<String, QrError> {
 /// tipear el `join_code` a mano como fallback).
 pub fn parse_join_payload(json: &str) -> Result<JoinPayload, QrError> {
     Ok(serde_json::from_str(json)?)
+}
+
+/// Decodifica un payload LAN completo desde JSON.
+pub fn parse_lan_join_payload(json: &str) -> Result<LanJoinPayload, QrError> {
+    Ok(serde_json::from_str(json)?)
+}
+
+/// Extrae el JSON de invitación desde un archivo/string SVG generado por
+/// `open_table_qr` o desde un texto JSON directo.
+pub fn extract_qr_payload_json(input: &str) -> Option<String> {
+    let trimmed = input.trim();
+    if let Some(start_idx) = trimmed.find("<!--OPENTABLE_QR_JSON:") {
+        let rest = &trimmed[start_idx + "<!--OPENTABLE_QR_JSON:".len()..];
+        if let Some(end_idx) = rest.find("-->") {
+            return Some(rest[..end_idx].trim().to_string());
+        }
+    }
+    if trimmed.starts_with('{') && trimmed.ends_with('}') {
+        return Some(trimmed.to_string());
+    }
+    None
 }

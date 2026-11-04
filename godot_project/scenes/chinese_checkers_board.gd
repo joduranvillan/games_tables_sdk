@@ -196,30 +196,41 @@ func start_match(p_count: int = 2) -> void:
 	_init_board_positions(num_players)
 	_setup_peg_buttons()
 
-	if bridge != null and is_instance_valid(bridge):
-		bridge.queue_free()
-
-	bridge = OpenTableBridge.new()
-	bridge.name = "Bridge"
-	add_child(bridge)
-
-	bridge.connect("game_over", _on_game_over)
-	bridge.connect("move_rejected", _on_move_rejected)
-	bridge.connect("event_json", _on_event_json)
-
-	var use_ai_mode := 0
-	if mode_option_button != null:
-		use_ai_mode = mode_option_button.selected
-	if use_ai_mode > 0 and num_players == 2:
-		var human_p := 1 if use_ai_mode == 1 else 2
-		var ai_p := 2 if human_p == 1 else 1
-		var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
-		var diff: int = gm.get_ai_difficulty() if (gm != null and gm.has_method("get_ai_difficulty")) else 1
-		bridge.start_local_match_chinese_checkers_vs_ai(human_p, ai_p, diff)
-	elif bridge.has_method("start_local_match_chinese_checkers_n_players"):
-		bridge.start_local_match_chinese_checkers_n_players(num_players)
+	var gm = (get_node_or_null("/root/GameManager") if is_inside_tree() else null)
+	var has_net_bridge: bool = (gm != null and gm.has_method("has_active_network_bridge") and bool(gm.call("has_active_network_bridge")))
+	if has_net_bridge:
+		var claimed = gm.call("claim_network_bridge", self)
+		if bridge != null and is_instance_valid(bridge) and bridge != claimed:
+			bridge.queue_free()
+		bridge = claimed
 	else:
-		bridge.start_local_match_chinese_checkers(1, 2)
+		if bridge != null and is_instance_valid(bridge):
+			bridge.queue_free()
+		bridge = OpenTableBridge.new()
+		bridge.name = "Bridge"
+		add_child(bridge)
+
+	if not bridge.is_connected("game_over", _on_game_over):
+		bridge.connect("game_over", _on_game_over)
+	if not bridge.is_connected("move_rejected", _on_move_rejected):
+		bridge.connect("move_rejected", _on_move_rejected)
+	if not bridge.is_connected("event_json", _on_event_json):
+		bridge.connect("event_json", _on_event_json)
+
+	var is_net_active: bool = (bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")))
+	if not is_net_active:
+		var use_ai_mode := 0
+		if mode_option_button != null:
+			use_ai_mode = mode_option_button.selected
+		if use_ai_mode > 0 and num_players == 2:
+			var human_p := 1 if use_ai_mode == 1 else 2
+			var ai_p := 2 if human_p == 1 else 1
+			var diff: int = gm.get_ai_difficulty() if (gm != null and gm.has_method("get_ai_difficulty")) else 1
+			bridge.start_local_match_chinese_checkers_vs_ai(human_p, ai_p, diff)
+		elif bridge.has_method("start_local_match_chinese_checkers_n_players"):
+			bridge.start_local_match_chinese_checkers_n_players(num_players)
+		else:
+			bridge.start_local_match_chinese_checkers(1, 2)
 
 	current = bridge.current_player()
 
