@@ -149,6 +149,10 @@ func _initialize() -> void:
 		if mono_menu == null:
 			mono_menu = board_inst.find_child("GameAppMenu", true, false)
 		results.append(["monopoly_board integra GameAppMenu en esquina superior derecha", mono_menu != null])
+		var mono_dw: DiceWidget = board_inst.get("dice_widget") as DiceWidget
+		if mono_dw != null:
+			mono_dw.show_roll([3, 4])
+		results.append(["monopoly_board integra DiceWidget 3D con par de dados", mono_dw != null and mono_dw.dock_roller_3d != null and mono_dw.last_values.size() == 2])
 
 		root.remove_child(board_inst)
 		board_inst.free()

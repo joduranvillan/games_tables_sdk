@@ -12,7 +12,9 @@ pub mod commands;
 pub mod events;
 pub mod rules;
 
-pub use ai::{best_move, goose_ai_pick_move};
+pub use ai::{
+    best_move, goose_ai_pick_move, select_ai_move, GooseAiDifficulty, GooseMoveGenerator,
+};
 pub use board::{
     compute_raw_square, is_goose_square, next_goose_square, resolve_landing, GooseBoardResource,
     LandingResolution, PendingRollResource, SpecialSquareKind, BRIDGE_A, BRIDGE_B, DICE_A, DICE_B,

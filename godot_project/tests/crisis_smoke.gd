@@ -152,6 +152,10 @@ func _initialize() -> void:
 		if crisis_menu == null:
 			crisis_menu = board_inst.find_child("GameAppMenu", true, false)
 		results.append(["crisis_board integra GameAppMenu en esquina superior derecha", crisis_menu != null])
+		var crisis_dw: DiceWidget = board_inst.get("dice_widget") as DiceWidget
+		if crisis_dw != null:
+			crisis_dw.show_roll([6, 5, 2])
+		results.append(["crisis_board integra DiceWidget 3D con soporte de hasta 3 dados de combate", crisis_dw != null and crisis_dw.dock_roller_3d != null and crisis_dw.last_values.size() == 3])
 
 		root.remove_child(board_inst)
 		board_inst.free()

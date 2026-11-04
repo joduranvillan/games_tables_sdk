@@ -27,5 +27,29 @@ func _init() -> void:
 		quit(1)
 		return
 
-	print("PASS: goose_smoke.gd completado correctamente")
+	# Verificar componente 3D de dados (DiceRoller3D + DiceWidget)
+	var widget: DiceWidget = DiceWidget.new()
+	root.add_child(widget)
+	widget._ready()
+	if widget.dock_roller_3d == null:
+		print("HAY FALLOS: DiceWidget debe inicializar dock_roller_3d (DiceRoller3D)")
+		quit(1)
+		return
+
+	for face_val in range(1, 7):
+		widget.show_roll([face_val])
+		var expected_rot: Vector3 = DiceRoller3D.get_target_rotation_for_value(face_val)
+		var actual_rot: Vector3 = widget.dock_roller_3d.get_die_rotation_degrees(0)
+		if not actual_rot.is_equal_approx(expected_rot):
+			print("HAY FALLOS: rotación 3D incorrecta para cara ", face_val, " esperado=", expected_rot, " obtenido=", actual_rot)
+			quit(1)
+			return
+
+	widget.show_roll([3, 6])
+	if widget.last_values.size() != 2 or widget.last_values[0] != 3 or widget.last_values[1] != 6:
+		print("HAY FALLOS: DiceWidget.show_roll([3, 6]) no registró los valores esperados")
+		quit(1)
+		return
+
+	print("PASS: goose_smoke.gd + DiceRoller3D completado correctamente")
 	quit(0)

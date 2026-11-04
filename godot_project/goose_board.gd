@@ -303,7 +303,7 @@ func _on_mode_selected(index: int) -> void:
 	queue_redraw()
 
 func _on_roll_dice_pressed() -> void:
-	if winner != -1:
+	if winner != -1 or (dice_widget != null and dice_widget.is_rolling):
 		return
 	var cmd: Dictionary = {"command_type": "RollDiceCommand", "player": current_p}
 	bridge.send_command_json(current_p, JSON.stringify(cmd))
@@ -311,6 +311,8 @@ func _on_roll_dice_pressed() -> void:
 func _on_advance_pressed() -> void:
 	if winner != -1:
 		return
+	if dice_widget != null and dice_widget.is_rolling:
+		await dice_widget.wait_if_rolling()
 	var cmd: Dictionary = {"command_type": "MoveTokenCommand", "player": current_p}
 	bridge.send_command_json(current_p, JSON.stringify(cmd))
 
@@ -350,6 +352,8 @@ func _animate_token_to(p: int, to_sq: int) -> void:
 	player_positions[p] = to_sq
 	if not token_buttons.has(p):
 		return
+	if dice_widget != null and dice_widget.is_rolling and is_inside_tree() and not OS.has_feature("headless"):
+		await dice_widget.wait_if_rolling()
 	var btn: TextureButton = token_buttons[p]
 	var offsets: Array[Vector2] = [
 		Vector2(-12, -12),
@@ -375,13 +379,23 @@ func _on_event_json(json_str: String) -> void:
 				var val: int = int(event.get("value", 1))
 				last_dice_val = val
 				has_pending_roll = true
-				if advance_button != null:
-					advance_button.disabled = false
 				if dice_label != null:
 					var faces: Array[String] = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
 					dice_label.text = faces[val - 1] if (val >= 1 and val <= 6) else ("🎲 %d" % val)
 				if dice_widget != null and dice_widget.has_method("show_roll"):
+					if advance_button != null and not OS.has_feature("headless"):
+						advance_button.disabled = true
 					dice_widget.show_roll([val])
+					if advance_button != null:
+						if dice_widget.is_rolling and not OS.has_feature("headless"):
+							dice_widget.animation_done.connect(func():
+								if advance_button != null and has_pending_roll:
+									advance_button.disabled = false
+							, CONNECT_ONE_SHOT)
+						else:
+							advance_button.disabled = false
+				elif advance_button != null:
+					advance_button.disabled = false
 				last_effect_text = "Jugador %d sacó un %d. Pulsa 'Avanzar Ficha' o tu ficha." % [int(event.get("player", current_p)), val]
 				if effect_label != null:
 					effect_label.text = last_effect_text

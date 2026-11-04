@@ -1829,6 +1829,8 @@ func _on_attack_resolved(from_id: int, to_id: int, attacker_rolls: Array, defend
 	dice_label.text = summary_txt
 	if dice_widget != null and attacker_rolls.size() > 0:
 		dice_widget.show_roll(attacker_rolls)
+		if is_inside_tree() and not OS.has_feature("headless"):
+			await dice_widget.wait_if_rolling()
 	if (not is_vs_ai or _is_human_attacking) and not OS.has_feature("headless"):
 		dice_popup.popup_centered()
 	_sync_all_from_bridge()

@@ -17,6 +17,7 @@
 | **Uno** (`uno_game`) | ✅ | ✅ (jump-in, robo acumulativo, colores) | ✅ (100%) | ✅ (`uno_smoke.gd`) | ✅ |
 | **Crisis / TEG** (`crisis_game`) | ✅ | ✅ (30 terr, 6 cont, obj. sec) | ✅ (100%) | ✅ (`crisis_smoke.gd`) | ✅ |
 | **Damas Chinas** (`chinese_checkers_game`) | ✅ | ✅ (tablero hexagonal) | ✅ (100%) | ✅ (`chinese_checkers_smoke.gd`) | ✅ |
+| **El Juego de la Oca** (`goose_game`) | ✅ | ✅ (63 casillas espiral, todas las especiales, rebote) | ✅ (100%) | ✅ (`goose_smoke.gd`, `dice_3d_smoke.gd`) | ✅ |
 
 ## 2. `crisis_game` Reescrito como TEG — Estado
 

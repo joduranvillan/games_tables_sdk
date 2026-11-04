@@ -178,6 +178,7 @@ var p2_money_lbl: Label
 var p2_props_lbl: Label
 var p2_pos_lbl: Label
 var dice_display_lbl: Label
+var dice_widget: DiceWidget
 
 var turn_indicator: TurnIndicator
 var rules_popup: RulesPopup
@@ -412,6 +413,11 @@ func _setup_ui() -> void:
 	dice_display_lbl.add_theme_font_size_override("font_size", 14)
 	dice_display_lbl.add_theme_color_override("font_color", Color(0.98, 0.95, 0.8))
 	center_vbox.add_child(dice_display_lbl)
+
+	dice_widget = DiceWidget.new()
+	dice_widget.name = "DiceWidget"
+	dice_widget.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	center_vbox.add_child(dice_widget)
 
 	card_event_banner = PanelContainer.new()
 	card_event_banner.name = "EventBanner"
@@ -1022,6 +1028,9 @@ func _animate_player_move(p: int, target_space: int) -> void:
 	var offset = Vector2(-spread, -spread) if p == P1 else Vector2(spread, spread)
 	var target_pos = base_pos + offset - Vector2(10, 10)
 
+	if dice_widget != null and dice_widget.is_rolling and is_inside_tree() and not OS.has_feature("headless"):
+		await dice_widget.wait_if_rolling()
+
 	_check_pending_purchase(p, target_space)
 	if is_inside_tree():
 		var tween = create_tween()
@@ -1292,6 +1301,8 @@ func _on_event_json(json_str: String) -> void:
 				last_dice_1 = int(event.get("d1", 1))
 				last_dice_2 = int(event.get("d2", 1))
 				last_roll_doubles = bool(event.get("is_doubles", false))
+				if dice_widget != null:
+					dice_widget.show_roll([last_dice_1, last_dice_2])
 
 				if event.get("passed_go", false):
 					money[p] += 200

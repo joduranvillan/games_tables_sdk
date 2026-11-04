@@ -95,6 +95,10 @@ func _initialize() -> void:
 		if board.get("turn_indicator") == null and board.has_method("_ready"):
 			board._ready()
 		results.append(["LudoBoard inicia centrado horizontalmente con GameAppMenu", board.position.x > 100.0 and board.get_node_or_null("GameAppMenu") != null])
+		var ludo_dw: DiceWidget = board.get("dice_widget") as DiceWidget
+		if ludo_dw != null:
+			ludo_dw.show_roll([6])
+		results.append(["LudoBoard integra DiceWidget con DiceRoller3D orientado a cara 6", ludo_dw != null and ludo_dw.dock_roller_3d != null and ludo_dw.dock_roller_3d.get_die_rotation_degrees(0).is_equal_approx(DiceRoller3D.get_target_rotation_for_value(6))])
 		root.remove_child(board)
 		board.free()
 

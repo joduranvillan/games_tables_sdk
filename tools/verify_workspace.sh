@@ -37,6 +37,7 @@ GAMES=(
     "go_game"
     "uno_game"
     "crisis_game"
+    "goose_game"
 )
 
 # (b) Verifica que los juegos exportan new_{game}_session y se referencian en open_table_godot/src/lib.rs

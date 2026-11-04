@@ -11,7 +11,12 @@ license = "GPL-3.0-or-later"
 publish = false
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
 open_table_core = { version = "1.0.0", path = "../open_table_core" }
 open_table_engine = { version = "1.0.0", path = "../open_table_engine" }
 open_table_macros = { version = "1.0.0", path = "../open_table_macros" }
+serde = { version = "1.0", features = ["derive"] }
+typetag = "0.2"
+bevy_ecs = "0.20"
+
+[dev-dependencies]
+serde_json = "1"

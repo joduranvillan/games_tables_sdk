@@ -511,6 +511,8 @@ func _create_checker_button(owner: int, badge_text: String = "") -> Control:
 	return ctrl
 
 func _animate_arc_movement(owner: int, start_pos: Vector2, end_pos: Vector2) -> void:
+	if dice_widget != null and dice_widget.is_rolling and is_inside_tree() and not OS.has_feature("headless"):
+		await dice_widget.wait_if_rolling()
 	var anim_checker = _create_checker_button(owner)
 	anim_checker.position = start_pos
 	add_child(anim_checker)

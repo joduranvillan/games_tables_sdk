@@ -69,15 +69,47 @@ if unsafe_walrus:
         print("  " + item, file=sys.stderr)
     sys.exit(1)
 
+board_count = 0
 for f in sorted(os.listdir(root)):
     if f.endswith("_board.gd"):
+        board_count += 1
         root_p = os.path.join(root, f)
         scene_p = os.path.join(root, "scenes", f)
         if os.path.isfile(scene_p) and not filecmp.cmp(root_p, scene_p, shallow=False):
             print(f"ERROR: Desincronización detectada entre {root_p} y {scene_p}", file=sys.stderr)
             sys.exit(1)
 
-print("OK: Validador Redot strict superado (0 inferencias := en Variant, 13/13 tableros sincronizados).")
+# Verificar integración de DiceRoller3D y DiceWidget en los 5 juegos de dados
+roller_path = os.path.join(root, "scripts", "dice_roller_3d.gd")
+widget_path = os.path.join(root, "dice_widget.gd")
+if not os.path.isfile(roller_path) or not os.path.isfile(widget_path):
+    print("ERROR: Falta scripts/dice_roller_3d.gd o dice_widget.gd", file=sys.stderr)
+    sys.exit(1)
+
+with open(roller_path, "r", encoding="utf-8") as fh:
+    r_src = fh.read()
+    for req in ("class_name DiceRoller3D", "SubViewport", "Camera3D", "DirectionalLight3D", "get_target_rotation_for_value", "play_3d_roll"):
+        if req not in r_src:
+            print(f"ERROR: DiceRoller3D no contiene símbolo requerido: {req}", file=sys.stderr)
+            sys.exit(1)
+
+with open(widget_path, "r", encoding="utf-8") as fh:
+    w_src = fh.read()
+    for req in ("class_name DiceWidget", "dock_roller_3d", "_overlay_roller_3d", "wait_if_rolling", "show_roll"):
+        if req not in w_src:
+            print(f"ERROR: DiceWidget no contiene símbolo requerido: {req}", file=sys.stderr)
+            sys.exit(1)
+
+dice_boards = ["goose_board.gd", "ludo_board.gd", "backgammon_board.gd", "monopoly_board.gd", "crisis_board.gd"]
+for db in dice_boards:
+    db_path = os.path.join(root, db)
+    with open(db_path, "r", encoding="utf-8") as fh:
+        b_src = fh.read()
+        if "DiceWidget.new()" not in b_src or "wait_if_rolling()" not in b_src:
+            print(f"ERROR: Tablero de dados {db} no integra DiceWidget.new() o wait_if_rolling()", file=sys.stderr)
+            sys.exit(1)
+
+print(f"OK: Validador Redot strict superado (0 inferencias := en Variant, {board_count}/{board_count} tableros sincronizados, 5/5 juegos de dados con DiceRoller3D verificados).")
 '
 
 if ! command -v "$REDOT_BIN" &>/dev/null || [ "$BIN_REAL" = "$SHIM_REAL" ]; then

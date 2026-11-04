@@ -340,7 +340,7 @@ func _is_colorblind_pattern_pixel(player_id: int, x: int, y: int) -> bool:
 
 func _on_roll_dice_pressed() -> void:
 	_sfx_dice_roll()
-	if winner != -1:
+	if winner != -1 or (dice_widget != null and dice_widget.is_rolling):
 		return
 	var cmd = {"command_type": "RollDiceCommand", "player": current_p}
 	bridge.send_command_json(current_p, JSON.stringify(cmd))
@@ -349,6 +349,8 @@ func _on_token_pressed(p: int, token_idx: int) -> void:
 	if winner != -1:
 		return
 	if p == current_p:
+		if dice_widget != null and dice_widget.is_rolling:
+			await dice_widget.wait_if_rolling()
 		var cmd = {
 			"command_type": "MoveTokenCommand",
 			"player": current_p,
@@ -484,6 +486,9 @@ func _animate_token_move(p: int, t_idx: int, to_steps: int) -> void:
 		var target_pos = _get_token_board_pos(p, t_idx, to_steps) - btn.size / 2.0
 		btn.position = target_pos
 		return
+
+	if dice_widget != null and dice_widget.is_rolling and is_inside_tree() and not OS.has_feature("headless"):
+		await dice_widget.wait_if_rolling()
 
 	var tween = create_tween()
 	for pos in path:

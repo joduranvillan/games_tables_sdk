@@ -93,6 +93,10 @@ func _initialize() -> void:
 		if bg_node.get("turn_indicator") == null and bg_node.has_method("_ready"):
 			bg_node._ready()
 		results.append(["BackgammonBoard inicia centrado con GameAppMenu activo", bg_node.position.x > 100.0 and bg_node.get_node_or_null("GameAppMenu") != null])
+		var bg_dw: DiceWidget = bg_node.get("dice_widget") as DiceWidget
+		if bg_dw != null:
+			bg_dw.show_roll([2, 5])
+		results.append(["BackgammonBoard integra DiceWidget 3D con 2 dados activos", bg_dw != null and bg_dw.dock_roller_3d != null and bg_dw.last_values.size() == 2])
 		root.remove_child(bg_node)
 		bg_node.free()
 
