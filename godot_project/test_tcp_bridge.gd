@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 ## Test TCP bridge host/cliente en una sola instancia Godot
 ## Crea dos nodos: uno host escuchando en 127.0.0.1:9090,
 ## otro cliente conectándose al mismo.

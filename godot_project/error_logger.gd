@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # ErrorLogger Autoload: Captura y registra errores/warnings en user://error.log
 # Muestra overlay debug semi-transparente en esquina inferior (toggleable con F12)
 # y permite exportar diagnóstico técnico sin datos personales (Prompt 493).

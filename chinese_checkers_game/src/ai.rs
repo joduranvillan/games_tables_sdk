@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Inteligencia Artificial MCTS ligero para Damas Chinas (Chinese Checkers).
 //!
 //! - Ejecuta `difficulty.rollouts()` simulaciones aleatorias (playouts).

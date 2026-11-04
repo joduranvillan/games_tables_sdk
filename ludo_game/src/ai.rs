@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::board::{PendingRollResource, TokensResource, MAX_STEPS, WIN_STEPS};
 use crate::commands::MoveTokenCommand;
 use open_table_engine::prelude::*;

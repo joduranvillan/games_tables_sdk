@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use rand_chacha::ChaCha8Rng;
 use rand_core::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};

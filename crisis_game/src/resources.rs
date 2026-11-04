@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::board::{Continent, ObjectiveCard, Territory, TerritoryId, CONTINENTS, TERRITORIES};
 use crate::events::{CardType, TerritoryCard};
 use open_table_core::ids::PlayerId;

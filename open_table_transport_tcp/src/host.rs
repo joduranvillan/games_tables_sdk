@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Lado host de `Transport` sobre TCP. Topología estrella: el host acepta
 //! N conexiones, cada una identificada por un `PlayerId`.
 //!

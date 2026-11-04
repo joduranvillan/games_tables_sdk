@@ -7,7 +7,7 @@ cd "$SDK_ROOT"
 echo "=== 1. Ejecutando gate previo PROMPTS11 (verify_p11.sh) ==="
 bash tools/verify_p11.sh
 
-echo "=== 2. Relay v2: guest auth + 13-game anticheat + rejoin + timeout + load test ==="
+echo "=== 2. Relay v2: guest auth + 14-game anticheat + rejoin + timeout + load test ==="
 if command -v cargo &>/dev/null; then
     cargo test -p open_table_relay
     cargo test -p open_table_relay --test load_test

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use battleship_game::{
     new_battleship_session, BattleshipConfigResource, FireShotCommand, FleetResource,
     GameOverEvent, PlaceFleetCommand, Position, RematchCommand, SetBattleshipRulesCommand, Ship,

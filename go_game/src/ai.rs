@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::board::{BoardHistoryResource, BoardResource, DeadMarkingResource};
 use crate::commands::{PassCommand, PlaceStoneCommand};
 use open_table_engine::prelude::*;

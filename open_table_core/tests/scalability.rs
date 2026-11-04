@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Este test simula lo que pasaría con dos juegos completamente distintos
 //! (uno de dados público, uno de cartas con mano oculta) usando el mismo
 //! `open_table_core` sin que el core necesite saber que existen.

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends SceneTree
 
 # ==============================================================================
@@ -18,6 +20,7 @@ const CheckersTutorialScript = preload("res://scripts/tutorials/checkers_tutoria
 const BackgammonTutorialScript = preload("res://scripts/tutorials/backgammon_tutorial.gd")
 const UnoTutorialScript = preload("res://scripts/tutorials/uno_tutorial.gd")
 const LudoTutorialScript = preload("res://scripts/tutorials/ludo_tutorial.gd")
+const GooseTutorialScript = preload("res://scripts/tutorials/goose_tutorial.gd")
 
 func _initialize() -> void:
 	print("=== Iniciando Test: tutorial_smoke.gd ===")
@@ -63,6 +66,12 @@ func _initialize() -> void:
 		quit(1)
 		return
 
+	var goose_steps: Array = GooseTutorialScript.get_steps()
+	if goose_steps.size() != 5:
+		printerr("FAIL: Se esperaban 5 pasos en GooseTutorial, se obtuvieron %d" % goose_steps.size())
+		quit(1)
+		return
+
 	var tm: Node = TutorialManagerScript.new()
 	var dummy_board: Node2D = Node2D.new()
 	root.add_child(dummy_board)
@@ -94,7 +103,7 @@ func _initialize() -> void:
 	while tm.is_running:
 		tm.advance_step()
 
-	# Verificar ejecución completa en TutorialManager para los otros 6 tutoriales
+	# Verificar ejecución completa en TutorialManager para los otros 7 tutoriales
 	var extra_tutorials: Array = [
 		{"name": "Go", "steps": go_steps},
 		{"name": "Shogi", "steps": shogi_steps},
@@ -102,6 +111,7 @@ func _initialize() -> void:
 		{"name": "Backgammon", "steps": backgammon_steps},
 		{"name": "UNO", "steps": uno_steps},
 		{"name": "Ludo", "steps": ludo_steps},
+		{"name": "Goose", "steps": goose_steps},
 	]
 
 	for tut in extra_tutorials:
@@ -125,5 +135,5 @@ func _initialize() -> void:
 
 	tm.free()
 	dummy_board.free()
-	print("PASS: tutorial_smoke.gd — 7 tutoriales interactivos (Chess, Go, Shogi, Checkers, Backgammon, UNO, Ludo) y TutorialManager verificados")
+	print("PASS: tutorial_smoke.gd — 8 tutoriales interactivos (Chess, Go, Shogi, Checkers, Backgammon, UNO, Ludo, Goose) y TutorialManager verificados")
 	quit(0)

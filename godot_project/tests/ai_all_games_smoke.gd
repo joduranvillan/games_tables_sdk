@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test de humo headless para TODOS los motores IA (Prompt 515).
 # Verifica que los bots de Monopoly, UNO, Mille Bornes, Backgammon, Go, Chess,
 # Checkers, Ludo, Battleship, Chinese Checkers, Crisis/TEG, Shogi y Xiangqi
@@ -143,6 +145,12 @@ func _initialize() -> void:
 	bridge.start_local_match_xiangqi_vs_ai(1, 2)
 	bridge.send_command_json(1, JSON.stringify({"command_type": "xiangqi_game::MovePieceCommand", "player": 1, "from": [4, 6], "to": [4, 5]}))
 	results.append(["Xiangqi vs IA (IA=J2): IA respondió tras jugada de J1 y devolvió turno a J1", bridge.current_player() == 1 and bridge.current_tick() >= 2])
+	bridge.free()
+
+	# 14. Goose (El Juego de la Oca) vs IA (IA como J1)
+	bridge = OpenTableBridge.new()
+	var goose_started = bridge.start_local_match_goose_vs_ai(2, 1)
+	results.append(["Goose vs IA (IA=J1): inició, tiró dado, movió ficha y avanzó tick", goose_started and bridge.current_tick() >= 2])
 	bridge.free()
 
 	var ok: bool = true

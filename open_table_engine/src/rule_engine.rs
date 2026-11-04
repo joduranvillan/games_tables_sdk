@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! El "Rule Engine" del RFC (capítulo 16): Command → Validation → Rules →
 //! Actions → Commit → Events.
 //!

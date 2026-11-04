@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de integración para Batalla Naval (Battleship).
 # Correr: redot --headless --path godot_project --script res://tests/battleship_smoke.gd
 extends SceneTree

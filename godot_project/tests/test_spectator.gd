@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test de humo para SpectatorMode en OpenTableBridge.
 # Inicia una partida host de damas (checkers) y un puente espectador que se conecta por TCP.
 # Realiza un movimiento y verifica que el espectador reciba la señal piece_moved y spectator_event_received.

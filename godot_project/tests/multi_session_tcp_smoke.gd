@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de humo para múltiples sesiones TCP simultáneas en OpenTableBridge.
 # Inicia dos servidores y clientes TCP en puertos distintos (19878 y 19879) y
 # verifica que los eventos de la sesión A no llegan a la B y viceversa.

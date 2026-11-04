@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use open_table_engine::prelude::*;
 use shogi_game::{new_shogi_session, DropPieceCommand, MovePieceCommand, PieceKind};
 

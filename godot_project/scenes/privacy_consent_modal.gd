@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends CanvasLayer
 
 ## Modal de Consentimiento de Privacidad y Términos de Servicio en Primer Arranque (Prompt 492).

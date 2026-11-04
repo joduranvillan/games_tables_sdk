@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Protocolo de handshake, intercambiado ANTES de que una conexión empiece
 //! a mandar `CommandEnvelope`s normales.
 //!

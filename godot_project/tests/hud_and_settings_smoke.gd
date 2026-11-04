@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 ## Smoke test for NetworkStatusHUD, SettingsMenu, SceneManager, TranslationLoader, and GameOverOverlay.
 extends SceneTree
 
@@ -115,7 +117,7 @@ func _initialize() -> void:
 	var stats_screen = load("res://scenes/stats_screen.gd").new()
 	stats_screen.tracker_ref = tracker_reloaded
 	stats_screen._ready()
-	assert(stats_screen.get_rendered_game_row_count() == 13, "StatsScreen debe renderizar las 13 filas de juegos")
+	assert(stats_screen.get_rendered_game_row_count() == 14, "StatsScreen debe renderizar las 14 filas de juegos")
 	assert(stats_screen.total_matches_label.text == "4", "Tarjeta Total de partidas debe mostrar 4")
 	assert(stats_screen.favorite_game_label.text.find("Ajedrez") != -1, "Tarjeta Juego favorito debe identificar Ajedrez")
 	assert(stats_screen.highest_elo_label.text.find("1218") != -1, "Tarjeta Mayor ELO alcanzado debe mostrar 1218")

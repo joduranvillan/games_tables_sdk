@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Código QR de invitación a una sala.
 //!
 //! Una aclaración de diseño importante: Nearby Connections (Android) y

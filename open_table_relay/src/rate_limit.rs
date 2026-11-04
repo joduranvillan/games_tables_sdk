@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Rate Limiting (algoritmo GCRA estilo `governor::RateLimiter`) y protección anti-spam para `open_table_relay`.
 //!
 //! Especificaciones:

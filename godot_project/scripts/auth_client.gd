@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends Node
 
 signal guest_token_updated(token: String, player_id: String, expires_at: int)

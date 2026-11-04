@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /// Un `Component` contiene únicamente datos, nunca lógica (I1 del RFC: un
 /// Component nunca modifica otro Component).
 ///

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Puente unificado entre los motores Rust (`open_table_engine`, juegos) y Godot/Redot.
 //!
 //! Expone un único nodo Godot (`OpenTableBridge`) con dispatch interno por modo:

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use ludo_game::{
     ludo_ai_pick_move, new_ludo_session, ConsecutiveSixesResource, GameOverEvent, MoveTokenCommand,
     NoValidMovesEvent, PendingRollResource, ResignCommand, RollDiceCommand, SetLudoRulesCommand,

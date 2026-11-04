@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de integración para Damas Chinas (Chinese Checkers).
 # Correr: redot --headless --path godot_project --script res://tests/chinese_checkers_smoke.gd
 extends SceneTree

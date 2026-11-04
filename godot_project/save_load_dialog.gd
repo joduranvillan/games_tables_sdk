@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends Control
 
 signal save_requested(save_id: String, metadata: Dictionary)

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Validación y emisión de tokens JWT (`HS256`) para el servidor Relay.
 //!
 //! Lee `JWT_SECRET` desde las variables de entorno:

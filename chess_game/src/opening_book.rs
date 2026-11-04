@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Libro de aperturas ECO compacto (A00-E99) indexado por hash Zobrist de 64 bits.
 //!
 //! En los niveles `AiDifficulty::Hard` y `AiDifficulty::Expert`, la IA consulta

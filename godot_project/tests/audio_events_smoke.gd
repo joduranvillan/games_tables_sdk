@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de humo para el sintetizador de SFX procedural en AudioManager.
 # Valida la generación de buffers PCM para los 7 efectos procedurales y los
 # controles de volumen independientes en decibelios para Música y SFX.
@@ -94,6 +96,7 @@ func _initialize() -> void:
 		"shogi_board.gd",
 		"uno_board.gd",
 		"xiangqi_board.gd",
+		"goose_board.gd",
 	]
 	for b_file in boards:
 		var b_script = load("res://" + b_file)

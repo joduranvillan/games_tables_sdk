@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test de rendimiento del bridge Godot en modo headless.
 #
 # Correr: RUN_PERF_TESTS=1 redot --headless --path godot_project --script res://tests/performance_smoke.gd

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Monopoly estándar de 40 casillas:
 //! - 28 propiedades (22 calles + 4 estaciones + 2 suministros)
 //! - GO, Cárcel (visita), Parking Gratuito, Ve a la Cárcel

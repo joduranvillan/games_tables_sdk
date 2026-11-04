@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends Node
 
 signal game_saved(save_id: String, metadata: Dictionary)

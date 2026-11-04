@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends Node
 
 ## Gestor de vibración háptica móvil (iOS y Android) — Tarea 491.

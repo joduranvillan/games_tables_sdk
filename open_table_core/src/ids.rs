@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! IDs fundamentales. Todos son newtypes sobre enteros: sin punteros, sin
 //! referencias, para que cualquier `Command`/`Event` que los contenga sea
 //! trivialmente serializable y determinista entre plataformas.

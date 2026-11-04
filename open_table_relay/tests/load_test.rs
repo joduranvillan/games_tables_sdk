@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Test de Carga e Integración de Concurrencia del Servidor Relay (`load_test.rs` — Prompt 494).
 //!
 //! Verifica que `open_table_relay` soporta simultáneamente:

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::board::{TerritoryId, TERRITORIES};
 
 pub fn territory_name(id: TerritoryId, lang: &str) -> &'static str {

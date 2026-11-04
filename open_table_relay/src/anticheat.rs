@@ -1,8 +1,11 @@
-//! Validación Anti-Cheat autoritativa de movimientos en el servidor Relay para los 13 juegos del catálogo.
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Validación Anti-Cheat autoritativa de movimientos en el servidor Relay para los 14 juegos del catálogo.
 //!
-//! Cuando una sala se crea con cualquiera de los 13 identificadores canónicos
+//! Cuando una sala se crea con cualquiera de los 14 identificadores canónicos
 //! (`"chess"`, `"checkers"`, `"go"`, `"shogi"`, `"xiangqi"`, `"backgammon"`, `"battleship"`,
-//! `"ludo"`, `"mille_bornes"`, `"monopoly"`, `"uno"`, `"crisis"`, `"chinese_checkers"`), el Relay
+//! `"ludo"`, `"mille_bornes"`, `"monopoly"`, `"uno"`, `"crisis"`, `"chinese_checkers"`, `"goose"`), el Relay
 //! mantiene una instancia autoritativa de `open_table_engine::session::Session` inicializada con
 //! una semilla determinista (`seed`) y verifica cada jugada antes de retransmitirla.
 
@@ -12,8 +15,8 @@ use open_table_engine::session::{Session, WinnerResource};
 use serde_json::{json, Value};
 use std::fmt;
 
-/// Identificadores canónicos de los 13 juegos soportados por el validador Anti-Cheat.
-pub const SUPPORTED_GAME_IDS: [&str; 13] = [
+/// Identificadores canónicos de los 14 juegos soportados por el validador Anti-Cheat.
+pub const SUPPORTED_GAME_IDS: [&str; 14] = [
     "chess",
     "checkers",
     "go",
@@ -27,6 +30,7 @@ pub const SUPPORTED_GAME_IDS: [&str; 13] = [
     "uno",
     "crisis",
     "chinese_checkers",
+    "goose",
 ];
 
 /// Estado de validación Anti-Cheat asociado a una sala activa.
@@ -48,7 +52,7 @@ impl fmt::Debug for AntiCheatSession {
     }
 }
 
-/// Normaliza un identificador de juego a su forma canónica si pertenece a los 13 juegos del catálogo.
+/// Normaliza un identificador de juego a su forma canónica si pertenece a los 14 juegos del catálogo.
 pub fn normalize_game_id(raw: &str) -> Option<&'static str> {
     match raw.trim().to_ascii_lowercase().as_str() {
         "chess" => Some("chess"),
@@ -64,12 +68,13 @@ pub fn normalize_game_id(raw: &str) -> Option<&'static str> {
         "uno" => Some("uno"),
         "crisis" => Some("crisis"),
         "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => Some("chinese_checkers"),
+        "goose" | "oca" | "goose_game" => Some("goose"),
         _ => None,
     }
 }
 
 impl AntiCheatSession {
-    /// Crea un validador Anti-Cheat para cualquiera de los 13 juegos del catálogo con semilla por defecto (`42`).
+    /// Crea un validador Anti-Cheat para cualquiera de los 14 juegos del catálogo con semilla por defecto (`42`).
     /// Para identificadores desconocidos o `None` devuelve `None`.
     pub fn for_game(game_id: Option<&str>) -> Option<Self> {
         Self::for_game_with_seed(game_id, 42)
@@ -98,6 +103,7 @@ impl AntiCheatSession {
             "chinese_checkers" => {
                 chinese_checkers_game::new_chinese_checkers_session(sid, seed, vec![p1, p2])
             }
+            "goose" => goose_game::new_goose_session(sid, seed, vec![p1, p2]),
             _ => return None,
         };
 
@@ -268,6 +274,7 @@ fn parse_game_command(
         "uno" => parse_uno_command(&with_player, default_player),
         "crisis" => parse_crisis_command(&with_player, default_player),
         "chinese_checkers" => parse_chinese_checkers_command(&with_player, default_player),
+        "goose" => parse_goose_command(&with_player, default_player),
         _ => None,
     }
 }
@@ -812,6 +819,34 @@ fn parse_hex_pos(v: &Value) -> Option<chinese_checkers_game::Position> {
     None
 }
 
+fn parse_goose_command(val: &Value, default_player: PlayerId) -> Option<Box<dyn Command>> {
+    if is_resign_action(val) {
+        return Some(Box::new(goose_game::ResignCommand {
+            player: default_player,
+        }));
+    }
+    let action = val.get("action").and_then(|v| v.as_str()).unwrap_or("");
+    if action == "move"
+        || action == "move_token"
+        || val.get("move").and_then(|v| v.as_bool()) == Some(true)
+    {
+        return Some(Box::new(goose_game::MoveTokenCommand {
+            player: default_player,
+        }));
+    }
+    if action == "roll"
+        || action == "roll_dice"
+        || val.get("roll").and_then(|v| v.as_bool()) == Some(true)
+        || val.get("RollDice").is_some()
+        || val.as_object().is_some()
+    {
+        return Some(Box::new(goose_game::RollDiceCommand {
+            player: default_player,
+        }));
+    }
+    None
+}
+
 fn parse_u8_pair(v: &Value) -> Option<(u8, u8)> {
     if let Some(arr) = v.as_array() {
         if arr.len() == 2 {
@@ -1023,6 +1058,19 @@ mod tests {
             ),
             Err("illegal_move")
         );
+
+        // 12. Goose (El Juego de la Oca): P2 intenta tirar fuera de turno -> rechazado; P1 tira y mueve -> OK
+        let mut goose_ac = AntiCheatSession::for_game_with_seed(Some("goose"), 2026).unwrap();
+        assert_eq!(
+            goose_ac.validate_and_apply(2, &json!({"player": 2, "roll": true})),
+            Err("illegal_move")
+        );
+        assert!(goose_ac
+            .validate_and_apply(1, &json!({"player": 1, "roll": true}))
+            .is_ok());
+        assert!(goose_ac
+            .validate_and_apply(1, &json!({"player": 1, "action": "move"}))
+            .is_ok());
     }
 
     #[test]

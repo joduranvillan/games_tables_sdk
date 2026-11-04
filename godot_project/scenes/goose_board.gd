@@ -232,6 +232,24 @@ func _setup_ui() -> void:
 	rules_popup.position = Vector2(80, 80)
 	add_child(rules_popup)
 
+	var tutorial_btn: Button = Button.new()
+	tutorial_btn.name = "GooseTutorialButton"
+	tutorial_btn.text = "🎓 Tutorial"
+	tutorial_btn.position = Vector2(235, 590)
+	tutorial_btn.custom_minimum_size = Vector2(130, 36)
+	tutorial_btn.visible = false
+	tutorial_btn.pressed.connect(start_goose_tutorial)
+	add_child(tutorial_btn)
+
+	var rules_btn: Button = Button.new()
+	rules_btn.name = "RulesButton"
+	rules_btn.text = "📖 Reglas"
+	rules_btn.position = Vector2(235, 590)
+	rules_btn.custom_minimum_size = Vector2(115, 36)
+	rules_btn.visible = false
+	rules_btn.pressed.connect(func(): rules_popup.show_for_game("goose"))
+	add_child(rules_btn)
+
 	for p in range(1, MAX_PLAYERS + 1):
 		var btn: TextureButton = TextureButton.new()
 		btn.custom_minimum_size = Vector2(28, 28)
@@ -256,6 +274,11 @@ func _setup_ui() -> void:
 		btn.pressed.connect(func(): _on_token_pressed(pid))
 		add_child(btn)
 		token_buttons[p] = btn
+
+func start_goose_tutorial() -> void:
+	var GooseTut = load("res://scripts/tutorials/goose_tutorial.gd")
+	if GooseTut != null:
+		GooseTut.start_on_board(self)
 
 func _get_token_color(player_id: int) -> Color:
 	var palette: Array[Color] = [
@@ -512,3 +535,52 @@ func _update_status() -> void:
 			status.text = ""
 		if turn_indicator != null:
 			turn_indicator.set_turn(current_p, p_name, col)
+
+func _sfx_piece_slide() -> void:
+	if is_inside_tree() and has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_slide()
+
+func _sfx_piece_place() -> void:
+	if is_inside_tree() and has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_place()
+
+func _sfx_capture(world_pos: Vector2 = Vector2(280, 280)) -> void:
+	if is_inside_tree() and has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_piece_place(2.0)
+	var particles: CPUParticles2D = CPUParticles2D.new()
+	particles.position = world_pos
+	particles.emitting = true
+	particles.one_shot = true
+	particles.amount = 18
+	particles.lifetime = 0.45
+	particles.explosiveness = 0.9
+	particles.spread = 180.0
+	particles.initial_velocity_min = 45.0
+	particles.initial_velocity_max = 110.0
+	particles.color = Color(1.0, 0.85, 0.3, 0.9)
+	add_child(particles)
+	if is_inside_tree():
+		get_tree().create_timer(0.6).timeout.connect(func():
+			if is_instance_valid(particles):
+				particles.queue_free()
+		)
+
+func _sfx_dice_roll() -> void:
+	if is_inside_tree() and has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_dice_roll()
+
+func _sfx_card_flip() -> void:
+	if is_inside_tree() and has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_card_flip()
+
+func _sfx_check_alert() -> void:
+	if is_inside_tree() and has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_check_alert()
+
+func _sfx_victory_fanfare() -> void:
+	if is_inside_tree() and has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_victory_fanfare()
+
+func _sfx_error_buzz() -> void:
+	if is_inside_tree() and has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_error_buzz()

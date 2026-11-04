@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Batalla Naval: juego de referencia para 2 jugadores.
 //! Maneja información oculta (ubicación de barcos), fase de colocación
 //! de flotas y disparos por turnos.

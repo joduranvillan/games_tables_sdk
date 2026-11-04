@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Sistema de torneos con llaves eliminatorias simples (4, 8 o 16 participantes) para `open_table_relay`.
 
 use serde::{Deserialize, Serialize};

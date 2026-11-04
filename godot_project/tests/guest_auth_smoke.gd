@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends SceneTree
 
 # Smoke test para Prompt 469: Emisión de JWT de Invitado y Cliente de Identidad (auth_client.gd)

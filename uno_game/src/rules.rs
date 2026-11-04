@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::board::{Card, CardColor, CardValue, UnoState};
 use crate::commands::{
     CallUnoCommand, CatchUnoFailureCommand, ChallengeWildDrawFourCommand, ChooseWildColorCommand,

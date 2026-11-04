@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de integración para el juego CRISIS (TEG).
 # Correr: redot --headless --path godot_project --script res://tests/crisis_smoke.gd
 extends SceneTree

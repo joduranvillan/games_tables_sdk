@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use chess_game::{
     new_chess_session, AcceptDrawCommand, BoardResource, GameOverEvent, HalfMoveClockResource,
     MovePieceCommand, OfferDrawCommand, Piece, PieceKind, PieceMovedEvent, Position,

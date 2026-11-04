@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 ## Autoload SceneManager que controla el cambio de escenas con animación de transición y pantalla de carga.
 extends SceneTransition
 

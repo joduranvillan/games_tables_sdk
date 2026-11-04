@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use open_table_engine::prelude::*;
 use xiangqi_game::{
     all_legal_moves_for, is_in_check, new_xiangqi_session, BoardResource, GameOverEvent,

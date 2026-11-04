@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Manejo de turnos. Genérico a propósito: `TurnOrder` solo sabe "en qué
 //! orden juegan" y "a quién le toca ahora" — no sabe nada de fases de
 //! partida (setup/juego/fin), porque eso es específico de cada juego.

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 ## Widget de indicador de turno con avatar de color, nombre de jugador y timer.
 class_name TurnIndicator
 extends HBoxContainer

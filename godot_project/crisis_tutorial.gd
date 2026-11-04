@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 ## Tutorial interactivo guiado para TEG / Crisis en Godot.
 ## Muestra burbujas de diálogo y flechas animadas en un CanvasLayer
 ## guíando al usuario a través de los conceptos básicos del juego.

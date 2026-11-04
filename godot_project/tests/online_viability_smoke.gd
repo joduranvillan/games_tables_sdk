@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Smoke Test de Viabilidad Online (Guest Auth + Rejoin + LAN Discovery)
 #
 # Verifica en modo headless el ciclo completo de:

@@ -4,14 +4,14 @@
 [![codecov](https://codecov.io/gh/joduranvillan/games_tables_sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/joduranvillan/games_tables_sdk)
 [![Crates.io](https://img.shields.io/crates/v/open_table_core.svg)](https://crates.io/crates/open_table_core)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3_or_later-blue.svg)](./LICENSE)
-[![Juegos Implementados](https://img.shields.io/badge/juegos-13%2F13-brightgreen.svg)](#juegos-de-referencia-y-reglas)
+[![Juegos Implementados](https://img.shields.io/badge/juegos-14%2F14-brightgreen.svg)](#juegos-de-referencia-y-reglas)
 
-Para el diseño completo del motor (diagrama de capas, detalle de los 22 crates y flujo de eventos) consulta **[`ARCHITECTURE.md`](./ARCHITECTURE.md)**.
+Para el diseño completo del motor (diagrama de capas, detalle de los 23 crates y flujo de eventos) consulta **[`ARCHITECTURE.md`](./ARCHITECTURE.md)**.
 Para expandir el motor, crear un juego nuevo desde cero o añadir un transporte de red con ejemplos completos, consulta **[`DEVELOPER_GUIDE.md`](./DEVELOPER_GUIDE.md)** y **[`docs/SDK_QUICKSTART.md`](./docs/SDK_QUICKSTART.md)**.
 
-## Estado de los 13 Juegos de la Suite (100% Reglas Canónicas + IA + UI Godot)
+## Estado de los 14 Juegos de la Suite (100% Reglas Canónicas + IA + UI Godot)
 
-Cada uno de los **13 juegos** cuenta con su propio crate en Rust (`*_game`), reglas oficiales de torneo validadas en `tests/canonical_rules.rs`, generador de jugadas legales (`LegalMoveGenerator`), oponente de IA local con 4 niveles y tablero completo en Godot/Redot con HUD compacto (`TurnIndicator` + `TurnTimerHud` + `GameAppMenu`):
+Cada uno de los **14 juegos** cuenta con su propio crate en Rust (`*_game`), reglas oficiales de torneo validadas en `tests/canonical_rules.rs`, generador de jugadas legales (`LegalMoveGenerator`), oponente de IA local con 4 niveles y tablero completo en Godot/Redot con HUD compacto (`TurnIndicator` + `TurnTimerHud` + `GameAppMenu`):
 
 | Juego | Reglas Básicas | Reglas Canónicas en Motor Rust | Controles Canónicos en UI Godot | Tests Rust | Test Godot | UI Godot | Documentación |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|---|
@@ -28,6 +28,7 @@ Cada uno de los **13 juegos** cuenta con su propio crate en Rust (`*_game`), reg
 | **Monopoly** (`monopoly_game`) | ✅ | ✅ (40 casillas, Suerte/Arca, Subastas, Casas/Hoteles uniformes, Hipotecas, Trueques) | ✅ (Paneles de Subasta, Construcción, Hipoteca y Trade) | ✅ | ✅ | ✅ | [`monopoly.md`](./docs/games/monopoly.md) |
 | **Uno** (`uno_game`) | ✅ | ✅ (mazo 108 cartas, grito/castigo `¡UNO!`, desafío `Wild +4`, intercepción Jump-In) | ✅ (`UnoCallButton`, `ChallengeW4Button`, `JumpInButton`, selector de color) | ✅ | ✅ | ✅ | [`uno.md`](./docs/games/uno.md) |
 | **Crisis / TEG** (`crisis_game`) | ✅ | ✅ (30 territorios, 6 continentes, objetivos secretos, combate 3v3, tarjeta + bono `+2`) | ✅ (Mapa interactivo 30 países, modal de tarjetas/canje y dados 3v3) | ✅ | ✅ | ✅ | [`teg.md`](./docs/games/teg.md) |
+| **El Juego de la Oca** (`goose_game`) | ✅ | ✅ (espiral 63 casillas, 13 Ocas, Puentes, Posada, Dados, Pozo, Laberinto, Cárcel, Calavera, rebote) | ✅ (`DiceWidget` 3D/2D, recorrido en espiral 63 casillas, `GooseTutorial`) | ✅ | ✅ | ✅ | [`goose.md`](./docs/games/goose.md) |
 
 **`open_table_godot/` (bridge de Godot/Redot): compila, carga y está
 verificado en runtime.** Corre en Redot 4.x / Godot 4.x.
@@ -82,7 +83,7 @@ Cálculo oficial de puntuación ELO ($E_a = \frac{1}{1 + 10^{(R_b - R_a)/400}}$,
 ### 3. Oponente de IA Local Offline (`ai_player: Option<PlayerId>`)
 El motor cuenta con algoritmos de IA locales y deterministas (heurísticas posicionales, Minimax/evaluación con profundidad configurable y agentes de toma de decisiones) para jugar contra la máquina sin conexión ni dependencias externas.
 
-- **Modos vs IA soportados**: Los **13 juegos** del catálogo (`chess`, `checkers`, `go`, `shogi`, `xiangqi`, `backgammon`, `ludo`, `mille_bornes`, `uno`, `crisis`, `chinese_checkers`, `monopoly`, `battleship`).
+- **Modos vs IA soportados**: Los **14 juegos** del catálogo (`chess`, `checkers`, `go`, `shogi`, `xiangqi`, `backgammon`, `ludo`, `mille_bornes`, `uno`, `crisis`, `chinese_checkers`, `monopoly`, `battleship`, `goose`).
 - **Ciclo Autónomo en `_process()`**: Cuando el turno actual coincide con `ai_player`, el bridge procesa y ejecuta automáticamente la jugada en el ECS emitiendo las señales correspondientes (`piece_moved`, `event_json`, `game_over`), validado en `ai_local_smoke.gd`, `ai_shogi_xiangqi_smoke.gd` y `ai_all_games_smoke.gd`.
 - **Inicialización desde GDScript**:
   ```gdscript

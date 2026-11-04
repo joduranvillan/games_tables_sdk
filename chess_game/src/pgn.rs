@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::board::{BoardResource, HalfMoveClockResource, Sides};
 use crate::position::{PieceKind, Position};
 use open_table_core::ids::PlayerId;

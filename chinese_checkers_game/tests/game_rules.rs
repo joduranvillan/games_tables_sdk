@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use chinese_checkers_game::{
     home_cells_a, home_cells_b, new_chinese_checkers_session, BoardResource,
     ChineseCheckersLegalMoveGenerator, GameOverEvent, MovePegCommand, PegMovedEvent, Position,

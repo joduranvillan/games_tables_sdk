@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 ## Escáner de Código QR y Cámara Nativa para OpenTable.
 ## Soporta escaneo mediante plugin de cámara nativo o ingreso manual por LineEdit.
 

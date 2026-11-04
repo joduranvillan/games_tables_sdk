@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::board::BoardResource;
 use crate::position::{Piece, PieceKind, Position};
 use open_table_core::error::EngineError;

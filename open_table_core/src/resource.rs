@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /// Un `Resource` es estado global único dentro de la `Session` (el mazo,
 /// el tablero, las reglas activas). Igual que `Component`, se define acá
 /// solo como contrato mínimo; el mapeo real a `bevy_ecs::Resource` vive en

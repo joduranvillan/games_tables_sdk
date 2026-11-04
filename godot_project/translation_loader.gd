@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends Node
 
 const LANGUAGES = ["es", "en", "pt", "it", "de", "ja", "fr", "ko", "zh"]

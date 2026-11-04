@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use open_table_core::command::CommandEnvelope;
 
 /// Convierte un `CommandEnvelope` del log de comandos a una representación en texto legible.

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de integración para el tablero de Backgammon.
 # Correr: redot --headless --path godot_project --script res://tests/backgammon_smoke.gd
 extends SceneTree

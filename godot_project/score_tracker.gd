@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends Node
 
 const SAVE_PATH = "user://scores.json"
@@ -18,6 +20,7 @@ const ALL_GAMES := [
 	{"id": "monopoly", "name": "Monopoly"},
 	{"id": "ludo", "name": "Ludo"},
 	{"id": "battleship", "name": "Batalla Naval"},
+	{"id": "goose", "name": "El Juego de la Oca"},
 ]
 
 # Schema:

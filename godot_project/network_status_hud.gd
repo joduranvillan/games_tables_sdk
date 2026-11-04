@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 ## CanvasLayer overlay para el estado de la red (Conectado, Reconectando, Desconectado).
 class_name NetworkStatusHUD
 extends CanvasLayer

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use checkers_game::{new_checkers_session, MovePieceCommand, Position};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use open_table_engine::prelude::*;

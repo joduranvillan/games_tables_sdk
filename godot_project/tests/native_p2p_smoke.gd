@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test de Humo P2P Nativo en Headless (Prompt 456)
 # Verifica que start_p2p_host y start_p2p_client existen en OpenTableBridge,
 # retornan sin crash en desktop/headless y que native_send_bytes está registrada.

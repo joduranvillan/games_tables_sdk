@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use backgammon_game::{
     new_backgammon_session, BoardResource as BgBoardResource, MoveCheckerCommand,
     CHECKERS_PER_PLAYER,

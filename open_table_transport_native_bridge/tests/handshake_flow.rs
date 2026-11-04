@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Un `RawByteLink` de prueba: un host con N clientes conectados por
 //! canales en memoria (`std::sync::mpsc`), simulando lo que haría un
 //! plugin nativo real sin necesitar Android/iOS. Esto es lo que permite

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de humo para Guardado (SaveManager) y Replay (ReplayViewer).
 # Inicia una partida de damas, ejecuta 3 jugadas, guarda a disco en user://saves/,
 # limpia el estado, carga el archivo guardado y verifica que el turno y las

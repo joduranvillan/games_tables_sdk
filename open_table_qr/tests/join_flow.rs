@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use open_table_core::ids::SessionId;
 use open_table_core::random::RandomService;
 use open_table_qr::{generate_join_code, generate_join_qr_svg, parse_join_payload, JoinPayload};

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `open_table_transport_native_bridge`: la capa de protocolo que
 //! comparten TODOS los transportes móviles nativos (Nearby Connections
 //! en Android, MultipeerConnectivity en iOS, y cualquier otro que

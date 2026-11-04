@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de integración para Damas (CheckersBoard + OpenTableBridge).
 # Correr: redot --headless --path godot_project -s tests/headless_smoke.gd
 extends SceneTree

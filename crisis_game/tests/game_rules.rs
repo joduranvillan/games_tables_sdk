@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crisis_game::{
     check_objective, new_crisis_session, AttackResolvedEvent, BoardResource, CardType,
     CardsExchangedEvent, DeclareAttackCommand, EliminatedPlayersResource, EndPhaseCommand,

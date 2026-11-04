@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Integración opcional con Steamworks para Achievements y Steam Cloud Saves.
 //!
 //! Cuando se compila con `--features steam`, habilita las rutinas de inicialización,

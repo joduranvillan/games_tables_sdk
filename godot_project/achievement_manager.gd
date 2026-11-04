@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Manager de Logros (Achievements) para OpenTable.
 # Guarda y carga el progreso en user://achievements.json y muestra
 # animaciones de notificación flotantes en pantalla.

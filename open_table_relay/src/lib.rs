@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Microservidor standalone de salas, retransmisión WebSocket y servicio ELO para OpenTable SDK.
 //!
 //! Protocolo JSON WebSocket (puerto 8080):

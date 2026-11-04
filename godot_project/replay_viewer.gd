@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends Control
 
 const PLAYBACK_SPEEDS: Array[float] = [1.0, 2.0, 4.0]

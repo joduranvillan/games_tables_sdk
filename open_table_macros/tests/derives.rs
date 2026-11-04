@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Reescribe el ejemplo del juego de dados y agrega uno de cartas, ahora
 //! usando los derives en vez de escribir `as_any()` / `Resource` /
 //! `Component` a mano. Si esto compila y pasa, los derives realmente

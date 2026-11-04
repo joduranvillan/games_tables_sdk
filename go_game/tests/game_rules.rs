@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use go_game::{
     go_ai_pick_move, new_go_session, BoardResource, ConfirmDeadCommand, GameOverEvent,
     MarkDeadCommand, PassCommand, PlaceHandicapCommand, PlaceStoneCommand, Stone,

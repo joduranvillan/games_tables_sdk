@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Gestión de salas y generación de códigos legibles para `open_table_relay`.
 //!
 //! Administra salas públicas/privadas en memoria y asigna códigos alfanuméricos

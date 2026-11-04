@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends SceneTree
 # Test headless de certificación end-to-end de controles UI y reglas canónicas (Prompt 519):
 #   godot --headless -s res://tests/canonical_rules_ui_smoke.gd
@@ -322,7 +324,7 @@ func _initialize() -> void:
 	var catalog_script: Script = load("res://scripts/rules_catalog.gd") as Script
 	_check(catalog_script != null, "rules_catalog.gd carga correctamente")
 	if catalog_script != null:
-		var all_game_ids: Array = ["checkers", "chess", "go", "shogi", "xiangqi", "chinese_checkers", "backgammon", "battleship", "ludo", "mille_bornes", "monopoly", "uno", "crisis"]
+		var all_game_ids: Array = ["checkers", "chess", "go", "shogi", "xiangqi", "chinese_checkers", "backgammon", "battleship", "ludo", "mille_bornes", "monopoly", "uno", "crisis", "goose"]
 		for gid in all_game_ids:
 			var es_data: Dictionary = catalog_script.call("get_game_rules", str(gid), "es")
 			var en_data: Dictionary = catalog_script.call("get_game_rules", str(gid), "en")
@@ -330,7 +332,7 @@ func _initialize() -> void:
 			var en_secs: Array = en_data.get("sections", [])
 			_check(es_secs.size() == 5 and en_secs.size() == 5, "RulesCatalog (%s): Contiene las 5 secciones canónicas en ES y EN" % str(gid))
 
-	# 15. Certificación de Layout Centrado Superior / Tablero / Inferior y GameAppMenu en los 13 tableros
+	# 15. Certificación de Layout Centrado Superior / Tablero / Inferior y GameAppMenu en los 14 tableros
 	var centered_boards: Array = [
 		"res://go_board.gd",
 		"res://chess_board.gd",
@@ -339,7 +341,8 @@ func _initialize() -> void:
 		"res://xiangqi_board.gd",
 		"res://backgammon_board.gd",
 		"res://ludo_board.gd",
-		"res://chinese_checkers_board.gd"
+		"res://chinese_checkers_board.gd",
+		"res://goose_board.gd"
 	]
 	for script_path in centered_boards:
 		var b_script: Script = load(str(script_path)) as Script

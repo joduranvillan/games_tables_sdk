@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Colector y exportador de métricas operacionales en formato Prometheus (`GET /metrics`).
 //!
 //! Métricas expuestas:

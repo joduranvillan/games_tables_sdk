@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Backgammon: juego de referencia para 2 jugadores.
 //! Soporta tiradas con dobles (4 movimientos iguales), punto de entrada
 //! desde la barra, regla de bear-off (sacar fichas) y paso automático

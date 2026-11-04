@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de humo para simulación de pérdida de paquetes TCP vía MockTcpProxy.
 # (1) Implementa MockTcpProxy que intercepta tráfico entre Host y Cliente usando StreamPeerBuffer
 #     y simula un 20% de descarte (randf_range(0.0, 1.0) < 0.2) con seed(2026).

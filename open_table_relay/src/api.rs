@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Servidor HTTP ligero en el puerto 8081 para consultar rankings ELO, métricas Prometheus, salud y autenticación de invitados.
 //!
 //! Endpoints soportados:

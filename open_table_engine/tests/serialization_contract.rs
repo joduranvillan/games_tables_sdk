@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fmt::Debug;

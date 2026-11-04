@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Mil Millas (Mille Bornes): juego de cartas de referencia.
 //! Maneja manos privadas, descarte de cartas, restricción por límite
 //! de velocidad (máximo 50 km), rebarajado de la pila de descarte al vaciarse

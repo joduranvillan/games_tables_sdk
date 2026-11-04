@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 ## Adaptador de red P2P nativo para OpenTable (Android Nearby / iOS Multipeer).
 ## Vincula de forma transparente el nodo OpenTableBridge (Rust/GDExtension)
 ## con los plugins nativos de plataforma (OpenTableNearby / OpenTableMultipeer).

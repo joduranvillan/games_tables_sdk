@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de integración para el Manager de Logros (AchievementManager).
 # Correr: redot --headless --path godot_project --script res://tests/achievements_smoke.gd
 extends SceneTree

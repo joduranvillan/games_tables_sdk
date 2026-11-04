@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use chess_game::{
     chess_ai_pick_move, load_chess_position_from_fen, new_chess_session, AcceptDrawCommand,
     BoardResource, DrawOfferedResource, GameOverEvent, HalfMoveClockResource, MovePieceCommand,

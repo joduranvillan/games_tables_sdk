@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use monopoly_game::{
     apply_land_effect, new_monopoly_session, AcceptTradeCommand, BoardResource, BuildHouseCommand,
     BuildingsResource, HouseBuiltEvent, HouseSoldEvent, JailCardUsedEvent, JailResource,

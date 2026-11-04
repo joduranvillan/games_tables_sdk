@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 ## Capa de input drag-and-drop reutilizable para tableros de juego grid-based.
 ## Soporta mouse y touch (un toque para seleccionar, segundo toque para mover, o drag & drop).
 class_name DragDropLayer

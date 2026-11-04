@@ -1,6 +1,6 @@
 # Checklist de Lanzamiento Comercial y Open-Source (`RELEASE_CHECKLIST.md`)
 
-Esta guía define todos los requisitos legales, técnicos y de empaquetado para publicar **OpenTable SDK & Suite (13 Juegos)** tanto en repositorios de código abierto (GitHub, Crates.io) como en tiendas digitales comerciales (Steam, Itch.io, Google Play y Apple App Store) bajo la licencia **`GPL-3.0-or-later`**.
+Esta guía define todos los requisitos legales, técnicos y de empaquetado para publicar **OpenTable SDK & Suite (14 Juegos)** tanto en repositorios de código abierto (GitHub, Crates.io) como en tiendas digitales comerciales (Steam, Itch.io, Google Play y Apple App Store) bajo la licencia **`GPL-3.0-or-later`**.
 
 ---
 
@@ -62,29 +62,29 @@ La licencia **GPL-3.0-or-later** permite vender copias binarias comerciales del 
 
 ---
 
-## 2. Certificación Técnica Pre-Release (Motor y 13 Juegos)
+## 2. Certificación Técnica Pre-Release (Motor y 14 Juegos)
 
 Antes de empaquetar, todos los controles de calidad automatizados deben aprobar sin errores ni advertencias:
 
-- [ ] **1. Suite de Pruebas Deterministas en Rust (Workspace completo)**:
+- [x] **1. Suite de Pruebas Deterministas en Rust (Workspace completo)**:
   ```bash
   cargo test --workspace --exclude open_table_godot
   ```
   Verifica:
-  - Reglas canónicas (`tests/canonical_rules.rs`) en los 13 juegos (`checkers`, `chess`, `ludo`, `uno`, `mille_bornes`, `monopoly`, `backgammon`, `battleship`, `chinese_checkers`, `crisis`, `go`, `shogi`, `xiangqi`).
+  - Reglas canónicas (`tests/canonical_rules.rs`) en los 14 juegos (`checkers`, `chess`, `ludo`, `uno`, `mille_bornes`, `monopoly`, `backgammon`, `battleship`, `chinese_checkers`, `crisis`, `go`, `shogi`, `xiangqi`, `goose`).
   - Determinismo de snapshots, serialización de replays `.otr` (`bincode`), reconexión TCP/WebSocket y cálculo de ELO.
 
-- [ ] **2. Validador Estático Redot 4.x Strict y Smoke Tests de Godot (43 suites)**:
+- [x] **2. Validador Estático Redot 4.x Strict y Smoke Tests de Godot (45 suites)**:
   ```bash
   bash tools/run_godot_tests.sh
   ```
   Verifica:
   - `0` inferencias implícitas `:=` sobre expresiones `Variant` / `Dictionary` / `Array` en GDScript.
-  - Paridad 13/13 de scripts de tablero entre `godot_project/<juego>_board.gd` y `godot_project/scenes/<juego>_board.gd`.
-  - Validación de las 5 secciones canónicas de `RulesCatalog` (`DEFAULT_MODES`, `RULES`, `TUTORIAL_STEPS`, `RULES_SUMMARY`, `MODE_VARIANTS`) para los 13 juegos.
+  - Paridad 14/14 de scripts de tablero entre `godot_project/<juego>_board.gd` y `godot_project/scenes/<juego>_board.gd`.
+  - Validación de las 5 secciones canónicas de `RulesCatalog` (`DEFAULT_MODES`, `RULES`, `TUTORIAL_STEPS`, `RULES_SUMMARY`, `MODE_VARIANTS`) para los 14 juegos.
   - HUD compacto sin solapamiento de etiquetas de jugador y con badge regresivo `MM:SS` (`00:30`) activo en `TurnIndicator`.
 
-- [ ] **3. Verificación de Formato y Linter en Rust**:
+- [x] **3. Verificación de Formato y Linter en Rust**:
   ```bash
   cargo fmt --all -- --check
   cargo clippy --workspace --exclude open_table_godot -- -D warnings

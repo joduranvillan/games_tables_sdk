@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test de regresión y snapshot visual para tableros Godot.
 # Ejecutar: redot --headless --path godot_project --script res://tests/visual_regression.gd
 # Para actualizar los snapshots de referencia: UPDATE_SNAPSHOTS=1 make test-godot
@@ -19,7 +21,8 @@ const BOARDS = [
 	{"id": "mille_bornes", "scene": "res://mille_bornes_board.tscn"},
 	{"id": "monopoly", "scene": "res://monopoly_board.tscn"},
 	{"id": "chinese_checkers", "scene": "res://chinese_checkers_board.tscn"},
-	{"id": "battleship", "scene": "res://battleship_board.tscn"}
+	{"id": "battleship", "scene": "res://battleship_board.tscn"},
+	{"id": "goose", "scene": "res://goose_board.tscn"}
 ]
 
 func _initialize() -> void:

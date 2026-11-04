@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 ## Gestor de transiciones visuales y pantalla de carga entre escenas.
 class_name SceneTransition
 extends CanvasLayer

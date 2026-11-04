@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de integración para el flujo de Relay en OpenTableBridge.
 # Simula la conexión de dos clientes (Host y Guest) a través del flujo de Relay,
 # valida la generación de código de sala alfanumérico de 4 caracteres y verifica

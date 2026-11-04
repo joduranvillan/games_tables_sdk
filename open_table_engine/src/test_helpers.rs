@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Test helpers and macros for testing games built on `open_table_engine`.
 
 /// Directly mutates `TurnResource` in a session to force the current turn to a given player.

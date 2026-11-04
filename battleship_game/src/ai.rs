@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Inteligencia Artificial para Batalla Naval (Battleship) con Probabilistic Targeting.
 //!
 //! Niveles de dificultad (`AiDifficulty`):

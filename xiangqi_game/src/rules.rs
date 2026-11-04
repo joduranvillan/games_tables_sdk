@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::board::BoardResource;
 pub use crate::board::XiangqiHistoryResource;
 use crate::commands::{MovePieceCommand, ResignCommand};

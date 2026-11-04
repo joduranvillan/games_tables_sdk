@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de humo para la IA local (Checkers, Chess, Go y Ludo vs IA).
 # Correr: redot --headless --path godot_project --script res://tests/ai_local_smoke.gd
 extends SceneTree

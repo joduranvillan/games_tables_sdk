@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use open_table_core::error::EngineResult;
 
 /// Lo mínimo que un plugin nativo (Nearby Connections en Android,

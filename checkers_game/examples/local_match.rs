@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Partida de damas jugable por consola, dos jugadores humanos en el
 //! mismo proceso (turnándose frente a la misma terminal). Sirve para
 //! probar el juego de punta a punta sin esperar a `open_table_godot`.

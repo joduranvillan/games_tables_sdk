@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Lado cliente de `Transport` sobre TCP.
 //!
 //! Dos formas de conectarse: `connect_as_new_player` (primera vez, el

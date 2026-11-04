@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends Control
 
 ## Pantalla de Créditos, Licencias Open Source y Exportación de Diagnóstico Técnico (Prompt 493).

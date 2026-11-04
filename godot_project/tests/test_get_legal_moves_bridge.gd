@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test test_get_legal_moves_bridge.gd en Godot.
 #
 # Correr: redot --headless --path godot_project --script res://tests/test_get_legal_moves_bridge.gd

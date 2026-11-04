@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de humo del puente Rust<->Redot. Verifica en RUNTIME (no
 # solo que la extensión cargue) que OpenTableBridge arranca una partida,
 # valida movimientos contra el motor real y emite las señales correctas.

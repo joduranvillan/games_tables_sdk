@@ -124,23 +124,25 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
 
 ## 9. Certificación de Reglas Oficiales Canónicas y UI (PROMPTS13.md — v4.0.0) — Completado ✅
 
-- [x] **496–512.** Motores Rust (`*_game`) y tests de certificación `tests/canonical_rules.rs` completados al 100% en los 13 juegos.
-- [x] **513–518.** Controles UI canónicos en los 13 tableros de Godot (`godot_project/*_board.gd` y `godot_project/scenes/*_board.gd`):
+- [x] **496–512.** Motores Rust (`*_game`) y tests de certificación `tests/canonical_rules.rs` completados al 100% en los 14 juegos (incluyendo `goose_game` Prompts 521–529).
+- [x] **513–518.** Controles UI canónicos en los 14 tableros de Godot (`godot_project/*_board.gd` y `godot_project/scenes/*_board.gd`):
   - **Ajedrez (`chess_board.gd`)**: Modal selector de pieza de coronación (`PromotionSelectorPanel`: Dama, Torre, Alfil, Caballo) y botones de oferta/aceptación de tablas (`OfferDrawButton`, `DrawOfferBanner`, `AcceptDrawButton`).
   - **Go (`go_board.gd`)**: Selector de Handicap inicial (`HandicapOptionButton`: 0, 2, 3, 4 piedras Hoshi), marcado interactivo de piedras muertas con `✕` carmesí (`mark_dead_stone`) y confirmación (`ConfirmDeadButton`).
   - **Shogi (`shogi_board.gd`)**: Diálogo de promoción opcional (`PromotionDialogPanel`) con detección de promoción obligatoria FESA (`_is_promotion_mandatory_fesa`).
   - **Batalla Naval (`battleship_board.gd`)**: Siluetas cenitales SVG, orientación Horizontal/Vertical (`R`/clic derecho/vista previa), `ExtraTurnCheckBox` (`🔥 Racha al impactar`) y `RematchButton` (`🔁 Revancha`).
   - **Mille Bornes (`mille_bornes_board.gd`)**: Botón reactivo `CoupFourreButton` (`⚡ ¡Coup Fourré!`) y visualización de los 4 Escudos (`Prioridad`, `Cisterna`, `Impinchable`, `As Volante`).
+  - **El Juego de la Oca (`goose_board.gd`)**: Tablero espiral de 63 casillas, cubilete 3D (`DiceRoller3D` / `DiceWidget`), tutorial interactivo (`goose_tutorial.gd`), integración Anti-Cheat en `open_table_relay` y registro ELO en `score_tracker.gd`.
   - **Xiangqi, Backgammon, Ludo, UNO, Monopoly, Crisis/TEG, Damas Chinas y Damas**: Todos los controles e interacciones canónicas verificados y compatibles con Redot Engine (`safeguards strict`).
-- [x] **519–520.** Smoke test headless de controles UI canónicos (`godot_project/tests/canonical_rules_ui_smoke.gd`) y script de certificación `tools/verify_p13.sh`.
+- [x] **519–520.** Smoke test headless de controles UI canónicos (`godot_project/tests/canonical_rules_ui_smoke.gd`) y script de certificación `tools/verify_p13.sh` (14/14 juegos).
 
 ## 10. Para publicación en crates.io y Estado de Deuda Técnica
 
 - [x] Doubling cube Backgammon (prompt 310) — ✅ Implementado
 - [x] Jump-in UNO (prompt 311) — ✅ Implementado
-- [x] `get_legal_moves` con `LegalMoveGenerator` para los 13 juegos — ✅ Implementado
+- [x] `get_legal_moves` con `LegalMoveGenerator` para los 14 juegos — ✅ Implementado
 - [x] 0 warnings de Clippy (`cargo clippy --workspace --exclude open_table_godot -- -D warnings`) — ✅ 0 warnings (exit 0)
 - [x] **401.** Versión semántica 0.1.0 en todos los `Cargo.toml` y dependencias internas (`version = "0.1.0"`) — ✅ Verificado
 - [x] **402.** Documentación pública en `docs.rs` (`cargo doc --workspace --exclude open_table_godot --no-deps`) — ✅ 0 errores, 0 warnings (exit 0)
 - **0 TODOs activos** en el código fuente de los crates de Rust y GDScript, y 0 inferencias inseguras `:=` sobre `Variant` en Redot strict.
+
 

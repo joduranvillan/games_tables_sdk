@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Inteligencia Artificial con Monte Carlo Tree Search (MCTS) y heurísticas tácticas para Crisis / TEG.
 //!
 //! Cubre las tres fases principales del turno:

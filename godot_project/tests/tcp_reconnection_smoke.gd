@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de humo para reconexión TCP en OpenTableBridge.
 # (1) Arranca una sesión de damas como host TCP en puerto 19877
 # (2) Conecta un cliente con client.connect_to_host("127.0.0.1", 19877, "P2")

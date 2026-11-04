@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use open_table_engine::prelude::*;
 use open_table_macros::GameResource;
 use serde::{Deserialize, Serialize};

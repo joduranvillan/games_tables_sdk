@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use std::net::TcpStream;
 use std::thread;
 use std::time::{Duration, Instant};

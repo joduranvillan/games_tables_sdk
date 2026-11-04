@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use monopoly_game::{
     board_layout, new_monopoly_session, AcceptTradeCommand, AuctionBidCommand, AuctionStartedEvent,
     AuctionWonEvent, BankruptcyEvent, BuildHouseCommand, BuildingsResource, BuyPropertyCommand,

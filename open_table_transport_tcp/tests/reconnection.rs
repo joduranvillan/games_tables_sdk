@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Prueba el mecanismo de reconexión de punta a punta:
 //!
 //! 1. Alice se une (Join) y juega un par de turnos junto con Bob.

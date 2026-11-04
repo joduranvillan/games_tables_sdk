@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use mille_bornes_game::{
     new_mille_bornes_session, Card, CardDiscardedEvent, CoupFourreCommand, DiscardCardCommand,
     DrawCardCommand, GameOverEvent, Hazard, HazardPlayedEvent, PlayCardCommand, PlayHazardCommand,

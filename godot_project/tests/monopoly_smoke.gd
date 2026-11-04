@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de integración para Monopoly.
 # Correr: redot --headless --path godot_project --script res://tests/monopoly_smoke.gd
 extends SceneTree

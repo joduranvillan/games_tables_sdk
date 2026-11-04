@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Implementación real de `RawByteLink` para el bridge GDExtension (`open_table_godot`).
 //!
 //! `GodotRawByteLink` reemplaza a `FakeRawByteLink` en producción conectando

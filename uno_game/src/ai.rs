@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Inteligencia Artificial heurística basada en reglas para UNO.
 //!
 //! Prioridad de jugada (`Medium` / `Hard` / `Expert`):

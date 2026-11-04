@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Ludo: juego de referencia para 2-4 jugadores. Maneja tiradas
 //! de dado, detección de movimientos válidos (pasando el turno si no
 //! hay jugada posible), casillas seguras en las salidas de cada jugador,

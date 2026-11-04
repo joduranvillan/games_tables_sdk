@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Este es el test que faltaba: dos `Session` REALES (con `bevy_ecs`
 //! adentro) hablando por sockets TCP de verdad, no simulado en memoria.
 //! Prueba el ciclo completo:

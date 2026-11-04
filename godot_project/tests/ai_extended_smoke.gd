@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test de humo headless para los 6 nuevos motores IA en el bridge (Prompt 461):
 # Battleship, Mille Bornes, UNO, Monopoly, Chinese Checkers y Crisis/TEG.
 # Ejecutar: redot --headless --path godot_project -s tests/ai_extended_smoke.gd

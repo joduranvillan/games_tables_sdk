@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use crate::board::{BoardResource, Stone};
 use crate::commands::{PassCommand, PlaceHandicapCommand, PlaceStoneCommand};
 use open_table_core::ids::PlayerId;

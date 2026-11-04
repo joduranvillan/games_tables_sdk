@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 extends SceneTree
 
 # Smoke test para Prompt 475: Auto-Descubrimiento de Partidas en Red Local (UDP Broadcast / LAN Beacon)

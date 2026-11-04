@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `open_table_transport_tcp`: implementación de `Transport` sobre TCP
 //! para desktop, con reconexión autenticada.
 

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 ## Vista de damas: dibuja el tablero, toma el input táctil/mouse y habla
 ## con el motor Rust a través del nodo nativo `OpenTableBridge` (del
 ## GDExtension open_table_godot). Este script NUNCA valida reglas: manda

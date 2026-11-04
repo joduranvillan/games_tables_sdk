@@ -28,6 +28,7 @@ monopoly_game = { path = "../monopoly_game" }
 uno_game = { path = "../uno_game" }
 crisis_game = { path = "../crisis_game" }
 chinese_checkers_game = { path = "../chinese_checkers_game" }
+goose_game = { path = "../goose_game" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 getrandom = "0.4"

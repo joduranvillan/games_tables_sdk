@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use checkers_game::commands::MovePieceCommand;
 use checkers_game::{new_checkers_session, Position};
 use open_table_core::ids::{PlayerId, SessionId};

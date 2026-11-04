@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Test headless de humo para múltiples sesiones en OpenTableBridge.
 # Verifica que dos partidas simultáneas no mezclan eventos entre sí.
 #

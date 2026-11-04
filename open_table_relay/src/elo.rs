@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Módulo de ratings ELO persistentes (`./data/ratings.db`) para `open_table_relay`.
 //!
 //! Esquema lógico:

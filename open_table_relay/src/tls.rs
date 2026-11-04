@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Configuración y carga de certificados PEM para WebSocket Secure (`wss://`).
 //!
 //! Lee `TLS_CERT_PATH` y `TLS_KEY_PATH` del entorno. Si no están definidas,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Proc-macros derive para juegos construidos sobre OpenTable SDK.
 //!
 //! Sin esto, cada `Command`/`Event`/`Resource`/`Component` de un juego

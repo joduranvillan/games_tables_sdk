@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Ajedrez: octavo y último juego de referencia, el más completo en
 //! términos de validación de reglas. Implementa movimiento real de las
 //! 6 piezas, enroque (corto y largo), captura al paso, elección de pieza

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Framing binario mínimo: 4 bytes de longitud (big-endian) + el payload.
 //! TCP es un stream de bytes sin límites de mensaje, así que sin esto no
 //! hay forma de saber dónde termina un `CommandEnvelope`/`EventEnvelope`

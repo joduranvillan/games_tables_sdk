@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Prueba que un jugador desconectado que NO vuelve a tiempo:
 //! 1. Genera un `ConnectionEvent::TimedOut` (no se queda esperando para
 //!    siempre).

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 OpenTable Contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Juego de referencia del OpenTable SDK: damas.
 //!
 //! Ejercita el SDK completo: `Command`/`Event` via los derives de
