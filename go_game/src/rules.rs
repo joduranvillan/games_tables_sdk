@@ -493,10 +493,20 @@ pub fn build_go_rules() -> RuleEngine {
     });
 
     rules.register::<SetKomiCommand, _>(|cmd, world| {
+        if world.resource::<TurnResource>().0.turn_number() != 0 {
+            return Err(EngineError::InvalidCommand {
+                reason: "Komi can only be set before game start".into(),
+            });
+        }
         let mut board = world.resource_mut::<BoardResource>();
         if cmd.player != board.black_player && cmd.player != board.white_player {
             return Err(EngineError::InvalidCommand {
                 reason: "Invalid player".into(),
+            });
+        }
+        if board.grid.iter().any(|s| s.is_some()) {
+            return Err(EngineError::InvalidCommand {
+                reason: "Komi can only be set on an empty board".into(),
             });
         }
         board.komi_half_points = cmd.komi_half_points;
