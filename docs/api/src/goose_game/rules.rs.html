@@ -163,30 +163,34 @@
 <a href=#163 id=163 data-nosnippet>163</a>        })];
 <a href=#164 id=164 data-nosnippet>164</a>
 <a href=#165 id=165 data-nosnippet>165</a>        <span class="kw">if </span>finished {
-<a href=#166 id=166 data-nosnippet>166</a>            events.push(Box::new(GameOverEvent { winner: cmd.player }));
-<a href=#167 id=167 data-nosnippet>167</a>        } <span class="kw">else if </span>!resolution.bonus_turn {
-<a href=#168 id=168 data-nosnippet>168</a>            advance_turn_skipping_penalized(world, <span class="kw-2">&amp;mut </span>events);
-<a href=#169 id=169 data-nosnippet>169</a>        }
-<a href=#170 id=170 data-nosnippet>170</a>
-<a href=#171 id=171 data-nosnippet>171</a>        <span class="prelude-val">Ok</span>(events)
-<a href=#172 id=172 data-nosnippet>172</a>    });
-<a href=#173 id=173 data-nosnippet>173</a>
-<a href=#174 id=174 data-nosnippet>174</a>    rules.register::&lt;ResignCommand, <span class="kw">_</span>&gt;(|cmd, world| {
-<a href=#175 id=175 data-nosnippet>175</a>        ensure_goose_resources(world);
-<a href=#176 id=176 data-nosnippet>176</a>
-<a href=#177 id=177 data-nosnippet>177</a>        <span class="kw">let </span>players = world.resource::&lt;TurnResource&gt;().<span class="number">0</span>.players().to_vec();
-<a href=#178 id=178 data-nosnippet>178</a>        <span class="kw">if </span>!players.contains(<span class="kw-2">&amp;</span>cmd.player) {
-<a href=#179 id=179 data-nosnippet>179</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(invalid(<span class="string">"no sos un jugador de esta partida"</span>));
-<a href=#180 id=180 data-nosnippet>180</a>        }
-<a href=#181 id=181 data-nosnippet>181</a>        <span class="kw">let </span>opponent = players
-<a href=#182 id=182 data-nosnippet>182</a>            .into_iter()
-<a href=#183 id=183 data-nosnippet>183</a>            .find(|<span class="kw-2">&amp;</span>p| p != cmd.player)
-<a href=#184 id=184 data-nosnippet>184</a>            .unwrap_or(cmd.player);
-<a href=#185 id=185 data-nosnippet>185</a>
-<a href=#186 id=186 data-nosnippet>186</a>        world.resource_mut::&lt;GooseBoardResource&gt;().winner = <span class="prelude-val">Some</span>(opponent);
-<a href=#187 id=187 data-nosnippet>187</a>        <span class="prelude-val">Ok</span>(<span class="macro">vec!</span>[Box::new(GameOverEvent { winner: opponent })])
-<a href=#188 id=188 data-nosnippet>188</a>    });
-<a href=#189 id=189 data-nosnippet>189</a>
-<a href=#190 id=190 data-nosnippet>190</a>    rules
-<a href=#191 id=191 data-nosnippet>191</a>}
+<a href=#166 id=166 data-nosnippet>166</a>            world.insert_resource(GameOverResource(<span class="bool-val">true</span>));
+<a href=#167 id=167 data-nosnippet>167</a>            world.insert_resource(WinnerResource(<span class="prelude-val">Some</span>(cmd.player)));
+<a href=#168 id=168 data-nosnippet>168</a>            events.push(Box::new(GameOverEvent { winner: cmd.player }));
+<a href=#169 id=169 data-nosnippet>169</a>        } <span class="kw">else if </span>!resolution.bonus_turn {
+<a href=#170 id=170 data-nosnippet>170</a>            advance_turn_skipping_penalized(world, <span class="kw-2">&amp;mut </span>events);
+<a href=#171 id=171 data-nosnippet>171</a>        }
+<a href=#172 id=172 data-nosnippet>172</a>
+<a href=#173 id=173 data-nosnippet>173</a>        <span class="prelude-val">Ok</span>(events)
+<a href=#174 id=174 data-nosnippet>174</a>    });
+<a href=#175 id=175 data-nosnippet>175</a>
+<a href=#176 id=176 data-nosnippet>176</a>    rules.register::&lt;ResignCommand, <span class="kw">_</span>&gt;(|cmd, world| {
+<a href=#177 id=177 data-nosnippet>177</a>        ensure_goose_resources(world);
+<a href=#178 id=178 data-nosnippet>178</a>
+<a href=#179 id=179 data-nosnippet>179</a>        <span class="kw">let </span>players = world.resource::&lt;TurnResource&gt;().<span class="number">0</span>.players().to_vec();
+<a href=#180 id=180 data-nosnippet>180</a>        <span class="kw">if </span>!players.contains(<span class="kw-2">&amp;</span>cmd.player) {
+<a href=#181 id=181 data-nosnippet>181</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(invalid(<span class="string">"no sos un jugador de esta partida"</span>));
+<a href=#182 id=182 data-nosnippet>182</a>        }
+<a href=#183 id=183 data-nosnippet>183</a>        <span class="kw">let </span>opponent = players
+<a href=#184 id=184 data-nosnippet>184</a>            .into_iter()
+<a href=#185 id=185 data-nosnippet>185</a>            .find(|<span class="kw-2">&amp;</span>p| p != cmd.player)
+<a href=#186 id=186 data-nosnippet>186</a>            .unwrap_or(cmd.player);
+<a href=#187 id=187 data-nosnippet>187</a>
+<a href=#188 id=188 data-nosnippet>188</a>        world.resource_mut::&lt;GooseBoardResource&gt;().winner = <span class="prelude-val">Some</span>(opponent);
+<a href=#189 id=189 data-nosnippet>189</a>        world.insert_resource(GameOverResource(<span class="bool-val">true</span>));
+<a href=#190 id=190 data-nosnippet>190</a>        world.insert_resource(WinnerResource(<span class="prelude-val">Some</span>(opponent)));
+<a href=#191 id=191 data-nosnippet>191</a>        <span class="prelude-val">Ok</span>(<span class="macro">vec!</span>[Box::new(GameOverEvent { winner: opponent })])
+<a href=#192 id=192 data-nosnippet>192</a>    });
+<a href=#193 id=193 data-nosnippet>193</a>
+<a href=#194 id=194 data-nosnippet>194</a>    rules
+<a href=#195 id=195 data-nosnippet>195</a>}
 </code></pre></div></section></main></body></html>
