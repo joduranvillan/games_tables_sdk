@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["QrError"],"fn":["generate_join_code","generate_join_qr_svg","parse_join_payload"],"struct":["JoinPayload"]};
+window.SIDEBAR_ITEMS = {"enum":["QrError"],"fn":["extract_qr_payload_json","generate_join_code","generate_join_qr_svg","generate_lan_join_qr_svg","parse_join_payload","parse_lan_join_payload"],"struct":["JoinPayload","LanJoinPayload"]};
