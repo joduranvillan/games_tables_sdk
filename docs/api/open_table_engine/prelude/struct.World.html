@@ -138,7 +138,7 @@ Using a <a href="crate::schedule::Schedule"><code>Schedule</code></a> is still p
 due to its better performance and ability to run non-conflicting systems simultaneously.</p>
 </div></details><details class="toggle method-toggle" open><summary><section id="method.register_boxed_system" class="method"><h4 class="code-header">pub fn <a href="#method.register_boxed_system" class="fn">register_boxed_system</a>&lt;I, O&gt;(
     &amp;mut self,
-    system: <a class="struct" href="https://doc.rust-lang.org/1.99.1/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn System&lt;Out = O, In = I&gt;&gt;,
+    system: <a class="struct" href="https://doc.rust-lang.org/1.99.1/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn System&lt;In = I, Out = O&gt;&gt;,
 ) -&gt; SystemId&lt;I, O&gt;<div class="where">where
     I: SystemInput + 'static,
     O: 'static,</div></h4></section></summary><div class="docblock"><p>Similar to <a href="struct.World.html#method.register_system" title="method open_table_engine::prelude::World::register_system"><code>Self::register_system</code></a>, but allows passing in a [<code>BoxedSystem</code>].</p>
@@ -161,7 +161,7 @@ this function multiple times. If that’s not what you want, consider using
 <a href="struct.World.html#method.register_system_cached" title="method open_table_engine::prelude::World::register_system_cached"><code>World::register_system_cached</code></a> instead.</p>
 </div></details><details class="toggle method-toggle" open><summary><section id="method.register_tracked_boxed_system" class="method"><h4 class="code-header">pub fn <a href="#method.register_tracked_boxed_system" class="fn">register_tracked_boxed_system</a>&lt;I, O&gt;(
     &amp;mut self,
-    system: <a class="struct" href="https://doc.rust-lang.org/1.99.1/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn System&lt;Out = O, In = I&gt;&gt;,
+    system: <a class="struct" href="https://doc.rust-lang.org/1.99.1/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn System&lt;In = I, Out = O&gt;&gt;,
 ) -&gt; SystemHandle&lt;I, O&gt;<div class="where">where
     I: SystemInput + 'static,
     O: 'static,</div></h4></section></summary><div class="docblock"><p>Similar to <a href="struct.World.html#method.register_tracked_system" title="method open_table_engine::prelude::World::register_tracked_system"><code>Self::register_tracked_system</code></a>, but allows passing in a
