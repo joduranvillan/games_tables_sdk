@@ -285,4 +285,3 @@ fn canonical_construccion_desigual_rechazada_hipoteca_sin_renta_y_tarjeta_carcel
         .jailed
         .contains_key(&P1));
 }
-

@@ -148,4 +148,3 @@ fn canonical_subpromocion_y_rechazo_tablas_sin_oferta() {
         .process_command(BLACK, Box::new(OfferDrawCommand { player: BLACK }))
         .is_err());
 }
-

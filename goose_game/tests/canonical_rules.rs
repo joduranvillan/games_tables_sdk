@@ -216,7 +216,13 @@ fn test_inn_well_and_prison_penalties_and_well_rescue() {
     assert_eq!(session.current_player(), P2);
 
     // Verificar constante de Cárcel (52) e Inn/Well/Labyrinth/Skull
-    let _ = (INN_SQUARE, WELL_SQUARE, LABYRINTH_SQUARE, PRISON_SQUARE, SKULL_SQUARE);
+    let _ = (
+        INN_SQUARE,
+        WELL_SQUARE,
+        LABYRINTH_SQUARE,
+        PRISON_SQUARE,
+        SKULL_SQUARE,
+    );
 }
 
 #[test]

@@ -181,4 +181,3 @@ fn canonical_maximo_una_tarjeta_por_turno_y_rechazo_canje_invalido() {
         )
         .is_err());
 }
-

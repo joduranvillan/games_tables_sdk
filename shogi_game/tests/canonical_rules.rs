@@ -273,4 +273,3 @@ fn canonical_captura_pieza_promocionada_vuelve_a_mano_sin_promocionar_y_drop() {
         Some(PieceKind::Silver)
     );
 }
-

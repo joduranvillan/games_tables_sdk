@@ -218,4 +218,3 @@ fn canonical_reinicio_contador_seises_y_meta_exacta() {
         )
         .is_err());
 }
-

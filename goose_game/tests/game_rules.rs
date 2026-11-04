@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use goose_game::{
-    new_goose_session, GooseAiDifficulty, GooseBoardResource, GooseMoveGenerator, MoveTokenCommand,
-    PendingRollResource, ResignCommand, RollDiceCommand, select_ai_move,
+    new_goose_session, select_ai_move, GooseAiDifficulty, GooseBoardResource, GooseMoveGenerator,
+    MoveTokenCommand, PendingRollResource, ResignCommand, RollDiceCommand,
 };
 use open_table_engine::prelude::*;
 

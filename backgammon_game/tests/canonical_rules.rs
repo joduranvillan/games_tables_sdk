@@ -150,4 +150,3 @@ fn canonical_cubo_doblaje_y_regla_crawford() {
     assert!(session.world().resource::<GameOverResource>().0);
     assert_eq!(session.world().resource::<WinnerResource>().0, Some(P2));
 }
-

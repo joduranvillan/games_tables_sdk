@@ -99,4 +99,3 @@ fn canonical_cadena_de_saltos_multiples_y_rechazo_salto_invalido() {
         Some(&P1)
     );
 }
-

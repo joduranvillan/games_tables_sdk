@@ -112,8 +112,8 @@ pub fn resolve_landing(from: u8, roll: u8) -> LandingResolution {
             bonus_turn: true,
             wait_turns: 0,
             kind: SpecialSquareKind::Bridge,
-            description:
-                "¡De puente (6) a puente (12) y tiro porque me lleva la corriente!".to_string(),
+            description: "¡De puente (6) a puente (12) y tiro porque me lleva la corriente!"
+                .to_string(),
         },
         BRIDGE_B => LandingResolution {
             raw_square,
@@ -121,8 +121,8 @@ pub fn resolve_landing(from: u8, roll: u8) -> LandingResolution {
             bonus_turn: true,
             wait_turns: 0,
             kind: SpecialSquareKind::Bridge,
-            description:
-                "¡De puente (12) a puente (6) y tiro porque me lleva la corriente!".to_string(),
+            description: "¡De puente (12) a puente (6) y tiro porque me lleva la corriente!"
+                .to_string(),
         },
         INN_SQUARE => LandingResolution {
             raw_square,

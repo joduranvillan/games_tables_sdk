@@ -183,4 +183,3 @@ fn canonical_triple_repeticion_tablas_y_general_volador() {
         }
     }
 }
-

@@ -207,4 +207,3 @@ fn canonical_reinicio_reloj_tablas_y_captura_obligatoria() {
         0
     );
 }
-

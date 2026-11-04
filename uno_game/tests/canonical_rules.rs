@@ -174,4 +174,3 @@ fn canonical_jump_in_intercept_carta_identica_y_rechazo_no_identica() {
         .expect("Jump-In con carta exactamente idéntica debe aceptarse");
     assert!(ev_int[0].as_any().is::<InterceptedEvent>());
 }
-

@@ -145,4 +145,3 @@ fn canonical_safety_cura_hazard_activo_y_limite_dos_cartas_200km() {
         )
         .is_err());
 }
-

@@ -4117,10 +4117,7 @@ impl OpenTableBridge {
                 );
             }
 
-            if let Some(g_moved) = event
-                .as_any()
-                .downcast_ref::<goose_game::GooseMovedEvent>()
-            {
+            if let Some(g_moved) = event.as_any().downcast_ref::<goose_game::GooseMovedEvent>() {
                 self.emit_bridge_signal(
                     "token_moved",
                     &[

@@ -154,4 +154,3 @@ fn canonical_rechazo_set_komi_tardio_y_marcado_antes_de_doble_pase() {
         )
         .is_err());
 }
-

@@ -187,10 +187,5 @@ fn canonical_hundir_flota_con_racha_y_rematch_reinicia_estado() {
         .unwrap();
 
     assert!(!session.world().resource::<GameOverResource>().0);
-    assert!(session
-        .world()
-        .resource::<FleetResource>()
-        .ships
-        .is_empty());
+    assert!(session.world().resource::<FleetResource>().ships.is_empty());
 }
-
