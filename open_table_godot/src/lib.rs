@@ -1649,7 +1649,7 @@ impl OpenTableBridge {
             | BridgeMode::NativeClient { player_id, .. }
             | BridgeMode::MultipeerClient { player_id, .. }
             | BridgeMode::RelayClient { player_id, .. } => {
-                if player_id.0 == 0 {
+                if player_id.0 <= 1 {
                     2
                 } else {
                     player_id.0 as i64
@@ -2088,8 +2088,13 @@ impl OpenTableBridge {
             } if *handshake_complete => Some(*player_id),
             _ => None,
         };
-        let Some(player_id) = command_parts else {
+        let Some(raw_pid) = command_parts else {
             return;
+        };
+        let player_id = if raw_pid.0 <= 1 {
+            PlayerId(2)
+        } else {
+            raw_pid
         };
 
         let command: Box<dyn Command> = Box::new(MovePieceCommand {
@@ -2787,63 +2792,19 @@ impl OpenTableBridge {
         }
 
         if let Ok(events) = self.process_and_emit(player_id, command) {
-            let gtype = self.current_game_type.clone();
+            let serialized = serde_json::to_vec(&events).unwrap_or_default();
             match &mut self.mode {
-                BridgeMode::Host { session, transport } => {
-                    if let Ok(log_bytes) = session.export_log() {
-                        let sync_msg = SyncProtocolMessage::SyncState {
-                            game_type: gtype,
-                            log_bytes,
-                        };
-                        if let Ok(sync_bytes) = serde_json::to_vec(&sync_msg) {
-                            let _ = transport.broadcast(&sync_bytes);
-                        }
-                    }
-                    let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                BridgeMode::Host { transport, .. } => {
                     let _ = transport.broadcast(&serialized);
                 }
-                BridgeMode::NativeHost {
-                    session, transport, ..
-                } => {
-                    if let Ok(log_bytes) = session.export_log() {
-                        let sync_msg = SyncProtocolMessage::SyncState {
-                            game_type: gtype,
-                            log_bytes,
-                        };
-                        if let Ok(sync_bytes) = serde_json::to_vec(&sync_msg) {
-                            let _ = transport.broadcast(&sync_bytes);
-                        }
-                    }
-                    let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                BridgeMode::NativeHost { transport, .. } => {
                     let _ = transport.broadcast(&serialized);
                 }
-                BridgeMode::MultipeerHost {
-                    session, transport, ..
-                } => {
-                    if let Ok(log_bytes) = session.export_log() {
-                        let sync_msg = SyncProtocolMessage::SyncState {
-                            game_type: gtype,
-                            log_bytes,
-                        };
-                        if let Ok(sync_bytes) = serde_json::to_vec(&sync_msg) {
-                            let _ = transport.broadcast(&sync_bytes);
-                        }
-                    }
-                    let serialized = serde_json::to_vec(&events).unwrap_or_default();
+                BridgeMode::MultipeerHost { transport, .. } => {
                     let _ = transport.broadcast(&serialized);
                 }
-                BridgeMode::RelayHost { session } => {
+                BridgeMode::RelayHost { .. } => {
                     if let Some(relay) = &mut self.relay_client {
-                        if let Ok(log_bytes) = session.export_log() {
-                            let sync_msg = SyncProtocolMessage::SyncState {
-                                game_type: gtype,
-                                log_bytes,
-                            };
-                            if let Ok(sync_bytes) = serde_json::to_vec(&sync_msg) {
-                                let _ = relay.send_relay_data(&sync_bytes);
-                            }
-                        }
-                        let serialized = serde_json::to_vec(&events).unwrap_or_default();
                         let _ = relay.send_relay_data(&serialized);
                     }
                 }
@@ -3938,12 +3899,30 @@ impl OpenTableBridge {
 
                         let cmd_str = String::from_utf8_lossy(&data);
                         if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
-                            let sender = if from.0 == 0 { PlayerId(2) } else { from };
+                            let sender = command.issuer().unwrap_or_else(|| {
+                                if from.0 <= 1 {
+                                    PlayerId(2)
+                                } else {
+                                    from
+                                }
+                            });
                             if let Ok(game_events) = self.process_and_emit(sender, command) {
-                                if let Some(relay) = &mut self.relay_client {
-                                    let serialized =
-                                        serde_json::to_vec(&game_events).unwrap_or_default();
-                                    let _ = relay.send_relay_data(&serialized);
+                                let gtype = self.current_game_type.clone();
+                                if let BridgeMode::RelayHost { session } = &mut self.mode {
+                                    if let Some(relay) = &mut self.relay_client {
+                                        if let Ok(log_bytes) = session.export_log() {
+                                            let sync_msg = SyncProtocolMessage::SyncState {
+                                                game_type: gtype,
+                                                log_bytes,
+                                            };
+                                            if let Ok(sync_bytes) = serde_json::to_vec(&sync_msg) {
+                                                let _ = relay.send_relay_data(&sync_bytes);
+                                            }
+                                        }
+                                        let serialized =
+                                            serde_json::to_vec(&game_events).unwrap_or_default();
+                                        let _ = relay.send_relay_data(&serialized);
+                                    }
                                 }
                             }
                         }
@@ -4148,11 +4127,13 @@ impl OpenTableBridge {
 
             let cmd_str = String::from_utf8_lossy(&command_bytes);
             if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
-                let effective_sender = if player_id.0 == 0 {
-                    command.issuer().unwrap_or(PlayerId(2))
-                } else {
-                    player_id
-                };
+                let effective_sender = command.issuer().unwrap_or_else(|| {
+                    if player_id.0 <= 1 {
+                        PlayerId(2)
+                    } else {
+                        player_id
+                    }
+                });
                 if let Ok(events) = self.process_and_emit(effective_sender, command) {
                     let gtype = self.current_game_type.clone();
                     if let BridgeMode::Host { session, transport } = &mut self.mode {
@@ -4343,7 +4324,14 @@ impl OpenTableBridge {
 
             let cmd_str = String::from_utf8_lossy(&command_bytes);
             if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
-                if let Ok(events) = self.process_and_emit(player_id, command) {
+                let effective_sender = command.issuer().unwrap_or_else(|| {
+                    if player_id.0 <= 1 {
+                        PlayerId(2)
+                    } else {
+                        player_id
+                    }
+                });
+                if let Ok(events) = self.process_and_emit(effective_sender, command) {
                     let gtype = self.current_game_type.clone();
                     if let BridgeMode::NativeHost {
                         session, transport, ..
@@ -4520,7 +4508,14 @@ impl OpenTableBridge {
 
             let cmd_str = String::from_utf8_lossy(&command_bytes);
             if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
-                if let Ok(events) = self.process_and_emit(player_id, command) {
+                let effective_sender = command.issuer().unwrap_or_else(|| {
+                    if player_id.0 <= 1 {
+                        PlayerId(2)
+                    } else {
+                        player_id
+                    }
+                });
+                if let Ok(events) = self.process_and_emit(effective_sender, command) {
                     let gtype = self.current_game_type.clone();
                     if let BridgeMode::MultipeerHost {
                         session, transport, ..
