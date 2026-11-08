@@ -110,6 +110,8 @@ func _ready() -> void:
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
+	if bridge.has_signal("turn_changed"):
+		bridge.connect("turn_changed", _on_turn_changed)
 
 	if has_net_bridge:
 		if mode_option_button != null:
@@ -570,7 +572,23 @@ func _input(event: InputEvent) -> void:
 		var local_pos: Vector2 = _event_to_board_pos(event.position, false)
 		_handle_unified_input(local_pos, event.pressed, not event.pressed)
 
+func is_local_turn_allowed() -> bool:
+	if bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")):
+		if bridge.has_method("is_local_player_turn"):
+			return bool(bridge.call("is_local_player_turn"))
+		if bridge.has_method("get_network_local_player_id"):
+			return int(bridge.call("get_network_local_player_id")) == int(bridge.current_player())
+	return true
+
+func _on_turn_changed(player_id: int) -> void:
+	current = player_id
+	_update_hand_panels()
+	_update_status()
+	_request_board_redraw()
+
 func _handle_unified_input(pos: Vector2, is_press: bool, is_release: bool) -> void:
+	if not is_local_turn_allowed():
+		return
 	var board_x = pos.x - BOARD_ORIGIN_X
 	var board_y = pos.y - BOARD_ORIGIN_Y
 	if board_x < 0.0 or board_x >= BOARD_SIZE * CELL_SIZE or board_y < 0.0 or board_y >= BOARD_SIZE * CELL_SIZE:
@@ -653,6 +671,8 @@ func start_shogi_tutorial() -> void:
 		ShogiTut.start_on_board(self)
 
 func _handle_board_click(row: int, col: int) -> void:
+	if not is_local_turn_allowed():
+		return
 	if (is_inside_tree() and has_node("/root/TutorialManager")):
 		var tm = get_node("/root/TutorialManager")
 		if tm.get("is_running") == true:

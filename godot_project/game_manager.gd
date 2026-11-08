@@ -24,6 +24,16 @@ var active_network_bridge: Node = null
 var network_mode: String = "" # "", "host", or "client"
 var local_network_player_id: int = 1
 var open_qr_scanner_on_lobby_ready: bool = false
+var relay_url: String = "ws://127.0.0.1:8080"
+var last_host_ip: String = ""
+var last_host_port: int = 0
+var last_reconnect_token: String = ""
+var last_relay_room_code: String = ""
+var last_transport_kind: String = ""
+var reconnect_in_progress: bool = false
+var reconnect_attempts: int = 0
+var reconnect_timer_accum: float = 0.0
+const MAX_RECONNECT_ATTEMPTS: int = 5
 var ai_difficulty: int = 1 # 0=Easy, 1=Normal, 2=Hard, 3=Expert
 var chess_ai_depth: int = 2
 var sfx_enabled: bool = true
@@ -37,6 +47,40 @@ var replay_log_bytes: PackedByteArray = PackedByteArray()
 var replay_game_type: String = "checkers"
 var last_layout: int = -1
 var last_safe_margins: Dictionary = {"top": 0, "bottom": 0, "left": 0, "right": 0}
+
+func set_relay_url(url: String, persist: bool = true) -> void:
+	var clean: String = url.strip_edges()
+	if clean.is_empty():
+		clean = "ws://127.0.0.1:8080"
+	if not clean.begins_with("ws://") and not clean.begins_with("wss://"):
+		clean = "ws://" + clean
+	relay_url = clean
+	if persist:
+		var cfg := ConfigFile.new()
+		cfg.load("user://settings.cfg")
+		cfg.set_value("network", "relay_url", relay_url)
+		cfg.save("user://settings.cfg")
+
+func get_relay_url() -> String:
+	if relay_url.strip_edges().is_empty():
+		var env_url: String = OS.get_environment("OPEN_TABLE_RELAY_URL").strip_edges()
+		if not env_url.is_empty():
+			return env_url
+		return "ws://127.0.0.1:8080"
+	return relay_url
+
+func set_tcp_connection_info(ip: String, port: int, token: String = "") -> void:
+	last_host_ip = ip.strip_edges()
+	last_host_port = port
+	if not token.is_empty():
+		last_reconnect_token = token
+	last_transport_kind = "tcp_client"
+
+func set_relay_connection_info(url: String, room_code: String, is_host: bool = false) -> void:
+	if not url.strip_edges().is_empty():
+		set_relay_url(url, false)
+	last_relay_room_code = room_code.strip_edges().to_upper()
+	last_transport_kind = "relay_host" if is_host else "relay_client"
 
 func set_online_features_enabled(enabled: bool) -> void:
 	online_features_enabled = enabled
@@ -52,6 +96,8 @@ func set_game_mode(mode: String) -> void:
 	game_mode = mode
 	if mode != "network" and mode != "host" and mode != "client":
 		network_mode = ""
+		reconnect_in_progress = false
+		reconnect_attempts = 0
 
 func get_game_mode() -> String:
 	return game_mode
@@ -73,8 +119,82 @@ func register_network_bridge(bridge_node: Node, mode_str: String, local_pid: int
 	local_network_player_id = 2 if local_pid == 2 else 1
 	human_player_id = local_network_player_id
 	game_mode = "network"
+	reconnect_in_progress = false
+	reconnect_attempts = 0
+	if bridge_node.has_method("get_network_transport_kind"):
+		var tk: String = str(bridge_node.call("get_network_transport_kind"))
+		if tk != "none" and not tk.is_empty():
+			last_transport_kind = tk
+	if bridge_node.has_method("get_relay_room_code"):
+		var rc: String = str(bridge_node.call("get_relay_room_code"))
+		if not rc.is_empty():
+			last_relay_room_code = rc
+	if bridge_node.has_method("get_relay_url"):
+		var rurl: String = str(bridge_node.call("get_relay_url"))
+		if not rurl.is_empty():
+			relay_url = rurl
+	if bridge_node.has_signal("native_handshake_established"):
+		var hs_cb := Callable(self, "_on_bridge_handshake_established")
+		if not bridge_node.is_connected("native_handshake_established", hs_cb):
+			bridge_node.connect("native_handshake_established", hs_cb)
+	if bridge_node.has_signal("disconnected"):
+		var disc_cb := Callable(self, "_on_bridge_disconnected")
+		if not bridge_node.is_connected("disconnected", disc_cb):
+			bridge_node.connect("disconnected", disc_cb)
 	if not game_id.is_empty():
 		set_active_game(game_id)
+
+func _on_bridge_handshake_established(pid: int, token: String) -> void:
+	if pid >= 2:
+		local_network_player_id = pid
+		human_player_id = pid
+	if not token.is_empty():
+		last_reconnect_token = token
+
+func _on_bridge_disconnected() -> void:
+	if not is_network_match() or active_network_bridge == null or not is_instance_valid(active_network_bridge):
+		return
+	if last_transport_kind in ["tcp_client", "relay_client", "relay_host"]:
+		reconnect_in_progress = true
+		reconnect_attempts = 0
+		reconnect_timer_accum = 0.0
+		if active_network_bridge.has_method("emit_connection_reconnecting"):
+			active_network_bridge.call("emit_connection_reconnecting", 1)
+
+func attempt_auto_reconnect() -> bool:
+	if active_network_bridge == null or not is_instance_valid(active_network_bridge):
+		reconnect_in_progress = false
+		return false
+	var ok: bool = false
+	if last_transport_kind == "tcp_client" and not last_host_ip.is_empty() and last_host_port > 0:
+		if not last_reconnect_token.is_empty() and active_network_bridge.has_method("reconnect_to_host"):
+			ok = bool(active_network_bridge.call("reconnect_to_host", last_host_ip, last_host_port, local_network_player_id, last_reconnect_token))
+		elif active_network_bridge.has_method("connect_to_host"):
+			ok = bool(active_network_bridge.call("connect_to_host", last_host_ip, last_host_port, "Player" + str(local_network_player_id)))
+	elif last_transport_kind in ["relay_client", "relay_host"] and not last_relay_room_code.is_empty():
+		if active_network_bridge.has_method("rejoin_relay_room"):
+			ok = bool(active_network_bridge.call("rejoin_relay_room", last_relay_room_code))
+	if ok:
+		reconnect_in_progress = false
+		reconnect_attempts = 0
+		reconnect_timer_accum = 0.0
+		if active_network_bridge.has_method("emit_connection_restored"):
+			active_network_bridge.call("emit_connection_restored")
+	return ok
+
+func _process(delta: float) -> void:
+	if not reconnect_in_progress:
+		return
+	reconnect_timer_accum += delta
+	if reconnect_timer_accum >= 2.0:
+		reconnect_timer_accum = 0.0
+		reconnect_attempts += 1
+		if active_network_bridge != null and is_instance_valid(active_network_bridge) and active_network_bridge.has_method("emit_connection_reconnecting"):
+			active_network_bridge.call("emit_connection_reconnecting", reconnect_attempts)
+		if attempt_auto_reconnect():
+			return
+		if reconnect_attempts >= MAX_RECONNECT_ATTEMPTS:
+			reconnect_in_progress = false
 
 func has_active_network_bridge() -> bool:
 	return active_network_bridge != null and is_instance_valid(active_network_bridge)
@@ -94,6 +214,19 @@ func claim_network_bridge(target_parent: Node = null) -> Node:
 func get_network_local_player_id() -> int:
 	return local_network_player_id
 
+func is_local_player_turn(bridge_node: Node = null) -> bool:
+	if not is_network_match():
+		return true
+	var b: Node = bridge_node if (bridge_node != null and is_instance_valid(bridge_node)) else active_network_bridge
+	if b != null and is_instance_valid(b):
+		if b.has_method("is_local_player_turn") and b.has_method("is_network_mode") and bool(b.call("is_network_mode")):
+			return bool(b.call("is_local_player_turn"))
+		if b.has_method("current_player"):
+			var cp: int = int(b.call("current_player"))
+			if cp > 0:
+				return cp == local_network_player_id
+	return true
+
 func is_network_match() -> bool:
 	return game_mode == "network" or not network_mode.is_empty()
 
@@ -104,6 +237,8 @@ func clear_network_bridge() -> void:
 		active_network_bridge.queue_free()
 	active_network_bridge = null
 	network_mode = ""
+	reconnect_in_progress = false
+	reconnect_attempts = 0
 
 func set_human_player_id(pid: int) -> void:
 	human_player_id = 2 if pid == 2 else 1
@@ -273,6 +408,14 @@ func load_saved_settings() -> void:
 		offline_only_mode = bool(cfg.get_value("privacy", "offline_only_mode", false))
 		online_features_enabled = bool(cfg.get_value("privacy", "online_enabled", not offline_only_mode)) and not offline_only_mode
 		set_online_features_enabled(online_features_enabled)
+		var env_relay: String = OS.get_environment("OPEN_TABLE_RELAY_URL").strip_edges()
+		var default_relay: String = env_relay if not env_relay.is_empty() else "ws://127.0.0.1:8080"
+		var saved_relay: String = str(cfg.get_value("network", "relay_url", default_relay))
+		set_relay_url(saved_relay, false)
+	else:
+		var env_relay_fallback: String = OS.get_environment("OPEN_TABLE_RELAY_URL").strip_edges()
+		if not env_relay_fallback.is_empty():
+			set_relay_url(env_relay_fallback, false)
 
 func set_active_game(game_type: String) -> void:
 	active_game_type = game_type

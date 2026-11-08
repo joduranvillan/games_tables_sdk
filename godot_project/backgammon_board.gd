@@ -81,6 +81,8 @@ func _ready() -> void:
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
+	if bridge.has_signal("turn_changed"):
+		bridge.connect("turn_changed", _on_turn_changed)
 	
 	# HUD de red — solo en modo Host/Client, nunca en headless
 	if not OS.has_feature("headless"):
@@ -345,15 +347,28 @@ func _on_mode_selected(index: int) -> void:
 	_update_status()
 	queue_redraw()
 
+func is_local_turn_allowed() -> bool:
+	if bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")):
+		if bridge.has_method("is_local_player_turn"):
+			return bool(bridge.call("is_local_player_turn"))
+		if bridge.has_method("get_network_local_player_id"):
+			return int(bridge.call("get_network_local_player_id")) == int(bridge.current_player())
+	return true
+
+func _on_turn_changed(player_id: int) -> void:
+	current = player_id
+	_update_status()
+	queue_redraw()
+
 func _on_roll_pressed() -> void:
 	_sfx_dice_roll()
-	if winner != -1:
+	if winner != -1 or not is_local_turn_allowed():
 		return
 	var cmd = {"command_type": "RollDiceCommand", "player": current}
 	bridge.send_command_json(current, JSON.stringify(cmd))
 
 func _input(event: InputEvent) -> void:
-	if winner != -1:
+	if winner != -1 or not is_local_turn_allowed():
 		return
 		
 	var click_pos = Vector2.ZERO
@@ -410,6 +425,8 @@ func _input(event: InputEvent) -> void:
 				return
 
 func _handle_point_click(pt: int) -> void:
+	if not is_local_turn_allowed():
+		return
 	if selected_from == -2 and bar_checkers[current] > 0:
 		selected_from = -1
 	if selected_from == -2:

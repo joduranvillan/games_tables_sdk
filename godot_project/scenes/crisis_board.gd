@@ -1525,7 +1525,17 @@ func _on_map_canvas_gui_input(event: InputEvent) -> void:
 				_on_territory_clicked(i)
 				break
 
+func is_local_turn_allowed() -> bool:
+	if bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")):
+		if bridge.has_method("is_local_player_turn"):
+			return bool(bridge.call("is_local_player_turn"))
+		if bridge.has_method("get_network_local_player_id"):
+			return int(bridge.call("get_network_local_player_id")) == int(bridge.current_player())
+	return true
+
 func _on_territory_clicked(t_id: int) -> void:
+	if not is_local_turn_allowed():
+		return
 	var t_owner = territory_owners.get(t_id, 0)
 	var armies = territory_armies.get(t_id, 0)
 
@@ -1633,6 +1643,8 @@ func _on_btn_place_pressed() -> void:
 	_place_armies(1)
 
 func _place_armies(count: int) -> void:
+	if not is_local_turn_allowed():
+		return
 	var target_t = selected_from
 	if target_t == -1 or territory_owners.get(target_t, 0) != current_player_id:
 		for t in territory_owners:
@@ -1653,6 +1665,8 @@ func _place_armies(count: int) -> void:
 		_update_ui_state()
 
 func _on_btn_attack_pressed() -> void:
+	if not is_local_turn_allowed():
+		return
 	_is_human_attacking = true
 	if selected_from != -1 and selected_to != -1:
 		var dice_count = int(attack_dice_spinbox.value)
@@ -1680,6 +1694,8 @@ func _on_btn_attack_pressed() -> void:
 	_update_ui_state()
 
 func _on_btn_fortify_pressed() -> void:
+	if not is_local_turn_allowed():
+		return
 	if selected_from != -1 and selected_to != -1:
 		var armies_to_move = int(fortify_armies_spinbox.value)
 		bridge.send_command_json(current_player_id, JSON.stringify({
@@ -1696,6 +1712,8 @@ func _on_btn_fortify_pressed() -> void:
 		_update_ui_state()
 
 func _on_btn_end_phase_pressed() -> void:
+	if not is_local_turn_allowed():
+		return
 	selected_from = -1
 	selected_to = -1
 	valid_targets.clear()
@@ -1707,6 +1725,8 @@ func _on_btn_end_phase_pressed() -> void:
 	_update_ui_state()
 
 func _on_btn_exchange_pressed() -> void:
+	if not is_local_turn_allowed():
+		return
 	if selected_card_indices.size() == 3:
 		bridge.send_command_json(current_player_id, JSON.stringify({
 			"command_type": "ExchangeCardsCommand",
@@ -1766,7 +1786,7 @@ func _format_phase_es(phase_str: String) -> String:
 func _update_ui_state() -> void:
 	if bridge != null:
 		current_player_id = bridge.current_player()
-	var is_active = (winner == -1)
+	var is_active = (winner == -1) and is_local_turn_allowed()
 
 	var is_placement = current_phase == "PlaceArmies" or current_phase.begins_with("PlaceArmies") or current_phase == "Placement"
 	var is_attack = current_phase == "Attack"

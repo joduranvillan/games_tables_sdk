@@ -1013,13 +1013,27 @@ func _on_join_code_pressed() -> void:
 	var dialog: Control = dialog_script.new()
 	add_child(dialog)
 	dialog.setup(bridge)
-	dialog.connect("join_completed", func(success: bool, _player_id: int):
+	dialog.connect("join_completed", func(success: bool, player_id: int):
 		if success:
+			var resolved_game: String = ""
+			if "synced_game_type" in dialog and not String(dialog.synced_game_type).is_empty():
+				resolved_game = String(dialog.synced_game_type)
+			elif bridge != null and bridge.has_method("get_current_game_type"):
+				resolved_game = String(bridge.call("get_current_game_type"))
+			var gm_ref = get_node_or_null("/root/GameManager") if is_inside_tree() else null
+			if resolved_game.is_empty() and gm_ref != null and "active_game" in gm_ref and not String(gm_ref.active_game).is_empty():
+				resolved_game = String(gm_ref.active_game)
+			if resolved_game.is_empty():
+				resolved_game = "checkers"
+			var pid: int = player_id if player_id >= 2 else 2
+			if gm_ref != null:
+				if gm_ref.has_method("set_relay_connection_info"):
+					gm_ref.call("set_relay_connection_info", dialog.call("get_relay_url"), dialog.call("get_code"), false)
+				if gm_ref.has_method("register_network_bridge"):
+					gm_ref.call("register_network_bridge", bridge, "client", pid, resolved_game)
 			dialog.close()
 			dialog.queue_free()
-			var gm_ref = get_node_or_null("/root/GameManager") if is_inside_tree() else null
-			var active_id: String = String(gm_ref.active_game) if gm_ref != null and "active_game" in gm_ref and not String(gm_ref.active_game).is_empty() else "checkers"
-			var scene_path := "res://%s_board.tscn" % active_id
+			var scene_path := "res://%s_board.tscn" % resolved_game
 			if not ResourceLoader.exists(scene_path):
 				scene_path = "res://checkers_board.tscn"
 			if (is_inside_tree() and has_node("/root/SceneManager")):
@@ -1051,6 +1065,8 @@ func _on_join_pressed(default_game_id: String = "checkers") -> void:
 			bridge.call("connect_as_client", ip, port)
 		if is_inside_tree() and has_node("/root/GameManager"):
 			var gm = get_node("/root/GameManager")
+			if gm.has_method("set_tcp_connection_info"):
+				gm.call("set_tcp_connection_info", ip, port)
 			if gm.has_method("register_network_bridge"):
 				gm.call("register_network_bridge", bridge, "client", 2, target_game)
 		var scene_path: String = "res://%s_board.tscn" % target_game

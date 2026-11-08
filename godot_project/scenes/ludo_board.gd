@@ -97,6 +97,8 @@ func _ready() -> void:
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
+	if bridge.has_signal("turn_changed"):
+		bridge.connect("turn_changed", _on_turn_changed)
 
 	if has_net_bridge:
 		if mode_option_button != null:
@@ -347,15 +349,28 @@ func _is_colorblind_pattern_pixel(player_id: int, x: int, y: int) -> bool:
 		_:
 			return false
 
+func is_local_turn_allowed() -> bool:
+	if bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")):
+		if bridge.has_method("is_local_player_turn"):
+			return bool(bridge.call("is_local_player_turn"))
+		if bridge.has_method("get_network_local_player_id"):
+			return int(bridge.call("get_network_local_player_id")) == int(bridge.current_player())
+	return true
+
+func _on_turn_changed(player_id: int) -> void:
+	current_p = player_id
+	_update_status()
+	queue_redraw()
+
 func _on_roll_dice_pressed() -> void:
 	_sfx_dice_roll()
-	if winner != -1 or (dice_widget != null and dice_widget.is_rolling):
+	if winner != -1 or (dice_widget != null and dice_widget.is_rolling) or not is_local_turn_allowed():
 		return
 	var cmd = {"command_type": "RollDiceCommand", "player": current_p}
 	bridge.send_command_json(current_p, JSON.stringify(cmd))
 
 func _on_token_pressed(p: int, token_idx: int) -> void:
-	if winner != -1:
+	if winner != -1 or not is_local_turn_allowed():
 		return
 	if p == current_p:
 		if dice_widget != null and dice_widget.is_rolling:

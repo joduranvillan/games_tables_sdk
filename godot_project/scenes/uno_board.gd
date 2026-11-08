@@ -1293,7 +1293,7 @@ func _update_ui(animate_drawn_index: int = -1) -> void:
 	var spread: float = min(92.0, (container_w - card_w - 60.0) / max(1, n_cards - 1))
 	var start_x: float = center_x - ((n_cards - 1) * spread) / 2.0 - card_w / 2.0
 
-	var is_local_turn: bool = (not _is_playing_ai_sequence) and ((current == local_player) if is_vs_ai else true)
+	var is_local_turn: bool = (not _is_playing_ai_sequence) and ((current == local_player) if is_vs_ai else is_local_turn_allowed())
 	var has_any_playable: bool = false
 	var has_any_interceptable: bool = false
 
@@ -1482,8 +1482,16 @@ func _on_unplayable_card_clicked(card: Dictionary) -> void:
 		event_banner_label.text = "Esa carta no coincide con el color activo (%s) ni con el símbolo actual." % col_es
 	_sfx_error_buzz()
 
+func is_local_turn_allowed() -> bool:
+	if bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")):
+		if bridge.has_method("is_local_player_turn"):
+			return bool(bridge.call("is_local_player_turn"))
+		if bridge.has_method("get_network_local_player_id"):
+			return int(bridge.call("get_network_local_player_id")) == int(bridge.current_player())
+	return true
+
 func _on_card_pressed(idx: int, card_btn: Control) -> void:
-	if winner != -1 or wild_picker_modal.visible or _is_playing_ai_sequence:
+	if winner != -1 or wild_picker_modal.visible or _is_playing_ai_sequence or not is_local_turn_allowed():
 		return
 
 	if idx < 0 or idx >= player_hand.size():
@@ -1817,7 +1825,7 @@ func _run_uno_ai_turns_if_needed() -> void:
 	_executing_ai_turn = false
 
 func _on_draw_pile_pressed() -> void:
-	if winner != -1 or wild_picker_modal.visible or _is_playing_ai_sequence:
+	if winner != -1 or wild_picker_modal.visible or _is_playing_ai_sequence or not is_local_turn_allowed():
 		return
 	if is_vs_ai and current != local_player:
 		return

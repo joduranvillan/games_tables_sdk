@@ -103,9 +103,30 @@ func bind_bridge(p_bridge) -> void:
 	if bridge_node != null:
 		if not bridge_node.is_connected("turn_changed", _on_turn_changed):
 			bridge_node.connect("turn_changed", _on_turn_changed)
+		if bridge_node.has_method("is_network_mode") and bool(bridge_node.call("is_network_mode")):
+			_ensure_network_status_hud()
 		var p_id = bridge_node.current_player()
 		if p_id > 0:
 			_on_turn_changed(p_id)
+
+func _ensure_network_status_hud() -> void:
+	var board_root: Node = _find_board_root()
+	if board_root == null or bridge_node == null:
+		return
+	var existing: Node = board_root.get_node_or_null("NetworkStatusHUD")
+	if existing != null:
+		if existing.has_method("bind_bridge"):
+			existing.call("bind_bridge", bridge_node)
+		return
+	var hud_script = load("res://network_status_hud.gd")
+	if hud_script != null:
+		var hud: Node = hud_script.new()
+		hud.name = "NetworkStatusHUD"
+		if "return_to_menu_on_exhausted" in hud:
+			hud.return_to_menu_on_exhausted = false
+		board_root.add_child(hud)
+		if hud.has_method("bind_bridge"):
+			hud.call("bind_bridge", bridge_node)
 
 func _on_turn_changed(player_id: int) -> void:
 	var p_col = Color.WHITE

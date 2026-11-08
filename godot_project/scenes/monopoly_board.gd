@@ -1104,15 +1104,23 @@ func _on_pass_bid_pressed() -> void:
 	bridge.send_command_json(current, JSON.stringify(cmd))
 	auction_modal.visible = false
 
+func is_local_turn_allowed() -> bool:
+	if bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")):
+		if bridge.has_method("is_local_player_turn"):
+			return bool(bridge.call("is_local_player_turn"))
+		if bridge.has_method("get_network_local_player_id"):
+			return int(bridge.call("get_network_local_player_id")) == int(bridge.current_player())
+	return true
+
 func _on_roll_pressed() -> void:
 	_sfx_dice_roll()
-	if winner != -1 or buy_modal.visible or auction_modal.visible:
+	if winner != -1 or buy_modal.visible or auction_modal.visible or not is_local_turn_allowed():
 		return
 	var cmd = {"command_type": "RollAndMoveCommand", "player": current}
 	bridge.send_command_json(current, JSON.stringify(cmd))
 
 func _on_pay_jail_pressed() -> void:
-	if winner != -1:
+	if winner != -1 or not is_local_turn_allowed():
 		return
 	var cmd = {"command_type": "PayJailFeeCommand", "player": current}
 	bridge.send_command_json(current, JSON.stringify(cmd))
@@ -1131,7 +1139,7 @@ func _can_build_on_space(space_idx: int, player_id: int) -> bool:
 	return property_houses.get(space_idx, 0) < 5
 
 func _on_build_house_pressed() -> void:
-	if winner != -1:
+	if winner != -1 or not is_local_turn_allowed():
 		return
 	var target_space: int = -1
 	if _can_build_on_space(selected_space, current):
@@ -1154,7 +1162,7 @@ func _on_build_house_pressed() -> void:
 			card_event_label.text = "ℹ️ Necesitas un grupo de color completo para construir casas."
 
 func _on_mortgage_pressed() -> void:
-	if winner != -1:
+	if winner != -1 or not is_local_turn_allowed():
 		return
 	var target_space: int = -1
 	var is_unmortgage: bool = false
@@ -1185,7 +1193,7 @@ func _on_mortgage_pressed() -> void:
 			card_event_label.text = "ℹ️ No tienes propiedades para hipotecar."
 
 func _on_trade_pressed() -> void:
-	if winner != -1:
+	if winner != -1 or not is_local_turn_allowed():
 		return
 	var opponent = P2 if current == P1 else P1
 	var offered: Array = []

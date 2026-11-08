@@ -634,8 +634,16 @@ func _update_hand_ui() -> void:
 # -------------------------------------------------------------------------
 # CARD PLAY ANIMATION (b) & EXECUTION
 # -------------------------------------------------------------------------
+func is_local_turn_allowed() -> bool:
+	if bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")):
+		if bridge.has_method("is_local_player_turn"):
+			return bool(bridge.call("is_local_player_turn"))
+		if bridge.has_method("get_network_local_player_id"):
+			return int(bridge.call("get_network_local_player_id")) == int(bridge.current_player())
+	return true
+
 func _on_card_clicked_with_animation(idx: int, card_panel: Control) -> void:
-	if winner != -1 or (is_vs_ai and current != local_player):
+	if winner != -1 or (is_vs_ai and current != local_player) or not is_local_turn_allowed():
 		return
 
 	# Animación de salida: desplazar hacia el tablero superior y desvanecer
@@ -659,7 +667,7 @@ func _on_card_clicked_with_animation(idx: int, card_panel: Control) -> void:
 
 func _on_card_pressed(idx: int) -> void:
 	_sfx_card_flip()
-	if winner != -1 or (is_vs_ai and current != local_player):
+	if winner != -1 or (is_vs_ai and current != local_player) or not is_local_turn_allowed():
 		return
 
 	var acting_p: int = int(current)
@@ -686,7 +694,7 @@ func _on_card_pressed(idx: int) -> void:
 
 func _on_draw_pressed() -> void:
 	_sfx_card_flip()
-	if winner != -1:
+	if winner != -1 or not is_local_turn_allowed():
 		return
 	var cmd = {"command_type": "DrawCardCommand", "player": current}
 	bridge.send_command_json(current, JSON.stringify(cmd))

@@ -364,6 +364,7 @@ pub struct OpenTableBridge {
     base: Base<Node>,
     mode: BridgeMode,
     relay_client: Option<WsRelayClient>,
+    relay_url: String,
     relay_auth_token: Option<String>,
     current_game_type: String,
     undone_commands: Vec<(PlayerId, String)>,
@@ -379,6 +380,7 @@ impl INode for OpenTableBridge {
             base,
             mode: BridgeMode::None,
             relay_client: None,
+            relay_url: String::from("ws://127.0.0.1:8080"),
             relay_auth_token: None,
             current_game_type: String::from("checkers"),
             undone_commands: Vec::new(),
@@ -1619,6 +1621,40 @@ impl OpenTableBridge {
                 }
                 false
             }
+            BridgeMode::MultipeerHost {
+                session, transport, ..
+            } => {
+                if let Some(new_s) = create_session_for_players(&gtype, PlayerId(1), PlayerId(2)) {
+                    *session = new_s;
+                    let log_bytes = session.export_log().unwrap_or_default();
+                    let sync_msg = SyncProtocolMessage::SyncState {
+                        game_type: gtype.clone(),
+                        log_bytes,
+                    };
+                    if let Ok(serialized) = serde_json::to_vec(&sync_msg) {
+                        let _ = transport.broadcast(&serialized);
+                    }
+                    return true;
+                }
+                false
+            }
+            BridgeMode::RelayHost { session } => {
+                if let Some(new_s) = create_session_for_players(&gtype, PlayerId(1), PlayerId(2)) {
+                    *session = new_s;
+                    let log_bytes = session.export_log().unwrap_or_default();
+                    let sync_msg = SyncProtocolMessage::SyncState {
+                        game_type: gtype.clone(),
+                        log_bytes,
+                    };
+                    if let Ok(serialized) = serde_json::to_vec(&sync_msg) {
+                        if let Some(relay) = &mut self.relay_client {
+                            let _ = relay.send_relay_data(&serialized);
+                        }
+                    }
+                    return true;
+                }
+                false
+            }
             BridgeMode::Client { session, .. }
             | BridgeMode::NativeClient { session, .. }
             | BridgeMode::MultipeerClient { session, .. }
@@ -1657,6 +1693,45 @@ impl OpenTableBridge {
             }
             _ => 1,
         }
+    }
+
+    #[func]
+    pub fn get_network_local_player_id(&self) -> i64 {
+        self.get_local_player_id()
+    }
+
+    #[func]
+    pub fn is_local_player_turn(&self) -> bool {
+        if !self.is_network_mode() {
+            return true;
+        }
+        let curr = self.current_player();
+        if curr <= 0 {
+            return true;
+        }
+        curr == self.get_local_player_id()
+    }
+
+    #[func]
+    pub fn current_turn(&self) -> i64 {
+        self.current_player()
+    }
+
+    #[func]
+    pub fn get_network_transport_kind(&self) -> GString {
+        let kind = match &self.mode {
+            BridgeMode::Host { .. } => "tcp_host",
+            BridgeMode::Client { .. } => "tcp_client",
+            BridgeMode::RelayHost { .. } => "relay_host",
+            BridgeMode::RelayClient { .. } => "relay_client",
+            BridgeMode::NativeHost { .. } => "native_host",
+            BridgeMode::NativeClient { .. } => "native_client",
+            BridgeMode::MultipeerHost { .. } => "multipeer_host",
+            BridgeMode::MultipeerClient { .. } => "multipeer_client",
+            BridgeMode::Spectator { .. } => "spectator",
+            _ => "none",
+        };
+        GString::from(kind)
     }
 
     #[func]
@@ -1883,12 +1958,18 @@ impl OpenTableBridge {
         let target_url = if url.trim().is_empty() {
             "ws://127.0.0.1:8080".to_string()
         } else {
-            url
+            url.trim().to_string()
         };
+        self.relay_url = target_url.clone();
         self.relay_client = Some(WsRelayClient::connect_with_token(
             &target_url,
             self.relay_auth_token.as_deref(),
         ));
+    }
+
+    #[func]
+    pub fn get_relay_url(&self) -> GString {
+        GString::from(&self.relay_url)
     }
 
     #[func]
@@ -1902,8 +1983,13 @@ impl OpenTableBridge {
         self.current_game_type = effective_game.clone();
 
         if self.relay_client.is_none() {
+            let target_url = if self.relay_url.trim().is_empty() {
+                "ws://127.0.0.1:8080"
+            } else {
+                &self.relay_url
+            };
             self.relay_client = Some(WsRelayClient::connect_with_token(
-                "ws://127.0.0.1:8080",
+                target_url,
                 self.relay_auth_token.as_deref(),
             ));
         }
@@ -1930,8 +2016,13 @@ impl OpenTableBridge {
     #[func]
     pub fn join_relay_room(&mut self, code: GString) {
         if self.relay_client.is_none() {
+            let target_url = if self.relay_url.trim().is_empty() {
+                "ws://127.0.0.1:8080"
+            } else {
+                &self.relay_url
+            };
             self.relay_client = Some(WsRelayClient::connect_with_token(
-                "ws://127.0.0.1:8080",
+                target_url,
                 self.relay_auth_token.as_deref(),
             ));
         }
@@ -2788,19 +2879,60 @@ impl OpenTableBridge {
         }
 
         if let Ok(events) = self.process_and_emit(player_id, command) {
+            let gtype = self.current_game_type.clone();
             let serialized = serde_json::to_vec(&events).unwrap_or_default();
             match &mut self.mode {
-                BridgeMode::Host { transport, .. } => {
+                BridgeMode::Host { session, transport } => {
+                    if let Ok(log_bytes) = session.export_log() {
+                        let sync_msg = SyncProtocolMessage::SyncState {
+                            game_type: gtype,
+                            log_bytes,
+                        };
+                        if let Ok(sync_bytes) = serde_json::to_vec(&sync_msg) {
+                            let _ = transport.broadcast(&sync_bytes);
+                        }
+                    }
                     let _ = transport.broadcast(&serialized);
                 }
-                BridgeMode::NativeHost { transport, .. } => {
+                BridgeMode::NativeHost {
+                    session, transport, ..
+                } => {
+                    if let Ok(log_bytes) = session.export_log() {
+                        let sync_msg = SyncProtocolMessage::SyncState {
+                            game_type: gtype,
+                            log_bytes,
+                        };
+                        if let Ok(sync_bytes) = serde_json::to_vec(&sync_msg) {
+                            let _ = transport.broadcast(&sync_bytes);
+                        }
+                    }
                     let _ = transport.broadcast(&serialized);
                 }
-                BridgeMode::MultipeerHost { transport, .. } => {
+                BridgeMode::MultipeerHost {
+                    session, transport, ..
+                } => {
+                    if let Ok(log_bytes) = session.export_log() {
+                        let sync_msg = SyncProtocolMessage::SyncState {
+                            game_type: gtype,
+                            log_bytes,
+                        };
+                        if let Ok(sync_bytes) = serde_json::to_vec(&sync_msg) {
+                            let _ = transport.broadcast(&sync_bytes);
+                        }
+                    }
                     let _ = transport.broadcast(&serialized);
                 }
-                BridgeMode::RelayHost { .. } => {
+                BridgeMode::RelayHost { session } => {
                     if let Some(relay) = &mut self.relay_client {
+                        if let Ok(log_bytes) = session.export_log() {
+                            let sync_msg = SyncProtocolMessage::SyncState {
+                                game_type: gtype,
+                                log_bytes,
+                            };
+                            if let Ok(sync_bytes) = serde_json::to_vec(&sync_msg) {
+                                let _ = relay.send_relay_data(&sync_bytes);
+                            }
+                        }
                         let _ = relay.send_relay_data(&serialized);
                     }
                 }
@@ -3865,10 +3997,24 @@ impl OpenTableBridge {
                 }
                 RelayClientEvent::PeerJoined { player_id } => {
                     let pid = player_id.0 as i64;
+                    if let BridgeMode::RelayHost { session } = &mut self.mode {
+                        let log_bytes = session.export_log().unwrap_or_default();
+                        let sync_msg = SyncProtocolMessage::SyncState {
+                            game_type: self.current_game_type.clone(),
+                            log_bytes,
+                        };
+                        if let Ok(serialized) = serde_json::to_vec(&sync_msg) {
+                            if let Some(relay) = &mut self.relay_client {
+                                let _ = relay.send_relay_data(&serialized);
+                            }
+                        }
+                    }
                     self.base_mut()
                         .emit_signal("peer_joined", &[Variant::from(pid)]);
                     self.base_mut()
                         .emit_signal("player_joined", &[Variant::from(pid)]);
+                    self.base_mut()
+                        .emit_signal("peer_connected", &[Variant::from(pid)]);
                 }
                 RelayClientEvent::PeerLeft { player_id } => {
                     let pid = player_id.0 as i64;
@@ -3951,6 +4097,10 @@ impl OpenTableBridge {
                                     *session = loaded_session;
                                     *client_current_player = current_p;
                                 }
+                                self.base_mut().emit_signal(
+                                    "game_started",
+                                    &[Variant::from(GString::from(&gtype))],
+                                );
                                 self.base_mut()
                                     .emit_signal("turn_changed", &[Variant::from(current_p)]);
                             }
@@ -3987,6 +4137,10 @@ impl OpenTableBridge {
                                     *client_current_player = current_p;
                                 }
                                 self.emit_game_events(&game_events);
+                                self.base_mut().emit_signal(
+                                    "game_started",
+                                    &[Variant::from(GString::from(&gtype))],
+                                );
                                 self.base_mut()
                                     .emit_signal("turn_changed", &[Variant::from(current_p)]);
                             }
@@ -4702,12 +4856,24 @@ impl OpenTableBridge {
             }
 
             if let Some(moved) = event.as_any().downcast_ref::<PieceMovedEvent>() {
-                if let BridgeMode::Client {
-                    client_current_player,
-                    ..
-                } = &mut self.mode
-                {
-                    *client_current_player = if moved.player.0 == 1 { 2 } else { 1 };
+                match &mut self.mode {
+                    BridgeMode::Client {
+                        session,
+                        client_current_player,
+                        ..
+                    }
+                    | BridgeMode::RelayClient {
+                        session,
+                        client_current_player,
+                        ..
+                    } => {
+                        if session.current_tick().0 > 0 {
+                            *client_current_player = session.current_player().0 as i64;
+                        } else {
+                            *client_current_player = if moved.player.0 == 1 { 2 } else { 1 };
+                        }
+                    }
+                    _ => {}
                 }
                 let (captured_row, captured_col) = moved
                     .captured

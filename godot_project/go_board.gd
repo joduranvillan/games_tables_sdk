@@ -97,6 +97,8 @@ func _ready() -> void:
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
+	if bridge.has_signal("turn_changed"):
+		bridge.connect("turn_changed", _on_turn_changed)
 	
 	var initial_mode_idx: int = 0
 	if gm != null and gm.get_game_mode() == "vs_ai":
@@ -474,8 +476,21 @@ func _start_or_reset_match() -> void:
 	_update_captured_score()
 	queue_redraw()
 
+func is_local_turn_allowed() -> bool:
+	if bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")):
+		if bridge.has_method("is_local_player_turn"):
+			return bool(bridge.call("is_local_player_turn"))
+		if bridge.has_method("get_network_local_player_id"):
+			return int(bridge.call("get_network_local_player_id")) == int(bridge.current_player())
+	return true
+
+func _on_turn_changed(player_id: int) -> void:
+	current = player_id
+	_update_status()
+	queue_redraw()
+
 func _on_pass_pressed() -> void:
-	if winner != -1:
+	if winner != -1 or not is_local_turn_allowed():
 		return
 	if _local_oversize_hotseat:
 		_handle_local_pass()
@@ -568,6 +583,8 @@ func _on_cell_clicked(cell: Vector2i) -> void:
 	if row >= 0 and row < BOARD_SIZE and col >= 0 and col < BOARD_SIZE:
 		if scoring_phase and board[row][col] != null:
 			mark_dead_stone(row, col)
+			return
+		if not is_local_turn_allowed():
 			return
 		if board[row][col] == null:
 			if _local_oversize_hotseat:

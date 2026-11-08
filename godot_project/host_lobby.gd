@@ -67,11 +67,15 @@ var lan_empty_label: Label
 var start_game_button: Button
 var join_room_button: Button
 var status_label: Label
+var relay_url_hbox: HBoxContainer
+var relay_url_input: LineEdit
+var apply_relay_button: Button
 var join_dialog: Control = null
 var save_qr_file_dialog: FileDialog = null
 
 func _ready() -> void:
 	var open_scanner_immediately: bool = false
+	_load_saved_relay_url()
 	if (is_inside_tree() and has_node("/root/GameManager")):
 		var gm = get_node("/root/GameManager")
 		if gm.has_method("get_active_game") and not String(gm.get_active_game()).is_empty():
@@ -106,6 +110,45 @@ func _ready() -> void:
 
 	if open_scanner_immediately:
 		call_deferred("_on_scan_qr_pressed")
+
+func _load_saved_relay_url() -> void:
+	if is_inside_tree() and has_node("/root/GameManager"):
+		var gm = get_node("/root/GameManager")
+		if gm.has_method("get_relay_url"):
+			var gm_url: String = str(gm.call("get_relay_url")).strip_edges()
+			if not gm_url.is_empty():
+				relay_url = gm_url
+				return
+	var cfg := ConfigFile.new()
+	if cfg.load("user://settings.cfg") == OK:
+		var saved: String = str(cfg.get_value("network", "relay_url", relay_url)).strip_edges()
+		if not saved.is_empty():
+			relay_url = saved
+
+func set_relay_url(new_url: String) -> void:
+	var clean := new_url.strip_edges()
+	if clean.is_empty():
+		clean = "ws://127.0.0.1:8080"
+	if not clean.begins_with("ws://") and not clean.begins_with("wss://"):
+		clean = "ws://" + clean
+	relay_url = clean
+	if relay_url_input != null and relay_url_input.text != relay_url:
+		relay_url_input.text = relay_url
+	var cfg := ConfigFile.new()
+	cfg.load("user://settings.cfg")
+	cfg.set_value("network", "relay_url", relay_url)
+	cfg.save("user://settings.cfg")
+	if is_inside_tree() and has_node("/root/GameManager"):
+		var gm = get_node("/root/GameManager")
+		if gm.has_method("set_relay_url"):
+			gm.call("set_relay_url", relay_url, false)
+	if connection_mode == ConnectionMode.ONLINE_RELAY:
+		_apply_connection_mode(ConnectionMode.ONLINE_RELAY)
+
+func get_relay_url() -> String:
+	if relay_url_input != null and not relay_url_input.text.strip_edges().is_empty():
+		return relay_url_input.text.strip_edges()
+	return relay_url
 
 func _connect_bridge_signals() -> void:
 	if bridge == null:
@@ -257,6 +300,37 @@ func _setup_ui() -> void:
 	ip_port_label.add_theme_font_size_override("font_size", 18)
 	ip_port_label.add_theme_color_override("font_color", Color(0.4, 0.9, 1.0))
 	vbox.add_child(ip_port_label)
+
+	relay_url_hbox = HBoxContainer.new()
+	relay_url_hbox.name = "RelayUrlHBox"
+	relay_url_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	relay_url_hbox.add_theme_constant_override("separation", 8)
+	vbox.add_child(relay_url_hbox)
+
+	var relay_lbl := Label.new()
+	relay_lbl.text = "Relay:"
+	relay_lbl.add_theme_font_size_override("font_size", 14)
+	relay_url_hbox.add_child(relay_lbl)
+
+	relay_url_input = LineEdit.new()
+	relay_url_input.name = "RelayUrlInput"
+	relay_url_input.text = relay_url
+	relay_url_input.placeholder_text = "ws://127.0.0.1:8080"
+	relay_url_input.custom_minimum_size = Vector2(240, 32)
+	relay_url_input.text_submitted.connect(func(new_txt: String):
+		set_relay_url(new_txt)
+	)
+	relay_url_hbox.add_child(relay_url_input)
+
+	apply_relay_button = Button.new()
+	apply_relay_button.name = "ApplyRelayButton"
+	apply_relay_button.text = "Aplicar"
+	apply_relay_button.custom_minimum_size = Vector2(80, 32)
+	apply_relay_button.pressed.connect(func():
+		if relay_url_input != null:
+			set_relay_url(relay_url_input.text)
+	)
+	relay_url_hbox.add_child(apply_relay_button)
 
 	status_label = Label.new()
 	status_label.name = "StatusLabel"
@@ -433,6 +507,8 @@ func _apply_connection_mode(index: int) -> void:
 			lan_discovery.stop_listening()
 		if lan_rooms_section != null:
 			lan_rooms_section.hide()
+		if relay_url_hbox != null:
+			relay_url_hbox.show()
 		if ip_port_label != null:
 			ip_port_label.text = "Relay: %s" % relay_url
 		if bridge != null:
@@ -444,11 +520,17 @@ func _apply_connection_mode(index: int) -> void:
 				var created_code: String = str(bridge.call("create_relay_room", game_type))
 				if not created_code.is_empty():
 					_set_room_code(created_code)
+		if is_inside_tree() and has_node("/root/GameManager"):
+			var gm = get_node("/root/GameManager")
+			if gm.has_method("set_relay_connection_info"):
+				gm.call("set_relay_connection_info", relay_url, room_code, true)
 		if status_label != null:
 			status_label.text = "En Línea | SALA: %s" % room_code
 	else:
 		if lan_rooms_section != null:
 			lan_rooms_section.show()
+		if relay_url_hbox != null:
+			relay_url_hbox.hide()
 		var local_ip = _get_local_ip()
 		if ip_port_label != null:
 			ip_port_label.text = "IP: %s  |  Puerto: %d" % [local_ip, port]
@@ -534,6 +616,11 @@ func join_lan_room(target_ip: String, target_port: int, target_game: String = ""
 			connected = bool(bridge.call("connect_to_host", clean_ip, target_port, host_name))
 		elif bridge.has_method("connect_as_client"):
 			connected = bool(bridge.call("connect_as_client", clean_ip, target_port))
+
+	if is_inside_tree() and has_node("/root/GameManager"):
+		var gm = get_node("/root/GameManager")
+		if gm.has_method("set_tcp_connection_info"):
+			gm.call("set_tcp_connection_info", clean_ip, target_port)
 
 	if status_label != null:
 		if connected:

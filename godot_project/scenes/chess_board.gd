@@ -104,6 +104,8 @@ func _ready() -> void:
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
 	bridge.connect("piece_moved", _on_piece_moved_signal)
+	if bridge.has_signal("turn_changed"):
+		bridge.connect("turn_changed", _on_turn_changed)
 	
 	if has_net_bridge:
 		if mode_option_button != null:
@@ -537,9 +539,22 @@ func _bounce_piece(r: int, c: int) -> void:
 		tw.tween_property(sprite, "scale", Vector2(1.15, 1.15), 0.08)
 		tw.tween_property(sprite, "scale", Vector2(1.0, 1.0), 0.08)
 
+func is_local_turn_allowed() -> bool:
+	if bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")):
+		if bridge.has_method("is_local_player_turn"):
+			return bool(bridge.call("is_local_player_turn"))
+		if bridge.has_method("get_network_local_player_id"):
+			return int(bridge.call("get_network_local_player_id")) == int(bridge.current_player())
+	return true
+
+func _on_turn_changed(player_id: int) -> void:
+	current = player_id
+	_update_status()
+	queue_redraw()
+
 func _on_drag_started(from_cell: Vector2i) -> void:
 	_sfx_piece_slide()
-	if winner != -1: return
+	if winner != -1 or not is_local_turn_allowed(): return
 	var r = from_cell.x
 	var c = from_cell.y
 	var piece = piece_sprites[r][c]
@@ -557,7 +572,7 @@ func _on_drag_started(from_cell: Vector2i) -> void:
 		queue_redraw()
 
 func _on_piece_dropped(to_cell: Vector2i) -> void:
-	if winner != -1 or selected_pos == null: return
+	if winner != -1 or selected_pos == null or not is_local_turn_allowed(): return
 	
 	var from_r = selected_pos.x
 	var from_c = selected_pos.y
@@ -594,7 +609,7 @@ func handle_promotion_shortcut(index: int) -> void:
 		4: select_promotion_piece("Knight")
 
 func _on_offer_draw_pressed() -> void:
-	if winner != -1 or bridge == null:
+	if winner != -1 or bridge == null or not is_local_turn_allowed():
 		return
 	var cmd: Dictionary = {
 		"command_type": "chess_game::OfferDrawCommand",
@@ -862,7 +877,7 @@ func _select_piece_at(row: int, col: int) -> void:
 	queue_redraw()
 
 func _handle_unified_input(event: InputEvent) -> void:
-	if winner != -1:
+	if winner != -1 or not is_local_turn_allowed():
 		return
 	if _rules_popup != null and _rules_popup.visible:
 		return
@@ -938,6 +953,8 @@ func start_chess_tutorial() -> void:
 		ChessTut.start_on_board(self)
 
 func _handle_cell_click(row: int, col: int) -> void:
+	if not is_local_turn_allowed():
+		return
 	if (is_inside_tree() and has_node("/root/TutorialManager")):
 		var tm = get_node("/root/TutorialManager")
 		if tm.get("is_running") == true and tm.get("current_board") == self:

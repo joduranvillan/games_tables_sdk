@@ -143,6 +143,8 @@ func _ready() -> void:
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
 	bridge.connect("event_json", _on_event_json)
+	if bridge.has_signal("turn_changed"):
+		bridge.connect("turn_changed", _on_turn_changed)
 
 	if has_net_bridge:
 		if mode_option_button != null:
@@ -469,11 +471,24 @@ func _build_piece_control(player: int, kind: String, size_scale: float = 1.0) ->
 
 	return ctrl
 
+func is_local_turn_allowed() -> bool:
+	if bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")):
+		if bridge.has_method("is_local_player_turn"):
+			return bool(bridge.call("is_local_player_turn"))
+		if bridge.has_method("get_network_local_player_id"):
+			return int(bridge.call("get_network_local_player_id")) == int(bridge.current_player())
+	return true
+
+func _on_turn_changed(player_id: int) -> void:
+	current = player_id
+	_update_status()
+	queue_redraw()
+
 # -------------------------------------------------------------------------
 # INTERACCIÓN DEL USUARIO (CLICK Y MOVIMIENTO)
 # -------------------------------------------------------------------------
 func _input(event: InputEvent) -> void:
-	if winner != -1:
+	if winner != -1 or not is_local_turn_allowed():
 		return
 
 	var click_pos = Vector2.ZERO
@@ -495,6 +510,8 @@ func _input(event: InputEvent) -> void:
 				_handle_intersection_click(row, col)
 
 func _handle_intersection_click(row: int, col: int) -> void:
+	if not is_local_turn_allowed():
+		return
 	if selected_pos == null:
 		var piece = board[row][col]
 		if piece != null and piece.get("player") == current:

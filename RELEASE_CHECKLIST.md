@@ -74,7 +74,7 @@ Antes de empaquetar, todos los controles de calidad automatizados deben aprobar 
   - Reglas canónicas (`tests/canonical_rules.rs`) en los 14 juegos (`checkers`, `chess`, `ludo`, `uno`, `mille_bornes`, `monopoly`, `backgammon`, `battleship`, `chinese_checkers`, `crisis`, `go`, `shogi`, `xiangqi`, `goose`).
   - Determinismo de snapshots, serialización de replays `.otr` (`bincode`), reconexión TCP/WebSocket y cálculo de ELO.
 
-- [x] **2. Validador Estático Redot 4.x Strict y Smoke Tests de Godot (45 suites)**:
+- [x] **2. Validador Estático Redot 4.x Strict y Smoke Tests de Godot (47 suites)**:
   ```bash
   bash tools/run_godot_tests.sh
   ```
@@ -83,6 +83,7 @@ Antes de empaquetar, todos los controles de calidad automatizados deben aprobar 
   - Paridad 14/14 de scripts de tablero entre `godot_project/<juego>_board.gd` y `godot_project/scenes/<juego>_board.gd`.
   - Validación de las 5 secciones canónicas de `RulesCatalog` (`DEFAULT_MODES`, `RULES`, `TUTORIAL_STEPS`, `RULES_SUMMARY`, `MODE_VARIANTS`) para los 14 juegos.
   - HUD compacto sin solapamiento de etiquetas de jugador y con badge regresivo `MM:SS` (`00:30`) activo en `TurnIndicator`.
+  - Integración completa de red P2P/LAN por Código QR (`qr_lan_multiplayer_smoke.gd`) y Online Relay WebSocket con `SyncState` automático, bloqueo de turno por jugador local (`is_local_turn_allowed()`) en los 14 tableros y reconexión automática con `ReconnectToken` (`network_full_integration_smoke.gd`).
 
 - [x] **3. Verificación de Formato y Linter en Rust**:
   ```bash

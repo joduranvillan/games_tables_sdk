@@ -114,6 +114,8 @@ func _ready() -> void:
 	bridge.connect("piece_moved", _on_piece_moved)
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
+	if bridge.has_signal("turn_changed"):
+		bridge.connect("turn_changed", _on_turn_changed)
 
 	if has_net_bridge:
 		if mode_option_button != null:
@@ -359,9 +361,22 @@ func _bounce_piece(r: int, c: int) -> void:
 		tw.tween_property(sprite, "scale", Vector2(1.15, 1.15), 0.08)
 		tw.tween_property(sprite, "scale", Vector2(1.0, 1.0), 0.08)
 
+func is_local_turn_allowed() -> bool:
+	if bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")):
+		if bridge.has_method("is_local_player_turn"):
+			return bool(bridge.call("is_local_player_turn"))
+		if bridge.has_method("get_network_local_player_id"):
+			return int(bridge.call("get_network_local_player_id")) == int(bridge.current_player())
+	return true
+
+func _on_turn_changed(player_id: int) -> void:
+	current = player_id
+	_update_status()
+	queue_redraw()
+
 func _on_drag_started(from_cell: Vector2i) -> void:
 	_sfx_piece_slide()
-	if winner != -1 or animating: return
+	if winner != -1 or animating or not is_local_turn_allowed(): return
 	var r = from_cell.x
 	var c = from_cell.y
 	var cell = board[r][c]
@@ -379,7 +394,7 @@ func _on_drag_started(from_cell: Vector2i) -> void:
 		queue_redraw()
 
 func _on_piece_dropped(to_cell: Vector2i) -> void:
-	if winner != -1 or selected == null or animating: return
+	if winner != -1 or selected == null or animating or not is_local_turn_allowed(): return
 	_reset_all_piece_scales()
 	var from_row = selected.row
 	var from_col = selected.col
@@ -531,7 +546,7 @@ func _input(event: InputEvent) -> void:
 	_handle_unified_input(event)
 
 func _handle_unified_input(event: InputEvent) -> void:
-	if winner != -1:
+	if winner != -1 or not is_local_turn_allowed():
 		return
 	if rules_popup != null and rules_popup.visible:
 		return
@@ -607,6 +622,8 @@ func _handle_unified_input(event: InputEvent) -> void:
 		_selected_on_current_press = false
 
 func _handle_click(pos: Vector2) -> void:
+	if not is_local_turn_allowed():
+		return
 	var col: int = int(floor(pos.x / CELL))
 	var row: int = int(floor(pos.y / CELL))
 

@@ -4,6 +4,7 @@ extends Control
 
 signal code_submitted(room_code: String)
 signal join_completed(success: bool, player_id: int)
+signal match_ready(game_type: String, player_id: int)
 signal closed()
 
 const VALID_CHARS := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -12,19 +13,64 @@ const CODE_LENGTH := 4
 @export var relay_url: String = "ws://127.0.0.1:8080"
 
 var bridge: Node = null
+var relay_url_input: LineEdit
 var code_input: LineEdit
 var connect_button: Button
 var cancel_button: Button
 var status_label: Label
+var synced_game_type: String = ""
+var last_joined_player_id: int = 2
 
 func _ready() -> void:
+	_load_saved_relay_url()
 	_setup_ui()
 
-func setup(p_bridge: Node, p_relay_url: String = "ws://127.0.0.1:8080") -> void:
+func _load_saved_relay_url() -> void:
+	if is_inside_tree() and has_node("/root/GameManager"):
+		var gm = get_node("/root/GameManager")
+		if gm.has_method("get_relay_url"):
+			var gm_url: String = str(gm.call("get_relay_url")).strip_edges()
+			if not gm_url.is_empty():
+				relay_url = gm_url
+				return
+	var cfg := ConfigFile.new()
+	if cfg.load("user://settings.cfg") == OK:
+		var saved: String = str(cfg.get_value("network", "relay_url", relay_url)).strip_edges()
+		if not saved.is_empty():
+			relay_url = saved
+
+func setup(p_bridge: Node, p_relay_url: String = "") -> void:
 	bridge = p_bridge
 	if not p_relay_url.strip_edges().is_empty():
-		relay_url = p_relay_url
+		relay_url = p_relay_url.strip_edges()
+	else:
+		_load_saved_relay_url()
+	if relay_url_input != null:
+		relay_url_input.text = relay_url
 	_connect_bridge_signals()
+
+func set_relay_url(new_url: String) -> void:
+	var clean := new_url.strip_edges()
+	if clean.is_empty():
+		clean = "ws://127.0.0.1:8080"
+	if not clean.begins_with("ws://") and not clean.begins_with("wss://"):
+		clean = "ws://" + clean
+	relay_url = clean
+	if relay_url_input != null and relay_url_input.text != relay_url:
+		relay_url_input.text = relay_url
+	var cfg := ConfigFile.new()
+	cfg.load("user://settings.cfg")
+	cfg.set_value("network", "relay_url", relay_url)
+	cfg.save("user://settings.cfg")
+	if is_inside_tree() and has_node("/root/GameManager"):
+		var gm = get_node("/root/GameManager")
+		if gm.has_method("set_relay_url"):
+			gm.call("set_relay_url", relay_url, false)
+
+func get_relay_url() -> String:
+	if relay_url_input != null and not relay_url_input.text.strip_edges().is_empty():
+		return relay_url_input.text.strip_edges()
+	return relay_url
 
 func open(p_bridge: Node = null) -> void:
 	if p_bridge != null:
@@ -44,6 +90,10 @@ func _connect_bridge_signals() -> void:
 		var cb := Callable(self, "_on_bridge_room_joined")
 		if not bridge.is_connected("room_joined", cb):
 			bridge.connect("room_joined", cb)
+	if bridge.has_signal("game_started"):
+		var cb_gs := Callable(self, "_on_bridge_game_started")
+		if not bridge.is_connected("game_started", cb_gs):
+			bridge.connect("game_started", cb_gs)
 
 func _setup_ui() -> void:
 	if code_input != null:
@@ -62,7 +112,7 @@ func _setup_ui() -> void:
 	add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(380, 260)
+	panel.custom_minimum_size = Vector2(400, 320)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.13, 0.15, 0.20, 0.98)
 	style.border_color = Color(0.35, 0.65, 0.95)
@@ -79,7 +129,7 @@ func _setup_ui() -> void:
 	panel.add_child(margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 14)
+	vbox.add_theme_constant_override("separation", 12)
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	margin.add_child(vbox)
 
@@ -88,6 +138,24 @@ func _setup_ui() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 22)
 	vbox.add_child(title)
+
+	var relay_lbl := Label.new()
+	relay_lbl.text = "Servidor Relay (ws/wss):"
+	relay_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	relay_lbl.add_theme_font_size_override("font_size", 13)
+	relay_lbl.add_theme_color_override("font_color", Color(0.72, 0.80, 0.92))
+	vbox.add_child(relay_lbl)
+
+	relay_url_input = LineEdit.new()
+	relay_url_input.name = "RelayUrlInput"
+	relay_url_input.text = relay_url
+	relay_url_input.placeholder_text = "ws://127.0.0.1:8080"
+	relay_url_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	relay_url_input.custom_minimum_size = Vector2(320, 34)
+	relay_url_input.text_changed.connect(func(new_url: String):
+		relay_url = new_url.strip_edges()
+	)
+	vbox.add_child(relay_url_input)
 
 	var subtitle := Label.new()
 	subtitle.text = "Ingresa el código de invitación de 4 caracteres:"
@@ -172,6 +240,9 @@ func _on_connect_pressed() -> void:
 			status_label.text = "Código inválido (debe tener 4 caracteres)"
 		return
 
+	if relay_url_input != null and not relay_url_input.text.strip_edges().is_empty():
+		set_relay_url(relay_url_input.text)
+
 	if status_label != null:
 		status_label.text = "Conectando a sala %s..." % code
 
@@ -186,7 +257,36 @@ func _on_connect_pressed() -> void:
 		if bridge.has_method("join_relay_room"):
 			bridge.call("join_relay_room", code)
 
+func _on_bridge_game_started(remote_game: String) -> void:
+	if not remote_game.strip_edges().is_empty():
+		synced_game_type = remote_game.strip_edges()
+		if is_inside_tree() and has_node("/root/GameManager"):
+			var gm = get_node("/root/GameManager")
+			if gm.has_method("set_active_game"):
+				gm.call("set_active_game", synced_game_type)
+		match_ready.emit(synced_game_type, last_joined_player_id)
+
 func _on_bridge_room_joined(success: bool, player_id: int) -> void:
+	last_joined_player_id = player_id if player_id >= 2 else 2
+	if success and bridge != null:
+		if bridge.has_method("poll_events"):
+			for _i in range(4):
+				bridge.call("poll_events")
+		if synced_game_type.is_empty() and bridge.has_method("get_current_game_type"):
+			var b_game: String = str(bridge.call("get_current_game_type")).strip_edges()
+			if not b_game.is_empty():
+				synced_game_type = b_game
+		if is_inside_tree() and has_node("/root/GameManager"):
+			var gm = get_node("/root/GameManager")
+			var target_game: String = synced_game_type
+			if target_game.is_empty() and gm.has_method("get_active_game"):
+				target_game = str(gm.call("get_active_game"))
+			if target_game.is_empty():
+				target_game = "checkers"
+			if gm.has_method("set_relay_connection_info"):
+				gm.call("set_relay_connection_info", relay_url, get_code(), false)
+			if gm.has_method("register_network_bridge"):
+				gm.call("register_network_bridge", bridge, "client", last_joined_player_id, target_game)
 	if status_label != null:
 		if success:
 			status_label.text = "¡Unido como Jugador %d!" % player_id

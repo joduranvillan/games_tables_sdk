@@ -782,6 +782,8 @@ func _on_save_pressed() -> void:
 		gm.sfx_enabled = sfx_on
 		gm.animations_enabled = anim_on
 		gm.font_size_tier = font_tier
+		if gm.has_method("set_relay_url"):
+			gm.call("set_relay_url", relay_url_val, false)
 			
 	settings_saved.emit()
 	

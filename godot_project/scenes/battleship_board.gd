@@ -124,6 +124,8 @@ func _ready() -> void:
 	bridge.connect("event_json", _on_event_json)
 	bridge.connect("game_over", _on_game_over)
 	bridge.connect("move_rejected", _on_move_rejected)
+	if bridge.has_signal("turn_changed"):
+		bridge.connect("turn_changed", _on_turn_changed)
 
 	var gm_mode: String = str(gm.get_game_mode()) if (gm != null and gm.has_method("get_game_mode")) else "hotseat"
 	var start_vs_ai: bool = (not has_net_bridge) and ((gm_mode == "vs_ai") or (not OS.has_feature("headless") and gm_mode == "hotseat"))
@@ -799,8 +801,9 @@ func _submit_fleet_for_active_player() -> void:
 		return
 
 	# Garantizar transición inmediata de fase si el comando fue aceptado
+	var is_net_mode: bool = (bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")))
 	if phase == Phase.PLACEMENT_P1 or phase == Phase.PLACEMENT_P2:
-		if is_vs_ai:
+		if is_vs_ai or is_net_mode:
 			phase = Phase.FIRE
 		elif active_player == P1 and phase == Phase.PLACEMENT_P1:
 			phase = Phase.PLACEMENT_P2
@@ -828,13 +831,30 @@ func _is_cell_adjacent_to_ships(cell: Vector2i, ships: Array) -> bool:
 				return true
 	return false
 
+func is_local_turn_allowed() -> bool:
+	if bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")):
+		if bridge.has_method("is_local_player_turn"):
+			return bool(bridge.call("is_local_player_turn"))
+		if bridge.has_method("get_network_local_player_id"):
+			return int(bridge.call("get_network_local_player_id")) == int(bridge.current_player())
+	return true
+
+func _on_turn_changed(player_id: int) -> void:
+	current = player_id
+	_update_status()
+	_update_grid_ui()
+	queue_redraw()
+
 func _handle_fire_click(row: int, col: int) -> void:
+	if not is_local_turn_allowed():
+		return
 	if row < opp_shot_grid.size() and col < opp_shot_grid[row].size() and opp_shot_grid[row][col] != null:
 		if status_label != null:
 			status_label.text = "⚠️ Ya disparaste en esa casilla (%s%d)" % [String.chr("A".unicode_at(0) + row), col + 1]
 		return
 
-	var shooter: int = local_player if is_vs_ai else current
+	var is_net_mode: bool = (bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")))
+	var shooter: int = local_player if (is_vs_ai or is_net_mode) else current
 	var fire_cmd = {
 		"command_type": "FireShotCommand",
 		"player": shooter,
@@ -947,7 +967,8 @@ func _on_event_json(json_str: String) -> void:
 			var ev_type: String = raw_type.split("::")[-1]
 			if ev_type == "FleetPlacedEvent":
 				var player_id = int(event.get("player", 1))
-				if is_vs_ai:
+				var is_net_mode: bool = (bridge != null and bridge.has_method("is_network_mode") and bool(bridge.call("is_network_mode")))
+				if is_vs_ai or is_net_mode:
 					if player_id == local_player:
 						phase = Phase.FIRE
 				else:
