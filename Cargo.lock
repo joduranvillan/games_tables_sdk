@@ -694,9 +694,9 @@ dependencies = [
 
 [[package]]
 name = "ctutils"
-version = "0.4.7"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2376ffd6f96d8a9db59875b4b6b0237d6900b5baf64279714e05493ce64828a"
+checksum = "261af4dc7a06ea8a527a8717d8cbba3417530d6ea14e1edb3de6b67806be474f"
 dependencies = [
  "cmov",
 ]
@@ -807,9 +807,9 @@ checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
 
 [[package]]
 name = "flate2"
-version = "1.1.10"
+version = "1.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
+checksum = "626d4928326b646e70f65ed36fc7cf9f206bdb68a0019ee7c6b4709da4e084c4"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
@@ -1019,6 +1019,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "venial",
+]
+
+[[package]]
+name = "goose_game"
+version = "0.1.0"
+dependencies = [
+ "bevy_ecs",
+ "open_table_core",
+ "open_table_engine",
+ "open_table_macros",
+ "serde",
+ "serde_json",
+ "typetag",
 ]
 
 [[package]]
@@ -1367,6 +1380,7 @@ dependencies = [
  "crisis_game",
  "go_game",
  "godot",
+ "goose_game",
  "ludo_game",
  "mille_bornes_game",
  "monopoly_game",
@@ -1422,6 +1436,7 @@ dependencies = [
  "futures-util",
  "getrandom",
  "go_game",
+ "goose_game",
  "hmac",
  "ludo_game",
  "mille_bornes_game",
