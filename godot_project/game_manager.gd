@@ -108,7 +108,9 @@ func register_network_bridge(bridge_node: Node, mode_str: String, local_pid: int
 	if active_network_bridge != null and is_instance_valid(active_network_bridge) and active_network_bridge != bridge_node:
 		if active_network_bridge.get_parent() == self:
 			remove_child(active_network_bridge)
-		active_network_bridge.queue_free()
+			active_network_bridge.queue_free()
+		elif active_network_bridge.get_parent() == null:
+			active_network_bridge.queue_free()
 	var prev_parent: Node = bridge_node.get_parent()
 	if prev_parent != null and prev_parent != self:
 		prev_parent.remove_child(bridge_node)

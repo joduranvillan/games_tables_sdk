@@ -590,6 +590,18 @@ func _load_current_settings() -> void:
 			lang_option.selected = i
 			break
 
+func set_relay_url(url: String) -> void:
+	if relay_url_line != null:
+		relay_url_line.text = url.strip_edges()
+
+func get_relay_url() -> String:
+	if relay_url_line != null and not relay_url_line.text.strip_edges().is_empty():
+		return relay_url_line.text.strip_edges()
+	return DEFAULT_RELAY_URL
+
+func save_settings() -> void:
+	_on_save_pressed()
+
 static func resolve_health_url(raw_relay_url: String) -> String:
 	var cleaned := raw_relay_url.strip_edges()
 	if cleaned.is_empty():
