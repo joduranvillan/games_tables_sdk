@@ -139,14 +139,15 @@ Ver **[`NEXT_STEPS.md`](./NEXT_STEPS.md)** y **[`PROMPTS13.md`](./PROMPTS13.md)*
 
 ## Workspace y reproducibilidad
 
-Los 15 crates son un solo **workspace de Cargo** (`Cargo.toml` raíz) con un
+Los **23 crates** son un solo **workspace de Cargo** (`Cargo.toml` raíz) con un
 `target/` y un `Cargo.lock` compartidos y commiteados: esa es la garantía
-de builds reproducibles (reemplaza los viejos pines `=x.y.z` que se ponían
-a mano por la limitación del toolchain del sandbox original). Comandos:
+de builds reproducibles. Comandos principales:
 
 ```bash
-cargo test --workspace          # ~74 tests de todo el SDK
-cargo build -p open_table_godot # solo el bridge de Godot/Redot
+cargo test --workspace --exclude open_table_godot  # Suites unitarias, de reglas y canónicas en Rust
+cargo build -p open_table_godot                    # Puente GDExtension para Godot 4 / Redot
+./tools/run_godot_tests.sh                         # 47 suites smoke headless en Godot / Redot
+./tools/verify_p13.sh                              # Certificación completa de lanzamiento v1.0.0
 ```
 
 ## Guía de Contribución / Audit de Dependencias
@@ -162,20 +163,12 @@ Para mantener la seguridad y licencias del proyecto, se utiliza `cargo-deny` par
   cargo deny fetch
   ```
 
-## Lo que falta
+## Estado de Cierre (`v1.0.0` Ready)
 
-Ver `NEXT_STEPS.md` para la versión completa y ordenada. Resumen:
+Ver `NEXT_STEPS.md` y `TEST_SUMMARY.md` para el inventario completo de pruebas:
 
-1. ~~Compilar `open_table_godot`~~ ✅ hecho (compila y carga en Redot).
-2. ~~Separar el bridge de Godot en modo host/cliente~~ ✅ hecho — una
-   sola clase `CheckersBridge` con modos Local/Host/Client (ver
-   `ARCHITECTURE.md`), verificado en runtime sobre TCP real.
-3. **`open_table_transport_native_bridge`**: protocolo de
-   identidad/reconexión para transportes móviles nativos, ya probado
-   con 5 tests — falta conectarlo a los plugins reales de
-   `platform_plugins/` (implementar `RawByteLink`).
-4. **Cablear la escena principal de Godot a red** — hoy `main.tscn`
-   solo juega en modo local; el modo host/cliente solo se ejerce desde
-   la escena de prueba `test_tcp_bridge.tscn`.
-5. **Empaquetado real de los plugins nativos** (ver README de cada
-   carpeta en `platform_plugins/`).
+1. ✅ **`open_table_godot`**: Compila, carga en Redot 26.2 / Godot 4.x y expone los 14 juegos en modos Local, vs IA, Host/Cliente TCP, Relay WebSocket y P2P móvil.
+2. ✅ **14 Juegos con Reglas Canónicas + IA + Dados 3D**: Todos los motores de Rust y los 14 tableros de Godot implementan las reglas oficiales de torneo, generador de jugadas legales (`LegalMoveGenerator`) y dados 3D (`DiceRoller3D`).
+3. ✅ **Multijugador QR/LAN y Online Relay WebSocket**: Integrado en el Menú Principal (`main_menu.gd`) y `GameManager` con descubrimiento UDP (`19451`), transporte TCP (`19450`), salas Relay WebSocket con `SyncState`, bloqueo de turno local (`is_local_turn_allowed()`) en los 14 tableros y reconexión automática.
+4. ✅ **Plugins Nativos Móviles (`Android` / `iOS`)**: `OpenTableNearby` (`.aar`) y `OpenTableMultipeer` (`.xcframework`) conectados a `GodotRawByteLink` y compilados en CI/Release.
+5. ✅ **47/47 Suites Smoke Headless en Godot + `verify_p13.sh`**: Ejecutadas automáticamente en CI y en el pipeline de Release.
