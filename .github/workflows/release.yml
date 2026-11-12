@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   verify-release-readiness:
-    name: Verify Phase 12 Release Readiness
+    name: Verify Release Readiness (verify_p13.sh)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -24,11 +24,37 @@ jobs:
       - name: Install Rust toolchain (stable)
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run Phase 12 Verification Suite (verify_p12.sh)
+      - name: Install system dependencies & Redot 26.2 Headless
         shell: bash
         run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev
+          mkdir -p ~/redot
+          cd ~/redot
+          wget -q -O redot.zip https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip
+          unzip -q redot.zip
+          REDOT_EXEC=$(find ~/redot -type f ! -name "*.zip" | head -n 1)
+          chmod +x "$REDOT_EXEC"
+          sudo ln -sf "$REDOT_EXEC" /usr/bin/redot
+          sudo ln -sf "$REDOT_EXEC" /usr/bin/godot
+
+      - name: Build open_table_godot for Headless Verification
+        shell: bash
+        env:
+          GODOT_BIN: /usr/bin/godot
+          REDOT_BIN: /usr/bin/redot
+        run: cargo build -p open_table_godot
+
+      - name: Run Phase 13 Verification Suite (verify_p13.sh)
+        shell: bash
+        env:
+          GODOT_BIN: /usr/bin/godot
+          REDOT_BIN: /usr/bin/redot
+        run: |
           chmod +x tools/*.sh
-          if [ -f tools/verify_p12.sh ]; then
+          if [ -f tools/verify_p13.sh ]; then
+            ./tools/verify_p13.sh
+          elif [ -f tools/verify_p12.sh ]; then
             ./tools/verify_p12.sh
           else
             ./tools/verify_p11.sh
@@ -308,7 +334,7 @@ jobs:
           <html lang="es">
           <head>
             <meta charset="utf-8" />
-            <title>OpenTable — 13 Classic Board & Card Games</title>
+            <title>OpenTable — 14 Classic Board & Card Games</title>
           </head>
           <body>
             <h1>OpenTable Web Export</h1>

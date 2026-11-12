@@ -3,6 +3,20 @@
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.0.0] — 2026-04-23
+
+### Added
+- **Catálogo Completo de 14 Juegos Canónicos**: Incorporación de **El Juego de la Oca** (`goose_game`) con espiral de 63 casillas, las 13 Ocas ("De oca a oca y tiro porque me toca"), Puentes, Posada, Dados (26 y 53), Pozo, Laberinto, Cárcel, Calavera (58 → 1), rebote exacto en el Jardín de la Oca (63) y animaciones de casillas especiales.
+- **Cubilete y Dados 3D (`DiceRoller3D`)**: Simulación tridimensional de dados integrada en `DiceWidget` para los 5 juegos basados en dados (`backgammon`, `ludo`, `monopoly`, `crisis`, `goose`) con fallback determinista en modo headless.
+- **Multijugador Offline QR + LAN (`UDP 19451` / `TCP 19450`)**: Creación y unión de partidas locales sin servidor central desde `MainMenu` mediante descubrimiento automático LAN y código QR (`opentable://join?...`), con transferencia automática del bridge a cualquiera de los 14 tableros (`GameManager.claim_network_bridge()`).
+- **Multijugador Online Relay WebSocket (`OpenTableRelayServer` + `RelayClient`)**:
+  - Creación de salas con código de 6 caracteres (`create_online_relay_room`) y unión remota (`join_online_relay_room`) para los 14 juegos.
+  - Sincronización autoritativa de estado (`SyncState` / `sync_state_received`) al conectarse o reconectarse un par remoto (`apply_state_json` en Rust y `apply_sync_state_json` en los 14 tableros).
+  - URL del servidor Relay WebSocket configurable y persistente en `SettingsMenu` (`user://settings.cfg`) y editable en tiempo real desde el diálogo de conexión del Menú Principal.
+- **Bloqueo de Turno por Jugador Local en Red (`is_local_turn_allowed()`)**: Validación activa en los 14 tableros (`chess`, `checkers`, `go`, `shogi`, `xiangqi`, `chinese_checkers`, `backgammon`, `battleship`, `ludo`, `mille_bornes`, `monopoly`, `uno`, `crisis`, `goose`) que impide mover piezas o jugar cartas fuera del turno asignado (`local_network_player_id`).
+- **Reconexión Automática TCP y Relay**: Bucle de supervisión en `GameManager` que reintenta automáticamente la reconexión TCP y WebSocket Relay ante microcortes de red, notificando el estado en `NetworkStatusHud`.
+- **Suite de 47 Smoke Tests Headless en Godot/Redot**: Nuevas pruebas integrales `goose_smoke.gd`, `dice_3d_smoke.gd`, `qr_lan_multiplayer_smoke.gd` y `network_full_integration_smoke.gd`, integradas en CI (`ci.yml`) y en el validador de release (`verify_p13.sh` en `release.yml`).
+
 ## [0.2.0] — 2026-08-14
 
 ### Added

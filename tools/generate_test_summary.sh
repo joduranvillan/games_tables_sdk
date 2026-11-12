@@ -735,7 +735,7 @@ w("")
 if not errors and not warnings:
     w("### Estado Limpio: `0 Errores Detectados`")
     w("")
-    w("Todas las suites de Rust (14 juegos + 6 crates core), los 45 smoke tests de Godot/Redot, la validación de tipado estricto Redot 4.4 y la paridad byte a byte de `godot_project/scenes/` se encuentran en estado **PASS**.")
+    w(f"Todas las suites de Rust (14 juegos + 6 crates core), los {len(all_godot_tests)} smoke tests de Godot/Redot, la validación de tipado estricto Redot 4.4 y la paridad byte a byte de `godot_project/scenes/` se encuentran en estado **PASS**.")
     w("")
     w("> **Nota para Agentes de IA**: Si en el futuro introduces un cambio que rompa un test, desincronice un tablero o introduzca una inferencia `:=` inválida sobre un `Variant`, vuelve a ejecutar `bash games_tables_sdk/tools/generate_test_summary.sh` y esta sección listará automáticamente cada fallo con su ID, `archivo:línea`, traza de error y receta exacta de reparación.")
 else:
@@ -793,7 +793,7 @@ for gr in game_reports:
 
 w("---")
 w("")
-w("## 6. Inventario Completo de los 45 Smoke Tests de Godot (`godot_project/tests/*.gd`)")
+w(f"## 6. Inventario Completo de los {len(all_godot_tests)} Smoke Tests de Godot (`godot_project/tests/*.gd`)")
 w("")
 w("| # | Archivo de Prueba (`games_tables_sdk/...`) | Líneas | Aserciones / Chequeos | Funciones Definidas (`func:línea`) |")
 w("| :-: | :--- | :-: | :-: | :--- |")

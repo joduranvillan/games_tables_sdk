@@ -116,6 +116,12 @@ jobs:
           test -f target/debug/libopen_table_godot.so || test -f target/debug/libopen_table_godot.dylib || test -f target/debug/open_table_godot.dll
           echo "Godot bridge artifact produced successfully!"
 
+      - name: Run Godot Headless Smoke Suite (47 tests)
+        run: ./tools/run_godot_tests.sh
+        env:
+          GODOT_BIN: /usr/bin/godot
+          REDOT_BIN: /usr/bin/redot
+
   build-android-plugin:
     name: Build Android Plugin
     runs-on: ubuntu-latest

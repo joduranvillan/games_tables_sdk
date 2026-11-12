@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="OpenTable — 13 Classic Board & Card Games"
+config/name="OpenTable — 14 Classic Board & Card Games"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("26.2", "Redot")
 boot_splash/image="res://assets/icons/opentable_suite.png"

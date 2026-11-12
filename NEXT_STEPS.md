@@ -145,4 +145,10 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
 - [x] **402.** Documentación pública en `docs.rs` (`cargo doc --workspace --exclude open_table_godot --no-deps`) — ✅ 0 errores, 0 warnings (exit 0)
 - **0 TODOs activos** en el código fuente de los crates de Rust y GDScript, y 0 inferencias inseguras `:=` sobre `Variant` en Redot strict.
 
+## 11. Integración Completa de Red y Lanzamiento `v1.0.0` — Completado ✅
 
+- [x] **Multijugador Offline QR + LAN (`qr_lan_multiplayer_smoke.gd`)**: Creación/unión de partidas para los 14 juegos vía `UDP 19451` y `TCP 19450`, con transferencia de bridge activo (`GameManager.claim_network_bridge()`).
+- [x] **Flujo Online Relay WebSocket + `SyncState` (`network_full_integration_smoke.gd`)**: Salas de 6 caracteres (`create_online_relay_room` / `join_online_relay_room`), URL de Relay configurable en `SettingsMenu` (`user://settings.cfg`) y en el diálogo de conexión, y sincronización autoritativa de estado (`apply_state_json` / `apply_sync_state_json`).
+- [x] **Bloqueo de Turno por Jugador Local (`is_local_turn_allowed()`)**: Aplicado en los **14 tableros** (`godot_project/*_board.gd` y `godot_project/scenes/*_board.gd`).
+- [x] **Reconexión Automática TCP y Relay**: Reintento periódico automático ante microcortes en `GameManager` con feedback en `NetworkStatusHud`.
+- [x] **47 Suites Smoke Headless en Godot/Redot**: Verificadas en `tools/run_godot_tests.sh`, `tools/verify_p13.sh`, `.github/workflows/ci.yml` y `.github/workflows/release.yml`.
