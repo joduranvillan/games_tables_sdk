@@ -21,7 +21,22 @@ import { MilleBornesBoard } from "./components/boards/MilleBornesBoard";
 import { MonopolyBoard } from "./components/boards/MonopolyBoard";
 import { CrisisBoard } from "./components/boards/CrisisBoard";
 import {
+  applyClockMoveComplete,
+  ClockPresetId,
+  createInitialClockState,
+  stepClockTick,
+  TournamentClock,
+  TournamentClockState,
+} from "./components/common/TournamentClock";
+import { ReplayViewerBar } from "./components/common/ReplayViewerBar";
+import { InteractiveTutorialPanel } from "./components/common/InteractiveTutorialPanel";
+import {
+  OfflineIndicator,
+  PWAInstallButton,
+} from "./components/common/PWAInstallButton";
+import {
   Bot,
+  Eye,
   QrCode,
   RefreshCw,
   RotateCcw,
@@ -169,13 +184,16 @@ export const CATALOG_14_GAMES: GameCatalogItem[] = [
   },
 ];
 
-export type MatchMode = "hotseat" | "ai" | "online_relay";
+export type MatchMode = "hotseat" | "ai" | "online_relay" | "spectator";
 
 export function computeIsLocalTurnAllowed(
   mode: MatchMode,
   currentTurn: number,
-  localPlayerId: 1 | 2
+  localPlayerId: 1 | 2,
+  isReplayAtLiveHead: boolean = true
 ): boolean {
+  if (!isReplayAtLiveHead) return false;
+  if (mode === "spectator") return false;
   if (mode === "hotseat") return true;
   if (mode === "ai") return currentTurn === 1;
   return currentTurn === localPlayerId;
@@ -185,7 +203,9 @@ export const App: React.FC = () => {
   const bridgeRef = useRef<WasmGameBridge>(new WasmGameBridge());
   const relayRef = useRef<RelayWebSocketClient | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"play" | "catalog" | "network" | "settings">("play");
+  const [activeTab, setActiveTab] = useState<
+    "play" | "catalog" | "network" | "settings"
+  >("play");
   const [selectedGameId, setSelectedGameId] = useState<string>("chess");
   const [matchMode, setMatchMode] = useState<MatchMode>("hotseat");
   const [aiDifficulty, setAiDifficulty] = useState<number>(1);
@@ -199,9 +219,19 @@ export const App: React.FC = () => {
   const [currentTurn, setCurrentTurn] = useState<number>(1);
   const [localNetworkPlayerId, setLocalNetworkPlayerId] = useState<1 | 2>(1);
 
+  // Replay timeline state
+  const [replayCurrentStep, setReplayCurrentStep] = useState<number>(0);
+  const [replayTotalSteps, setReplayTotalSteps] = useState<number>(0);
+
+  // Tournament Clock state
+  const [clockState, setClockState] = useState<TournamentClockState>(() =>
+    createInitialClockState("none")
+  );
+
   // Relay & QR state
   const [relayUrl, setRelayUrl] = useState<string>(() => getSavedRelayUrl());
-  const [relayState, setRelayState] = useState<RelayConnectionState>("disconnected");
+  const [relayState, setRelayState] =
+    useState<RelayConnectionState>("disconnected");
   const [relayStatusText, setRelayStatusText] = useState<string>(
     "Sin sala activa (Modo Local)"
   );
@@ -214,6 +244,8 @@ export const App: React.FC = () => {
     setCurrentTurn(turn);
     setStateJson(bridgeRef.current.get_state_json());
     setLegalMovesJson(bridgeRef.current.get_legal_moves_json(turn));
+    setReplayCurrentStep(bridgeRef.current.get_current_replay_step());
+    setReplayTotalSteps(bridgeRef.current.get_replay_step_count());
   };
 
   useEffect(() => {
@@ -227,16 +259,27 @@ export const App: React.FC = () => {
           setRoomCode(code);
           setLocalNetworkPlayerId(pid);
           setQrSvg(
-            bridgeRef.current.generate_join_qr_svg(code, "WebHost", selectedGameId)
+            bridgeRef.current.generate_join_qr_svg(
+              code,
+              "WebHost",
+              selectedGameId
+            )
           );
         },
         onRoomJoined: (code, pid) => {
           setRoomCode(code);
           setLocalNetworkPlayerId(pid);
         },
+        onSpectatorJoined: (code) => {
+          setRoomCode(code);
+          setMatchMode("spectator");
+        },
         onPeerJoined: () => {
           const logJson = bridgeRef.current.export_log_json();
-          client.sendSyncState(bridgeRef.current.get_current_game_type(), logJson);
+          client.sendSyncState(
+            bridgeRef.current.get_current_game_type(),
+            logJson
+          );
         },
         onCommandReceived: (playerId, cmdJson) => {
           bridgeRef.current.send_command_json(playerId, cmdJson);
@@ -264,6 +307,7 @@ export const App: React.FC = () => {
   ) => {
     setSelectedGameId(gameId);
     setMatchMode(mode);
+    setClockState((prev) => createInitialClockState(prev.preset));
     if (mode === "ai") {
       bridgeRef.current.start_ai_match(gameId, 1, 2, diff);
       setLocalNetworkPlayerId(1);
@@ -277,8 +321,12 @@ export const App: React.FC = () => {
   };
 
   const handleDispatchCommand = (cmdJson: string) => {
-    const turnBefore = bridgeRef.current.current_player();
+    const turnBefore = bridgeRef.current.current_player() as 1 | 2;
     bridgeRef.current.send_command_json(turnBefore, cmdJson);
+    const turnAfter = bridgeRef.current.current_player() as 1 | 2;
+    if (turnAfter !== turnBefore) {
+      setClockState((prev) => applyClockMoveComplete(prev, turnBefore));
+    }
     syncFromBridge();
 
     if (matchMode === "online_relay" && relayRef.current) {
@@ -291,10 +339,44 @@ export const App: React.FC = () => {
       }
     } else if (matchMode === "ai") {
       setTimeout(() => {
+        const aiTurnBefore = bridgeRef.current.current_player() as 1 | 2;
         bridgeRef.current.step_ai_if_needed();
+        const aiTurnAfter = bridgeRef.current.current_player() as 1 | 2;
+        if (aiTurnAfter !== aiTurnBefore) {
+          setClockState((prev) => applyClockMoveComplete(prev, aiTurnBefore));
+        }
         syncFromBridge();
       }, 260);
     }
+  };
+
+  const handleClockTick = (deltaMs: number) => {
+    setClockState((prev) => {
+      const next = stepClockTick(
+        prev,
+        (currentTurn === 2 ? 2 : 1) as 1 | 2,
+        deltaMs
+      );
+      if (next.flaggedWinner !== null && prev.flaggedWinner === null) {
+        bridgeRef.current.force_timeout_win(next.flaggedWinner);
+        syncFromBridge();
+      }
+      return next;
+    });
+  };
+
+  const handleSeekReplayStep = (step: number) => {
+    bridgeRef.current.seek_replay_step(step);
+    syncFromBridge();
+  };
+
+  const handleImportReplayJson = (jsonStr: string): boolean => {
+    const ok = bridgeRef.current.apply_sync_log_json("", jsonStr);
+    if (ok) {
+      setSelectedGameId(bridgeRef.current.get_current_game_type());
+      syncFromBridge();
+    }
+    return ok;
   };
 
   const handleCreateRelayRoom = () => {
@@ -304,7 +386,9 @@ export const App: React.FC = () => {
     const code = relayRef.current.createRoom(selectedGameId);
     setRoomCode(code);
     setLocalNetworkPlayerId(1);
-    setQrSvg(bridgeRef.current.generate_join_qr_svg(code, "WebHost", selectedGameId));
+    setQrSvg(
+      bridgeRef.current.generate_join_qr_svg(code, "WebHost", selectedGameId)
+    );
     setActiveTab("play");
   };
 
@@ -319,6 +403,16 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleJoinAsSpectator = () => {
+    if (!relayRef.current || joinCodeInput.trim().length < 4) return;
+    relayRef.current.setRelayUrl(relayUrl);
+    startGameSession(selectedGameId, "spectator");
+    const ok = relayRef.current.joinAsSpectator(joinCodeInput);
+    if (ok) {
+      setActiveTab("play");
+    }
+  };
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     const cleaned = saveRelayUrl(relayUrl);
@@ -327,17 +421,30 @@ export const App: React.FC = () => {
     setRelayStatusText(`URL de Relay guardada: ${cleaned}`);
   };
 
+  const isReplayAtLiveHead = replayCurrentStep >= replayTotalSteps;
   const isLocalTurnAllowed = computeIsLocalTurnAllowed(
     matchMode,
     currentTurn,
-    localNetworkPlayerId
+    localNetworkPlayerId,
+    isReplayAtLiveHead
   );
 
+  const parsedStateWinner = (() => {
+    try {
+      return JSON.parse(stateJson).winner ?? null;
+    } catch {
+      return null;
+    }
+  })();
+
   const activeGameMeta =
-    CATALOG_14_GAMES.find((g) => g.id === selectedGameId) || CATALOG_14_GAMES[0];
+    CATALOG_14_GAMES.find((g) => g.id === selectedGameId) ||
+    CATALOG_14_GAMES[0];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+      <OfflineIndicator />
+
       {/* Strict 3-Zone Top Bar Contract */}
       <header className="flex items-center justify-between gap-8 px-6 py-4 border-b border-slate-800 bg-slate-950/95">
         <a
@@ -356,7 +463,9 @@ export const App: React.FC = () => {
             type="button"
             onClick={() => setActiveTab("play")}
             className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeTab === "play" ? "text-white underline underline-offset-8" : ""
+              activeTab === "play"
+                ? "text-white underline underline-offset-8"
+                : ""
             }`}
           >
             Tablero Activo
@@ -365,7 +474,9 @@ export const App: React.FC = () => {
             type="button"
             onClick={() => setActiveTab("catalog")}
             className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeTab === "catalog" ? "text-white underline underline-offset-8" : ""
+              activeTab === "catalog"
+                ? "text-white underline underline-offset-8"
+                : ""
             }`}
           >
             14 Juegos
@@ -374,7 +485,9 @@ export const App: React.FC = () => {
             type="button"
             onClick={() => setActiveTab("network")}
             className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeTab === "network" ? "text-white underline underline-offset-8" : ""
+              activeTab === "network"
+                ? "text-white underline underline-offset-8"
+                : ""
             }`}
           >
             Salas Online y QR
@@ -383,7 +496,9 @@ export const App: React.FC = () => {
             type="button"
             onClick={() => setActiveTab("settings")}
             className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeTab === "settings" ? "text-white underline underline-offset-8" : ""
+              activeTab === "settings"
+                ? "text-white underline underline-offset-8"
+                : ""
             }`}
           >
             Ajustes Relay
@@ -391,9 +506,12 @@ export const App: React.FC = () => {
         </nav>
 
         <div className="flex items-center gap-3 shrink-0">
+          <PWAInstallButton />
           <button
             type="button"
-            onClick={() => startGameSession(selectedGameId, matchMode, aiDifficulty)}
+            onClick={() =>
+              startGameSession(selectedGameId, matchMode, aiDifficulty)
+            }
             className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             Reiniciar Partida
@@ -402,9 +520,9 @@ export const App: React.FC = () => {
       </header>
 
       {/* Main Content Container (1440px baseline) */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 flex flex-col gap-8">
-        {/* Workspace Toolbar: Game Selector + Mode Selector + Network HUD */}
-        <section className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
+        {/* Workspace Toolbar: Game Selector + Mode Selector */}
+        <section className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-5 border-b border-slate-800">
           <div className="flex flex-wrap items-center gap-1.5">
             {CATALOG_14_GAMES.map((g) => (
               <button
@@ -439,7 +557,9 @@ export const App: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => startGameSession(selectedGameId, "ai", aiDifficulty)}
+                onClick={() =>
+                  startGameSession(selectedGameId, "ai", aiDifficulty)
+                }
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   matchMode === "ai"
                     ? "bg-emerald-600 text-white"
@@ -460,6 +580,18 @@ export const App: React.FC = () => {
               >
                 <Wifi className="w-3.5 h-3.5" />
                 <span>Online Relay / QR</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => startGameSession(selectedGameId, "spectator")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  matchMode === "spectator"
+                    ? "bg-amber-600 text-white"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Espectador</span>
               </button>
             </div>
 
@@ -485,51 +617,108 @@ export const App: React.FC = () => {
 
         {/* Active Tab View */}
         {activeTab === "play" && (
-          <section className="flex flex-col gap-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <section className="flex flex-col gap-5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-bold text-white font-display">
                   {activeGameMeta.title}
                 </h1>
                 <p className="text-xs text-slate-400 mt-1">
-                  {activeGameMeta.summary} · Motor: {activeGameMeta.crateName} (WASM) ·
-                  Turno actual: Jugador {currentTurn}
+                  {activeGameMeta.summary} · Motor: {activeGameMeta.crateName}{" "}
+                  (WASM) · Turno actual: Jugador {currentTurn}
+                  {matchMode === "spectator" ? " · 👁️ Modo Espectador" : ""}
                 </p>
               </div>
 
-              {/* Online Relay Turn-Lock Controls when in Online Mode */}
-              {matchMode === "online_relay" && (
-                <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
-                  <span className="text-slate-300 font-mono">
-                    Sala: <strong className="text-white">{roomCode || "LOCAL"}</strong>
-                  </span>
-                  <span aria-hidden="true">·</span>
-                  <span className="text-slate-300">Rol Local:</span>
-                  <button
-                    type="button"
-                    onClick={() => setLocalNetworkPlayerId(1)}
-                    className={`px-2.5 py-1 rounded font-semibold cursor-pointer ${
-                      localNetworkPlayerId === 1
-                        ? "bg-emerald-600 text-white"
-                        : "bg-slate-800 text-slate-300"
-                    }`}
-                  >
-                    Jugador 1 (Host)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLocalNetworkPlayerId(2)}
-                    className={`px-2.5 py-1 rounded font-semibold cursor-pointer ${
-                      localNetworkPlayerId === 2
-                        ? "bg-sky-600 text-white"
-                        : "bg-slate-800 text-slate-300"
-                    }`}
-                  >
-                    Jugador 2 (Cliente)
-                  </button>
-                </div>
-              )}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Tournament Clock (FIDE / Byo-yomi) */}
+                <TournamentClock
+                  clockState={clockState}
+                  activeTurn={(currentTurn === 2 ? 2 : 1) as 1 | 2}
+                  isPaused={
+                    parsedStateWinner !== null || !isReplayAtLiveHead
+                  }
+                  onPresetChange={(preset: ClockPresetId) =>
+                    setClockState(createInitialClockState(preset))
+                  }
+                  onTick={handleClockTick}
+                />
+
+                {/* Online Relay Turn-Lock Controls when in Online or Spectator Mode */}
+                {(matchMode === "online_relay" ||
+                  matchMode === "spectator") && (
+                  <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
+                    <span className="text-slate-300 font-mono">
+                      Sala:{" "}
+                      <strong className="text-white">
+                        {roomCode || "LOCAL"}
+                      </strong>
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMatchMode("online_relay");
+                        setLocalNetworkPlayerId(1);
+                      }}
+                      className={`px-2.5 py-1 rounded font-semibold cursor-pointer ${
+                        matchMode === "online_relay" &&
+                        localNetworkPlayerId === 1
+                          ? "bg-emerald-600 text-white"
+                          : "bg-slate-800 text-slate-300"
+                      }`}
+                    >
+                      J1 (Host)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMatchMode("online_relay");
+                        setLocalNetworkPlayerId(2);
+                      }}
+                      className={`px-2.5 py-1 rounded font-semibold cursor-pointer ${
+                        matchMode === "online_relay" &&
+                        localNetworkPlayerId === 2
+                          ? "bg-sky-600 text-white"
+                          : "bg-slate-800 text-slate-300"
+                      }`}
+                    >
+                      J2 (Cliente)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMatchMode("spectator")}
+                      className={`px-2.5 py-1 rounded font-semibold cursor-pointer ${
+                        matchMode === "spectator"
+                          ? "bg-amber-600 text-white"
+                          : "bg-slate-800 text-slate-300"
+                      }`}
+                    >
+                      👁️ Espectador
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Interactive Tutorial Panel (14 Games + Live WASM Suggestion) */}
+            <InteractiveTutorialPanel
+              gameId={selectedGameId}
+              currentTurn={(currentTurn === 2 ? 2 : 1) as 1 | 2}
+              legalMovesJson={legalMovesJson}
+              isLocalTurnAllowed={isLocalTurnAllowed}
+              onDispatchCommand={handleDispatchCommand}
+            />
+
+            {/* Step-by-Step Replay Viewer & Save/Load JSON Bar */}
+            <ReplayViewerBar
+              currentStep={replayCurrentStep}
+              totalSteps={replayTotalSteps}
+              gameId={selectedGameId}
+              onSeekStep={handleSeekReplayStep}
+              onExportJson={() => bridgeRef.current.export_log_json()}
+              onImportJson={handleImportReplayJson}
+            />
 
             {selectedGameId === "chess" && (
               <ChessBoard
@@ -557,7 +746,9 @@ export const App: React.FC = () => {
                 legalMovesJson={legalMovesJson}
                 isLocalTurnAllowed={isLocalTurnAllowed}
                 localPlayerId={localNetworkPlayerId}
-                isNetworkGame={matchMode === "online_relay"}
+                isNetworkGame={
+                  matchMode === "online_relay" || matchMode === "spectator"
+                }
                 onDispatchCommand={handleDispatchCommand}
               />
             )}
@@ -681,8 +872,10 @@ export const App: React.FC = () => {
               </h2>
               <p className="text-sm text-slate-400 mt-1">
                 Los 14 crates de Rust compilan sin cambios en{" "}
-                <code>open_table_wasm</code> y cuentan con su tablero interactivo
-                completo en React + Tailwind CSS (Fases 1 y 2 completadas: 14/14).
+                <code>open_table_wasm</code> y cuentan con su tablero
+                interactivo, tutorial guiado, reloj FIDE/Byo-yomi y visor de
+                repeticiones en React + Tailwind CSS (Fases 1, 2 y 3
+                completadas: 14/14).
               </p>
             </div>
 
@@ -706,7 +899,9 @@ export const App: React.FC = () => {
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-slate-800">
-                    <span className="text-xs text-slate-400">{item.blockLabel}</span>
+                    <span className="text-xs text-slate-400">
+                      {item.blockLabel}
+                    </span>
                     <button
                       type="button"
                       onClick={() => {
@@ -729,12 +924,13 @@ export const App: React.FC = () => {
             <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-5">
               <div>
                 <h2 className="text-xl font-bold text-white font-display">
-                  Crear o Unirse a Sala Online Relay
+                  Crear o Unirse a Sala Online Relay (Jugador o Espectador)
                 </h2>
                 <p className="text-xs text-slate-400 mt-1">
                   Compatible con <code>open_table_relay</code> (Cross-Play entre
                   clientes Godot y clientes Web React) con envío automático de{" "}
-                  <code>SyncState</code> y bloqueo de turno local.
+                  <code>SyncState</code>, bloqueo de turno local y modo
+                  Espectador en tiempo real.
                 </p>
               </div>
 
@@ -763,7 +959,9 @@ export const App: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => relayRef.current?.simulateMicroDisconnectAndReconnect()}
+                  onClick={() =>
+                    relayRef.current?.simulateMicroDisconnectAndReconnect()
+                  }
                   disabled={!roomCode}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
                 >
@@ -774,14 +972,16 @@ export const App: React.FC = () => {
 
               <div className="border-t border-slate-800 pt-4 flex flex-col gap-3">
                 <label className="text-xs font-medium text-slate-300">
-                  Unirse con Código de 6 Caracteres (Cliente J2)
+                  Unirse con Código de 6 Caracteres (Cliente J2 o Espectador)
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="text"
                     maxLength={8}
                     value={joinCodeInput}
-                    onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                    onChange={(e) =>
+                      setJoinCodeInput(e.target.value.toUpperCase())
+                    }
                     placeholder="Ej. AB12CD"
                     className="px-3.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white font-mono uppercase"
                   />
@@ -790,7 +990,15 @@ export const App: React.FC = () => {
                     onClick={handleJoinRelayRoom}
                     className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                   >
-                    Unirse a Sala
+                    Unirse como J2
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleJoinAsSpectator}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Observar (Espectador)</span>
                   </button>
                 </div>
               </div>
@@ -799,7 +1007,8 @@ export const App: React.FC = () => {
             {/* QR Code & Status Card */}
             <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col items-center justify-center gap-4 text-center">
               <div className="text-xs text-slate-400">
-                Estado de Transporte: <strong className="text-white">{relayState}</strong>
+                Estado de Transporte:{" "}
+                <strong className="text-white">{relayState}</strong>
               </div>
               <div className="text-sm font-medium text-slate-200">
                 {relayStatusText}
@@ -813,7 +1022,9 @@ export const App: React.FC = () => {
                   />
                   <div className="text-xs text-slate-300 font-mono">
                     Código de Sala:{" "}
-                    <strong className="text-emerald-400 text-sm">{roomCode}</strong>
+                    <strong className="text-emerald-400 text-sm">
+                      {roomCode}
+                    </strong>
                   </div>
                 </div>
               ) : (
@@ -847,8 +1058,8 @@ export const App: React.FC = () => {
                   className="px-3.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white font-mono"
                 />
                 <span className="text-[11px] text-slate-400">
-                  Clave de almacenamiento: <code>opentable.relay_url</code> · Por
-                  defecto: <code>ws://127.0.0.1:8080</code>
+                  Clave de almacenamiento: <code>opentable.relay_url</code> ·
+                  Por defecto: <code>ws://127.0.0.1:8080</code>
                 </span>
               </div>
 

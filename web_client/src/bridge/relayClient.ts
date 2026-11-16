@@ -14,6 +14,7 @@ export type RelayConnectionState =
   | "connecting"
   | "connected_host"
   | "connected_client"
+  | "connected_spectator"
   | "reconnecting";
 
 export interface SyncStateMessage {
@@ -26,6 +27,7 @@ export interface RelayEventCallbacks {
   onStateChange?: (state: RelayConnectionState, info?: string) => void;
   onRoomCreated?: (roomCode: string, localPlayerId: 1 | 2) => void;
   onRoomJoined?: (roomCode: string, localPlayerId: 1 | 2) => void;
+  onSpectatorJoined?: (roomCode: string) => void;
   onPeerJoined?: (peerPlayerId: number) => void;
   onCommandReceived?: (playerId: number, commandJson: string) => void;
   onSyncStateReceived?: (gameType: string, logJson: string) => void;
@@ -62,6 +64,7 @@ export class RelayWebSocketClient {
   private ws: WebSocket | null = null;
   private roomCode: string = "";
   private localPlayerId: 1 | 2 = 1;
+  private isSpectator: boolean = false;
   private state: RelayConnectionState = "disconnected";
   private reconnectAttempts: number = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -89,6 +92,10 @@ export class RelayWebSocketClient {
     return this.localPlayerId;
   }
 
+  public isSpectatorRole(): boolean {
+    return this.isSpectator;
+  }
+
   public getConnectionState(): RelayConnectionState {
     return this.state;
   }
@@ -106,11 +113,11 @@ export class RelayWebSocketClient {
         this.broadcastChannel.onmessage = (ev) => {
           const data = ev.data;
           if (!data || typeof data !== "object") return;
-          if (data.type === "PEER_JOINED" && this.localPlayerId === 1) {
+          if (data.type === "PEER_JOINED" && this.localPlayerId === 1 && !this.isSpectator) {
             this.callbacks.onPeerJoined?.(2);
-          } else if (data.type === "COMMAND" && data.sender !== this.localPlayerId) {
+          } else if (data.type === "COMMAND" && (this.isSpectator || data.sender !== this.localPlayerId)) {
             this.callbacks.onCommandReceived?.(data.sender, data.commandJson);
-          } else if (data.type === "SYNC_STATE" && this.localPlayerId === 2) {
+          } else if (data.type === "SYNC_STATE" && (this.isSpectator || this.localPlayerId === 2)) {
             this.callbacks.onSyncStateReceived?.(data.gameType, data.logJson);
           }
         };
@@ -128,6 +135,7 @@ export class RelayWebSocketClient {
     }
     this.roomCode = generated;
     this.localPlayerId = 1;
+    this.isSpectator = false;
     this.reconnectAttempts = 0;
     this.setState("connecting", `Creando sala ${generated} en ${this.relayUrl}...`);
     this.setupSameOriginTabChannel(generated);
@@ -142,6 +150,7 @@ export class RelayWebSocketClient {
     if (clean.length < 4) return false;
     this.roomCode = clean;
     this.localPlayerId = 2;
+    this.isSpectator = false;
     this.reconnectAttempts = 0;
     this.setState("connecting", `Uniéndose a sala ${clean} en ${this.relayUrl}...`);
     this.setupSameOriginTabChannel(clean);
@@ -149,6 +158,22 @@ export class RelayWebSocketClient {
     this.setState("connected_client", `Conectado a sala ${clean} (Jugador 2 · Cliente)`);
     this.callbacks.onRoomJoined?.(clean, 2);
     this.broadcastChannel?.postMessage({ type: "PEER_JOINED", playerId: 2 });
+    return true;
+  }
+
+  public joinAsSpectator(roomCode: string): boolean {
+    const clean = roomCode.trim().toUpperCase();
+    if (clean.length < 4) return false;
+    this.roomCode = clean;
+    this.localPlayerId = 2;
+    this.isSpectator = true;
+    this.reconnectAttempts = 0;
+    this.setState("connecting", `Uniéndose como Espectador a sala ${clean}...`);
+    this.setupSameOriginTabChannel(clean);
+    this.connectSocket({ action: "spectate_room", room_code: clean, spectator: true }, false);
+    this.setState("connected_spectator", `Modo Espectador activo en sala ${clean} (Solo lectura)`);
+    this.callbacks.onSpectatorJoined?.(clean);
+    this.broadcastChannel?.postMessage({ type: "PEER_JOINED", playerId: 0 });
     return true;
   }
 

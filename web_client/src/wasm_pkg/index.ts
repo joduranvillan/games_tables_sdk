@@ -339,6 +339,8 @@ export class WasmGameBridge {
   private aiPlayer: 1 | 2 | null = null;
   private aiDifficulty: number = 1;
   private commandLog: { player: number; command: string }[] = [];
+  private replayFullLog: { player: number; command: string }[] = [];
+  private replayCursor: number = 0;
   private rngState: number = 1337;
 
   // 1. Chess state
@@ -447,6 +449,8 @@ export class WasmGameBridge {
     this.winner = null;
     this.aiPlayer = null;
     this.commandLog = [];
+    this.replayFullLog = [];
+    this.replayCursor = 0;
     this.rngState = 1337;
 
     if (this.gameType === "chess") {
@@ -1077,7 +1081,13 @@ export class WasmGameBridge {
   }
 
   public send_command_json(playerId: number, jsonStr: string): string {
-    return this.executeCommandInternal(playerId, jsonStr, true);
+    if (this.replayCursor < this.replayFullLog.length) {
+      this.replayFullLog = this.replayFullLog.slice(0, this.replayCursor);
+    }
+    const res = this.executeCommandInternal(playerId, jsonStr, true);
+    this.replayFullLog = [...this.commandLog];
+    this.replayCursor = this.replayFullLog.length;
+    return res;
   }
 
   private executeCommandInternal(
@@ -2064,7 +2074,7 @@ export class WasmGameBridge {
   public export_log_json(): string {
     return JSON.stringify({
       game_type: this.gameType,
-      commands: this.commandLog,
+      commands: this.replayFullLog.length > 0 ? this.replayFullLog : this.commandLog,
       snapshot: JSON.parse(this.get_state_json()),
     });
   }
@@ -2073,15 +2083,60 @@ export class WasmGameBridge {
     try {
       const parsed = JSON.parse(logJson);
       const targetGame = gameType || parsed.game_type || this.gameType;
+      const savedAi = this.aiPlayer;
+      const savedDiff = this.aiDifficulty;
       this.start_local_match(targetGame, 1, 2);
+      this.aiPlayer = savedAi;
+      this.aiDifficulty = savedDiff;
       if (Array.isArray(parsed.commands)) {
         for (const entry of parsed.commands) {
           this.executeCommandInternal(entry.player, entry.command, true);
         }
       }
+      this.replayFullLog = [...this.commandLog];
+      this.replayCursor = this.replayFullLog.length;
       return true;
     } catch {
       return false;
+    }
+  }
+
+  public get_replay_step_count(): number {
+    return this.replayFullLog.length;
+  }
+
+  public get_current_replay_step(): number {
+    return this.replayCursor;
+  }
+
+  public is_replay_at_live_head(): boolean {
+    return this.replayCursor >= this.replayFullLog.length;
+  }
+
+  public seek_replay_step(stepIndex: number): boolean {
+    const full = [...this.replayFullLog];
+    const targetStep = Math.max(0, Math.min(full.length, Math.floor(stepIndex)));
+    const currentGame = this.gameType;
+    const savedAi = this.aiPlayer;
+    const savedDiff = this.aiDifficulty;
+
+    this.start_local_match(currentGame, 1, 2);
+    this.aiPlayer = savedAi;
+    this.aiDifficulty = savedDiff;
+
+    for (let i = 0; i < targetStep; i++) {
+      const entry = full[i];
+      this.executeCommandInternal(entry.player, entry.command, true);
+    }
+    this.replayFullLog = full;
+    this.replayCursor = targetStep;
+    return true;
+  }
+
+  public force_timeout_win(winnerId: 1 | 2): void {
+    if (this.winner === null) {
+      this.winner = winnerId;
+      this.tick += 1;
     }
   }
 
