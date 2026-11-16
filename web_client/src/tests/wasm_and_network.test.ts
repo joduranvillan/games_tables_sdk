@@ -30,9 +30,9 @@ async function runTests() {
     CATALOG_14_GAMES.length === 14,
     `El catálogo debe listar los 14 juegos canónicos, encontrados: ${CATALOG_14_GAMES.length}`
   );
-  const phase1Games = CATALOG_14_GAMES.filter((g) => g.phase === 1);
-  assert(phase1Games.length === 4, "La Fase 1 debe tener 4 tableros activos");
-  console.log("  [PASS] Catálogo de 14 juegos y 4 tableros activos de Fase 1 verificados");
+  const activeGames = CATALOG_14_GAMES.filter((g) => g.phase === 1);
+  assert(activeGames.length === 14, "Los 14 tableros deben estar activos tras completar Fase 2");
+  console.log("  [PASS] Catálogo de 14 juegos y 14 tableros activos verificados");
 
   // 2. Ajedrez (Chess) + Bloqueo de turno + IA
   const bridge = new WasmGameBridge();

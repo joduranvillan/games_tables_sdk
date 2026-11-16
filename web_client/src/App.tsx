@@ -10,6 +10,16 @@ import { ChessBoard } from "./components/boards/ChessBoard";
 import { CheckersBoard } from "./components/boards/CheckersBoard";
 import { UnoBoard } from "./components/boards/UnoBoard";
 import { GooseBoard } from "./components/boards/GooseBoard";
+import { GoBoard } from "./components/boards/GoBoard";
+import { ShogiBoard } from "./components/boards/ShogiBoard";
+import { XiangqiBoard } from "./components/boards/XiangqiBoard";
+import { ChineseCheckersBoard } from "./components/boards/ChineseCheckersBoard";
+import { BackgammonBoard } from "./components/boards/BackgammonBoard";
+import { LudoBoard } from "./components/boards/LudoBoard";
+import { BattleshipBoard } from "./components/boards/BattleshipBoard";
+import { MilleBornesBoard } from "./components/boards/MilleBornesBoard";
+import { MonopolyBoard } from "./components/boards/MonopolyBoard";
+import { CrisisBoard } from "./components/boards/CrisisBoard";
 import {
   Bot,
   QrCode,
@@ -72,8 +82,8 @@ export const CATALOG_14_GAMES: GameCatalogItem[] = [
     title: "Go (Weiqi / Baduk)",
     crateName: "go_game",
     category: "Estrategia Oriental",
-    phase: 2,
-    blockLabel: "Fase 2A · Motor WASM listo",
+    phase: 1,
+    blockLabel: "Fase 2A · Activo en Web + WASM",
     summary: "Tableros 9×9 / 13×13 / 19×19, Ko, Superko posicional, Handicap y Komi 6.5.",
   },
   {
@@ -81,8 +91,8 @@ export const CATALOG_14_GAMES: GameCatalogItem[] = [
     title: "Shogi",
     crateName: "shogi_game",
     category: "Estrategia Oriental",
-    phase: 2,
-    blockLabel: "Fase 2A · Motor WASM listo",
+    phase: 1,
+    blockLabel: "Fase 2A · Activo en Web + WASM",
     summary: "Reingreso de piezas capturadas (Komadai), Nifu, Uchifuzume y promoción FESA.",
   },
   {
@@ -90,8 +100,8 @@ export const CATALOG_14_GAMES: GameCatalogItem[] = [
     title: "Xiangqi",
     crateName: "xiangqi_game",
     category: "Estrategia Oriental",
-    phase: 2,
-    blockLabel: "Fase 2A · Motor WASM listo",
+    phase: 1,
+    blockLabel: "Fase 2A · Activo en Web + WASM",
     summary: "Tablero 9×10 con Río, Palacios diagonales, Cañones con pantalla y General Volador.",
   },
   {
@@ -99,8 +109,8 @@ export const CATALOG_14_GAMES: GameCatalogItem[] = [
     title: "Damas Chinas",
     crateName: "chinese_checkers_game",
     category: "Estrategia Oriental",
-    phase: 2,
-    blockLabel: "Fase 2A · Motor WASM listo",
+    phase: 1,
+    blockLabel: "Fase 2A · Activo en Web + WASM",
     summary: "Estrella hexagonal de 121 casillas para 2 a 6 jugadores con saltos en cadena.",
   },
   {
@@ -108,8 +118,8 @@ export const CATALOG_14_GAMES: GameCatalogItem[] = [
     title: "Backgammon",
     crateName: "backgammon_game",
     category: "Dados y Táctica",
-    phase: 2,
-    blockLabel: "Fase 2B · Motor WASM listo",
+    phase: 1,
+    blockLabel: "Fase 2B · Activo en Web + WASM",
     summary: "24 picos, barra central, Bear-Off, tiradas dobles y cubo de doblaje (Doubling Cube).",
   },
   {
@@ -117,8 +127,8 @@ export const CATALOG_14_GAMES: GameCatalogItem[] = [
     title: "Ludo",
     crateName: "ludo_game",
     category: "Dados y Carrera",
-    phase: 2,
-    blockLabel: "Fase 2B · Motor WASM listo",
+    phase: 1,
+    blockLabel: "Fase 2B · Activo en Web + WASM",
     summary: "Circuito de 52 casillas + 5 de meta, 8 casillas seguras estrella y tirada extra.",
   },
   {
@@ -126,8 +136,8 @@ export const CATALOG_14_GAMES: GameCatalogItem[] = [
     title: "Batalla Naval",
     crateName: "battleship_game",
     category: "Combate Táctico",
-    phase: 2,
-    blockLabel: "Fase 2B · Motor WASM listo",
+    phase: 1,
+    blockLabel: "Fase 2B · Activo en Web + WASM",
     summary: "Doble cuadrícula 10×10, flota de 5 buques, ráfaga al impactar y revancha.",
   },
   {
@@ -135,8 +145,8 @@ export const CATALOG_14_GAMES: GameCatalogItem[] = [
     title: "Mil Millas",
     crateName: "mille_bornes_game",
     category: "Cartas y Carrera",
-    phase: 2,
-    blockLabel: "Fase 2C · Motor WASM listo",
+    phase: 1,
+    blockLabel: "Fase 2C · Activo en Web + WASM",
     summary: "Ruta de 1000 km, 4 cartas de seguridad (Safeties) y reacción ¡Coup Fourré!.",
   },
   {
@@ -144,8 +154,8 @@ export const CATALOG_14_GAMES: GameCatalogItem[] = [
     title: "Monopoly",
     crateName: "monopoly_game",
     category: "Economía y Subastas",
-    phase: 2,
-    blockLabel: "Fase 2C · Motor WASM listo",
+    phase: 1,
+    blockLabel: "Fase 2C · Activo en Web + WASM",
     summary: "40 casillas, Suerte/Arca, Subastas, Casas/Hoteles uniformes, Hipotecas y Trueques.",
   },
   {
@@ -153,8 +163,8 @@ export const CATALOG_14_GAMES: GameCatalogItem[] = [
     title: "Crisis / TEG",
     crateName: "crisis_game",
     category: "Conquista Global",
-    phase: 2,
-    blockLabel: "Fase 2C · Motor WASM listo",
+    phase: 1,
+    blockLabel: "Fase 2C · Activo en Web + WASM",
     summary: "30 territorios en 6 continentes, objetivos secretos, tarjetas y dados 3v3.",
   },
 ];
@@ -395,13 +405,13 @@ export const App: React.FC = () => {
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 flex flex-col gap-8">
         {/* Workspace Toolbar: Game Selector + Mode Selector + Network HUD */}
         <section className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-6 border-b border-slate-800">
-          <div className="flex flex-wrap items-center gap-2">
-            {CATALOG_14_GAMES.filter((g) => g.phase === 1).map((g) => (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {CATALOG_14_GAMES.map((g) => (
               <button
                 key={g.id}
                 type="button"
                 onClick={() => startGameSession(g.id, matchMode, aiDifficulty)}
-                className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   selectedGameId === g.id
                     ? "bg-white text-slate-950 shadow-xs"
                     : "bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800"
@@ -413,7 +423,7 @@ export const App: React.FC = () => {
           </div>
 
           {/* Mode Segmented Control */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-lg">
               <button
                 type="button"
@@ -560,6 +570,106 @@ export const App: React.FC = () => {
                 onDispatchCommand={handleDispatchCommand}
               />
             )}
+
+            {selectedGameId === "go" && (
+              <GoBoard
+                stateJson={stateJson}
+                legalMovesJson={legalMovesJson}
+                isLocalTurnAllowed={isLocalTurnAllowed}
+                localPlayerId={localNetworkPlayerId}
+                onDispatchCommand={handleDispatchCommand}
+              />
+            )}
+
+            {selectedGameId === "shogi" && (
+              <ShogiBoard
+                stateJson={stateJson}
+                legalMovesJson={legalMovesJson}
+                isLocalTurnAllowed={isLocalTurnAllowed}
+                localPlayerId={localNetworkPlayerId}
+                onDispatchCommand={handleDispatchCommand}
+              />
+            )}
+
+            {selectedGameId === "xiangqi" && (
+              <XiangqiBoard
+                stateJson={stateJson}
+                legalMovesJson={legalMovesJson}
+                isLocalTurnAllowed={isLocalTurnAllowed}
+                localPlayerId={localNetworkPlayerId}
+                onDispatchCommand={handleDispatchCommand}
+              />
+            )}
+
+            {selectedGameId === "chinese_checkers" && (
+              <ChineseCheckersBoard
+                stateJson={stateJson}
+                legalMovesJson={legalMovesJson}
+                isLocalTurnAllowed={isLocalTurnAllowed}
+                localPlayerId={localNetworkPlayerId}
+                onDispatchCommand={handleDispatchCommand}
+              />
+            )}
+
+            {selectedGameId === "backgammon" && (
+              <BackgammonBoard
+                stateJson={stateJson}
+                legalMovesJson={legalMovesJson}
+                isLocalTurnAllowed={isLocalTurnAllowed}
+                localPlayerId={localNetworkPlayerId}
+                onDispatchCommand={handleDispatchCommand}
+              />
+            )}
+
+            {selectedGameId === "ludo" && (
+              <LudoBoard
+                stateJson={stateJson}
+                legalMovesJson={legalMovesJson}
+                isLocalTurnAllowed={isLocalTurnAllowed}
+                localPlayerId={localNetworkPlayerId}
+                onDispatchCommand={handleDispatchCommand}
+              />
+            )}
+
+            {selectedGameId === "battleship" && (
+              <BattleshipBoard
+                stateJson={stateJson}
+                legalMovesJson={legalMovesJson}
+                isLocalTurnAllowed={isLocalTurnAllowed}
+                localPlayerId={localNetworkPlayerId}
+                onDispatchCommand={handleDispatchCommand}
+              />
+            )}
+
+            {selectedGameId === "mille_bornes" && (
+              <MilleBornesBoard
+                stateJson={stateJson}
+                legalMovesJson={legalMovesJson}
+                isLocalTurnAllowed={isLocalTurnAllowed}
+                localPlayerId={localNetworkPlayerId}
+                onDispatchCommand={handleDispatchCommand}
+              />
+            )}
+
+            {selectedGameId === "monopoly" && (
+              <MonopolyBoard
+                stateJson={stateJson}
+                legalMovesJson={legalMovesJson}
+                isLocalTurnAllowed={isLocalTurnAllowed}
+                localPlayerId={localNetworkPlayerId}
+                onDispatchCommand={handleDispatchCommand}
+              />
+            )}
+
+            {selectedGameId === "crisis" && (
+              <CrisisBoard
+                stateJson={stateJson}
+                legalMovesJson={legalMovesJson}
+                isLocalTurnAllowed={isLocalTurnAllowed}
+                localPlayerId={localNetworkPlayerId}
+                onDispatchCommand={handleDispatchCommand}
+              />
+            )}
           </section>
         )}
 
@@ -571,9 +681,8 @@ export const App: React.FC = () => {
               </h2>
               <p className="text-sm text-slate-400 mt-1">
                 Los 14 crates de Rust compilan sin cambios en{" "}
-                <code>open_table_wasm</code>. En la Fase 1 están habilitados los 4
-                tableros representativos en React y en la Fase 2 se conectan los 10
-                tableros restantes.
+                <code>open_table_wasm</code> y cuentan con su tablero interactivo
+                completo en React + Tailwind CSS (Fases 1 y 2 completadas: 14/14).
               </p>
             </div>
 
@@ -598,22 +707,16 @@ export const App: React.FC = () => {
 
                   <div className="flex items-center justify-between pt-3 border-t border-slate-800">
                     <span className="text-xs text-slate-400">{item.blockLabel}</span>
-                    {item.phase === 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          startGameSession(item.id, matchMode, aiDifficulty);
-                          setActiveTab("play");
-                        }}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-                      >
-                        Jugar Ahora
-                      </button>
-                    ) : (
-                      <span className="text-xs text-slate-500 font-mono">
-                        Fase 2
-                      </span>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        startGameSession(item.id, matchMode, aiDifficulty);
+                        setActiveTab("play");
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      Jugar Ahora
+                    </button>
                   </div>
                 </div>
               ))}
@@ -776,4 +879,5 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
 export default App;

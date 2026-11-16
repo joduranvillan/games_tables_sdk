@@ -141,7 +141,9 @@ impl WasmGameBridge {
 
     pub fn start_local_match(&mut self, game_type: &str, p1: u32, p2: u32) -> bool {
         let gtype = game_type.trim().to_lowercase();
-        if let Some(sess) = create_session_for_players(&gtype, PlayerId(p1.max(1)), PlayerId(p2.max(2))) {
+        if let Some(sess) =
+            create_session_for_players(&gtype, PlayerId(p1.max(1)), PlayerId(p2.max(2)))
+        {
             self.current_game_type = gtype;
             self.session = Some(sess);
             self.ai_player = None;
@@ -166,7 +168,13 @@ impl WasmGameBridge {
         } else {
             (p_ai, p_human)
         };
-        if let Some(sess) = create_session_for_players(&gtype, p1, p2) {
+        if let Some(mut sess) = create_session_for_players(&gtype, p1, p2) {
+            if gtype == "battleship" {
+                let _ = sess.process_command(
+                    p_ai,
+                    Box::new(battleship_game::default_ai_place_fleet_command(p_ai)),
+                );
+            }
             self.current_game_type = gtype;
             self.session = Some(sess);
             self.ai_player = Some(p_ai);
@@ -283,7 +291,32 @@ impl WasmGameBridge {
                 .map(|c| Box::new(c) as Box<dyn Command>),
             "checkers" => checkers_game::ai::best_move(sess, ai_p, self.ai_difficulty)
                 .map(|c| Box::new(c) as Box<dyn Command>),
+            "shogi" => shogi_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                .map(|c| Box::new(c) as Box<dyn Command>),
+            "xiangqi" => xiangqi_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                .map(|c| Box::new(c) as Box<dyn Command>),
+            "go" => go_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                .map(|c| Box::new(c) as Box<dyn Command>)
+                .or_else(|| Some(Box::new(go_game::PassCommand { player: ai_p }) as Box<dyn Command>)),
+            "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => {
+                chinese_checkers_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                    .map(|c| Box::new(c) as Box<dyn Command>)
+            }
+            "backgammon" => backgammon_game::backgammon_ai_pick_move(sess, ai_p)
+                .map(|c| Box::new(c) as Box<dyn Command>),
+            "ludo" => ludo_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                .map(|c| Box::new(c) as Box<dyn Command>),
+            "battleship" => battleship_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                .map(|c| Box::new(c) as Box<dyn Command>),
+            "mille_bornes" | "mille-bornes" | "millebornes" => {
+                mille_bornes_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                    .map(|c| c.into_command())
+            }
+            "monopoly" => monopoly_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                .map(|c| c.into_command()),
             "uno" => uno_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                .map(|c| c.into_command()),
+            "crisis" | "teg" => crisis_game::ai::best_move(sess, ai_p, self.ai_difficulty)
                 .map(|c| c.into_command()),
             "goose" | "oca" => {
                 let has_pending = sess
