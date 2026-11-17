@@ -16,7 +16,6 @@ proc-macro = true
 [dependencies]
 syn = { version = "3", features = ["full"] }
 quote = "1"
-proc-macro2 = "1"
 
 [dev-dependencies]
 open_table_core = { version = "1.0.0", path = "../open_table_core" }

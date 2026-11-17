@@ -32,40 +32,24 @@ pub fn is_legal_move(
 
     match piece.kind {
         PieceKind::General => {
-            if dx + dy != 1 {
-                return false;
-            }
-            if !(3..=5).contains(&tx) {
+            if dx + dy != 1 || !(3..=5).contains(&tx) {
                 return false;
             }
             if is_red {
-                if ty < 7 {
-                    return false;
-                }
+                ty >= 7
             } else {
-                if ty > 2 {
-                    return false;
-                }
+                ty <= 2
             }
-            true
         }
         PieceKind::Advisor => {
-            if dx != 1 || dy != 1 {
-                return false;
-            }
-            if !(3..=5).contains(&tx) {
+            if dx != 1 || dy != 1 || !(3..=5).contains(&tx) {
                 return false;
             }
             if is_red {
-                if ty < 7 {
-                    return false;
-                }
+                ty >= 7
             } else {
-                if ty > 2 {
-                    return false;
-                }
+                ty <= 2
             }
-            true
         }
         PieceKind::Elephant => {
             if dx != 2 || dy != 2 {
@@ -75,26 +59,18 @@ pub fn is_legal_move(
                 if ty < 5 {
                     return false;
                 }
-            } else {
-                if ty > 4 {
-                    return false;
-                }
+            } else if ty > 4 {
+                return false;
             }
             let eye_x = (fx + tx) / 2;
             let eye_y = (fy + ty) / 2;
-            if board.squares.contains_key(&(eye_x, eye_y)) {
-                return false;
-            }
-            true
+            !board.squares.contains_key(&(eye_x, eye_y))
         }
         PieceKind::Horse => {
             if (dx == 1 && dy == 2) || (dx == 2 && dy == 1) {
                 let block_x = if dx == 2 { (fx + tx) / 2 } else { fx };
                 let block_y = if dy == 2 { (fy + ty) / 2 } else { fy };
-                if board.squares.contains_key(&(block_x, block_y)) {
-                    return false;
-                }
-                true
+                !board.squares.contains_key(&(block_x, block_y))
             } else {
                 false
             }
@@ -161,10 +137,7 @@ pub fn is_legal_move(
             if real_dy == forward_dy && dx == 0 {
                 return true;
             }
-            if past_river && real_dy == 0 && dx == 1 {
-                return true;
-            }
-            false
+            past_river && real_dy == 0 && dx == 1
         }
     }
 }

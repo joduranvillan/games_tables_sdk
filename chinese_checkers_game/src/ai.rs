@@ -228,11 +228,10 @@ pub fn best_move(
     let mut best_idx = 0;
     let mut best_avg = f64::NEG_INFINITY;
 
-    for i in 0..pool.len() {
+    for (i, cmd) in pool.iter().enumerate() {
         let avg = if visit_counts[i] > 0 {
             total_scores[i] / (visit_counts[i] as f64)
         } else {
-            let cmd = &pool[i];
             (hex_distance(cmd.from, apex) - hex_distance(cmd.to, apex)) as f64 * 10.0
         };
         if avg > best_avg {

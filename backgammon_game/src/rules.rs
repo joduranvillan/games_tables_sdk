@@ -91,8 +91,8 @@ impl LegalMoveGenerator for BackgammonLegalMoveGenerator {
                 }
             }
         } else {
-            for from in 0..POINTS {
-                if board.points[from] * owner_sign > 0 {
+            for (from, &point_count) in board.points.iter().enumerate().take(POINTS) {
+                if point_count * owner_sign > 0 {
                     for &die in &unique_dice {
                         if sides
                             .simulate_step(board, player, Some(from), die)

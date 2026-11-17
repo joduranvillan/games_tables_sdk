@@ -170,8 +170,8 @@ impl Sides {
 
         let all_home = self.all_checkers_home(board, player);
 
-        for from in 0..POINTS {
-            if board.points[from] * owner_sign > 0 {
+        for (from, &point_count) in board.points.iter().enumerate().take(POINTS) {
+            if point_count * owner_sign > 0 {
                 for &d in dice {
                     let raw = from as i32 + self.forward_direction(player) * d as i32;
                     if raw >= 0 && raw < POINTS as i32 {
@@ -305,8 +305,8 @@ impl Sides {
                 results.push((None, next));
             }
         } else {
-            for from in 0..POINTS {
-                if board.points[from] * owner_sign > 0 {
+            for (from, &point_count) in board.points.iter().enumerate().take(POINTS) {
+                if point_count * owner_sign > 0 {
                     if let Some(next) = self.simulate_step(board, player, Some(from), die) {
                         results.push((Some(from), next));
                     }
