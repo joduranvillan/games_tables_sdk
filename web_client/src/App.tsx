@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { WasmGameBridge } from "./wasm_pkg";
 import {
   getSavedRelayUrl,
+  RelayChatMessage,
   RelayConnectionState,
   RelayWebSocketClient,
   saveRelayUrl,
@@ -35,12 +36,37 @@ import {
   PWAInstallButton,
 } from "./components/common/PWAInstallButton";
 import {
+  loadThemeAndAudioConfig,
+  playProceduralSound,
+  ThemeAndAudioConfig,
+  ThemeAndAudioToolbar,
+  VISUAL_THEMES,
+} from "./components/common/ThemeAndAudioManager";
+import {
+  ACHIEVEMENTS_CATALOG,
+  EloAndAchievementsPanel,
+  getAiCalibrationRating,
+  loadEloProfile,
+  PlayerEloProfile,
+  recordMatchInEloProfile,
+  recordTournamentVictoryInProfile,
+} from "./components/common/EloAndAchievementsPanel";
+import {
+  loadTournamentState,
+  recordTournamentMatchResult,
+  TournamentManagerPanel,
+  TournamentMatchItem,
+  TournamentState,
+} from "./components/common/TournamentManagerPanel";
+import { RelayChatPanel } from "./components/common/RelayChatPanel";
+import {
   Bot,
   Eye,
   QrCode,
   RefreshCw,
   RotateCcw,
   Settings,
+  Trophy,
   Users,
   Wifi,
 } from "lucide-react";
@@ -184,6 +210,10 @@ export const CATALOG_14_GAMES: GameCatalogItem[] = [
   },
 ];
 
+export const GAME_TITLES_MAP: Record<string, string> = Object.fromEntries(
+  CATALOG_14_GAMES.map((g) => [g.id, g.title])
+);
+
 export type MatchMode = "hotseat" | "ai" | "online_relay" | "spectator";
 
 export function computeIsLocalTurnAllowed(
@@ -202,9 +232,10 @@ export function computeIsLocalTurnAllowed(
 export const App: React.FC = () => {
   const bridgeRef = useRef<WasmGameBridge>(new WasmGameBridge());
   const relayRef = useRef<RelayWebSocketClient | null>(null);
+  const matchOutcomeRecordedRef = useRef<boolean>(false);
 
   const [activeTab, setActiveTab] = useState<
-    "play" | "catalog" | "network" | "settings"
+    "play" | "catalog" | "tournaments" | "elo" | "network"
   >("play");
   const [selectedGameId, setSelectedGameId] = useState<string>("chess");
   const [matchMode, setMatchMode] = useState<MatchMode>("hotseat");
@@ -228,7 +259,32 @@ export const App: React.FC = () => {
     createInitialClockState("none")
   );
 
-  // Relay & QR state
+  // Phase 4: Theme & Audio state
+  const [themeConfig, setThemeConfig] = useState<ThemeAndAudioConfig>(() =>
+    loadThemeAndAudioConfig()
+  );
+
+  // Phase 4: ELO Profile & Achievements state
+  const [eloProfile, setEloProfile] = useState<PlayerEloProfile>(() =>
+    loadEloProfile()
+  );
+  const [recentAchievementBanner, setRecentAchievementBanner] = useState<
+    string | null
+  >(null);
+  const [peerEloInfo, setPeerEloInfo] = useState<{
+    playerName: string;
+    rating: number;
+  } | null>(null);
+
+  // Phase 4: Tournament Organizer state
+  const [tournamentState, setTournamentState] = useState<TournamentState>(() =>
+    loadTournamentState("chess")
+  );
+  const [activeTournamentMatchId, setActiveTournamentMatchId] = useState<
+    string | null
+  >(null);
+
+  // Relay & QR + Chat state
   const [relayUrl, setRelayUrl] = useState<string>(() => getSavedRelayUrl());
   const [relayState, setRelayState] =
     useState<RelayConnectionState>("disconnected");
@@ -238,14 +294,92 @@ export const App: React.FC = () => {
   const [roomCode, setRoomCode] = useState<string>("");
   const [joinCodeInput, setJoinCodeInput] = useState<string>("");
   const [qrSvg, setQrSvg] = useState<string>("");
+  const [chatMessages, setChatMessages] = useState<RelayChatMessage[]>([]);
+
+  const checkAndRecordWinnerIfAny = (
+    nextStateStr: string,
+    gameId: string,
+    mode: MatchMode,
+    diff: number
+  ) => {
+    try {
+      const parsed = JSON.parse(nextStateStr);
+      const winner = parsed.winner ?? null;
+      if (winner !== null && !matchOutcomeRecordedRef.current) {
+        matchOutcomeRecordedRef.current = true;
+        playProceduralSound("victory", themeConfig);
+
+        const outcome: "win" | "loss" | "draw" =
+          winner === 0
+            ? "draw"
+            : winner === localNetworkPlayerId
+            ? "win"
+            : "loss";
+        const oppRating =
+          mode === "ai"
+            ? getAiCalibrationRating(diff)
+            : peerEloInfo?.rating || 1200;
+        const oppLabel =
+          mode === "ai"
+            ? `IA Nivel ${diff + 1}`
+            : peerEloInfo?.playerName || "Oponente Local/Red";
+
+        setEloProfile((prev) => {
+          const { updatedProfile, newlyUnlocked } = recordMatchInEloProfile(
+            prev,
+            gameId,
+            outcome,
+            oppRating,
+            oppLabel
+          );
+          if (newlyUnlocked.length > 0) {
+            const firstTitle =
+              ACHIEVEMENTS_CATALOG.find((a) => a.id === newlyUnlocked[0])
+                ?.title || newlyUnlocked[0];
+            setRecentAchievementBanner(`¡Logro desbloqueado: ${firstTitle}!`);
+          }
+          return updatedProfile;
+        });
+
+        if (activeTournamentMatchId) {
+          setTournamentState((prevTour) => {
+            const m = prevTour.matches.find(
+              (item) => item.id === activeTournamentMatchId
+            );
+            if (!m) return prevTour;
+            const winParticipantId =
+              winner === 1
+                ? m.player1Id
+                : winner === 2
+                ? m.player2Id
+                : "draw";
+            return recordTournamentMatchResult(
+              prevTour,
+              m.id,
+              winParticipantId
+            );
+          });
+        }
+      }
+    } catch {
+      // Ignore parse error
+    }
+  };
 
   const syncFromBridge = () => {
     const turn = bridgeRef.current.current_player();
+    const nextStateStr = bridgeRef.current.get_state_json();
     setCurrentTurn(turn);
-    setStateJson(bridgeRef.current.get_state_json());
+    setStateJson(nextStateStr);
     setLegalMovesJson(bridgeRef.current.get_legal_moves_json(turn));
     setReplayCurrentStep(bridgeRef.current.get_current_replay_step());
     setReplayTotalSteps(bridgeRef.current.get_replay_step_count());
+    checkAndRecordWinnerIfAny(
+      nextStateStr,
+      bridgeRef.current.get_current_game_type(),
+      matchMode,
+      aiDifficulty
+    );
   };
 
   useEffect(() => {
@@ -291,6 +425,12 @@ export const App: React.FC = () => {
             syncFromBridge();
           }
         },
+        onChatMessageReceived: (msg) => {
+          setChatMessages((prev) => [...prev, msg]);
+        },
+        onEloSyncReceived: (_pid, rating, playerName) => {
+          setPeerEloInfo({ playerName, rating });
+        },
       },
       relayUrl
     );
@@ -305,6 +445,7 @@ export const App: React.FC = () => {
     mode: MatchMode,
     diff: number = aiDifficulty
   ) => {
+    matchOutcomeRecordedRef.current = false;
     setSelectedGameId(gameId);
     setMatchMode(mode);
     setClockState((prev) => createInitialClockState(prev.preset));
@@ -324,6 +465,18 @@ export const App: React.FC = () => {
     const turnBefore = bridgeRef.current.current_player() as 1 | 2;
     bridgeRef.current.send_command_json(turnBefore, cmdJson);
     const turnAfter = bridgeRef.current.current_player() as 1 | 2;
+
+    if (cmdJson.toLowerCase().includes("roll")) {
+      playProceduralSound("dice_roll", themeConfig);
+    } else if (
+      selectedGameId === "uno" ||
+      selectedGameId === "mille_bornes"
+    ) {
+      playProceduralSound("card_play", themeConfig);
+    } else {
+      playProceduralSound("move", themeConfig);
+    }
+
     if (turnAfter !== turnBefore) {
       setClockState((prev) => applyClockMoveComplete(prev, turnBefore));
     }
@@ -358,6 +511,7 @@ export const App: React.FC = () => {
         deltaMs
       );
       if (next.flaggedWinner !== null && prev.flaggedWinner === null) {
+        playProceduralSound("clock_alert", themeConfig);
         bridgeRef.current.force_timeout_win(next.flaggedWinner);
         syncFromBridge();
       }
@@ -377,6 +531,32 @@ export const App: React.FC = () => {
       syncFromBridge();
     }
     return ok;
+  };
+
+  const handleSendChatMessage = (text: string) => {
+    const sent = relayRef.current?.sendChatMessage(
+      eloProfile.playerName,
+      text,
+      localNetworkPlayerId
+    );
+    if (sent) {
+      setChatMessages((prev) => [...prev, sent]);
+    }
+  };
+
+  const handleLaunchTournamentMatch = (
+    match: TournamentMatchItem,
+    gameId: string
+  ) => {
+    setActiveTournamentMatchId(match.id);
+    const p2 = tournamentState.participants.find(
+      (p) => p.id === match.player2Id
+    );
+    const mode: MatchMode = p2?.kind === "ai" ? "ai" : "hotseat";
+    const diff = p2?.aiDifficulty ?? 1;
+    setAiDifficulty(diff);
+    startGameSession(gameId, mode, diff);
+    setActiveTab("play");
   };
 
   const handleCreateRelayRoom = () => {
@@ -441,12 +621,21 @@ export const App: React.FC = () => {
     CATALOG_14_GAMES.find((g) => g.id === selectedGameId) ||
     CATALOG_14_GAMES[0];
 
+  const currentTheme =
+    VISUAL_THEMES[themeConfig.themeId] || VISUAL_THEMES.piedra_oscura;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div
+      data-theme={themeConfig.themeId}
+      data-okabe-ito={themeConfig.okabeIto ? "true" : "false"}
+      className={`min-h-screen flex flex-col transition-colors ${currentTheme.rootBgClass}`}
+    >
       <OfflineIndicator />
 
       {/* Strict 3-Zone Top Bar Contract */}
-      <header className="flex items-center justify-between gap-8 px-6 py-4 border-b border-slate-800 bg-slate-950/95">
+      <header
+        className={`flex items-center justify-between gap-8 px-6 py-4 border-b ${currentTheme.headerBgClass}`}
+      >
         <a
           href="#top"
           onClick={(e) => {
@@ -483,6 +672,28 @@ export const App: React.FC = () => {
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab("tournaments")}
+            className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              activeTab === "tournaments"
+                ? "text-white underline underline-offset-8"
+                : ""
+            }`}
+          >
+            Torneos
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("elo")}
+            className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              activeTab === "elo"
+                ? "text-white underline underline-offset-8"
+                : ""
+            }`}
+          >
+            Ranking ELO
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab("network")}
             className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               activeTab === "network"
@@ -490,18 +701,7 @@ export const App: React.FC = () => {
                 : ""
             }`}
           >
-            Salas Online y QR
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("settings")}
-            className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeTab === "settings"
-                ? "text-white underline underline-offset-8"
-                : ""
-            }`}
-          >
-            Ajustes Relay
+            Salas Online
           </button>
         </nav>
 
@@ -512,7 +712,7 @@ export const App: React.FC = () => {
             onClick={() =>
               startGameSession(selectedGameId, matchMode, aiDifficulty)
             }
-            className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${currentTheme.accentBtnClass}`}
           >
             Reiniciar Partida
           </button>
@@ -521,97 +721,150 @@ export const App: React.FC = () => {
 
       {/* Main Content Container (1440px baseline) */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
-        {/* Workspace Toolbar: Game Selector + Mode Selector */}
-        <section className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-5 border-b border-slate-800">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {CATALOG_14_GAMES.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                onClick={() => startGameSession(g.id, matchMode, aiDifficulty)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                  selectedGameId === g.id
-                    ? "bg-white text-slate-950 shadow-xs"
-                    : "bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800"
-                }`}
-              >
-                {g.title}
-              </button>
-            ))}
+        {/* Achievement Toast if newly unlocked */}
+        {recentAchievementBanner && (
+          <div className="p-3.5 rounded-xl bg-slate-900 border border-amber-500/70 flex items-center justify-between gap-4 text-xs">
+            <div className="flex items-center gap-2 text-amber-300 font-semibold">
+              <Trophy className="w-4 h-4 shrink-0" />
+              <span>{recentAchievementBanner}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRecentAchievementBanner(null)}
+              className="text-slate-400 hover:text-white font-medium cursor-pointer"
+            >
+              Cerrar
+            </button>
           </div>
+        )}
 
-          {/* Mode Segmented Control */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-lg">
-              <button
-                type="button"
-                onClick={() => startGameSession(selectedGameId, "hotseat")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                  matchMode === "hotseat"
-                    ? "bg-emerald-600 text-white"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>Hotseat Local</span>
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  startGameSession(selectedGameId, "ai", aiDifficulty)
-                }
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                  matchMode === "ai"
-                    ? "bg-emerald-600 text-white"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                <Bot className="w-3.5 h-3.5" />
-                <span>vs IA Rust</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("network")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                  matchMode === "online_relay"
-                    ? "bg-emerald-600 text-white"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                <Wifi className="w-3.5 h-3.5" />
-                <span>Online Relay / QR</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => startGameSession(selectedGameId, "spectator")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                  matchMode === "spectator"
-                    ? "bg-amber-600 text-white"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>Espectador</span>
-              </button>
+        {/* Workspace Toolbar: Game Selector + Mode Selector + Theme/Audio */}
+        <section className="flex flex-col gap-4 pb-5 border-b border-slate-800">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {CATALOG_14_GAMES.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() =>
+                    startGameSession(g.id, matchMode, aiDifficulty)
+                  }
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    selectedGameId === g.id
+                      ? "bg-white text-slate-950 shadow-xs"
+                      : "bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800"
+                  }`}
+                >
+                  {g.title}
+                </button>
+              ))}
             </div>
 
-            {matchMode === "ai" && (
-              <select
-                aria-label="Dificultad de IA"
-                value={aiDifficulty}
-                onChange={(e) => {
-                  const nextDiff = Number(e.target.value);
-                  setAiDifficulty(nextDiff);
-                  startGameSession(selectedGameId, "ai", nextDiff);
-                }}
-                className="px-3 py-2 rounded-lg text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200"
-              >
-                <option value={0}>IA Fácil</option>
-                <option value={1}>IA Media</option>
-                <option value={2}>IA Difícil</option>
-                <option value={3}>IA Maestra</option>
-              </select>
-            )}
+            {/* Mode Segmented Control */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => startGameSession(selectedGameId, "hotseat")}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    matchMode === "hotseat"
+                      ? "bg-emerald-600 text-white"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Hotseat Local</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    startGameSession(selectedGameId, "ai", aiDifficulty)
+                  }
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    matchMode === "ai"
+                      ? "bg-emerald-600 text-white"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>vs IA Rust</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("network")}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    matchMode === "online_relay"
+                      ? "bg-emerald-600 text-white"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <Wifi className="w-3.5 h-3.5" />
+                  <span>Online Relay / QR</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => startGameSession(selectedGameId, "spectator")}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    matchMode === "spectator"
+                      ? "bg-amber-600 text-white"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Espectador</span>
+                </button>
+              </div>
+
+              {matchMode === "ai" && (
+                <select
+                  aria-label="Dificultad de IA"
+                  value={aiDifficulty}
+                  onChange={(e) => {
+                    const nextDiff = Number(e.target.value);
+                    setAiDifficulty(nextDiff);
+                    startGameSession(selectedGameId, "ai", nextDiff);
+                  }}
+                  className="px-3 py-2 rounded-lg text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200"
+                >
+                  <option value={0}>IA Fácil</option>
+                  <option value={1}>IA Media</option>
+                  <option value={2}>IA Difícil</option>
+                  <option value={3}>IA Maestra</option>
+                </select>
+              )}
+            </div>
+          </div>
+
+          {/* Phase 4 Theme, Okabe-Ito & Procedural Audio Bar + ELO Summary */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <ThemeAndAudioToolbar
+              config={themeConfig}
+              onChange={setThemeConfig}
+            />
+
+            <div className="flex items-center gap-3 text-xs text-slate-300 font-mono tabular-nums">
+              <span>
+                ELO {activeGameMeta.title}:{" "}
+                <strong className="text-emerald-400">
+                  {eloProfile.statsByGame[selectedGameId]?.rating ?? 1200}
+                </strong>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                ELO Global:{" "}
+                <strong className="text-white">
+                  {eloProfile.globalRating}
+                </strong>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                Logros:{" "}
+                <strong className="text-amber-400">
+                  {eloProfile.unlockedAchievements.length}/
+                  {ACHIEVEMENTS_CATALOG.length}
+                </strong>
+              </span>
+            </div>
           </div>
         </section>
 
@@ -626,7 +879,7 @@ export const App: React.FC = () => {
                 <p className="text-xs text-slate-400 mt-1">
                   {activeGameMeta.summary} · Motor: {activeGameMeta.crateName}{" "}
                   (WASM) · Turno actual: Jugador {currentTurn}
-                  {matchMode === "spectator" ? " · 👁️ Modo Espectador" : ""}
+                  {matchMode === "spectator" ? " · Modo Espectador" : ""}
                 </p>
               </div>
 
@@ -694,7 +947,7 @@ export const App: React.FC = () => {
                           : "bg-slate-800 text-slate-300"
                       }`}
                     >
-                      👁️ Espectador
+                      Espectador
                     </button>
                   </div>
                 )}
@@ -861,6 +1114,17 @@ export const App: React.FC = () => {
                 onDispatchCommand={handleDispatchCommand}
               />
             )}
+
+            {/* Live Room Chat when in Online Relay or Spectator Mode */}
+            {(matchMode === "online_relay" || matchMode === "spectator") && (
+              <RelayChatPanel
+                roomCode={roomCode}
+                localPlayerName={eloProfile.playerName}
+                localPlayerId={localNetworkPlayerId}
+                messages={chatMessages}
+                onSendMessage={handleSendChatMessage}
+              />
+            )}
           </section>
         )}
 
@@ -873,9 +1137,9 @@ export const App: React.FC = () => {
               <p className="text-sm text-slate-400 mt-1">
                 Los 14 crates de Rust compilan sin cambios en{" "}
                 <code>open_table_wasm</code> y cuentan con su tablero
-                interactivo, tutorial guiado, reloj FIDE/Byo-yomi y visor de
-                repeticiones en React + Tailwind CSS (Fases 1, 2 y 3
-                completadas: 14/14).
+                interactivo, tutorial guiado, reloj FIDE/Byo-yomi, visor de
+                repeticiones, ranking ELO K=32 y modo torneo en React +
+                Tailwind CSS.
               </p>
             </div>
 
@@ -899,8 +1163,8 @@ export const App: React.FC = () => {
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-slate-800">
-                    <span className="text-xs text-slate-400">
-                      {item.blockLabel}
+                    <span className="text-xs text-slate-400 font-mono tabular-nums">
+                      ELO: {eloProfile.statsByGame[item.id]?.rating ?? 1200}
                     </span>
                     <button
                       type="button"
@@ -919,171 +1183,195 @@ export const App: React.FC = () => {
           </section>
         )}
 
-        {activeTab === "network" && (
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-5">
-              <div>
-                <h2 className="text-xl font-bold text-white font-display">
-                  Crear o Unirse a Sala Online Relay (Jugador o Espectador)
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Compatible con <code>open_table_relay</code> (Cross-Play entre
-                  clientes Godot y clientes Web React) con envío automático de{" "}
-                  <code>SyncState</code>, bloqueo de turno local y modo
-                  Espectador en tiempo real.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-medium text-slate-300">
-                  URL del Servidor Relay WebSocket
-                </label>
-                <input
-                  type="text"
-                  value={relayUrl}
-                  onChange={(e) => setRelayUrl(e.target.value)}
-                  placeholder="ws://127.0.0.1:8080"
-                  className="px-3.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white font-mono"
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleCreateRelayRoom}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  <QrCode className="w-4 h-4" />
-                  <span>Crear Sala Online (Host J1)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    relayRef.current?.simulateMicroDisconnectAndReconnect()
-                  }
-                  disabled={!roomCode}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  <span>Probar Reconexión Automática</span>
-                </button>
-              </div>
-
-              <div className="border-t border-slate-800 pt-4 flex flex-col gap-3">
-                <label className="text-xs font-medium text-slate-300">
-                  Unirse con Código de 6 Caracteres (Cliente J2 o Espectador)
-                </label>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="text"
-                    maxLength={8}
-                    value={joinCodeInput}
-                    onChange={(e) =>
-                      setJoinCodeInput(e.target.value.toUpperCase())
-                    }
-                    placeholder="Ej. AB12CD"
-                    className="px-3.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white font-mono uppercase"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleJoinRelayRoom}
-                    className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-                  >
-                    Unirse como J2
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleJoinAsSpectator}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Observar (Espectador)</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* QR Code & Status Card */}
-            <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col items-center justify-center gap-4 text-center">
-              <div className="text-xs text-slate-400">
-                Estado de Transporte:{" "}
-                <strong className="text-white">{relayState}</strong>
-              </div>
-              <div className="text-sm font-medium text-slate-200">
-                {relayStatusText}
-              </div>
-
-              {qrSvg ? (
-                <div className="flex flex-col items-center gap-3 mt-2">
-                  <div
-                    className="p-3 rounded-2xl bg-white shadow-lg"
-                    dangerouslySetInnerHTML={{ __html: qrSvg }}
-                  />
-                  <div className="text-xs text-slate-300 font-mono">
-                    Código de Sala:{" "}
-                    <strong className="text-emerald-400 text-sm">
-                      {roomCode}
-                    </strong>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-8 rounded-xl border border-dashed border-slate-800 text-xs text-slate-400">
-                  Crea una sala online para generar el código QR instantáneo de
-                  invitación.
-                </div>
-              )}
-            </div>
-          </section>
+        {activeTab === "tournaments" && (
+          <TournamentManagerPanel
+            tournament={tournamentState}
+            gameTitles={GAME_TITLES_MAP}
+            activeMatchId={activeTournamentMatchId}
+            onUpdateTournament={setTournamentState}
+            onLaunchMatchOnBoard={handleLaunchTournamentMatch}
+            onTournamentChampionCrowned={() => {
+              playProceduralSound("victory", themeConfig);
+              setEloProfile((prev) => {
+                const { updatedProfile, newlyUnlocked } =
+                  recordTournamentVictoryInProfile(prev);
+                if (newlyUnlocked.length > 0) {
+                  setRecentAchievementBanner(
+                    "¡Logro desbloqueado: Campeón de Torneo!"
+                  );
+                }
+                return updatedProfile;
+              });
+            }}
+          />
         )}
 
-        {activeTab === "settings" && (
-          <section className="max-w-xl p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-5">
-            <div className="flex items-center gap-2.5">
-              <Settings className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-xl font-bold text-white font-display">
-                Ajustes de Red y Servidor Relay
-              </h2>
+        {activeTab === "elo" && (
+          <EloAndAchievementsPanel
+            profile={eloProfile}
+            gameTitles={GAME_TITLES_MAP}
+            peerEloInfo={peerEloInfo}
+            onUpdateProfile={setEloProfile}
+            onSyncEloToRelay={() => {
+              relayRef.current?.sendEloSync(
+                localNetworkPlayerId,
+                eloProfile.globalRating,
+                eloProfile.playerName
+              );
+            }}
+          />
+        )}
+
+        {activeTab === "network" && (
+          <section className="flex flex-col gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-5">
+                <div>
+                  <h2 className="text-xl font-bold text-white font-display">
+                    Crear o Unirse a Sala Online Relay (Jugador o Espectador)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Compatible con <code>open_table_relay</code> (Cross-Play
+                    entre clientes Godot y clientes Web React) con envío
+                    automático de <code>SyncState</code>, bloqueo de turno
+                    local, sincronización ELO y chat en tiempo real.
+                  </p>
+                </div>
+
+                <form
+                  onSubmit={handleSaveSettings}
+                  className="flex flex-col gap-2"
+                >
+                  <label className="text-xs font-medium text-slate-300">
+                    URL del Servidor Relay WebSocket (Persistente)
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      value={relayUrl}
+                      onChange={(e) => setRelayUrl(e.target.value)}
+                      placeholder="ws://127.0.0.1:8080"
+                      className="flex-1 px-3.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white font-mono"
+                    />
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium cursor-pointer"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>Guardar URL</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const def = saveRelayUrl("ws://127.0.0.1:8080");
+                        setRelayUrl(def);
+                        relayRef.current?.setRelayUrl(def);
+                      }}
+                      className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Restaurar</span>
+                    </button>
+                  </div>
+                </form>
+
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCreateRelayRoom}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>Crear Sala Online (Host J1)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      relayRef.current?.simulateMicroDisconnectAndReconnect()
+                    }
+                    disabled={!roomCode}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Probar Reconexión Automática</span>
+                  </button>
+                </div>
+
+                <div className="border-t border-slate-800 pt-4 flex flex-col gap-3">
+                  <label className="text-xs font-medium text-slate-300">
+                    Unirse con Código de 6 Caracteres (Cliente J2 o Espectador)
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      maxLength={8}
+                      value={joinCodeInput}
+                      onChange={(e) =>
+                        setJoinCodeInput(e.target.value.toUpperCase())
+                      }
+                      placeholder="Ej. AB12CD"
+                      className="px-3.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white font-mono uppercase"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleJoinRelayRoom}
+                      className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      Unirse como J2
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleJoinAsSpectator}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Observar (Espectador)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* QR Code & Status Card */}
+              <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col items-center justify-center gap-4 text-center">
+                <div className="text-xs text-slate-400">
+                  Estado de Transporte:{" "}
+                  <strong className="text-white">{relayState}</strong>
+                </div>
+                <div className="text-sm font-medium text-slate-200">
+                  {relayStatusText}
+                </div>
+
+                {qrSvg ? (
+                  <div className="flex flex-col items-center gap-3 mt-2">
+                    <div
+                      className="p-3 rounded-2xl bg-white shadow-lg"
+                      dangerouslySetInnerHTML={{ __html: qrSvg }}
+                    />
+                    <div className="text-xs text-slate-300 font-mono">
+                      Código de Sala:{" "}
+                      <strong className="text-emerald-400 text-sm">
+                        {roomCode}
+                      </strong>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 rounded-xl border border-dashed border-slate-800 text-xs text-slate-400">
+                    Crea una sala online para generar el código QR instantáneo
+                    de invitación.
+                  </div>
+                )}
+              </div>
             </div>
 
-            <form onSubmit={handleSaveSettings} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-slate-300">
-                  URL del Servidor Relay WebSocket (Persistente en navegador)
-                </label>
-                <input
-                  type="text"
-                  value={relayUrl}
-                  onChange={(e) => setRelayUrl(e.target.value)}
-                  className="px-3.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white font-mono"
-                />
-                <span className="text-[11px] text-slate-400">
-                  Clave de almacenamiento: <code>opentable.relay_url</code> ·
-                  Por defecto: <code>ws://127.0.0.1:8080</code>
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  Guardar Configuración
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const def = saveRelayUrl("ws://127.0.0.1:8080");
-                    setRelayUrl(def);
-                    relayRef.current?.setRelayUrl(def);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Restaurar por defecto</span>
-                </button>
-              </div>
-            </form>
+            {/* Room Chat Panel */}
+            <RelayChatPanel
+              roomCode={roomCode}
+              localPlayerName={eloProfile.playerName}
+              localPlayerId={localNetworkPlayerId}
+              messages={chatMessages}
+              onSendMessage={handleSendChatMessage}
+            />
           </section>
         )}
       </main>

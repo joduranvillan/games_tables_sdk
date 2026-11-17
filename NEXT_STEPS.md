@@ -152,3 +152,14 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
 - [x] **Bloqueo de Turno por Jugador Local (`is_local_turn_allowed()`)**: Aplicado en los **14 tableros** (`godot_project/*_board.gd` y `godot_project/scenes/*_board.gd`).
 - [x] **Reconexión Automática TCP y Relay**: Reintento periódico automático ante microcortes en `GameManager` con feedback en `NetworkStatusHud`.
 - [x] **47 Suites Smoke Headless en Godot/Redot**: Verificadas en `tools/run_godot_tests.sh`, `tools/verify_p13.sh`, `.github/workflows/ci.yml` y `.github/workflows/release.yml`.
+
+## 12. Ecosistema Web Paralelo React + WebAssembly (`open_table_wasm` + `web_client`) — Fases 1 a 4 Completadas ✅
+
+- [x] **Fase 1 y 2 — Los 14 Tableros Canónicos en React + WASM**: Crate aislado `open_table_wasm/` y cliente `web_client/` con los 14 juegos completos, dados 3D interactivos (`DiceRoller3D.tsx`), generador QR y cliente WebSocket `RelayWebSocketClient` compatible con `SyncState`.
+- [x] **Fase 3 — Repeticiones, Tutoriales, Reloj FIDE/Byo-yomi, Espectador y PWA Offline-First**: `ReplayViewerBar.tsx`, `InteractiveTutorialPanel.tsx` (14 juegos), `TournamentClock.tsx`, modo Espectador de solo lectura y Service Worker PWA instalable.
+- [x] **Fase 4 — Clasificación ELO (`K = 32`), Logros, Torneos, Temas Visuales + Okabe-Ito, Audio Procedural y Chat Relay**:
+  - `EloAndAchievementsPanel.tsx`: Ecuación logística FIDE (`K = 32`), desglose ELO en los 14 juegos, exportación/importación JSON y catálogo de 12 logros desbloqueables.
+  - `TournamentManagerPanel.tsx`: Organizador de torneos *Round-Robin* (algoritmo de tablas de Berger) y *Eliminatoria Directa* (*Knockout*) con tabla de posiciones en vivo.
+  - `ThemeAndAudioManager.tsx`: 3 temas visuales oficiales (*Piedra Oscura*, *Noche Azul*, *Jade Verde*), modo daltónico *Okabe-Ito* y sintetizador acústico procedural basado en Web Audio API.
+  - `RelayChatPanel.tsx`: Chat de sala en tiempo real y reacciones tácticas rápidas sobre `RelayWebSocketClient`.
+  - Validado por 4 suites automatizadas (`wasm_and_network.test.ts`, `regression_14_games.test.ts`, `phase3_ecosystem.test.ts` y `phase4_competitive.test.ts`) integradas en `.github/workflows/ci.yml` y `.github/workflows/release.yml`.
