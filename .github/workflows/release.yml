@@ -302,11 +302,27 @@ jobs:
             platform_plugins/android/build/outputs/aar/OpenTableNearby-release.aar
 
   export-web:
-    name: Export Web (HTML5 & GitHub Pages)
+    name: Export Web (React + WASM PWA & HTML5 GitHub Pages)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test & Build React + WASM 14-Games PWA (web_client)
+        shell: bash
+        run: |
+          cd web_client
+          npm install
+          npm test
+          npm run build
+          cd ..
+          mkdir -p dist/web
+          cp -r web_client/dist/* dist/web/
 
       - name: Install Redot 4.5 Headless & Web Export Templates
         shell: bash
@@ -321,27 +337,12 @@ jobs:
             sudo ln -sf "$REDOT_EXEC" /usr/bin/redot
           fi
 
-      - name: Export Web (HTML5) to dist/web/
+      - name: Package Web Distribution (dist/opentable-web.tar.gz)
         shell: bash
         run: |
-          mkdir -p dist/web
+          mkdir -p dist/web/godot
           if command -v redot >/dev/null 2>&1; then
-            redot --headless --path godot_project --export-release "Web" ../dist/web/index.html || true
-          fi
-          if [ ! -f dist/web/index.html ]; then
-            cat > dist/web/index.html <<'EOF'
-          <!DOCTYPE html>
-          <html lang="es">
-          <head>
-            <meta charset="utf-8" />
-            <title>OpenTable — 14 Classic Board & Card Games</title>
-          </head>
-          <body>
-            <h1>OpenTable Web Export</h1>
-            <p>Versión HTML5 generada desde GitHub Actions para joduranvillan.github.io/games_tables_sdk.</p>
-          </body>
-          </html>
-          EOF
+            redot --headless --path godot_project --export-release "Web" ../dist/web/godot/index.html || true
           fi
           tar -czf dist/opentable-web.tar.gz -C dist web
 

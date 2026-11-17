@@ -57,31 +57,9 @@ pub fn is_legal_move(
         | PieceKind::PromotedSilver
         | PieceKind::PromotedKnight
         | PieceKind::PromotedLance
-        | PieceKind::PromotedPawn => {
-            if dx <= 1 && ady <= 1 {
-                if dx == 1 && dy == -forward {
-                    false
-                }
-                // Cannot move diagonally backward
-                else {
-                    true
-                }
-            } else {
-                false
-            }
-        }
+        | PieceKind::PromotedPawn => dx <= 1 && ady <= 1 && !(dx == 1 && dy == -forward),
         PieceKind::Silver => {
-            if dx <= 1 && ady <= 1 {
-                if (dx == 0 && dy == -forward) || (dx == 1 && dy == 0) {
-                    false
-                }
-                // Cannot move orthogonally backward or sideways
-                else {
-                    true
-                }
-            } else {
-                false
-            }
+            dx <= 1 && ady <= 1 && !((dx == 0 && dy == -forward) || (dx == 1 && dy == 0))
         }
         PieceKind::Knight => dx == 1 && dy == forward * 2,
         PieceKind::Lance => dx == 0 && dy.signum() == forward && check_slide(0, dy),
@@ -139,9 +117,7 @@ pub fn is_legal_drop(
         {
             return false;
         }
-        if rank == 1 && piece_kind == PieceKind::Knight {
-            return false;
-        }
+        !(rank == 1 && piece_kind == PieceKind::Knight)
     } else {
         if rank == 8
             && (piece_kind == PieceKind::Pawn
@@ -150,12 +126,8 @@ pub fn is_legal_drop(
         {
             return false;
         }
-        if rank == 7 && piece_kind == PieceKind::Knight {
-            return false;
-        }
+        !(rank == 7 && piece_kind == PieceKind::Knight)
     }
-
-    true
 }
 
 pub fn can_promote(
@@ -198,7 +170,7 @@ pub fn must_promote(
 
     let in_promo_zone = if is_sente { rank <= 2 } else { rank >= 6 };
 
-    if in_promo_zone
+    in_promo_zone
         && matches!(
             piece_kind,
             PieceKind::Rook
@@ -208,11 +180,6 @@ pub fn must_promote(
                 | PieceKind::Lance
                 | PieceKind::Pawn
         )
-    {
-        return true;
-    }
-
-    false
 }
 
 /// Regla oficial FESA de promoción obligatoria por fila de destino:

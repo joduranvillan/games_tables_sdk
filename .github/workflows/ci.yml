@@ -209,3 +209,27 @@ jobs:
         with:
           name: OpenTableMultipeer.xcframework
           path: OpenTableMultipeer.xcframework
+
+  build-and-test-web-client:
+    name: Test & Build React + WASM Web Client (14 Games PWA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Web Client Dependencies
+        working-directory: web_client
+        run: npm install
+
+      - name: Run 14-Games Regression & Phase 3 Ecosystem Test Suites
+        working-directory: web_client
+        run: npm test
+
+      - name: Build Production PWA Bundle (Vite)
+        working-directory: web_client
+        run: npm run build
+

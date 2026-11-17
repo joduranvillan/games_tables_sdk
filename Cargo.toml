@@ -36,13 +36,6 @@ members = [
     "goose_game",
 ]
 
-[workspace.package]
-rust-version = "1.82"
-license = "GPL-3.0-or-later"
-
-[workspace.dependencies]
-steamworks = "0.11"
-
 [profile.release]
 opt-level = "z"
 codegen-units = 1

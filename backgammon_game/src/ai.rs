@@ -169,8 +169,8 @@ pub fn backgammon_ai_pick_move(session: &Session, player: PlayerId) -> Option<Mo
             });
         }
     } else {
-        for from_idx in 0..POINTS {
-            if board.points[from_idx] * owner_sign > 0 {
+        for (from_idx, &point_count) in board.points.iter().enumerate().take(POINTS) {
+            if point_count * owner_sign > 0 {
                 for &die in &unique_dice {
                     potential_moves.push(MoveCheckerCommand {
                         player,
@@ -230,8 +230,8 @@ pub fn calculate_pip_count(board: &BoardResource, sides: &Sides, player: PlayerI
     let on_bar = board.bar.get(&player).copied().unwrap_or(0);
     pips += on_bar * 25;
 
-    for idx in 0..POINTS {
-        let count = board.points[idx] * owner_sign;
+    for (idx, &point_count) in board.points.iter().enumerate().take(POINTS) {
+        let count = point_count * owner_sign;
         if count > 0 {
             let distance = if player == sides.increasing {
                 24 - idx as u32
@@ -311,11 +311,7 @@ pub fn should_offer_double(session: &Session, player: PlayerId) -> bool {
         return true;
     }
     // 2) Ventaja en pip count (carrera): al menos 15 pips por delante
-    if my_bar == 0 && my_pips + 15 <= opp_pips {
-        return true;
-    }
-
-    false
+    my_bar == 0 && my_pips + 15 <= opp_pips
 }
 
 /// Determina si el jugador debe aceptar una oferta de doblaje del oponente.
