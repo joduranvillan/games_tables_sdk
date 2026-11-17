@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["new_go_session","new_go_session_with_komi","new_go_session_with_size"],"mod":["ai","board","commands","events","rules","sgf"]};

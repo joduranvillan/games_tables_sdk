@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["HOST_PLAYER_ID","PROTOCOL_VERSION"],"enum":["ConnectionEvent","HandshakeRequest","HandshakeResponse"],"fn":["reconnect_to_host"],"struct":["JoinedPlayer","MultiSessionServer","RetryPolicy","SessionHostTransport","TcpClientTransport","TcpHostTransport","TcpLobby"]};

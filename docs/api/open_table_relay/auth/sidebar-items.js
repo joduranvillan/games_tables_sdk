@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["AUTH_HANDSHAKE_TIMEOUT_SECS","DEV_DEFAULT_JWT_SECRET","GUEST_TOKEN_TTL_SECS"],"enum":["AuthError"],"fn":["current_unix_timestamp","derive_guest_player_id","encode_jwt_hs256","issue_guest_token_with_secret","verify_jwt_hs256"],"struct":["AuthConfig","GuestAuthRequest","GuestAuthResponse","JwtClaims"]};

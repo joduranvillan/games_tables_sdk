@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["new_monopoly_session"],"mod":["ai","board","commands","events","resources","rules"]};

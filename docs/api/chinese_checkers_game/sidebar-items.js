@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["new_chinese_checkers_session"],"mod":["ai","board","commands","events","position","rules"]};

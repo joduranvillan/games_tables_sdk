@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["best_move","compute_probability_density_map","default_ai_fleet","default_ai_place_fleet_command"],"type":["BattleshipCommand","BattleshipState"]};

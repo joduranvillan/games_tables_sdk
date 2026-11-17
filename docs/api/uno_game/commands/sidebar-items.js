@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["CallUnoCommand","CatchUnoFailureCommand","ChallengeWildDrawFourCommand","ChooseWildColorCommand","DrawCardCommand","InterceptCommand","PlayCardCommand"]};

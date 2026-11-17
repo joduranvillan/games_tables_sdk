@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["EXPECTED_SHIP_SIZES"],"struct":["BattleshipConfigResource","FleetResource","RematchResource","ShotsResource"],"type":["Ship"]};

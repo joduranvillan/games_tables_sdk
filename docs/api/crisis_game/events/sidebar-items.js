@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["CardType"],"struct":["ArmiesPlacedEvent","AttackDeclaredEvent","AttackResolvedEvent","CardsExchangedEvent","FortifiedEvent","PhaseChangedEvent","PlayerEliminatedEvent","TegGameOverEvent","TerritoryCard","TerritoryClaimedEvent","TerritoryConqueredEvent"],"type":["CardSymbol"]};

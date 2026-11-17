@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CHECKERS_PER_PLAYER","POINTS"],"fn":["must_use_larger_die_check"],"struct":["BoardResource","Sides"]};

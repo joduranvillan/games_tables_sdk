@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["best_move","generate_legal_moves","goal_apex","hex_distance","total_distance_to_goal"],"type":["ChineseCheckersCommand","ChineseCheckersState"]};

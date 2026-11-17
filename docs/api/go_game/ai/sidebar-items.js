@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["best_move","clone_go_session","count_territory","generate_legal_moves","go_ai_pick_move"]};

@@ -1,0 +1,21 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const __wbg_wasmgamebridge_free: (a: number, b: number) => void;
+export const wasmgamebridge_apply_sync_log_json: (a: number, b: number, c: number, d: number, e: number) => number;
+export const wasmgamebridge_current_player: (a: number) => number;
+export const wasmgamebridge_current_tick: (a: number) => bigint;
+export const wasmgamebridge_export_chess_fen: (a: number) => [number, number];
+export const wasmgamebridge_export_log_json: (a: number) => [number, number];
+export const wasmgamebridge_generate_join_qr_svg: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number];
+export const wasmgamebridge_get_legal_moves_json: (a: number, b: number) => [number, number];
+export const wasmgamebridge_new: () => number;
+export const wasmgamebridge_send_command_json: (a: number, b: number, c: number, d: number) => [number, number];
+export const wasmgamebridge_start_ai_match: (a: number, b: number, c: number, d: number, e: number, f: bigint) => number;
+export const wasmgamebridge_start_local_match: (a: number, b: number, c: number, d: number, e: number) => number;
+export const wasmgamebridge_step_ai_if_needed: (a: number) => [number, number];
+export const __wbindgen_externrefs: WebAssembly.Table;
+export const __wbindgen_malloc_command_export: (a: number, b: number) => number;
+export const __wbindgen_realloc_command_export: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_free_command_export: (a: number, b: number, c: number) => void;
+export const __wbindgen_start: () => void;
