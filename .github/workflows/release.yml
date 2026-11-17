@@ -97,6 +97,11 @@ jobs:
         env:
           GODOT4_GDEXTENSION_JSON: ${{ github.workspace }}/extension_api.json
         run: |
+          chmod +x tools/*.sh || true
+          if [ "${RUNNER_OS}" = "Windows" ]; then
+            rustc tools/redot_gdext_shim.rs -o tools/redot_gdext_shim.exe
+            export GODOT4_BIN="${GITHUB_WORKSPACE}/tools/redot_gdext_shim.exe"
+          fi
           cargo build --release -p open_table_godot
           cargo build --release -p open_table_relay
 
@@ -217,13 +222,16 @@ jobs:
           targets: aarch64-linux-android
 
       - name: Install cargo-ndk
-        uses: taiki-e/install-action@cargo-ndk
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
 
       - name: Build Android GDExtension (libopen_table_godot.so) & Native Plugin (OpenTableNearby-release.aar)
         shell: bash
         env:
           GODOT4_GDEXTENSION_JSON: ${{ github.workspace }}/extension_api.json
         run: |
+          chmod +x tools/*.sh || true
           # 1. Compilar libopen_table_godot.so para aarch64-linux-android
           if [ -n "${ANDROID_NDK_HOME:-}" ]; then
             cargo ndk -t arm64-v8a build --release -p open_table_godot || \
