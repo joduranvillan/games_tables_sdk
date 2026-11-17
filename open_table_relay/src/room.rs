@@ -183,6 +183,10 @@ pub struct Room {
     pub participants: HashMap<ConnectionId, Participant>,
     /// Sesión autoritativa opcional para validación Anti-Cheat de los 13 juegos.
     pub anticheat: Option<AntiCheatSession>,
+    /// Rating ELO opcional del anfitrión cuando la sala fue abierta mediante la cola de matchmaking.
+    pub host_elo: Option<i32>,
+    /// Ventana máxima de diferencia de ELO aceptada para el matchmaking en esta sala.
+    pub max_elo_delta: Option<i32>,
 }
 
 impl Room {
@@ -267,6 +271,8 @@ impl Room {
             next_player_id: 2,
             participants,
             anticheat,
+            host_elo: None,
+            max_elo_delta: None,
         }
     }
 
@@ -558,17 +564,44 @@ impl RoomManager {
         sender: ClientSender,
         game_id: Option<String>,
     ) -> (String, RoomPlayerId, bool) {
+        self.queue_matchmaking_with_elo(conn_id, sender, game_id, None, None)
+    }
+
+    /// Empareja al jugador en una partida de matchmaking público aplicando filtro de ventana ELO si se especifica.
+    ///
+    /// Si tanto la sala en espera como el nuevo jugador definen `elo`, verifica que
+    /// `|elo_sala - elo_jugador| <= min(max_delta_sala, max_delta_jugador)` (por defecto `300`).
+    pub fn queue_matchmaking_with_elo(
+        &mut self,
+        conn_id: ConnectionId,
+        sender: ClientSender,
+        game_id: Option<String>,
+        elo: Option<i32>,
+        max_elo_delta: Option<i32>,
+    ) -> (String, RoomPlayerId, bool) {
         let _ = self.leave_room(conn_id);
 
         let waiting_code = self
             .rooms
             .iter()
             .find(|(_, r)| {
-                r.is_public
+                if !(r.is_public
                     && !r.elo_reported
                     && r.player_count() == 1
                     && r.connected_player_count() == 1
-                    && r.game_id == game_id
+                    && r.game_id == game_id)
+                {
+                    return false;
+                }
+                match (r.host_elo, elo) {
+                    (Some(h_elo), Some(p_elo)) => {
+                        let h_tol = r.max_elo_delta.unwrap_or(300).max(50);
+                        let p_tol = max_elo_delta.unwrap_or(300).max(50);
+                        let allowed_delta = h_tol.min(p_tol);
+                        (h_elo - p_elo).abs() <= allowed_delta
+                    }
+                    _ => true,
+                }
             })
             .map(|(c, _)| c.clone());
 
@@ -588,6 +621,10 @@ impl RoomManager {
             true,
             Some(TURN_TIMEOUT_MATCHMAKING_SECS),
         );
+        if let Some(room) = self.rooms.get_mut(&code) {
+            room.host_elo = elo;
+            room.max_elo_delta = max_elo_delta;
+        }
         (code, 1, true)
     }
 
@@ -1633,5 +1670,48 @@ mod tests {
             manager.participant_info(200),
             Some((active_code.clone(), 1))
         );
+    }
+
+    #[test]
+    fn test_elo_range_matchmaking_pairs_compatible_and_separates_outliers() {
+        let mut manager = RoomManager::new();
+        let (tx1, _rx1) = mpsc::unbounded_channel();
+        let (tx2, _rx2) = mpsc::unbounded_channel();
+        let (tx3, _rx3) = mpsc::unbounded_channel();
+
+        // Jugador 1 (ELO 1200 ±150) entra en cola para "chess"
+        let (code_1, pid_1, is_new_1) = manager.queue_matchmaking_with_elo(
+            1,
+            tx1,
+            Some("chess".to_string()),
+            Some(1200),
+            Some(150),
+        );
+        assert!(is_new_1);
+        assert_eq!(pid_1, 1);
+
+        // Jugador 2 (ELO 1700 ±150) está fuera del rango de Jugador 1 -> crea nueva sala en espera
+        let (code_2, pid_2, is_new_2) = manager.queue_matchmaking_with_elo(
+            2,
+            tx2,
+            Some("chess".to_string()),
+            Some(1700),
+            Some(150),
+        );
+        assert!(is_new_2);
+        assert_eq!(pid_2, 1);
+        assert_ne!(code_1, code_2);
+
+        // Jugador 3 (ELO 1280 ±150) está dentro del rango de Jugador 1 (|1200 - 1280| = 80 <= 150) -> se une a code_1
+        let (code_3, pid_3, is_new_3) = manager.queue_matchmaking_with_elo(
+            3,
+            tx3,
+            Some("chess".to_string()),
+            Some(1280),
+            Some(150),
+        );
+        assert!(!is_new_3);
+        assert_eq!(code_3, code_1);
+        assert_eq!(pid_3, 2);
     }
 }

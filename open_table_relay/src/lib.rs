@@ -99,6 +99,12 @@ pub enum RelayRequest {
         /// Identificador opcional del juego.
         #[serde(default)]
         game_id: Option<String>,
+        /// Rating ELO opcional del jugador para emparejamiento por rango.
+        #[serde(default)]
+        elo: Option<i32>,
+        /// Diferencia máxima de ELO permitida (por defecto `300`).
+        #[serde(default)]
+        max_elo_delta: Option<i32>,
     },
     /// Une al cliente a una sala existente mediante su código.
     Join {
@@ -717,11 +723,15 @@ async fn process_text_message(
             global_metrics().set_rooms_active(mgr.active_room_count());
             send_response(tx, &RelayResponse::Created { room_code, seed });
         }
-        RelayRequest::Queue { game_id } => {
+        RelayRequest::Queue {
+            game_id,
+            elo,
+            max_elo_delta,
+        } => {
             global_metrics().inc_messages_total(game_id.as_deref());
             let mut mgr = state.manager.lock().await;
             let (room_code, player_id, is_new) =
-                mgr.queue_matchmaking(conn_id, tx.clone(), game_id);
+                mgr.queue_matchmaking_with_elo(conn_id, tx.clone(), game_id, elo, max_elo_delta);
             mgr.set_authenticated_player_id(conn_id, canonical_player_id.clone());
             let seed = mgr.room_seed(&room_code).unwrap_or(42);
             global_metrics().set_rooms_active(mgr.active_room_count());

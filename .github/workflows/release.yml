@@ -308,6 +308,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Rust toolchain (wasm32-unknown-unknown)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-bindgen-cli
+        uses: taiki-e/install-action@wasm-bindgen-cli
+
+      - name: Compile open_table_wasm & Generate WebAssembly Bindings
+        shell: bash
+        run: |
+          cargo build --manifest-path open_table_wasm/Cargo.toml --target wasm32-unknown-unknown --release
+          mkdir -p web_client/public/wasm
+          wasm-bindgen --target web --out-dir web_client/public/wasm open_table_wasm/target/wasm32-unknown-unknown/release/open_table_wasm.wasm || \
+            cp -f open_table_wasm/target/wasm32-unknown-unknown/release/open_table_wasm.wasm web_client/public/wasm/open_table_wasm_bg.wasm
+
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:

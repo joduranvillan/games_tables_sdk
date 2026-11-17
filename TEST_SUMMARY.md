@@ -10,11 +10,11 @@
 - **Modo de Verificación**: Verificación Híbrida (`run_godot_tests.sh` + Inspector Estático AST Rust/GDScript)
 - **Juegos Verificados**: **14 / 14** juegos completos (Motor Rust + Bridge GDExtension + Tablero Godot + Smoke Tests + Docs)
 - **Juegos con Dados 3D (`DiceRoller3D` + `DiceWidget`)**: **5 / 5** (`backgammon`, `ludo`, `monopoly`, `crisis`, `goose`)
-- **Total de Tests en Rust (`#[test]`)**: **456** tests distribuidos en 20 crates:
+- **Total de Tests en Rust (`#[test]`)**: **457** tests distribuidos en 20 crates:
   - Tests Unitarios en Juegos (`<game>_game/src/**`): **45**
   - Tests de Reglas de Juego (`<game>_game/tests/game_rules.rs`): **235**
   - Tests de Reglas Canónicas (`<game>_game/tests/canonical_rules.rs`): **39**
-  - Tests de Crates Core (`open_table_*`): **137**
+  - Tests de Crates Core (`open_table_*`): **138**
 - **Total de Suites Smoke Test en Godot (`godot_project/tests/*.gd`)**: **47** scripts (**682** puntos de aserción/verificación)
 - **Paridad Espejo de Tableros (`godot_project/*_board.gd` ↔ `godot_project/scenes/*_board.gd`)**: **14 / 14** sincronizados byte a byte
 - **Cumplimiento Tipado Estricto Redot 4.4 (`Variant` Inference Check)**: **0** violaciones detectadas
@@ -50,7 +50,7 @@
 | `open_table_engine` | Motor de sesiones de mesa, turnos, validación de comandos y snapshots | **79** | `open_table_engine/src/elo.rs:46` (`test_victoria_sube_elo_del_ganador`), `open_table_engine/src/elo.rs:57` (`test_empate_iguala_elos_similares`), `open_table_engine/src/elo.rs:75` (`test_victoria_contra_favorito_da_mayor_delta`), `open_table_engine/tests/api_contract.rs:10` (`contrato_cross_crate_de_constructores_de_sesion`), ... (+75 más) |
 | `open_table_net` | Protocolo de red determinista, sincronización P2P/Relay y serialización | **0** | Verificado vía integración en crates de juego |
 | `open_table_godot` | Puente GDExtension (Rust <-> Godot/Redot 4.4) con sesiones para los 14 juegos | **3** | `open_table_godot/src/lib.rs:5516` (`extended_ai_engines_produce_valid_commands_in_easy_mode`), `open_table_godot/src/lib.rs:5557` (`test_parse_command_json_polymorphic_new_commands`), `open_table_godot/tests/godot_api_surface.rs:8` (`test_godot_bridge_api_surface_compilation`) |
-| `open_table_relay` | Servidor relay autoritativo y módulo anticheat para los 14 juegos | **53** | `open_table_relay/src/anticheat.rs:890` (`test_anticheat_supports_all_13_canonical_games_with_seed`), `open_table_relay/src/anticheat.rs:907` (`test_anticheat_chess_legal_and_illegal_moves`), `open_table_relay/src/anticheat.rs:928` (`test_anticheat_checkers_legal_and_illegal_moves`), `open_table_relay/src/anticheat.rs:949` (`test_anticheat_all_13_games_validate_rules_and_active_turn`), ... (+49 más) |
+| `open_table_relay` | Servidor relay autoritativo y módulo anticheat para los 14 juegos | **54** | `open_table_relay/src/anticheat.rs:890` (`test_anticheat_supports_all_13_canonical_games_with_seed`), `open_table_relay/src/anticheat.rs:907` (`test_anticheat_chess_legal_and_illegal_moves`), `open_table_relay/src/anticheat.rs:928` (`test_anticheat_checkers_legal_and_illegal_moves`), `open_table_relay/src/anticheat.rs:949` (`test_anticheat_all_13_games_validate_rules_and_active_turn`), ... (+50 más) |
 | `open_table_schema` | Esquemas compartidos, identificadores y contratos de serialización JSON | **0** | Verificado vía integración en crates de juego |
 
 ---
