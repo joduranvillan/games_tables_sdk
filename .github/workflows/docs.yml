@@ -1,4 +1,4 @@
-name: Deploy Documentation (mdBook + rustdoc)
+name: Deploy Documentation & 14-Games PWA (GitHub Pages)
 
 on:
   push:
@@ -11,32 +11,56 @@ permissions:
 
 jobs:
   deploy-docs:
-    name: Build & Publish mdBook to GitHub Pages
+    name: Build & Publish 14-Games PWA + mdBook to GitHub Pages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust stable toolchain
+      - name: Install Rust stable toolchain (with wasm32-unknown-unknown)
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-bindgen-cli
+        uses: taiki-e/install-action@wasm-bindgen-cli
+
+      - name: Compile open_table_wasm & Generate WebAssembly Bindings
+        run: |
+          cargo build --manifest-path open_table_wasm/Cargo.toml --target wasm32-unknown-unknown --release
+          mkdir -p web_client/public/wasm
+          wasm-bindgen --target web --out-dir web_client/public/wasm open_table_wasm/target/wasm32-unknown-unknown/release/open_table_wasm.wasm || \
+            cp -f open_table_wasm/target/wasm32-unknown-unknown/release/open_table_wasm.wasm web_client/public/wasm/open_table_wasm_bg.wasm
+
+      - name: Set up Node.js 22 & Build 14-Games PWA
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build Production PWA Bundle
+        working-directory: web_client
+        run: |
+          npm install
+          npm run build
 
       - name: Install mdBook
         uses: peaceiris/actions-mdbook@v2
         with:
           mdbook-version: 'latest'
 
-      - name: Build mdBook documentation
-        run: mdbook build docs/
-
-      - name: Generate rustdoc API reference
+      - name: Build mdBook documentation & rustdoc API reference
         run: |
+          mdbook build docs/
           cargo doc --workspace --exclude open_table_godot --no-deps
           cp -r target/doc docs/book/api/
+          mkdir -p gh_pages_bundle/docs
+          cp -r web_client/dist/* gh_pages_bundle/
+          cp -r docs/book/* gh_pages_bundle/docs/
 
-      - name: Deploy docs/book/ to gh-pages
+      - name: Deploy 14-Games PWA & Docs to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs/book
-          destination_dir: docs
-          keep_files: true
+          publish_dir: ./gh_pages_bundle
+          keep_files: false
+

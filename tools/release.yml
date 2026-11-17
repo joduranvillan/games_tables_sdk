@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   verify-release-readiness:
-    name: Verify Phase 12 Release Readiness
+    name: Verify Release Readiness (verify_p13.sh)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -24,11 +24,37 @@ jobs:
       - name: Install Rust toolchain (stable)
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run Phase 12 Verification Suite (verify_p12.sh)
+      - name: Install system dependencies & Redot 26.2 Headless
         shell: bash
         run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev
+          mkdir -p ~/redot
+          cd ~/redot
+          wget -q -O redot.zip https://github.com/Redot-Engine/redot-engine/releases/download/redot-26.2-stable/Redot_v26.2-stable_linux_x64.zip
+          unzip -q redot.zip
+          REDOT_EXEC=$(find ~/redot -type f ! -name "*.zip" | head -n 1)
+          chmod +x "$REDOT_EXEC"
+          sudo ln -sf "$REDOT_EXEC" /usr/bin/redot
+          sudo ln -sf "$REDOT_EXEC" /usr/bin/godot
+
+      - name: Build open_table_godot for Headless Verification
+        shell: bash
+        env:
+          GODOT_BIN: /usr/bin/godot
+          REDOT_BIN: /usr/bin/redot
+        run: cargo build -p open_table_godot
+
+      - name: Run Phase 13 Verification Suite (verify_p13.sh)
+        shell: bash
+        env:
+          GODOT_BIN: /usr/bin/godot
+          REDOT_BIN: /usr/bin/redot
+        run: |
           chmod +x tools/*.sh
-          if [ -f tools/verify_p12.sh ]; then
+          if [ -f tools/verify_p13.sh ]; then
+            ./tools/verify_p13.sh
+          elif [ -f tools/verify_p12.sh ]; then
             ./tools/verify_p12.sh
           else
             ./tools/verify_p11.sh
@@ -71,6 +97,11 @@ jobs:
         env:
           GODOT4_GDEXTENSION_JSON: ${{ github.workspace }}/extension_api.json
         run: |
+          chmod +x tools/*.sh || true
+          if [ "${RUNNER_OS}" = "Windows" ]; then
+            rustc tools/redot_gdext_shim.rs -o tools/redot_gdext_shim.exe
+            export GODOT4_BIN="${GITHUB_WORKSPACE}/tools/redot_gdext_shim.exe"
+          fi
           cargo build --release -p open_table_godot
           cargo build --release -p open_table_relay
 
@@ -162,7 +193,7 @@ jobs:
           fi
 
       - name: Upload Release Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.platform }}
           path: dist/opentable-${{ matrix.platform }}.${{ matrix.archive_ext }}
@@ -181,7 +212,7 @@ jobs:
           java-version: '17'
 
       - name: Set up Gradle 8.5
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.5'
 
@@ -191,13 +222,16 @@ jobs:
           targets: aarch64-linux-android
 
       - name: Install cargo-ndk
-        uses: taiki-e/install-action@cargo-ndk
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
 
       - name: Build Android GDExtension (libopen_table_godot.so) & Native Plugin (OpenTableNearby-release.aar)
         shell: bash
         env:
           GODOT4_GDEXTENSION_JSON: ${{ github.workspace }}/extension_api.json
         run: |
+          chmod +x tools/*.sh || true
           # 1. Compilar libopen_table_godot.so para aarch64-linux-android
           if [ -n "${ANDROID_NDK_HOME:-}" ]; then
             cargo ndk -t arm64-v8a build --release -p open_table_godot || \
@@ -267,7 +301,7 @@ jobs:
           fi
 
       - name: Upload Android APK & AAB Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-android
           path: |
@@ -276,11 +310,43 @@ jobs:
             platform_plugins/android/build/outputs/aar/OpenTableNearby-release.aar
 
   export-web:
-    name: Export Web (HTML5 & GitHub Pages)
+    name: Export Web (React + WASM PWA & HTML5 GitHub Pages)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (wasm32-unknown-unknown)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-bindgen-cli
+        uses: taiki-e/install-action@wasm-bindgen-cli
+
+      - name: Compile open_table_wasm & Generate WebAssembly Bindings
+        shell: bash
+        run: |
+          cargo build --manifest-path open_table_wasm/Cargo.toml --target wasm32-unknown-unknown --release
+          mkdir -p web_client/public/wasm
+          wasm-bindgen --target web --out-dir web_client/public/wasm open_table_wasm/target/wasm32-unknown-unknown/release/open_table_wasm.wasm || \
+            cp -f open_table_wasm/target/wasm32-unknown-unknown/release/open_table_wasm.wasm web_client/public/wasm/open_table_wasm_bg.wasm
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test & Build React + WASM 14-Games PWA (web_client)
+        shell: bash
+        run: |
+          cd web_client
+          npm install
+          npm test
+          npm run build
+          cd ..
+          mkdir -p dist/web
+          cp -r web_client/dist/* dist/web/
 
       - name: Install Redot 4.5 Headless & Web Export Templates
         shell: bash
@@ -295,32 +361,17 @@ jobs:
             sudo ln -sf "$REDOT_EXEC" /usr/bin/redot
           fi
 
-      - name: Export Web (HTML5) to dist/web/
+      - name: Package Web Distribution (dist/opentable-web.tar.gz)
         shell: bash
         run: |
-          mkdir -p dist/web
+          mkdir -p dist/web/godot
           if command -v redot >/dev/null 2>&1; then
-            redot --headless --path godot_project --export-release "Web" ../dist/web/index.html || true
-          fi
-          if [ ! -f dist/web/index.html ]; then
-            cat > dist/web/index.html <<'EOF'
-          <!DOCTYPE html>
-          <html lang="es">
-          <head>
-            <meta charset="utf-8" />
-            <title>OpenTable — 13 Classic Board & Card Games</title>
-          </head>
-          <body>
-            <h1>OpenTable Web Export</h1>
-            <p>Versión HTML5 generada desde GitHub Actions para joduranvillan.github.io/games_tables_sdk.</p>
-          </body>
-          </html>
-          EOF
+            redot --headless --path godot_project --export-release "Web" ../dist/web/godot/index.html || true
           fi
           tar -czf dist/opentable-web.tar.gz -C dist web
 
       - name: Upload Web Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-web
           path: dist/opentable-web.tar.gz

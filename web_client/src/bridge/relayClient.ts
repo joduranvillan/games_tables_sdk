@@ -32,6 +32,27 @@ export interface RelayChatMessage {
   timestamp: string;
 }
 
+export interface MatchmakingQueueTicket {
+  ticketId: string;
+  gameId: string;
+  playerName: string;
+  elo: number;
+  maxEloDelta: number;
+  roomCode: string;
+  queuedAtMs: number;
+}
+
+export function areMatchmakingTicketsCompatible(
+  a: Pick<MatchmakingQueueTicket, "gameId" | "elo" | "maxEloDelta">,
+  b: Pick<MatchmakingQueueTicket, "gameId" | "elo" | "maxEloDelta">
+): boolean {
+  if (a.gameId.trim().toLowerCase() !== b.gameId.trim().toLowerCase()) {
+    return false;
+  }
+  const allowedDelta = Math.min(Math.max(50, a.maxEloDelta), Math.max(50, b.maxEloDelta));
+  return Math.abs(a.elo - b.elo) <= allowedDelta;
+}
+
 export interface RelayEventCallbacks {
   onStateChange?: (state: RelayConnectionState, info?: string) => void;
   onRoomCreated?: (roomCode: string, localPlayerId: 1 | 2) => void;
@@ -42,6 +63,12 @@ export interface RelayEventCallbacks {
   onSyncStateReceived?: (gameType: string, logJson: string) => void;
   onChatMessageReceived?: (msg: RelayChatMessage) => void;
   onEloSyncReceived?: (playerId: number, rating: number, playerName: string) => void;
+  onMatchmakingFound?: (
+    roomCode: string,
+    assignedPlayerId: 1 | 2,
+    opponentElo: number,
+    opponentName: string
+  ) => void;
 }
 
 export function getSavedRelayUrl(): string {
@@ -81,6 +108,8 @@ export class RelayWebSocketClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private callbacks: RelayEventCallbacks;
   private broadcastChannel: BroadcastChannel | null = null;
+  private matchmakingChannel: BroadcastChannel | null = null;
+  private activeQueueTicket: MatchmakingQueueTicket | null = null;
 
   constructor(callbacks: RelayEventCallbacks = {}, initialUrl?: string) {
     this.callbacks = callbacks;
@@ -196,6 +225,178 @@ export class RelayWebSocketClient {
     return true;
   }
 
+  public isQueuingMatchmaking(): boolean {
+    return this.activeQueueTicket !== null;
+  }
+
+  public getActiveQueueTicket(): MatchmakingQueueTicket | null {
+    return this.activeQueueTicket;
+  }
+
+  public queueMatchmaking(
+    gameId: string,
+    elo: number,
+    maxEloDelta: number = 300,
+    playerName: string = "Jugador"
+  ): MatchmakingQueueTicket {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let generatedCode = "";
+    for (let i = 0; i < 4; i++) {
+      generatedCode += chars[(Math.floor(Math.random() * chars.length) + i * 5) % chars.length];
+    }
+
+    const ticket: MatchmakingQueueTicket = {
+      ticketId: `mm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      gameId: gameId.trim().toLowerCase(),
+      playerName: playerName.trim() || "Jugador",
+      elo: Math.round(elo),
+      maxEloDelta: Math.max(50, Math.round(maxEloDelta)),
+      roomCode: generatedCode,
+      queuedAtMs: Date.now(),
+    };
+
+    this.activeQueueTicket = ticket;
+    this.roomCode = generatedCode;
+    this.localPlayerId = 1;
+    this.isSpectator = false;
+    this.setState(
+      "connecting",
+      `Buscando rival en cola ELO (${ticket.elo} ±${ticket.maxEloDelta}) para ${ticket.gameId.toUpperCase()}...`
+    );
+
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        this.matchmakingChannel?.close();
+        this.matchmakingChannel = new BroadcastChannel("opentable_global_matchmaking_v1");
+        this.matchmakingChannel.onmessage = (ev) => {
+          const msg = ev.data;
+          if (!msg || typeof msg !== "object" || !this.activeQueueTicket) return;
+          const myTicket = this.activeQueueTicket;
+          if (msg.type === "MM_SEEK" && msg.ticket && msg.ticket.ticketId !== myTicket.ticketId) {
+            const other = msg.ticket as MatchmakingQueueTicket;
+            if (areMatchmakingTicketsCompatible(myTicket, other)) {
+              if (myTicket.queuedAtMs <= other.queuedAtMs) {
+                this.matchmakingChannel?.postMessage({
+                  type: "MM_MATCHED",
+                  hostTicket: myTicket,
+                  guestTicketId: other.ticketId,
+                  guestElo: other.elo,
+                  guestName: other.playerName,
+                });
+                this.completeMatchmakingAsHost(myTicket.roomCode, other.elo, other.playerName);
+              }
+            }
+          } else if (
+            msg.type === "MM_MATCHED" &&
+            msg.guestTicketId === myTicket.ticketId &&
+            msg.hostTicket
+          ) {
+            const hostTicket = msg.hostTicket as MatchmakingQueueTicket;
+            this.completeMatchmakingAsClient(
+              hostTicket.roomCode,
+              hostTicket.elo,
+              hostTicket.playerName
+            );
+          }
+        };
+        this.matchmakingChannel.postMessage({ type: "MM_SEEK", ticket });
+      }
+    } catch {
+      // BroadcastChannel optional
+    }
+
+    this.setupSameOriginTabChannel(generatedCode);
+    this.connectSocket(
+      {
+        op: "queue",
+        action: "queue",
+        game_id: ticket.gameId,
+        elo: ticket.elo,
+        max_elo_delta: ticket.maxEloDelta,
+      },
+      true
+    );
+
+    return ticket;
+  }
+
+  public expandMatchmakingTolerance(newMaxEloDelta: number): void {
+    if (!this.activeQueueTicket) return;
+    this.activeQueueTicket = {
+      ...this.activeQueueTicket,
+      maxEloDelta: Math.max(50, Math.round(newMaxEloDelta)),
+    };
+    try {
+      this.matchmakingChannel?.postMessage({
+        type: "MM_SEEK",
+        ticket: this.activeQueueTicket,
+      });
+    } catch {
+      // Ignore
+    }
+  }
+
+  public cancelMatchmaking(): void {
+    this.activeQueueTicket = null;
+    try {
+      this.matchmakingChannel?.close();
+    } catch {
+      // Ignore
+    }
+    this.matchmakingChannel = null;
+    if (this.state === "connecting") {
+      this.disconnect();
+    }
+  }
+
+  private completeMatchmakingAsHost(
+    roomCode: string,
+    opponentElo: number,
+    opponentName: string
+  ): void {
+    const myTicket = this.activeQueueTicket;
+    this.activeQueueTicket = null;
+    this.roomCode = roomCode;
+    this.localPlayerId = 1;
+    this.isSpectator = false;
+    this.setupSameOriginTabChannel(roomCode);
+    this.setState(
+      "connected_host",
+      `Emparejado por ELO en sala ${roomCode} contra ${opponentName} (${opponentElo} ELO)`
+    );
+    this.callbacks.onRoomCreated?.(roomCode, 1);
+    this.callbacks.onPeerJoined?.(2);
+    this.callbacks.onEloSyncReceived?.(2, opponentElo, opponentName);
+    this.callbacks.onMatchmakingFound?.(roomCode, 1, opponentElo, opponentName);
+    if (myTicket) {
+      this.sendEloSync(1, myTicket.elo, myTicket.playerName);
+    }
+  }
+
+  private completeMatchmakingAsClient(
+    roomCode: string,
+    opponentElo: number,
+    opponentName: string
+  ): void {
+    const myTicket = this.activeQueueTicket;
+    this.activeQueueTicket = null;
+    this.roomCode = roomCode;
+    this.localPlayerId = 2;
+    this.isSpectator = false;
+    this.setupSameOriginTabChannel(roomCode);
+    this.setState(
+      "connected_client",
+      `Emparejado por ELO en sala ${roomCode} contra ${opponentName} (${opponentElo} ELO)`
+    );
+    this.callbacks.onRoomJoined?.(roomCode, 2);
+    this.callbacks.onEloSyncReceived?.(1, opponentElo, opponentName);
+    this.callbacks.onMatchmakingFound?.(roomCode, 2, opponentElo, opponentName);
+    this.broadcastChannel?.postMessage({ type: "PEER_JOINED", playerId: 2 });
+    if (myTicket) {
+      this.sendEloSync(2, myTicket.elo, myTicket.playerName);
+    }
+  }
+
   private connectSocket(handshakePayload: Record<string, unknown>, isHost: boolean): void {
     try {
       if (typeof WebSocket === "undefined") return;
@@ -223,8 +424,44 @@ export class RelayWebSocketClient {
             );
           } else if (msg.type === "command" && msg.command_json) {
             this.callbacks.onCommandReceived?.(Number(msg.player_id || 2), msg.command_json);
-          } else if (msg.type === "peer_joined") {
-            this.callbacks.onPeerJoined?.(Number(msg.player_id || 2));
+          } else if (msg.op === "created" && msg.room_code) {
+            this.roomCode = String(msg.room_code);
+            this.localPlayerId = 1;
+            this.setupSameOriginTabChannel(this.roomCode);
+            this.setState(
+              "connected_host",
+              `En espera de rival ELO en sala ${this.roomCode}...`
+            );
+            this.callbacks.onRoomCreated?.(this.roomCode, 1);
+          } else if (msg.op === "joined" && msg.player_id) {
+            const assignedPid: 1 | 2 = Number(msg.player_id) === 1 ? 1 : 2;
+            const myTicket = this.activeQueueTicket;
+            this.activeQueueTicket = null;
+            this.localPlayerId = assignedPid;
+            this.setState(
+              "connected_client",
+              `Partida ELO encontrada en servidor Relay (${this.roomCode})`
+            );
+            this.callbacks.onRoomJoined?.(this.roomCode, assignedPid);
+            this.callbacks.onMatchmakingFound?.(
+              this.roomCode,
+              assignedPid,
+              myTicket?.elo ?? 1200,
+              "Rival Relay ELO"
+            );
+          } else if (msg.type === "peer_joined" || msg.op === "peer_joined") {
+            const peerPid = Number(msg.player_id || 2);
+            if (this.activeQueueTicket) {
+              const myTicket = this.activeQueueTicket;
+              this.activeQueueTicket = null;
+              this.callbacks.onMatchmakingFound?.(
+                this.roomCode,
+                1,
+                myTicket.elo,
+                "Rival Relay ELO"
+              );
+            }
+            this.callbacks.onPeerJoined?.(peerPid);
           } else if (msg.type === "chat" && msg.text) {
             this.callbacks.onChatMessageReceived?.({
               id: String(msg.id || `${Date.now()}`),
@@ -382,11 +619,14 @@ export class RelayWebSocketClient {
 
   public disconnect(): void {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.activeQueueTicket = null;
     this.roomCode = "";
     this.ws?.close();
     this.ws = null;
     this.broadcastChannel?.close();
     this.broadcastChannel = null;
+    this.matchmakingChannel?.close();
+    this.matchmakingChannel = null;
     this.setState("disconnected", "Sin conexión de red activa");
   }
 }

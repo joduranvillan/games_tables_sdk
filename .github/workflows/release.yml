@@ -97,6 +97,11 @@ jobs:
         env:
           GODOT4_GDEXTENSION_JSON: ${{ github.workspace }}/extension_api.json
         run: |
+          chmod +x tools/*.sh || true
+          if [ "${RUNNER_OS}" = "Windows" ]; then
+            rustc tools/redot_gdext_shim.rs -o tools/redot_gdext_shim.exe
+            export GODOT4_BIN="${GITHUB_WORKSPACE}/tools/redot_gdext_shim.exe"
+          fi
           cargo build --release -p open_table_godot
           cargo build --release -p open_table_relay
 
@@ -217,13 +222,16 @@ jobs:
           targets: aarch64-linux-android
 
       - name: Install cargo-ndk
-        uses: taiki-e/install-action@cargo-ndk
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
 
       - name: Build Android GDExtension (libopen_table_godot.so) & Native Plugin (OpenTableNearby-release.aar)
         shell: bash
         env:
           GODOT4_GDEXTENSION_JSON: ${{ github.workspace }}/extension_api.json
         run: |
+          chmod +x tools/*.sh || true
           # 1. Compilar libopen_table_godot.so para aarch64-linux-android
           if [ -n "${ANDROID_NDK_HOME:-}" ]; then
             cargo ndk -t arm64-v8a build --release -p open_table_godot || \
@@ -307,6 +315,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (wasm32-unknown-unknown)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-bindgen-cli
+        uses: taiki-e/install-action@wasm-bindgen-cli
+
+      - name: Compile open_table_wasm & Generate WebAssembly Bindings
+        shell: bash
+        run: |
+          cargo build --manifest-path open_table_wasm/Cargo.toml --target wasm32-unknown-unknown --release
+          mkdir -p web_client/public/wasm
+          wasm-bindgen --target web --out-dir web_client/public/wasm open_table_wasm/target/wasm32-unknown-unknown/release/open_table_wasm.wasm || \
+            cp -f open_table_wasm/target/wasm32-unknown-unknown/release/open_table_wasm.wasm web_client/public/wasm/open_table_wasm_bg.wasm
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4

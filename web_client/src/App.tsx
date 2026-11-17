@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { WasmGameBridge } from "./wasm_pkg";
 import {
   getSavedRelayUrl,
+  MatchmakingQueueTicket,
   RelayChatMessage,
   RelayConnectionState,
   RelayWebSocketClient,
@@ -59,6 +60,8 @@ import {
   TournamentState,
 } from "./components/common/TournamentManagerPanel";
 import { RelayChatPanel } from "./components/common/RelayChatPanel";
+import { MatchmakingQueuePanel } from "./components/common/MatchmakingQueuePanel";
+import { PostMatchAnalyzerPanel } from "./components/common/PostMatchAnalyzerPanel";
 import {
   Bot,
   Eye,
@@ -235,7 +238,7 @@ export const App: React.FC = () => {
   const matchOutcomeRecordedRef = useRef<boolean>(false);
 
   const [activeTab, setActiveTab] = useState<
-    "play" | "catalog" | "tournaments" | "elo" | "network"
+    "play" | "catalog" | "tournaments" | "elo" | "analyzer" | "network"
   >("play");
   const [selectedGameId, setSelectedGameId] = useState<string>("chess");
   const [matchMode, setMatchMode] = useState<MatchMode>("hotseat");
@@ -295,6 +298,10 @@ export const App: React.FC = () => {
   const [joinCodeInput, setJoinCodeInput] = useState<string>("");
   const [qrSvg, setQrSvg] = useState<string>("");
   const [chatMessages, setChatMessages] = useState<RelayChatMessage[]>([]);
+  const [isQueuingMatchmaking, setIsQueuingMatchmaking] =
+    useState<boolean>(false);
+  const [activeQueueTicket, setActiveQueueTicket] =
+    useState<MatchmakingQueueTicket | null>(null);
 
   const checkAndRecordWinnerIfAny = (
     nextStateStr: string,
@@ -430,6 +437,16 @@ export const App: React.FC = () => {
         },
         onEloSyncReceived: (_pid, rating, playerName) => {
           setPeerEloInfo({ playerName, rating });
+        },
+        onMatchmakingFound: (code, assignedPid, oppElo, oppName) => {
+          setIsQueuingMatchmaking(false);
+          setActiveQueueTicket(null);
+          setRoomCode(code);
+          setLocalNetworkPlayerId(assignedPid);
+          setPeerEloInfo({ playerName: oppName, rating: oppElo });
+          setMatchMode("online_relay");
+          playProceduralSound("victory", themeConfig);
+          setActiveTab("play");
         },
       },
       relayUrl
@@ -593,6 +610,44 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleStartMatchmakingQueue = (maxEloDelta: number) => {
+    if (!relayRef.current) return;
+    relayRef.current.setRelayUrl(relayUrl);
+    startGameSession(selectedGameId, "online_relay");
+    const currentGameElo =
+      eloProfile.statsByGame[selectedGameId]?.rating ?? eloProfile.globalRating;
+    const ticket = relayRef.current.queueMatchmaking(
+      selectedGameId,
+      currentGameElo,
+      maxEloDelta,
+      eloProfile.playerName
+    );
+    setActiveQueueTicket(ticket);
+    setIsQueuingMatchmaking(true);
+    setRoomCode(ticket.roomCode);
+    setQrSvg(
+      bridgeRef.current.generate_join_qr_svg(
+        ticket.roomCode,
+        eloProfile.playerName,
+        selectedGameId
+      )
+    );
+  };
+
+  const handleExpandMatchmakingTolerance = (newMaxDelta: number) => {
+    relayRef.current?.expandMatchmakingTolerance(newMaxDelta);
+    const updated = relayRef.current?.getActiveQueueTicket() ?? null;
+    if (updated) {
+      setActiveQueueTicket({ ...updated });
+    }
+  };
+
+  const handleCancelMatchmakingQueue = () => {
+    relayRef.current?.cancelMatchmaking();
+    setIsQueuingMatchmaking(false);
+    setActiveQueueTicket(null);
+  };
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     const cleaned = saveRelayUrl(relayUrl);
@@ -691,6 +746,17 @@ export const App: React.FC = () => {
             }`}
           >
             Ranking ELO
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("analyzer")}
+            className={`hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              activeTab === "analyzer"
+                ? "text-white underline underline-offset-8"
+                : ""
+            }`}
+          >
+            Analizador
           </button>
           <button
             type="button"
@@ -1222,8 +1288,42 @@ export const App: React.FC = () => {
           />
         )}
 
+        {activeTab === "analyzer" && (
+          <PostMatchAnalyzerPanel
+            activeGame={selectedGameId}
+            activeGameTitle={activeGameMeta.title}
+            activeExportLogJson={bridgeRef.current.export_log_json()}
+            colorblindMode={themeConfig.okabeIto}
+            onLoadReplayLogToBoard={(logJson) => {
+              if (handleImportReplayJson(logJson)) {
+                setActiveTab("play");
+              }
+            }}
+          />
+        )}
+
         {activeTab === "network" && (
           <section className="flex flex-col gap-8">
+            <MatchmakingQueuePanel
+              activeGame={selectedGameId}
+              activeGameTitle={activeGameMeta.title}
+              playerElo={
+                eloProfile.statsByGame[selectedGameId]?.rating ??
+                eloProfile.globalRating
+              }
+              playerName={eloProfile.playerName}
+              isQueuing={isQueuingMatchmaking}
+              activeTicket={activeQueueTicket}
+              onStartQueue={handleStartMatchmakingQueue}
+              onExpandQueueTolerance={handleExpandMatchmakingTolerance}
+              onCancelQueue={handleCancelMatchmakingQueue}
+              onQuickCalibratedAiMatch={(diff) => {
+                setAiDifficulty(diff);
+                startGameSession(selectedGameId, "ai", diff);
+                setActiveTab("play");
+              }}
+            />
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-5">
                 <div>

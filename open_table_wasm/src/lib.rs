@@ -15,10 +15,10 @@ use goose_game::new_goose_session;
 use ludo_game::new_ludo_session;
 use mille_bornes_game::new_mille_bornes_session;
 use monopoly_game::new_monopoly_session;
-use open_table_core::ai::AiDifficulty;
 use open_table_core::command::Command;
 use open_table_core::event::Event;
 use open_table_core::ids::{PlayerId, SessionId};
+use open_table_core::AiDifficulty;
 use open_table_engine::session::Session;
 use shogi_game::new_shogi_session;
 use uno_game::new_uno_session;
@@ -291,8 +291,7 @@ impl WasmGameBridge {
                 .map(|c| Box::new(c) as Box<dyn Command>),
             "checkers" => checkers_game::ai::best_move(sess, ai_p, self.ai_difficulty)
                 .map(|c| Box::new(c) as Box<dyn Command>),
-            "shogi" => shogi_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                .map(|c| Box::new(c) as Box<dyn Command>),
+            "shogi" => shogi_game::ai::best_move(sess, ai_p, self.ai_difficulty),
             "xiangqi" => xiangqi_game::ai::best_move(sess, ai_p, self.ai_difficulty)
                 .map(|c| Box::new(c) as Box<dyn Command>),
             "go" => go_game::ai::best_move(sess, ai_p, self.ai_difficulty)
@@ -302,20 +301,67 @@ impl WasmGameBridge {
                 chinese_checkers_game::ai::best_move(sess, ai_p, self.ai_difficulty)
                     .map(|c| Box::new(c) as Box<dyn Command>)
             }
-            "backgammon" => backgammon_game::backgammon_ai_pick_move(sess, ai_p)
-                .map(|c| Box::new(c) as Box<dyn Command>),
-            "ludo" => ludo_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                .map(|c| Box::new(c) as Box<dyn Command>),
+            "backgammon" => {
+                let has_pending = sess
+                    .world()
+                    .get_resource::<backgammon_game::PendingDiceResource>()
+                    .and_then(|p| p.pending.get(&ai_p))
+                    .map(|d| !d.is_empty())
+                    .unwrap_or(false);
+                if !has_pending {
+                    Some(Box::new(backgammon_game::RollDiceCommand { player: ai_p })
+                        as Box<dyn Command>)
+                } else {
+                    backgammon_game::backgammon_ai_pick_move(sess, ai_p)
+                        .map(|c| Box::new(c) as Box<dyn Command>)
+                }
+            }
+            "ludo" => {
+                let has_pending = sess
+                    .world()
+                    .get_resource::<ludo_game::PendingRollResource>()
+                    .and_then(|p| p.pending.get(&ai_p))
+                    .is_some();
+                if !has_pending {
+                    Some(Box::new(ludo_game::RollDiceCommand { player: ai_p }) as Box<dyn Command>)
+                } else {
+                    ludo_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                        .map(|c| Box::new(c) as Box<dyn Command>)
+                }
+            }
             "battleship" => battleship_game::ai::best_move(sess, ai_p, self.ai_difficulty)
                 .map(|c| Box::new(c) as Box<dyn Command>),
             "mille_bornes" | "mille-bornes" | "millebornes" => {
-                mille_bornes_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                    .map(|c| c.into_command())
+                let needs_draw = sess
+                    .world()
+                    .get_resource::<mille_bornes_game::DeckResource>()
+                    .is_some_and(|deck| {
+                        let hand_len = deck.hands.get(&ai_p).map(Vec::len).unwrap_or(0);
+                        hand_len < mille_bornes_game::MAX_HAND_SIZE
+                            && (!deck.draw_pile.is_empty() || !deck.discard_pile.is_empty())
+                    });
+                if needs_draw {
+                    Some(Box::new(mille_bornes_game::DrawCardCommand { player: ai_p })
+                        as Box<dyn Command>)
+                } else {
+                    mille_bornes_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                        .map(|c| c.into_command())
+                }
             }
             "monopoly" => monopoly_game::ai::best_move(sess, ai_p, self.ai_difficulty)
                 .map(|c| c.into_command()),
-            "uno" => uno_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                .map(|c| c.into_command()),
+            "uno" => {
+                let has_penalty = sess
+                    .world()
+                    .get_resource::<uno_game::UnoState>()
+                    .is_some_and(|s| s.draw_penalty > 0);
+                if has_penalty {
+                    Some(Box::new(uno_game::DrawCardCommand { player: ai_p }) as Box<dyn Command>)
+                } else {
+                    uno_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                        .map(|c| c.into_command())
+                }
+            }
             "crisis" | "teg" => crisis_game::ai::best_move(sess, ai_p, self.ai_difficulty)
                 .map(|c| c.into_command()),
             "goose" | "oca" => {

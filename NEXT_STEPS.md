@@ -163,3 +163,17 @@ Ejecutables mediante `tools/run_godot_tests.sh` en Redot 4.5.2 (Godot 4.x):
   - `ThemeAndAudioManager.tsx`: 3 temas visuales oficiales (*Piedra Oscura*, *Noche Azul*, *Jade Verde*), modo daltónico *Okabe-Ito* y sintetizador acústico procedural basado en Web Audio API.
   - `RelayChatPanel.tsx`: Chat de sala en tiempo real y reacciones tácticas rápidas sobre `RelayWebSocketClient`.
   - Validado por 4 suites automatizadas (`wasm_and_network.test.ts`, `regression_14_games.test.ts`, `phase3_ecosystem.test.ts` y `phase4_competitive.test.ts`) integradas en `.github/workflows/ci.yml` y `.github/workflows/release.yml`.
+
+## 13. Fase 5 — Matchmaking ELO Automático, Analizador Post-Partida, Compilación WASM en CI y GitHub Pages (`v1.1.0`) — Completado ✅
+
+- [x] **Cola de Matchmaking Automático por Rango ELO (`open_table_relay` + `RelayWebSocketClient` + `MatchmakingQueuePanel.tsx`)**:
+  - Extensión retrocompatible de `RelayRequest::Queue` con `elo: Option<i32>` y `max_elo_delta: Option<i32>` y método `RoomManager::queue_matchmaking_with_elo` en `open_table_relay/src/room.rs`.
+  - Emparejamiento automático por ventana ELO ($\pm 150$, $\pm 300$, $\pm 800$) con expansión dinámica (+100 ELO cada 5 segundos) tanto sobre el servidor WebSocket `open_table_relay` como entre pestañas locales (`BroadcastChannel`).
+- [x] **Analizador Táctico Post-Partida con Curva de Ventaja (`PostMatchAnalyzerPanel.tsx`)**:
+  - Función de evaluación posicional normalizada ($[-100, +100]$) para los **14 juegos canónicos** (`evaluateStateJsonAdvantage`).
+  - Reconstrucción jugada por jugada (`analyzeMatchCommandLog`), cálculo de precisión porcentual por jugador (`0%–100%`), clasificación de movimientos (`★ Óptima`, `✓ Buena`, `? Imprecisión`, `?? Error Crítico`), comparación con la línea recomendada por la IA Maestra (Nivel 4), gráfico SVG interactivo de ventaja y carga directa de cualquier turno histórico en el tablero activo.
+- [x] **Compilación de Binario WASM (`open_table_wasm`) en CI/Release y Despliegue Continuo de la PWA en GitHub Pages**:
+  - Integración de `wasm32-unknown-unknown` + `wasm-bindgen-cli` hacia `web_client/public/wasm/` en `.github/workflows/ci.yml`, `.github/workflows/release.yml` y `.github/workflows/docs.yml`.
+  - Despliegue automático de la PWA de los 14 juegos en la raíz de GitHub Pages coexistiendo con la documentación técnica (`mdBook` + `rustdoc`) en `/docs`.
+  - Validado por la 5.ª suite de regresión automatizada `phase5_matchmaking_and_analyzer.test.ts`.
+
