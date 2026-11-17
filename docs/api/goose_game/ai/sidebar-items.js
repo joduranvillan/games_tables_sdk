@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["best_move","goose_ai_pick_move","select_ai_move"],"struct":["GooseMoveGenerator"],"type":["GooseAiDifficulty"]};

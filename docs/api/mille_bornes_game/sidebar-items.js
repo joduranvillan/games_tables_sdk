@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["new_mille_bornes_session"],"mod":["ai","card","commands","deck","events","rules"]};

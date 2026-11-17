@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["MonopolyCommand"],"fn":["best_move","completes_color_group","space_market_price"],"type":["MonopolyState"]};

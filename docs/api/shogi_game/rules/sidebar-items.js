@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["build_shogi_rules"],"struct":["ShogiLegalMoveGenerator"]};

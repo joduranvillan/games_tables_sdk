@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["MAX_HAND_SIZE","TARGET_DISTANCE","WIN_DISTANCE"],"fn":["build_deck"],"struct":["DeckResource"]};

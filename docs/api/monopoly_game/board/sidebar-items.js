@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["BOARD_SIZE","GO_BONUS","GO_TO_JAIL_SPACE","JAIL_SPACE","STARTING_MONEY"],"enum":["ChanceCard","CommunityChestCard","SpaceKind"],"fn":["board_layout"],"type":["Space"]};

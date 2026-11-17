@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["export_session_sgf","export_to_sgf"],"trait":["GoSgfExport"]};

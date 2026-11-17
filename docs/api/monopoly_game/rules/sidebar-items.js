@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["apply_land_effect","build_monopoly_rules","house_cost_for_space"]};

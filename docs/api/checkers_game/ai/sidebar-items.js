@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["best_move","checkers_ai_pick_move"]};

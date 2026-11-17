@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["build_crisis_rules","is_valid_card_set"]};

@@ -1,2 +1,0 @@
-window.ALL_CRATES = ["backgammon_game","battleship_game","checkers_game","chess_game","chinese_checkers_game","crisis_game","go_game","goose_game","ludo_game","mille_bornes_game","monopoly_game","open_table_core","open_table_engine","open_table_macros","open_table_qr","open_table_relay","open_table_transport_native_bridge","open_table_transport_tcp","open_table_transport_websocket","shogi_game","uno_game","xiangqi_game"];
-//{"start":21,"fragment_lengths":[17,18,16,13,24,14,10,13,12,20,16,18,20,20,16,19,37,27,33,13,11,15]}

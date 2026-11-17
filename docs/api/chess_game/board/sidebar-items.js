@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["has_any_legal_move","is_in_check","is_legal_move","is_square_attacked","piece_moves"],"struct":["BoardResource","DrawOfferedResource","HalfMoveClockResource","PositionHistoryResource","Sides"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["new_crisis_session","new_crisis_session_with_players"],"mod":["ai","board","commands","events","i18n","resources","rules"]};

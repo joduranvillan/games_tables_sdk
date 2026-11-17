@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["new_chess_session"],"mod":["ai","board","commands","events","fen","legal_moves","opening_book","pgn","position","rules"]};

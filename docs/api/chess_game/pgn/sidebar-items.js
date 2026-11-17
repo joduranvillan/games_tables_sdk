@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["export_session_fen","export_session_pgn","export_to_pgn"],"trait":["ChessNotationExport"]};

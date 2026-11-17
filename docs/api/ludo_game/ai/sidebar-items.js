@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["best_move","ludo_ai_pick_move"]};

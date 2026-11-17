@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["check_flying_general","is_in_check","is_legal_move"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["CardDiscardedEvent","CardDrawnEvent","DistancePlayedEvent","GameOverEvent","HazardPlayedEvent","RemedyPlayedEvent","SafetyPlayedEvent","TripExtendedEvent"]};

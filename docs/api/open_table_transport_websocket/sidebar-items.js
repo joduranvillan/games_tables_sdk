@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["HEARTBEAT_INTERVAL","HOST_PLAYER_ID","MAX_RECONNECT_ATTEMPTS","PROTOCOL_VERSION","RECONNECT_BACKOFF_MS"],"enum":["ConnectionEvent","HandshakeRequest","HandshakeResponse","ReconnectState","RelayClientEvent"],"fn":["reconnect_backoff_duration"],"struct":["ReconnectPolicy","WsClientTransport","WsHostTransport","WsRelayClient"]};

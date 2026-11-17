@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"derive":["GameCommand","GameComponent","GameEvent","GameResource"]};

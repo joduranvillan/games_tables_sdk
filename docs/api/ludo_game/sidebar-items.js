@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["new_ludo_session"],"mod":["ai","board","commands","events","rules"]};

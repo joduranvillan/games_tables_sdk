@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["DeclareAttackCommand","EndPhaseCommand","ExchangeCardsCommand","FortifyCommand","PlaceArmiesCommand","RollAttackCommand"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["ADJACENCIES","CONTINENTS","CONTINENT_AFRICA","CONTINENT_ASIA","CONTINENT_EUROPE","CONTINENT_NORTH_AMERICA","CONTINENT_OCEANIA","CONTINENT_SOUTH_AMERICA","TERRITORIES","TERRITORY_CENTERS"],"enum":["ObjectiveCard"],"fn":["are_adjacent","check_continent_bonus","check_objective"],"struct":["Continent","ContinentId","Territory","TerritoryId"]};

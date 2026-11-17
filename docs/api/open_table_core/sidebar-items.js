@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["AiDifficulty"],"mod":["command","component","error","event","game_variant","ids","prelude","random","resource","time","transport","visibility"],"struct":["GameResult"]};

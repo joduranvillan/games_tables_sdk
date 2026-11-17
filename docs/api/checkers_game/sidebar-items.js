@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["new_checkers_session"],"mod":["ai","board","commands","events","legal_moves","piece","position","rules"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ShotResult"],"struct":["FleetPlacedEvent","GameOverEvent","ShotResultEvent","SunkenShipEvent"]};

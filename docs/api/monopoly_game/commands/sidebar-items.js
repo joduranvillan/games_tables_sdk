@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["AcceptTradeCommand","AuctionBidCommand","BuildHouseCommand","BuyPropertyCommand","MortgagePropertyCommand","PayJailFeeCommand","ProposeTradeCommand","RejectTradeCommand","RollAndMoveCommand","SellHouseCommand","UnmortgagePropertyCommand","UseJailCardCommand"]};

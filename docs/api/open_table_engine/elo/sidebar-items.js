@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["update_elo","update_elo_draw"],"struct":["EloRating"]};

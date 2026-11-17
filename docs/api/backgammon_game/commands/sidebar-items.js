@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["AcceptDoubleCommand","MoveCheckerCommand","OfferDoubleCommand","RejectDoubleCommand","ResignCommand","RollDiceCommand"]};

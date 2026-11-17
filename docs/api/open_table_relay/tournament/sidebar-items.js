@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["TournamentError"],"struct":["BracketMatch","Tournament","TournamentManager"]};

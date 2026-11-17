@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["COMPACT_BOOK_BYTES","MAX_BOOK_POSITIONS"],"fn":["compute_zobrist_hash"],"struct":["ChessMove","OpeningBook"]};

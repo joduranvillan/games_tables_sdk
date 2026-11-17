@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["from_fen","load_chess_position_from_fen","parse_fen_with_player"]};

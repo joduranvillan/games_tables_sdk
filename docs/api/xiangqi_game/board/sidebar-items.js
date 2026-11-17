@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["PieceKind"],"struct":["BoardResource","Piece","XiangqiHistoryResource"]};

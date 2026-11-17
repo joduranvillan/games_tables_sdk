@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"macro":[["advance_turn",1],["force_turn",1]],"mod":["elo","history","prelude","rule_engine","session","test_helpers","turn"]};

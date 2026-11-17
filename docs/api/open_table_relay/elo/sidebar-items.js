@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["DEFAULT_INITIAL_ELO","DEFAULT_K_FACTOR"],"struct":["EloStore","PlayerRating"]};
