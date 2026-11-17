@@ -23,6 +23,15 @@ export interface SyncStateMessage {
   log_json: string;
 }
 
+export interface RelayChatMessage {
+  id: string;
+  roomCode: string;
+  senderName: string;
+  playerId: number;
+  text: string;
+  timestamp: string;
+}
+
 export interface RelayEventCallbacks {
   onStateChange?: (state: RelayConnectionState, info?: string) => void;
   onRoomCreated?: (roomCode: string, localPlayerId: 1 | 2) => void;
@@ -31,6 +40,8 @@ export interface RelayEventCallbacks {
   onPeerJoined?: (peerPlayerId: number) => void;
   onCommandReceived?: (playerId: number, commandJson: string) => void;
   onSyncStateReceived?: (gameType: string, logJson: string) => void;
+  onChatMessageReceived?: (msg: RelayChatMessage) => void;
+  onEloSyncReceived?: (playerId: number, rating: number, playerName: string) => void;
 }
 
 export function getSavedRelayUrl(): string {
@@ -119,6 +130,14 @@ export class RelayWebSocketClient {
             this.callbacks.onCommandReceived?.(data.sender, data.commandJson);
           } else if (data.type === "SYNC_STATE" && (this.isSpectator || this.localPlayerId === 2)) {
             this.callbacks.onSyncStateReceived?.(data.gameType, data.logJson);
+          } else if (data.type === "CHAT" && data.message) {
+            this.callbacks.onChatMessageReceived?.(data.message as RelayChatMessage);
+          } else if (data.type === "ELO_SYNC") {
+            this.callbacks.onEloSyncReceived?.(
+              Number(data.playerId || 1),
+              Number(data.rating || 1200),
+              String(data.playerName || "Jugador")
+            );
           }
         };
       }
@@ -206,6 +225,21 @@ export class RelayWebSocketClient {
             this.callbacks.onCommandReceived?.(Number(msg.player_id || 2), msg.command_json);
           } else if (msg.type === "peer_joined") {
             this.callbacks.onPeerJoined?.(Number(msg.player_id || 2));
+          } else if (msg.type === "chat" && msg.text) {
+            this.callbacks.onChatMessageReceived?.({
+              id: String(msg.id || `${Date.now()}`),
+              roomCode: String(msg.room_code || this.roomCode),
+              senderName: String(msg.sender || `Jugador ${msg.player_id || 2}`),
+              playerId: Number(msg.player_id || 2),
+              text: String(msg.text),
+              timestamp: String(msg.timestamp || new Date().toLocaleTimeString()),
+            });
+          } else if (msg.type === "elo_sync") {
+            this.callbacks.onEloSyncReceived?.(
+              Number(msg.player_id || 2),
+              Number(msg.rating || 1200),
+              String(msg.player_name || "Jugador")
+            );
           }
         } catch {
           // Ignore malformed relay frames
@@ -290,6 +324,57 @@ export class RelayWebSocketClient {
           room_code: this.roomCode,
           game_type: gameType,
           log_json: logJson,
+        })
+      );
+    }
+  }
+
+  public sendChatMessage(senderName: string, text: string, playerId: number = this.localPlayerId): RelayChatMessage | null {
+    const cleanText = text.trim();
+    if (!cleanText) return null;
+    const chatMsg: RelayChatMessage = {
+      id: `chat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      roomCode: this.roomCode || "LOCAL",
+      senderName: senderName.trim() || `Jugador ${playerId}`,
+      playerId,
+      text: cleanText,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+    this.broadcastChannel?.postMessage({
+      type: "CHAT",
+      message: chatMsg,
+    });
+    if (this.ws && this.ws.readyState === 1) {
+      this.ws.send(
+        JSON.stringify({
+          type: "chat",
+          id: chatMsg.id,
+          room_code: chatMsg.roomCode,
+          sender: chatMsg.senderName,
+          player_id: chatMsg.playerId,
+          text: chatMsg.text,
+          timestamp: chatMsg.timestamp,
+        })
+      );
+    }
+    return chatMsg;
+  }
+
+  public sendEloSync(playerId: number, rating: number, playerName: string): void {
+    this.broadcastChannel?.postMessage({
+      type: "ELO_SYNC",
+      playerId,
+      rating,
+      playerName,
+    });
+    if (this.ws && this.ws.readyState === 1) {
+      this.ws.send(
+        JSON.stringify({
+          type: "elo_sync",
+          room_code: this.roomCode,
+          player_id: playerId,
+          rating,
+          player_name: playerName,
         })
       );
     }

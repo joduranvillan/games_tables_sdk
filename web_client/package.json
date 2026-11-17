@@ -7,7 +7,7 @@
     "dev": "vite --port 5173",
     "build": "vite build",
     "preview": "vite preview --port 4173",
-    "test": "tsx src/tests/wasm_and_network.test.ts && tsx src/tests/regression_14_games.test.ts && tsx src/tests/phase3_ecosystem.test.ts"
+    "test": "tsx src/tests/wasm_and_network.test.ts && tsx src/tests/regression_14_games.test.ts && tsx src/tests/phase3_ecosystem.test.ts && tsx src/tests/phase4_competitive.test.ts"
   },
   "dependencies": {
     "lucide-react": "^0.546.0",
