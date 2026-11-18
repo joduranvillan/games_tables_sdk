@@ -220,6 +220,84 @@ async function runRegression14Games() {
     "ConfirmDeadCommand en Go debe definir al ganador con Komi 6.5"
   );
 
+  // 1b. Go: Captura BFS de cadena conectada de 2+ piedras blancas acorraladas por negras
+  specialBridge.start_local_match("go", 1, 2);
+  const placeGo = (p: 1 | 2, row: number, col: number) =>
+    JSON.parse(
+      specialBridge.send_command_json(
+        p,
+        JSON.stringify({
+          command_type: "go_game::PlaceStoneCommand",
+          player: p,
+          row,
+          col,
+        })
+      )
+    );
+  // Blancas formarán una cadena conectada de 2 piedras en (4,4) y (4,5).
+  // Negras las rodearán en (3,4), (3,5), (5,4), (5,5), (4,3) y finalmente cerrarán la última libertad en (4,6).
+  placeGo(1, 3, 4); // B
+  placeGo(2, 4, 4); // W1
+  placeGo(1, 3, 5); // B
+  placeGo(2, 4, 5); // W2 (conectada con W1)
+  placeGo(1, 5, 4); // B
+  placeGo(2, 0, 0); // W juega lejos
+  placeGo(1, 5, 5); // B
+  placeGo(2, 0, 1); // W juega lejos
+  placeGo(1, 4, 3); // B deja a la cadena blanca [(4,4),(4,5)] en Atari (1 sola libertad en 4_6)
+
+  const goStateAtari = JSON.parse(specialBridge.get_state_json());
+  assert(
+    goStateAtari.liberties_by_cell["4_4"] === 1 &&
+      goStateAtari.liberties_by_cell["4_5"] === 1,
+    `La cadena blanca [(4,4),(4,5)] debe reportar exactamente 1 libertad (Atari), actual: ${goStateAtari.liberties_by_cell["4_4"]}`
+  );
+
+  placeGo(2, 0, 2); // W juega lejos
+  // Negras cierran la última libertad en (4,6) -> debe capturar AMBAS piedras blancas
+  const captureEvents = placeGo(1, 4, 6);
+  const goStateAfterChainCapture = JSON.parse(specialBridge.get_state_json());
+  assert(
+    Array.isArray(captureEvents) &&
+      goStateAfterChainCapture.captures[1] === 2 &&
+      goStateAfterChainCapture.grid[4][4] === 0 &&
+      goStateAfterChainCapture.grid[4][5] === 0,
+    `Negras deben capturar la cadena conectada de 2 piedras blancas en (4,4) y (4,5); capturas=${goStateAfterChainCapture.captures[1]}`
+  );
+
+  // 1c. Go: Regla de Suicidio y Tamaños 9x9 / 13x13 / 19x19
+  specialBridge.start_local_match("go", 1, 2);
+  // Negras rodean la esquina (0,0) colocando en (0,1) y (1,0)
+  placeGo(1, 0, 1);
+  placeGo(2, 8, 8);
+  placeGo(1, 1, 0);
+  // Ahora Blancas intentan jugar en (0,0) sin libertades ni captura -> debe rechazarse por suicidio
+  const suicideResp = placeGo(2, 0, 0);
+  assert(
+    suicideResp.ok === false && suicideResp.error === "suicide_rule",
+    "Colocar una piedra sin libertades que no captura nada debe rechazarse por suicide_rule"
+  );
+
+  // Cambiar tamaño de tablero a 13x13 y 19x19
+  specialBridge.send_command_json(
+    1,
+    JSON.stringify({ command_type: "go_game::SetBoardSizeCommand", size: 13 })
+  );
+  assert(
+    JSON.parse(specialBridge.get_state_json()).size === 13 &&
+      JSON.parse(specialBridge.get_state_json()).grid.length === 13,
+    "SetBoardSizeCommand(13) debe redimensionar el Goban a 13x13"
+  );
+  specialBridge.send_command_json(
+    1,
+    JSON.stringify({ command_type: "go_game::SetBoardSizeCommand", size: 19 })
+  );
+  assert(
+    JSON.parse(specialBridge.get_state_json()).size === 19 &&
+      JSON.parse(specialBridge.get_state_json()).grid.length === 19,
+    "SetBoardSizeCommand(19) debe redimensionar el Goban a 19x19"
+  );
+
   // 2. Backgammon: Cubo de Doblaje (OfferDouble + AcceptDouble)
   specialBridge.start_local_match("backgammon", 1, 2);
   specialBridge.send_command_json(

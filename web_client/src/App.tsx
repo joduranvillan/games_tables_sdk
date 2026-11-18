@@ -82,6 +82,7 @@ import {
   Eye,
   History,
   Layers,
+  Menu,
   Palette,
   QrCode,
   RefreshCw,
@@ -91,6 +92,7 @@ import {
   Trophy,
   Users,
   Wifi,
+  X,
 } from "lucide-react";
 
 interface GameCatalogItem {
@@ -270,9 +272,7 @@ export const App: React.FC = () => {
   const [gameSearchQuery, setGameSearchQuery] = useState<string>("");
   const [gameCategoryFilter, setGameCategoryFilter] =
     useState<CategoryFilterId>("all");
-  const [activeHudDrawer, setActiveHudDrawer] = useState<
-    "none" | "clock" | "tutorial" | "replay" | "appearance"
-  >("none");
+  const [isTopRightMenuOpen, setIsTopRightMenuOpen] = useState<boolean>(false);
   const [selectedGameId, setSelectedGameId] = useState<string>("chess");
   const [matchMode, setMatchMode] = useState<MatchMode>("hotseat");
   const [aiDifficulty, setAiDifficulty] = useState<number>(1);
@@ -804,19 +804,174 @@ export const App: React.FC = () => {
           </button>
         </nav>
 
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           <PWAInstallButton />
           <button
             type="button"
             onClick={() =>
               startGameSession(selectedGameId, matchMode, aiDifficulty)
             }
-            className={`min-h-[40px] px-3.5 sm:px-4 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${currentTheme.accentBtnClass}`}
+            className={`hidden sm:inline-flex items-center justify-center min-h-[40px] px-3.5 sm:px-4 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${currentTheme.accentBtnClass}`}
           >
             Reiniciar Partida
           </button>
+          <button
+            type="button"
+            onClick={() => setIsTopRightMenuOpen((prev) => !prev)}
+            aria-label="Abrir menú superior derecho de Temas, Tutoriales y Herramientas"
+            aria-expanded={isTopRightMenuOpen}
+            className={`min-h-[40px] inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 text-xs font-semibold rounded-lg border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              isTopRightMenuOpen
+                ? "bg-amber-500 text-slate-950 border-amber-400"
+                : "bg-slate-900 hover:bg-slate-800 text-white border-slate-700"
+            }`}
+          >
+            <Menu className="w-4 h-4" />
+            <span>Menú</span>
+          </button>
         </div>
       </header>
+
+      {/* Unified Top-Right Menu Drawer (Themes, Audio, Interactive Tutorial, Replay Viewer, Tournament Clock & Docs) */}
+      {isTopRightMenuOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menú Superior Derecho de Temas, Tutoriales y Herramientas"
+          className="fixed inset-0 z-50 flex justify-end"
+        >
+          <div
+            onClick={() => setIsTopRightMenuOpen(false)}
+            className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm"
+          />
+          <aside className="relative z-10 w-full max-w-md sm:max-w-lg bg-slate-950 border-l border-slate-800 h-full overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 shadow-2xl">
+            <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+                  Centro de Control · {activeGameMeta.title}
+                </div>
+                <h2 className="text-base sm:text-lg font-bold text-white font-display">
+                  Menú: Tutorial, Temas y Herramientas
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTopRightMenuOpen(false)}
+                aria-label="Cerrar menú superior derecho"
+                className="min-h-[38px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+                <span>Cerrar</span>
+              </button>
+            </div>
+
+            {/* Quick Global Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsTopRightMenuOpen(false);
+                  setIsDocsModalOpen(true);
+                }}
+                className="min-h-[42px] px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-sky-400 text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <BookOpen className="w-4 h-4 shrink-0" />
+                <span>Guía y Docs React</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsTopRightMenuOpen(false);
+                  setActiveTab("diagnostics");
+                }}
+                className="min-h-[42px] px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-emerald-400 text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Activity className="w-4 h-4 shrink-0" />
+                <span>Diagnóstico E2E</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  startGameSession(selectedGameId, matchMode, aiDifficulty);
+                  setIsTopRightMenuOpen(false);
+                }}
+                className="min-h-[42px] px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4 shrink-0" />
+                <span>Reiniciar Partida</span>
+              </button>
+            </div>
+
+            {/* 1. Interactive Tutorial & WASM AI Move Suggestion */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>1. Tutorial Interactivo y Sugerencia IA ({activeGameMeta.title})</span>
+              </div>
+              <InteractiveTutorialPanel
+                gameId={selectedGameId}
+                currentTurn={(currentTurn === 2 ? 2 : 1) as 1 | 2}
+                legalMovesJson={legalMovesJson}
+                isLocalTurnAllowed={isLocalTurnAllowed}
+                onDispatchCommand={(cmd) => {
+                  handleDispatchCommand(cmd);
+                  setIsTopRightMenuOpen(false);
+                }}
+                hideToggleButton={true}
+              />
+            </div>
+
+            {/* 2. Visual Themes, Okabe-Ito Colorblind Mode & Procedural Audio */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+                <Palette className="w-3.5 h-3.5 text-emerald-400" />
+                <span>2. Temas Visuales, Accesibilidad Okabe-Ito y Audio FX</span>
+              </div>
+              <ThemeAndAudioToolbar
+                config={themeConfig}
+                onChange={setThemeConfig}
+              />
+            </div>
+
+            {/* 3. Tournament Clock (FIDE Blitz, Rapid, Oriental Byo-yomi) */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+                <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                <span>3. Reloj de Torneo (FIDE Blitz, Rápido y Byo-yomi)</span>
+              </div>
+              <TournamentClock
+                clockState={clockState}
+                activeTurn={(currentTurn === 2 ? 2 : 1) as 1 | 2}
+                isPaused={parsedStateWinner !== null || !isReplayAtLiveHead}
+                onPresetChange={(preset: ClockPresetId) =>
+                  setClockState(createInitialClockState(preset))
+                }
+                onTick={handleClockTick}
+              />
+            </div>
+
+            {/* 4. Step-by-Step Replay Viewer & JSON Export/Import */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+                <History className="w-3.5 h-3.5 text-emerald-400" />
+                <span>
+                  4. Visor de Repeticiones ({replayCurrentStep}/{replayTotalSteps}) y JSON
+                </span>
+              </div>
+              <ReplayViewerBar
+                currentStep={replayCurrentStep}
+                totalSteps={replayTotalSteps}
+                gameId={selectedGameId}
+                onSeekStep={handleSeekReplayStep}
+                onExportJson={() => bridgeRef.current.export_log_json()}
+                onImportJson={handleImportReplayJson}
+              />
+            </div>
+          </aside>
+        </div>
+      )}
 
       {/* Mobile & Tablet Game List Drawer (< 1024px) */}
       <MobileGameListDrawer
@@ -1101,103 +1256,24 @@ export const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Row 2: Collapsible Secondary Tool Toggles (Clock, Tutorial/IA, Replay, Appearance/Audio) */}
-                <div className="pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setActiveHudDrawer((prev) =>
-                          prev === "tutorial" ? "none" : "tutorial"
-                        )
-                      }
-                      className={`min-h-[38px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                        activeHudDrawer === "tutorial"
-                          ? "bg-amber-500 text-slate-950 border-amber-400"
-                          : "bg-slate-950 hover:bg-slate-800 text-amber-300 border-slate-800"
-                      }`}
-                    >
-                      <BookOpen className="w-3.5 h-3.5" />
-                      <span>Tutorial y Sugerencia</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setActiveHudDrawer((prev) =>
-                          prev === "replay" ? "none" : "replay"
-                        )
-                      }
-                      className={`min-h-[38px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                        activeHudDrawer === "replay" || !isReplayAtLiveHead
-                          ? "bg-emerald-600 text-white border-emerald-500"
-                          : "bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800"
-                      }`}
-                    >
-                      <History className="w-3.5 h-3.5" />
-                      <span className="font-mono tabular-nums">
-                        Repeticiones ({replayCurrentStep}/{replayTotalSteps})
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setActiveHudDrawer((prev) =>
-                          prev === "clock" ? "none" : "clock"
-                        )
-                      }
-                      className={`min-h-[38px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                        activeHudDrawer === "clock" ||
-                        clockState.preset !== "none"
-                          ? "bg-emerald-600/25 text-emerald-300 border-emerald-500/50"
-                          : "bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800"
-                      }`}
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>
-                        {clockState.preset === "none"
-                          ? "Reloj de Torneo"
-                          : "Reloj Activo"}
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setActiveHudDrawer((prev) =>
-                          prev === "appearance" ? "none" : "appearance"
-                        )
-                      }
-                      className={`min-h-[38px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                        activeHudDrawer === "appearance"
-                          ? "bg-white text-slate-950 border-white"
-                          : "bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800"
-                      }`}
-                    >
-                      <Palette className="w-3.5 h-3.5" />
-                      <span>Tema y Audio</span>
-                    </button>
-                  </div>
-
-                  {/* Online Relay Role Switcher when in Online or Spectator Mode */}
-                  {(matchMode === "online_relay" ||
-                    matchMode === "spectator") && (
-                    <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
-                      <span className="text-slate-300 font-mono">
-                        Sala:{" "}
-                        <strong className="text-white">
-                          {roomCode || "LOCAL"}
-                        </strong>
-                      </span>
-                      <span aria-hidden="true">·</span>
+                {/* Online Relay Role Switcher when in Online or Spectator Mode */}
+                {(matchMode === "online_relay" ||
+                  matchMode === "spectator") && (
+                  <div className="pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="text-slate-300 font-mono">
+                      Sala Activa:{" "}
+                      <strong className="text-white">
+                        {roomCode || "LOCAL"}
+                      </strong>
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => {
                           setMatchMode("online_relay");
                           setLocalNetworkPlayerId(1);
                         }}
-                        className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
+                        className={`px-2.5 py-1 rounded font-semibold cursor-pointer ${
                           matchMode === "online_relay" &&
                           localNetworkPlayerId === 1
                             ? "bg-emerald-600 text-white"
@@ -1212,7 +1288,7 @@ export const App: React.FC = () => {
                           setMatchMode("online_relay");
                           setLocalNetworkPlayerId(2);
                         }}
-                        className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
+                        className={`px-2.5 py-1 rounded font-semibold cursor-pointer ${
                           matchMode === "online_relay" &&
                           localNetworkPlayerId === 2
                             ? "bg-sky-600 text-white"
@@ -1224,7 +1300,7 @@ export const App: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setMatchMode("spectator")}
-                        className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
+                        className={`px-2.5 py-1 rounded font-semibold cursor-pointer ${
                           matchMode === "spectator"
                             ? "bg-amber-600 text-white"
                             : "bg-slate-800 text-slate-300"
@@ -1233,12 +1309,11 @@ export const App: React.FC = () => {
                         Espectador
                       </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
-                {/* Collapsible Drawer: Clock (Always mounted if preset !== "none" so timer keeps ticking) */}
-                {(activeHudDrawer === "clock" ||
-                  clockState.preset !== "none") && (
+                {/* Keep Active Clock mounted above board when a preset is active and top-right menu is closed */}
+                {clockState.preset !== "none" && !isTopRightMenuOpen && (
                   <div className="pt-2 border-t border-slate-800/80">
                     <TournamentClock
                       clockState={clockState}
@@ -1254,42 +1329,29 @@ export const App: React.FC = () => {
                   </div>
                 )}
 
-                {/* Collapsible Drawer: Theme, Okabe-Ito & Procedural Audio */}
-                {activeHudDrawer === "appearance" && (
-                  <div className="pt-2 border-t border-slate-800/80">
-                    <ThemeAndAudioToolbar
-                      config={themeConfig}
-                      onChange={setThemeConfig}
-                    />
-                  </div>
-                )}
-
-                {/* Collapsible Drawer: Interactive Tutorial & Live WASM Move Suggestion */}
-                {activeHudDrawer === "tutorial" && (
-                  <div className="pt-2 border-t border-slate-800/80">
-                    <InteractiveTutorialPanel
-                      gameId={selectedGameId}
-                      currentTurn={(currentTurn === 2 ? 2 : 1) as 1 | 2}
-                      legalMovesJson={legalMovesJson}
-                      isLocalTurnAllowed={isLocalTurnAllowed}
-                      onDispatchCommand={handleDispatchCommand}
-                      hideToggleButton={true}
-                      onClose={() => setActiveHudDrawer("none")}
-                    />
-                  </div>
-                )}
-
-                {/* Collapsible Drawer: Step-by-Step Replay Viewer & Save/Load JSON */}
-                {(activeHudDrawer === "replay" || !isReplayAtLiveHead) && (
-                  <div className="pt-2 border-t border-slate-800/80">
-                    <ReplayViewerBar
-                      currentStep={replayCurrentStep}
-                      totalSteps={replayTotalSteps}
-                      gameId={selectedGameId}
-                      onSeekStep={handleSeekReplayStep}
-                      onExportJson={() => bridgeRef.current.export_log_json()}
-                      onImportJson={handleImportReplayJson}
-                    />
+                {/* Replay Historical Step Notice when browsing past moves and top-right menu is closed */}
+                {!isReplayAtLiveHead && !isTopRightMenuOpen && (
+                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs">
+                    <span className="text-amber-300 font-medium">
+                      Viendo jugada histórica ({replayCurrentStep}/
+                      {replayTotalSteps})
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSeekReplayStep(replayTotalSteps)}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-semibold cursor-pointer"
+                      >
+                        Ir a Turno en Vivo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsTopRightMenuOpen(true)}
+                        className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 font-medium cursor-pointer"
+                      >
+                        Abrir Controles en Menú ☰
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

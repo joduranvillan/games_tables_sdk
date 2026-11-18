@@ -331,6 +331,172 @@ function createInitialCrisisTerritories(): CrisisTerritory[] {
   }));
 }
 
+export interface GoGroupAnalysis {
+  color: 1 | 2;
+  stones: [number, number][];
+  liberties: string[];
+}
+
+export function serializeGoGrid(grid: (0 | 1 | 2)[][]): string {
+  return grid.map((row) => row.join("")).join("|");
+}
+
+export function computeGoGroupAndLiberties(
+  grid: (0 | 1 | 2)[][],
+  size: number,
+  startR: number,
+  startC: number
+): GoGroupAnalysis | null {
+  const color = grid[startR]?.[startC];
+  if (color !== 1 && color !== 2) return null;
+
+  const visited = new Set<string>();
+  const stones: [number, number][] = [];
+  const liberties = new Set<string>();
+  const queue: [number, number][] = [[startR, startC]];
+  visited.add(`${startR}_${startC}`);
+
+  const dirs: [number, number][] = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ];
+
+  while (queue.length > 0) {
+    const [cr, cc] = queue.shift()!;
+    stones.push([cr, cc]);
+
+    for (const [dr, dc] of dirs) {
+      const nr = cr + dr;
+      const nc = cc + dc;
+      if (nr < 0 || nr >= size || nc < 0 || nc >= size) continue;
+      const cell = grid[nr]?.[nc] ?? 0;
+      const key = `${nr}_${nc}`;
+      if (cell === 0) {
+        liberties.add(key);
+      } else if (cell === color && !visited.has(key)) {
+        visited.add(key);
+        queue.push([nr, nc]);
+      }
+    }
+  }
+
+  return {
+    color,
+    stones,
+    liberties: Array.from(liberties),
+  };
+}
+
+export function computeAllGoLibertiesMap(
+  grid: (0 | 1 | 2)[][],
+  size: number
+): Record<string, number> {
+  const libertiesByCell: Record<string, number> = {};
+  const visited = new Set<string>();
+
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      const cell = grid[r]?.[c] ?? 0;
+      const key = `${r}_${c}`;
+      if ((cell === 1 || cell === 2) && !visited.has(key)) {
+        const grp = computeGoGroupAndLiberties(grid, size, r, c);
+        if (grp) {
+          const libCount = grp.liberties.length;
+          for (const [sr, sc] of grp.stones) {
+            const skey = `${sr}_${sc}`;
+            visited.add(skey);
+            libertiesByCell[skey] = libCount;
+          }
+        }
+      }
+    }
+  }
+
+  return libertiesByCell;
+}
+
+export function simulateGoPlaceStone(
+  grid: (0 | 1 | 2)[][],
+  size: number,
+  r: number,
+  c: number,
+  player: 1 | 2,
+  boardHistory: Set<string>
+):
+  | {
+      ok: true;
+      nextGrid: (0 | 1 | 2)[][];
+      nextHash: string;
+      capturedStones: [number, number][];
+    }
+  | {
+      ok: false;
+      error: "out_of_bounds" | "occupied_intersection" | "suicide_rule" | "ko_rule";
+    } {
+  if (r < 0 || r >= size || c < 0 || c >= size) {
+    return { ok: false, error: "out_of_bounds" };
+  }
+  if (grid[r]?.[c] !== 0) {
+    return { ok: false, error: "occupied_intersection" };
+  }
+
+  const nextGrid: (0 | 1 | 2)[][] = grid.map((row) => [...row]);
+  nextGrid[r][c] = player;
+  const opp: 1 | 2 = player === 1 ? 2 : 1;
+
+  const capturedStones: [number, number][] = [];
+  const checkedOpponentCells = new Set<string>();
+  const dirs: [number, number][] = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ];
+
+  // Step 1: Check all orthogonal opponent groups for 0 liberties and capture entire connected chains
+  for (const [dr, dc] of dirs) {
+    const nr = r + dr;
+    const nc = c + dc;
+    if (nr < 0 || nr >= size || nc < 0 || nc >= size) continue;
+    const nKey = `${nr}_${nc}`;
+    if (nextGrid[nr]?.[nc] === opp && !checkedOpponentCells.has(nKey)) {
+      const oppGroup = computeGoGroupAndLiberties(nextGrid, size, nr, nc);
+      if (oppGroup) {
+        for (const [sr, sc] of oppGroup.stones) {
+          checkedOpponentCells.add(`${sr}_${sc}`);
+        }
+        if (oppGroup.liberties.length === 0) {
+          for (const [sr, sc] of oppGroup.stones) {
+            nextGrid[sr][sc] = 0;
+            capturedStones.push([sr, sc]);
+          }
+        }
+      }
+    }
+  }
+
+  // Step 2: Check suicide rule on the newly placed stone's own connected chain
+  const ownGroup = computeGoGroupAndLiberties(nextGrid, size, r, c);
+  if (!ownGroup || ownGroup.liberties.length === 0) {
+    return { ok: false, error: "suicide_rule" };
+  }
+
+  // Step 3: Check Ko / Positional Superko rule against board history
+  const nextHash = serializeGoGrid(nextGrid);
+  if (boardHistory.has(nextHash)) {
+    return { ok: false, error: "ko_rule" };
+  }
+
+  return {
+    ok: true,
+    nextGrid,
+    nextHash,
+    capturedStones,
+  };
+}
+
 export class WasmGameBridge {
   private gameType: string = "chess";
   private turn: 1 | 2 = 1;
@@ -378,6 +544,9 @@ export class WasmGameBridge {
   private goDeadStones: string[] = [];
   private goHandicap: number = 0;
   private goScoringPhase: boolean = false;
+  private goBoardHistory: Set<string> = new Set<string>();
+  private goLastMove: [number, number] | null = null;
+  private goLastBanner: string = "Goban 9×9 listo · Captura por cadenas BFS, regla de suicidio y Ko activas.";
 
   // 6. Shogi state
   private shogiGrid: (ShogiPiece | null)[][] = createInitialShogiGrid();
@@ -489,6 +658,9 @@ export class WasmGameBridge {
       this.goDeadStones = [];
       this.goHandicap = 0;
       this.goScoringPhase = false;
+      this.goBoardHistory = new Set<string>([serializeGoGrid(this.goGrid)]);
+      this.goLastMove = null;
+      this.goLastBanner = "Goban 9×9 listo · Captura por cadenas BFS, regla de suicidio y Ko activas.";
     } else if (this.gameType === "shogi") {
       this.shogiGrid = createInitialShogiGrid();
       this.shogiHands = { 1: [], 2: [] };
@@ -777,14 +949,30 @@ export class WasmGameBridge {
       return JSON.stringify([{ command_type: "goose_game::RollDiceCommand", player: p }]);
     }
     if (this.gameType === "go") {
-      const moves: { row: number; col: number }[] = [];
+      const moves: { row: number; col: number; capturesCount: number }[] = [];
       for (let r = 0; r < this.goSize; r++) {
         for (let c = 0; c < this.goSize; c++) {
           if (this.goGrid[r]?.[c] === 0) {
-            moves.push({ row: r, col: c });
+            const sim = simulateGoPlaceStone(
+              this.goGrid,
+              this.goSize,
+              r,
+              c,
+              p,
+              this.goBoardHistory
+            );
+            if (sim.ok) {
+              moves.push({
+                row: r,
+                col: c,
+                capturesCount: sim.capturedStones.length,
+              });
+            }
           }
         }
       }
+      // Prioritize capturing moves for AI and tutorial suggestions
+      moves.sort((a, b) => b.capturesCount - a.capturesCount);
       return JSON.stringify(moves);
     }
     if (this.gameType === "shogi") {
@@ -963,6 +1151,9 @@ export class WasmGameBridge {
         handicap: this.goHandicap,
         scoring_phase: this.goScoringPhase,
         komi: 6.5,
+        liberties_by_cell: computeAllGoLibertiesMap(this.goGrid, this.goSize),
+        last_move: this.goLastMove,
+        last_banner: this.goLastBanner,
       });
     }
     if (this.gameType === "shogi") {
@@ -1379,23 +1570,60 @@ export class WasmGameBridge {
 
     // 5. GO
     if (this.gameType === "go") {
-      if (cmdName === "SetHandicapCommand") {
-        const count = Number(parsed.handicap ?? 0);
+      if (cmdName === "SetBoardSizeCommand") {
+        const rawSize = Number(parsed.size ?? 9);
+        const validSize: 9 | 13 | 19 =
+          rawSize === 13 ? 13 : rawSize === 19 ? 19 : 9;
+        this.goSize = validSize;
+        this.goGrid = Array.from({ length: validSize }, () =>
+          Array.from({ length: validSize }, () => 0)
+        );
+        this.goCaptures = { 1: 0, 2: 0 };
+        this.goPasses = 0;
+        this.goDeadStones = [];
+        this.goHandicap = 0;
+        this.goScoringPhase = false;
+        this.turn = 1;
+        this.winner = null;
+        this.goBoardHistory = new Set<string>([serializeGoGrid(this.goGrid)]);
+        this.goLastMove = null;
+        this.goLastBanner = `Goban ${validSize}×${validSize} activado. Turno de Negras (J1).`;
+        this.tick += 1;
+        if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
+        return JSON.stringify([
+          { event: "BoardSizeChangedEvent", size: validSize },
+        ]);
+      }
+      if (cmdName === "SetHandicapCommand" || cmdName === "PlaceHandicapCommand") {
+        const count = Number(parsed.handicap ?? parsed.stones ?? 0);
         this.goHandicap = count;
         this.goGrid = Array.from({ length: this.goSize }, () =>
           Array.from({ length: this.goSize }, () => 0)
         );
+        const edgeOffset = this.goSize >= 13 ? 3 : 2;
+        const mid = Math.floor(this.goSize / 2);
         const hoshi: [number, number][] = [
-          [2, 2],
-          [2, this.goSize - 3],
-          [this.goSize - 3, 2],
-          [this.goSize - 3, this.goSize - 3],
+          [edgeOffset, edgeOffset],
+          [edgeOffset, this.goSize - 1 - edgeOffset],
+          [this.goSize - 1 - edgeOffset, edgeOffset],
+          [this.goSize - 1 - edgeOffset, this.goSize - 1 - edgeOffset],
+          [mid, mid],
         ];
         for (let i = 0; i < Math.min(count, hoshi.length); i++) {
           const [hr, hc] = hoshi[i];
           this.goGrid[hr][hc] = 1;
         }
+        this.goCaptures = { 1: 0, 2: 0 };
+        this.goPasses = 0;
+        this.goDeadStones = [];
+        this.goScoringPhase = false;
         this.turn = count > 0 ? 2 : 1;
+        this.goBoardHistory = new Set<string>([serializeGoGrid(this.goGrid)]);
+        this.goLastMove = null;
+        this.goLastBanner =
+          count > 0
+            ? `Handicap de ${count} piedras colocado. Turno de Blancas (J2).`
+            : "Partida sin handicap. Turno de Negras (J1).";
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
         return JSON.stringify([{ event: "HandicapPlacedEvent", handicap: count }]);
@@ -1420,9 +1648,14 @@ export class WasmGameBridge {
             const dead = this.goDeadStones.includes(`${r}_${c}`);
             if (v === 1 && !dead) blackPoints += 1;
             if (v === 2 && !dead) whitePoints += 1;
+            if (v === 1 && dead) whitePoints += 1;
+            if (v === 2 && dead) blackPoints += 1;
           }
         }
         this.winner = blackPoints >= whitePoints ? 1 : 2;
+        this.goLastBanner = `Conteo finalizado: Negras ${blackPoints.toFixed(
+          1
+        )} pts vs Blancas ${whitePoints.toFixed(1)} pts (Komi 6.5).`;
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
         return JSON.stringify([{ event: "GameOverEvent", winner: this.winner }]);
@@ -1434,50 +1667,79 @@ export class WasmGameBridge {
         this.goPasses += 1;
         if (this.goPasses >= 2) {
           this.goScoringPhase = true;
+          this.goLastBanner =
+            "Ambos jugadores pasaron consecutivamente (2/2). Fase de Conteo activada.";
+        } else {
+          this.goLastBanner = `Jugador ${p} (${
+            p === 1 ? "Negras" : "Blancas"
+          }) pasó turno (1/2).`;
         }
         this.turn = p === 1 ? 2 : 1;
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
         return JSON.stringify([{ event: "PassedEvent", player: p }]);
       }
-      const r = Number(parsed.row ?? 0);
-      const c = Number(parsed.col ?? 0);
-      if (this.goGrid[r]?.[c] !== 0) {
-        return JSON.stringify({ ok: false, error: "occupied_intersection" });
-      }
-      this.goGrid[r][c] = p;
-      this.goPasses = 0;
-      const opp: 1 | 2 = p === 1 ? 2 : 1;
-      for (const [dr, dc] of [
-        [-1, 0],
-        [1, 0],
-        [0, -1],
-        [0, 1],
-      ]) {
-        const nr = r + dr;
-        const nc = c + dc;
-        if (this.goGrid[nr]?.[nc] === opp) {
-          const surrounded = [
-            [-1, 0],
-            [1, 0],
-            [0, -1],
-            [0, 1],
-          ].every(([ar, ac]) => {
-            const rr = nr + ar;
-            const cc = nc + ac;
-            if (rr < 0 || rr >= this.goSize || cc < 0 || cc >= this.goSize) return true;
-            return this.goGrid[rr][cc] === p;
-          });
-          if (surrounded) {
-            this.goGrid[nr][nc] = 0;
-            this.goCaptures[p] += 1;
-          }
+
+      const r = Number(parsed.row ?? parsed.y ?? 0);
+      const c = Number(parsed.col ?? parsed.x ?? 0);
+      const sim = simulateGoPlaceStone(
+        this.goGrid,
+        this.goSize,
+        r,
+        c,
+        p,
+        this.goBoardHistory
+      );
+
+      if (!sim.ok) {
+        if (sim.error === "suicide_rule") {
+          this.goLastBanner =
+            "Jugada ilegal (Regla de Suicidio): la cadena propia quedaría con 0 libertades sin capturar piedras rivales.";
+        } else if (sim.error === "ko_rule") {
+          this.goLastBanner =
+            "Jugada ilegal (Regla de Ko / Superko): no se puede repetir inmediatamente la posición previa del tablero.";
+        } else if (sim.error === "occupied_intersection") {
+          this.goLastBanner = "Intersección ocupada.";
         }
+        return JSON.stringify({ ok: false, error: sim.error });
       }
+
+      const opp: 1 | 2 = p === 1 ? 2 : 1;
+      this.goGrid = sim.nextGrid;
+      this.goBoardHistory.add(sim.nextHash);
+      this.goPasses = 0;
+      this.goLastMove = [r, c];
+
+      const capturedCount = sim.capturedStones.length;
+      if (capturedCount > 0) {
+        this.goCaptures[p] += capturedCount;
+        this.goLastBanner = `¡Captura por cadena BFS! ${
+          p === 1 ? "Negras (J1)" : "Blancas (J2)"
+        } capturó ${capturedCount} ${
+          capturedCount === 1 ? "piedra rival" : "piedras rivales conectadas"
+        }.`;
+      } else {
+        this.goLastBanner = `${
+          p === 1 ? "Negras (J1)" : "Blancas (J2)"
+        } colocó piedra en (${r + 1}, ${c + 1}).`;
+      }
+
       this.turn = opp;
       this.tick += 1;
       if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
-      return JSON.stringify([{ event: "StonePlacedEvent", player: p, row: r, col: c }]);
+
+      const events: Record<string, unknown>[] = [
+        { event: "StonePlacedEvent", player: p, row: r, col: c },
+      ];
+      if (capturedCount > 0) {
+        events.push({
+          event: "StonesCapturedEvent",
+          by_player: p,
+          captured: sim.capturedStones,
+          count: capturedCount,
+        });
+      }
+      return JSON.stringify(events);
     }
 
     // 6. SHOGI
