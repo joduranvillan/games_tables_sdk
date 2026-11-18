@@ -308,6 +308,9 @@ interface InteractiveTutorialPanelProps {
   legalMovesJson: string;
   isLocalTurnAllowed: boolean;
   onDispatchCommand: (cmdJson: string) => void;
+  defaultOpen?: boolean;
+  hideToggleButton?: boolean;
+  onClose?: () => void;
 }
 
 export const InteractiveTutorialPanel: React.FC<InteractiveTutorialPanelProps> = ({
@@ -316,8 +319,11 @@ export const InteractiveTutorialPanel: React.FC<InteractiveTutorialPanelProps> =
   legalMovesJson,
   isLocalTurnAllowed,
   onDispatchCommand,
+  defaultOpen = false,
+  hideToggleButton = false,
+  onClose,
 }) => {
-  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isOpen, setIsOpen] = useState<boolean>(defaultOpen);
   const spec = TUTORIALS_14_GAMES[gameId] || TUTORIALS_14_GAMES.chess;
 
   const handleApplySuggestion = () => {
@@ -328,18 +334,22 @@ export const InteractiveTutorialPanel: React.FC<InteractiveTutorialPanelProps> =
     }
   };
 
+  const effectiveOpen = hideToggleButton ? true : isOpen;
+
   return (
     <div className="flex flex-col gap-2">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-amber-300 transition-colors cursor-pointer"
-      >
-        <BookOpen className="w-3.5 h-3.5" />
-        <span>{isOpen ? "Ocultar Tutorial Interactivo" : "Tutorial y Jugada Sugerida"}</span>
-      </button>
+      {!hideToggleButton && (
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-amber-300 transition-colors cursor-pointer"
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>{isOpen ? "Ocultar Tutorial Interactivo" : "Tutorial y Jugada Sugerida"}</span>
+        </button>
+      )}
 
-      {isOpen && (
+      {effectiveOpen && (
         <div className="p-5 rounded-2xl bg-slate-900/95 border border-amber-500/40 shadow-xl flex flex-col gap-4">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -353,7 +363,13 @@ export const InteractiveTutorialPanel: React.FC<InteractiveTutorialPanelProps> =
             </div>
             <button
               type="button"
-              onClick={() => setIsOpen(false)}
+              onClick={() => {
+                if (onClose) {
+                  onClose();
+                } else {
+                  setIsOpen(false);
+                }
+              }}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
             >
               <X className="w-4 h-4" />

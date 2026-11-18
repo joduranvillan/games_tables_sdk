@@ -10,6 +10,11 @@ import {
   runSingleGameSelfTest,
 } from "../components/common/SystemDiagnosticsPanel";
 import { DOCUMENTATION_SECTIONS } from "../components/common/DocumentationCenterModal";
+import {
+  filterAndGroupCatalogGames,
+  GAME_CATEGORY_GROUPS,
+} from "../components/common/GameListNavigation";
+import { CATALOG_14_GAMES } from "../App";
 
 function assert(condition: boolean, message: string): void {
   if (!condition) {
@@ -120,6 +125,46 @@ console.log("=== INICIANDO SUITE DE GARANTIA FUNCIONAL E2E (14 JUEGOS & CENTRO D
     );
   }
   console.log("  [PASS] Cobertura del Centro de Documentación (Uso, 14 Juegos, Desarrollo React/WASM) verificada.");
+}
+
+// 4. Verificación de la Lista de Juegos Categorizada, Buscador y Filtros Rápidos
+{
+  assert(
+    GAME_CATEGORY_GROUPS.length === 4,
+    "Deben existir 4 grupos de categorías en GAME_CATEGORY_GROUPS"
+  );
+  const allGrouped = filterAndGroupCatalogGames(CATALOG_14_GAMES, "", "all");
+  const totalInGroups = allGrouped.reduce(
+    (acc, sec) => acc + sec.games.length,
+    0
+  );
+  assert(
+    totalInGroups === 14,
+    `Los 14 juegos deben estar distribuidos en las categorías, encontrados: ${totalInGroups}`
+  );
+
+  const orientalOnly = filterAndGroupCatalogGames(
+    CATALOG_14_GAMES,
+    "",
+    "oriental"
+  );
+  assert(
+    orientalOnly.length === 1 && orientalOnly[0].games.length === 4,
+    "La categoría Estrategia Oriental debe agrupar exactamente 4 juegos (Go, Shogi, Xiangqi, Damas Chinas)"
+  );
+
+  const searchShogi = filterAndGroupCatalogGames(
+    CATALOG_14_GAMES,
+    "komadai",
+    "all"
+  );
+  assert(
+    searchShogi.length === 1 &&
+      searchShogi[0].games.length === 1 &&
+      searchShogi[0].games[0].id === "shogi",
+    "El buscador debe filtrar juegos por regla canónica (Komadai -> Shogi)"
+  );
+  console.log("  [PASS] Lista de 14 juegos agrupada por categoría, buscador y filtros rápidos verificados.");
 }
 
 console.log("=== SUITE DE GARANTIA FUNCIONAL E2E COMPLETADA AL 100% ===");
