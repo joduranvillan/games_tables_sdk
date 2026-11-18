@@ -1,10 +1,11 @@
 /**
  * OpenTable WebAssembly Bridge Loader (`open_table_wasm`) — 14/14 Juegos Canónicos
  *
- * Carga el binario `.wasm` compilado desde `games_tables_sdk/open_table_wasm` cuando
- * está presente y provee un motor determinista isomórfico para los 14 juegos con el mismo
- * contrato JSON (`get_state_json`, `get_legal_moves_json`, `send_command_json`,
- * `apply_sync_log_json`, `step_ai_if_needed`).
+ * Conecta con el binario `.wasm` compilado desde `games_tables_sdk/open_table_wasm` cuando
+ * está presente e implementa en paridad 1:1 las reglas canónicas de los 14 motores Rust
+ * (`chess_game`, `checkers_game`, `shogi_game`, `xiangqi_game`, `go_game`, `uno_game`,
+ * `goose_game`, `chinese_checkers_game`, `backgammon_game`, `ludo_game`, `battleship_game`,
+ * `mille_bornes_game`, `monopoly_game`, `crisis_game`) sin modificar los crates del motor ni Godot.
  */
 
 export interface ChessPiece {
@@ -16,6 +17,17 @@ export interface ChessMove {
   from: [number, number];
   to: [number, number];
   promotion?: "Queen" | "Rook" | "Bishop" | "Knight";
+  isCastling?: "short" | "long";
+  isEnPassant?: boolean;
+}
+
+export interface ChessCastlingRights {
+  whiteKingMoved: boolean;
+  whiteRookAMoved: boolean;
+  whiteRookHMoved: boolean;
+  blackKingMoved: boolean;
+  blackRookAMoved: boolean;
+  blackRookHMoved: boolean;
 }
 
 export interface CheckersPiece {
@@ -63,6 +75,14 @@ export interface ShogiPiece {
   promoted: boolean;
 }
 
+export interface ShogiMove {
+  from?: [number, number];
+  to: [number, number];
+  canPromote?: boolean;
+  mustPromote?: boolean;
+  dropKind?: ShogiPiece["kind"];
+}
+
 export interface XiangqiPiece {
   kind: "General" | "Advisor" | "Elephant" | "Horse" | "Chariot" | "Cannon" | "Soldier";
   owner: 1 | 2;
@@ -88,7 +108,14 @@ export interface CrisisTerritory {
   neighbors: number[];
 }
 
+export interface BattleshipShip {
+  name: string;
+  size: number;
+  cells: [number, number][];
+}
+
 const GOOSE_SQUARES = new Set([5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59]);
+const LUDO_SAFE_STARS = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
 
 function createInitialChessGrid(): (ChessPiece | null)[][] {
   const grid: (ChessPiece | null)[][] = Array.from({ length: 8 }, () =>
@@ -111,6 +138,235 @@ function createInitialChessGrid(): (ChessPiece | null)[][] {
     grid[7][c] = { kind: backRank[c], owner: 1 };
   }
   return grid;
+}
+
+function createInitialCastlingRights(): ChessCastlingRights {
+  return {
+    whiteKingMoved: false,
+    whiteRookAMoved: false,
+    whiteRookHMoved: false,
+    blackKingMoved: false,
+    blackRookAMoved: false,
+    blackRookHMoved: false,
+  };
+}
+
+function cloneChessGrid(grid: (ChessPiece | null)[][]): (ChessPiece | null)[][] {
+  return grid.map((row) => row.map((cell) => (cell ? { ...cell } : null)));
+}
+
+/**
+ * Generates pseudo-legal attack/movement squares for a single piece (without castling or check filtering).
+ * For pawns, when `attacksOnly` is true, returns diagonal attack squares even if empty.
+ */
+function getChessPieceRawMoves(
+  grid: (ChessPiece | null)[][],
+  r: number,
+  c: number,
+  enPassantTarget: [number, number] | null,
+  attacksOnly: boolean = false
+): [number, number][] {
+  const piece = grid[r]?.[c];
+  if (!piece) return [];
+  const player = piece.owner;
+  const inBounds = (nr: number, nc: number) => nr >= 0 && nr < 8 && nc >= 0 && nc < 8;
+  const targets: [number, number][] = [];
+
+  if (piece.kind === "Pawn") {
+    const dir = player === 1 ? -1 : 1;
+    const startRow = player === 1 ? 6 : 1;
+
+    if (attacksOnly) {
+      for (const dc of [-1, 1]) {
+        const nr = r + dir;
+        const nc = c + dc;
+        if (inBounds(nr, nc)) {
+          targets.push([nr, nc]);
+        }
+      }
+      return targets;
+    }
+
+    if (inBounds(r + dir, c) && !grid[r + dir][c]) {
+      targets.push([r + dir, c]);
+      if (r === startRow && inBounds(r + dir * 2, c) && !grid[r + dir * 2][c]) {
+        targets.push([r + dir * 2, c]);
+      }
+    }
+    for (const dc of [-1, 1]) {
+      const nr = r + dir;
+      const nc = c + dc;
+      if (inBounds(nr, nc)) {
+        const dst = grid[nr][nc];
+        if (dst && dst.owner !== player) {
+          targets.push([nr, nc]);
+        } else if (
+          !dst &&
+          enPassantTarget &&
+          enPassantTarget[0] === nr &&
+          enPassantTarget[1] === nc
+        ) {
+          targets.push([nr, nc]);
+        }
+      }
+    }
+    return targets;
+  }
+
+  if (piece.kind === "Knight") {
+    const jumps = [
+      [-2, -1],
+      [-2, 1],
+      [-1, -2],
+      [-1, 2],
+      [1, -2],
+      [1, 2],
+      [2, -1],
+      [2, 1],
+    ];
+    for (const [dr, dc] of jumps) {
+      const nr = r + dr;
+      const nc = c + dc;
+      if (!inBounds(nr, nc)) continue;
+      const dst = grid[nr][nc];
+      if (!dst || dst.owner !== player) {
+        targets.push([nr, nc]);
+      }
+    }
+    return targets;
+  }
+
+  if (piece.kind === "King") {
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = r + dr;
+        const nc = c + dc;
+        if (!inBounds(nr, nc)) continue;
+        const dst = grid[nr][nc];
+        if (!dst || dst.owner !== player) {
+          targets.push([nr, nc]);
+        }
+      }
+    }
+    return targets;
+  }
+
+  const dirs: [number, number][] = [];
+  if (piece.kind === "Rook" || piece.kind === "Queen") {
+    dirs.push([-1, 0], [1, 0], [0, -1], [0, 1]);
+  }
+  if (piece.kind === "Bishop" || piece.kind === "Queen") {
+    dirs.push([-1, -1], [-1, 1], [1, -1], [1, 1]);
+  }
+  for (const [dr, dc] of dirs) {
+    let nr = r + dr;
+    let nc = c + dc;
+    while (inBounds(nr, nc)) {
+      const dst = grid[nr][nc];
+      if (!dst) {
+        targets.push([nr, nc]);
+      } else {
+        if (dst.owner !== player) {
+          targets.push([nr, nc]);
+        }
+        break;
+      }
+      nr += dr;
+      nc += dc;
+    }
+  }
+  return targets;
+}
+
+export function isChessSquareAttacked(
+  grid: (ChessPiece | null)[][],
+  target: [number, number],
+  byPlayer: 1 | 2
+): boolean {
+  const [tr, tc] = target;
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const pc = grid[r]?.[c];
+      if (!pc || pc.owner !== byPlayer) continue;
+      const attacks = getChessPieceRawMoves(grid, r, c, null, true);
+      if (attacks.some(([ar, ac]) => ar === tr && ac === tc)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+export function findChessKing(
+  grid: (ChessPiece | null)[][],
+  player: 1 | 2
+): [number, number] | null {
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const pc = grid[r]?.[c];
+      if (pc && pc.owner === player && pc.kind === "King") {
+        return [r, c];
+      }
+    }
+  }
+  return null;
+}
+
+export function isChessKingInCheck(
+  grid: (ChessPiece | null)[][],
+  player: 1 | 2
+): boolean {
+  const kingPos = findChessKing(grid, player);
+  if (!kingPos) return false;
+  const opp: 1 | 2 = player === 1 ? 2 : 1;
+  return isChessSquareAttacked(grid, kingPos, opp);
+}
+
+function simulateChessMoveOnGrid(
+  grid: (ChessPiece | null)[][],
+  from: [number, number],
+  to: [number, number],
+  enPassantTarget: [number, number] | null,
+  promotion?: ChessMove["promotion"]
+): (ChessPiece | null)[][] {
+  const sim = cloneChessGrid(grid);
+  const moving = sim[from[0]]?.[from[1]];
+  if (!moving) return sim;
+
+  const isEnPassant =
+    moving.kind === "Pawn" &&
+    from[1] !== to[1] &&
+    !sim[to[0]][to[1]] &&
+    enPassantTarget !== null &&
+    enPassantTarget[0] === to[0] &&
+    enPassantTarget[1] === to[1];
+
+  const isCastling =
+    moving.kind === "King" && Math.abs(to[1] - from[1]) === 2 && from[0] === to[0];
+
+  sim[from[0]][from[1]] = null;
+  sim[to[0]][to[1]] = {
+    kind: promotion || moving.kind,
+    owner: moving.owner,
+  };
+
+  if (isEnPassant) {
+    sim[from[0]][to[1]] = null;
+  } else if (isCastling) {
+    const row = from[0];
+    if (to[1] === 6) {
+      const rook = sim[row][7];
+      sim[row][7] = null;
+      sim[row][5] = rook || { kind: "Rook", owner: moving.owner };
+    } else if (to[1] === 2) {
+      const rook = sim[row][0];
+      sim[row][0] = null;
+      sim[row][3] = rook || { kind: "Rook", owner: moving.owner };
+    }
+  }
+
+  return sim;
 }
 
 function createInitialCheckersGrid(): (CheckersPiece | null)[][] {
@@ -198,6 +454,129 @@ function createInitialShogiGrid(): (ShogiPiece | null)[][] {
   return grid;
 }
 
+export function isShogiMovePseudoLegal(
+  grid: (ShogiPiece | null)[][],
+  from: [number, number],
+  to: [number, number],
+  player: 1 | 2
+): boolean {
+  const [fr, fc] = from;
+  const [tr, tc] = to;
+  if (fr < 0 || fr > 8 || fc < 0 || fc > 8 || tr < 0 || tr > 8 || tc < 0 || tc > 8) {
+    return false;
+  }
+  if (fr === tr && fc === tc) return false;
+  const piece = grid[fr]?.[fc];
+  if (!piece || piece.owner !== player) return false;
+  const dst = grid[tr]?.[tc];
+  if (dst && dst.owner === player) return false;
+
+  const dr = tr - fr; // row delta (Sente P1 moves up: forward = -1; Gote P2 moves down: forward = +1)
+  const dc = tc - fc;
+  const adr = Math.abs(dr);
+  const adc = Math.abs(dc);
+  const forward = player === 1 ? -1 : 1;
+
+  const checkSlide = (): boolean => {
+    const stepR = Math.sign(dr);
+    const stepC = Math.sign(dc);
+    let cr = fr + stepR;
+    let cc = fc + stepC;
+    while (cr !== tr || cc !== tc) {
+      if (grid[cr]?.[cc] !== null) return false;
+      cr += stepR;
+      cc += stepC;
+    }
+    return true;
+  };
+
+  if (piece.promoted) {
+    if (piece.kind === "Rook") {
+      if (adr <= 1 && adc <= 1) return true;
+      return (dr === 0 || dc === 0) && checkSlide();
+    }
+    if (piece.kind === "Bishop") {
+      if (adr <= 1 && adc <= 1) return true;
+      return adr === adc && checkSlide();
+    }
+    // Promoted Silver, Knight, Lance, Pawn all move as Gold General
+    return adr <= 1 && adc <= 1 && !(adc === 1 && dr === -forward);
+  }
+
+  switch (piece.kind) {
+    case "King":
+      return adr <= 1 && adc <= 1;
+    case "Rook":
+      return (dr === 0 || dc === 0) && checkSlide();
+    case "Bishop":
+      return adr === adc && checkSlide();
+    case "Gold":
+      return adr <= 1 && adc <= 1 && !(adc === 1 && dr === -forward);
+    case "Silver":
+      return adr <= 1 && adc <= 1 && !((adc === 0 && dr === -forward) || (adc === 1 && dr === 0));
+    case "Knight":
+      return adc === 1 && dr === forward * 2;
+    case "Lance":
+      return dc === 0 && Math.sign(dr) === forward && checkSlide();
+    case "Pawn":
+      return dc === 0 && dr === forward;
+  }
+}
+
+export function isShogiDropLegal(
+  grid: (ShogiPiece | null)[][],
+  kind: ShogiPiece["kind"],
+  to: [number, number],
+  player: 1 | 2
+): { ok: true } | { ok: false; error: "occupied" | "nifu_rule" | "no_legal_moves_rank" } {
+  const [tr, tc] = to;
+  if (tr < 0 || tr > 8 || tc < 0 || tc > 8 || grid[tr]?.[tc] !== null) {
+    return { ok: false, error: "occupied" };
+  }
+  // Nifu rule: cannot drop an unpromoted Pawn on a column that already has an unpromoted Pawn of the same player
+  if (kind === "Pawn") {
+    for (let r = 0; r < 9; r++) {
+      const p = grid[r]?.[tc];
+      if (p && p.owner === player && p.kind === "Pawn" && !p.promoted) {
+        return { ok: false, error: "nifu_rule" };
+      }
+    }
+  }
+  // Dead-end rank rule
+  if (player === 1) {
+    if (tr === 0 && (kind === "Pawn" || kind === "Lance" || kind === "Knight")) {
+      return { ok: false, error: "no_legal_moves_rank" };
+    }
+    if (tr === 1 && kind === "Knight") {
+      return { ok: false, error: "no_legal_moves_rank" };
+    }
+  } else {
+    if (tr === 8 && (kind === "Pawn" || kind === "Lance" || kind === "Knight")) {
+      return { ok: false, error: "no_legal_moves_rank" };
+    }
+    if (tr === 7 && kind === "Knight") {
+      return { ok: false, error: "no_legal_moves_rank" };
+    }
+  }
+  return { ok: true };
+}
+
+export function mustPromoteShogiFesa(
+  kind: ShogiPiece["kind"],
+  toRow: number,
+  player: 1 | 2
+): boolean {
+  if (player === 1) {
+    if (kind === "Pawn" || kind === "Lance") return toRow === 0;
+    if (kind === "Knight") return toRow <= 1;
+    return false;
+  } else {
+    if (kind === "Pawn" || kind === "Lance") return toRow === 8;
+    if (kind === "Knight") return toRow >= 7;
+    return false;
+  }
+}
+
 function createInitialXiangqiGrid(): (XiangqiPiece | null)[][] {
   const grid: (XiangqiPiece | null)[][] = Array.from({ length: 10 }, () =>
     Array.from({ length: 9 }, () => null)
@@ -226,6 +605,151 @@ function createInitialXiangqiGrid(): (XiangqiPiece | null)[][] {
     grid[6][c] = { kind: "Soldier", owner: 1 };
   }
   return grid;
+}
+
+export function isXiangqiFlyingGeneral(grid: (XiangqiPiece | null)[][]): boolean {
+  let redGen: [number, number] | null = null;
+  let blackGen: [number, number] | null = null;
+  for (let r = 0; r < 10; r++) {
+    for (let c = 0; c < 9; c++) {
+      const pc = grid[r]?.[c];
+      if (pc?.kind === "General") {
+        if (pc.owner === 1) redGen = [r, c];
+        else blackGen = [r, c];
+      }
+    }
+  }
+  if (redGen && blackGen && redGen[1] === blackGen[1]) {
+    const col = redGen[1];
+    const minR = Math.min(redGen[0], blackGen[0]);
+    const maxR = Math.max(redGen[0], blackGen[0]);
+    let piecesBetween = 0;
+    for (let r = minR + 1; r < maxR; r++) {
+      if (grid[r]?.[col] !== null) piecesBetween++;
+    }
+    return piecesBetween === 0;
+  }
+  return false;
+}
+
+export function isXiangqiMovePseudoLegal(
+  grid: (XiangqiPiece | null)[][],
+  from: [number, number],
+  to: [number, number],
+  player: 1 | 2
+): boolean {
+  const [fr, fc] = from;
+  const [tr, tc] = to;
+  if (fr < 0 || fr > 9 || fc < 0 || fc > 8 || tr < 0 || tr > 9 || tc < 0 || tc > 8) {
+    return false;
+  }
+  if (fr === tr && fc === tc) return false;
+  const piece = grid[fr]?.[fc];
+  if (!piece || piece.owner !== player) return false;
+  const dst = grid[tr]?.[tc];
+  if (dst && dst.owner === player) return false;
+
+  const dr = tr - fr;
+  const dc = tc - fc;
+  const adr = Math.abs(dr);
+  const adc = Math.abs(dc);
+  const isRed = player === 1;
+
+  const countBetweenOrthogonal = (): number => {
+    let count = 0;
+    if (dr === 0) {
+      const minC = Math.min(fc, tc);
+      const maxC = Math.max(fc, tc);
+      for (let c = minC + 1; c < maxC; c++) {
+        if (grid[fr]?.[c] !== null) count++;
+      }
+    } else if (dc === 0) {
+      const minR = Math.min(fr, tr);
+      const maxR = Math.max(fr, tr);
+      for (let r = minR + 1; r < maxR; r++) {
+        if (grid[r]?.[fc] !== null) count++;
+      }
+    }
+    return count;
+  };
+
+  switch (piece.kind) {
+    case "General": {
+      if (adr + adc !== 1 || tc < 3 || tc > 5) return false;
+      return isRed ? tr >= 7 && tr <= 9 : tr >= 0 && tr <= 2;
+    }
+    case "Advisor": {
+      if (adr !== 1 || adc !== 1 || tc < 3 || tc > 5) return false;
+      return isRed ? tr >= 7 && tr <= 9 : tr >= 0 && tr <= 2;
+    }
+    case "Elephant": {
+      if (adr !== 2 || adc !== 2) return false;
+      // Cannot cross the River
+      if (isRed && tr < 5) return false;
+      if (!isRed && tr > 4) return false;
+      // Elephant eye check
+      const eyeR = (fr + tr) / 2;
+      const eyeC = (fc + tc) / 2;
+      return grid[eyeR]?.[eyeC] === null;
+    }
+    case "Horse": {
+      if (!((adr === 2 && adc === 1) || (adr === 1 && adc === 2))) return false;
+      const legR = adr === 2 ? (fr + tr) / 2 : fr;
+      const legC = adc === 2 ? (fc + tc) / 2 : fc;
+      return grid[legR]?.[legC] === null;
+    }
+    case "Chariot": {
+      if (dr !== 0 && dc !== 0) return false;
+      return countBetweenOrthogonal() === 0;
+    }
+    case "Cannon": {
+      if (dr !== 0 && dc !== 0) return false;
+      const between = countBetweenOrthogonal();
+      return dst !== null ? between === 1 : between === 0;
+    }
+    case "Soldier": {
+      const forward = isRed ? -1 : 1;
+      const pastRiver = isRed ? fr <= 4 : fr >= 5;
+      if (dr === forward && dc === 0) return true;
+      return pastRiver && dr === 0 && adc === 1;
+    }
+  }
+}
+
+export function isXiangqiMoveLegal(
+  grid: (XiangqiPiece | null)[][],
+  from: [number, number],
+  to: [number, number],
+  player: 1 | 2
+): boolean {
+  if (!isXiangqiMovePseudoLegal(grid, from, to, player)) return false;
+  const sim = grid.map((row) => row.map((cell) => (cell ? { ...cell } : null)));
+  sim[to[0]][to[1]] = sim[from[0]][from[1]];
+  sim[from[0]][from[1]] = null;
+  if (isXiangqiFlyingGeneral(sim)) return false;
+
+  // Verify player's own General is not left in check
+  let genPos: [number, number] | null = null;
+  for (let r = 0; r < 10; r++) {
+    for (let c = 0; c < 9; c++) {
+      const pc = sim[r]?.[c];
+      if (pc && pc.owner === player && pc.kind === "General") {
+        genPos = [r, c];
+        break;
+      }
+    }
+  }
+  if (!genPos) return true;
+  const opp: 1 | 2 = player === 1 ? 2 : 1;
+  for (let r = 0; r < 10; r++) {
+    for (let c = 0; c < 9; c++) {
+      const pc = sim[r]?.[c];
+      if (pc && pc.owner === opp && isXiangqiMovePseudoLegal(sim, [r, c], genPos, opp)) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 function createInitialMonopolySpaces(): MonopolySpace[] {
@@ -323,12 +847,60 @@ function createInitialCrisisTerritories(): CrisisTerritory[] {
     continent,
     owner: (id % 2 === 0 ? 1 : 2) as 1 | 2,
     armies: 3,
-    neighbors: [
-      (id + 1) % 30,
-      (id + 29) % 30,
-      (id + 5) % 30,
-    ],
+    neighbors: [(id + 1) % 30, (id + 29) % 30, (id + 5) % 30],
   }));
+}
+
+function createDefaultBattleshipFleet(): BattleshipShip[] {
+  return [
+    {
+      name: "Portaaviones",
+      size: 5,
+      cells: [
+        [0, 0],
+        [0, 3],
+        [0, 6],
+        [0, 9],
+        [1, 2],
+      ],
+    },
+    {
+      name: "Acorazado",
+      size: 4,
+      cells: [
+        [1, 5],
+        [1, 8],
+        [2, 1],
+        [2, 4],
+      ],
+    },
+    {
+      name: "Crucero",
+      size: 3,
+      cells: [
+        [2, 7],
+        [3, 0],
+        [3, 3],
+      ],
+    },
+    {
+      name: "Submarino",
+      size: 3,
+      cells: [
+        [3, 6],
+        [3, 9],
+        [4, 2],
+      ],
+    },
+    {
+      name: "Destructor",
+      size: 2,
+      cells: [
+        [4, 5],
+        [4, 8],
+      ],
+    },
+  ];
 }
 
 export interface GoGroupAnalysis {
@@ -509,11 +1081,17 @@ export class WasmGameBridge {
   private replayCursor: number = 0;
   private rngState: number = 1337;
 
-  // 1. Chess state
+  // 1. Chess state (FIDE Canonical Rules: Castling O-O / O-O-O, En Passant, Promotion, Check/Pin simulation, 50-move & Threefold)
   private chessGrid: (ChessPiece | null)[][] = createInitialChessGrid();
+  private chessCastling: ChessCastlingRights = createInitialCastlingRights();
+  private chessEnPassantTarget: [number, number] | null = null;
+  private chessHalfMoveClock: number = 0;
+  private chessPositionHistory: Record<string, number> = {};
   private chessLastMove: { from: [number, number]; to: [number, number] } | null = null;
   private chessDrawOfferedBy: 1 | 2 | null = null;
   private chessInCheck: 1 | 2 | null = null;
+  private chessStatusBanner: string =
+    "Enroque corto (O-O), enroque largo (O-O-O), captura al paso y detección FIDE de jaque/clavadas activos.";
 
   // 2. Checkers state
   private checkersGrid: (CheckersPiece | null)[][] = createInitialCheckersGrid();
@@ -546,7 +1124,8 @@ export class WasmGameBridge {
   private goScoringPhase: boolean = false;
   private goBoardHistory: Set<string> = new Set<string>();
   private goLastMove: [number, number] | null = null;
-  private goLastBanner: string = "Goban 9×9 listo · Captura por cadenas BFS, regla de suicidio y Ko activas.";
+  private goLastBanner: string =
+    "Goban 9×9 listo · Captura por cadenas BFS, regla de suicidio y Ko activas.";
 
   // 6. Shogi state
   private shogiGrid: (ShogiPiece | null)[][] = createInitialShogiGrid();
@@ -554,7 +1133,8 @@ export class WasmGameBridge {
 
   // 7. Xiangqi state
   private xiangqiGrid: (XiangqiPiece | null)[][] = createInitialXiangqiGrid();
-  private xiangqiBanner: string = "Río Chu He / Han Jie activo · Regla de General Volador activa";
+  private xiangqiBanner: string =
+    "Río Chu He / Han Jie activo · Palacio 3×3, Pantalla de Cañón y General Volador activos";
 
   // 8. Chinese Checkers state
   private ccCells: { id: string; r: number; c: number; owner: 0 | 1 | 2; zone: 0 | 1 | 2 }[] = [];
@@ -575,15 +1155,22 @@ export class WasmGameBridge {
   // 11. Battleship state
   private bsShots: Record<1 | 2, Record<string, "hit" | "miss">> = { 1: {}, 2: {} };
   private bsHitsCount: Record<1 | 2, number> = { 1: 0, 2: 0 };
+  private bsFleets: Record<1 | 2, BattleshipShip[]> = {
+    1: createDefaultBattleshipFleet(),
+    2: createDefaultBattleshipFleet(),
+  };
+  private bsSunkShips: Record<1 | 2, string[]> = { 1: [], 2: [] };
   private bsExtraTurnOnHit: boolean = false;
-  private bsBanner: string = "Flotas desplegadas (5 buques: 5,4,3,3,2). Selecciona coordenada en el radar enemigo.";
+  private bsBanner: string =
+    "Flotas desplegadas (5 buques: 5,4,3,3,2). Selecciona coordenada en el radar enemigo.";
 
   // 12. Mille Bornes state
   private mbDistance: Record<1 | 2, number> = { 1: 0, 2: 0 };
   private mbHands: Record<1 | 2, string[]> = { 1: [], 2: [] };
   private mbSafeties: Record<1 | 2, string[]> = { 1: [], 2: [] };
   private mbHazard: Record<1 | 2, string | null> = { 1: null, 2: null };
-  private mbLastBanner: string = "Meta: 1000 km · Escudos y reacción Coup Fourré listos.";
+  private mbPlayed200Count: Record<1 | 2, number> = { 1: 0, 2: 0 };
+  private mbLastBanner: string = "Meta exacta: 1000 km · Escudos y reacción Coup Fourré listos.";
 
   // 13. Monopoly state
   private monoSpaces: MonopolySpace[] = createInitialMonopolySpaces();
@@ -599,6 +1186,7 @@ export class WasmGameBridge {
   private crisisPhase: "PlaceArmies" | "Attack" | "Fortify" = "PlaceArmies";
   private crisisArmiesRemaining: number = 5;
   private crisisCards: Record<1 | 2, number> = { 1: 2, 2: 1 };
+  private crisisConqueredThisTurn: boolean = false;
   private crisisBanner: string = "Fase de Refuerzo: coloca ejércitos en tus territorios.";
 
   constructor() {
@@ -624,9 +1212,15 @@ export class WasmGameBridge {
 
     if (this.gameType === "chess") {
       this.chessGrid = createInitialChessGrid();
+      this.chessCastling = createInitialCastlingRights();
+      this.chessEnPassantTarget = null;
+      this.chessHalfMoveClock = 0;
+      this.chessPositionHistory = {};
       this.chessLastMove = null;
       this.chessDrawOfferedBy = null;
       this.chessInCheck = null;
+      this.chessStatusBanner =
+        "Enroque corto (O-O), enroque largo (O-O-O), captura al paso y detección FIDE de jaque/clavadas activos.";
     } else if (this.gameType === "checkers") {
       this.checkersGrid = createInitialCheckersGrid();
       this.checkersChainPos = null;
@@ -660,13 +1254,15 @@ export class WasmGameBridge {
       this.goScoringPhase = false;
       this.goBoardHistory = new Set<string>([serializeGoGrid(this.goGrid)]);
       this.goLastMove = null;
-      this.goLastBanner = "Goban 9×9 listo · Captura por cadenas BFS, regla de suicidio y Ko activas.";
+      this.goLastBanner =
+        "Goban 9×9 listo · Captura por cadenas BFS, regla de suicidio y Ko activas.";
     } else if (this.gameType === "shogi") {
       this.shogiGrid = createInitialShogiGrid();
       this.shogiHands = { 1: [], 2: [] };
     } else if (this.gameType === "xiangqi") {
       this.xiangqiGrid = createInitialXiangqiGrid();
-      this.xiangqiBanner = "Río Chu He / Han Jie activo · Regla de General Volador activa";
+      this.xiangqiBanner =
+        "Río Chu He / Han Jie activo · Palacio 3×3, Pantalla de Cañón y General Volador activos";
     } else if (this.gameType === "chinese_checkers") {
       const cells: { id: string; r: number; c: number; owner: 0 | 1 | 2; zone: 0 | 1 | 2 }[] = [];
       for (let r = 0; r < 9; r++) {
@@ -704,6 +1300,11 @@ export class WasmGameBridge {
     } else if (this.gameType === "battleship") {
       this.bsShots = { 1: {}, 2: {} };
       this.bsHitsCount = { 1: 0, 2: 0 };
+      this.bsFleets = {
+        1: createDefaultBattleshipFleet(),
+        2: createDefaultBattleshipFleet(),
+      };
+      this.bsSunkShips = { 1: [], 2: [] };
       this.bsExtraTurnOnHit = false;
       this.bsBanner = "Flotas colocadas (5 barcos: 5,4,3,3,2). Dispara en el radar enemigo.";
     } else if (this.gameType === "mille_bornes") {
@@ -728,6 +1329,7 @@ export class WasmGameBridge {
       };
       this.mbSafeties = { 1: [], 2: [] };
       this.mbHazard = { 1: null, 2: null };
+      this.mbPlayed200Count = { 1: 0, 2: 0 };
       this.mbLastBanner = "Ruta de 1000 km iniciada. Juega cartas de distancia, escudos o ataques.";
     } else if (this.gameType === "monopoly") {
       this.monoSpaces = createInitialMonopolySpaces();
@@ -742,6 +1344,7 @@ export class WasmGameBridge {
       this.crisisPhase = "PlaceArmies";
       this.crisisArmiesRemaining = 5;
       this.crisisCards = { 1: 3, 2: 2 };
+      this.crisisConqueredThisTurn = false;
       this.crisisBanner = "Fase de Refuerzo: coloca 5 ejércitos o canjea tarjetas.";
     } else {
       return false;
@@ -773,110 +1376,160 @@ export class WasmGameBridge {
     return this.gameType;
   }
 
+  /**
+   * 1. CHESS: Canonical FIDE legal move generator mirroring `chess_game/src/board.rs`:
+   * - Includes standard piece movements, double pawn push, En Passant, Short Castling (O-O), Long Castling (O-O-O), and Pawn Promotion.
+   * - Filters out any move that leaves the moving player's King in check (pins & check resolution).
+   */
   private getChessLegalMoves(player: 1 | 2): ChessMove[] {
-    const moves: ChessMove[] = [];
-    const inBounds = (r: number, c: number) => r >= 0 && r < 8 && c >= 0 && c < 8;
+    const candidateMoves: ChessMove[] = [];
+    const opp: 1 | 2 = player === 1 ? 2 : 1;
+    const promoRow = player === 1 ? 0 : 7;
 
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
-        const piece = this.chessGrid[r][c];
+        const piece = this.chessGrid[r]?.[c];
         if (!piece || piece.owner !== player) continue;
 
-        if (piece.kind === "Pawn") {
-          const dir = player === 1 ? -1 : 1;
-          const startRow = player === 1 ? 6 : 1;
-          const promoRow = player === 1 ? 0 : 7;
+        const rawTargets = getChessPieceRawMoves(
+          this.chessGrid,
+          r,
+          c,
+          this.chessEnPassantTarget,
+          false
+        );
 
-          if (inBounds(r + dir, c) && !this.chessGrid[r + dir][c]) {
-            if (r + dir === promoRow) {
-              for (const p of ["Queen", "Rook", "Bishop", "Knight"] as const) {
-                moves.push({ from: [r, c], to: [r + dir, c], promotion: p });
-              }
-            } else {
-              moves.push({ from: [r, c], to: [r + dir, c] });
+        for (const [tr, tc] of rawTargets) {
+          if (piece.kind === "Pawn" && tr === promoRow) {
+            for (const p of ["Queen", "Rook", "Bishop", "Knight"] as const) {
+              candidateMoves.push({ from: [r, c], to: [tr, tc], promotion: p });
             }
-            if (r === startRow && inBounds(r + dir * 2, c) && !this.chessGrid[r + dir * 2][c]) {
-              moves.push({ from: [r, c], to: [r + dir * 2, c] });
+          } else {
+            const isEp =
+              piece.kind === "Pawn" &&
+              c !== tc &&
+              !this.chessGrid[tr][tc] &&
+              this.chessEnPassantTarget !== null &&
+              this.chessEnPassantTarget[0] === tr &&
+              this.chessEnPassantTarget[1] === tc;
+            candidateMoves.push({
+              from: [r, c],
+              to: [tr, tc],
+              ...(isEp ? { isEnPassant: true } : {}),
+            });
+          }
+        }
+
+        // Castling (O-O and O-O-O) matching chess_game/src/board.rs
+        if (piece.kind === "King") {
+          const homeRow = player === 1 ? 7 : 0;
+          const kingMoved =
+            player === 1 ? this.chessCastling.whiteKingMoved : this.chessCastling.blackKingMoved;
+          const rookHMoved =
+            player === 1 ? this.chessCastling.whiteRookHMoved : this.chessCastling.blackRookHMoved;
+          const rookAMoved =
+            player === 1 ? this.chessCastling.whiteRookAMoved : this.chessCastling.blackRookAMoved;
+
+          if (r === homeRow && c === 4 && !kingMoved && !isChessKingInCheck(this.chessGrid, player)) {
+            // Short Castling (Kingside O-O: col 4 -> 6, rook col 7 -> 5)
+            const hRook = this.chessGrid[homeRow][7];
+            if (
+              !rookHMoved &&
+              hRook &&
+              hRook.owner === player &&
+              hRook.kind === "Rook" &&
+              !this.chessGrid[homeRow][5] &&
+              !this.chessGrid[homeRow][6] &&
+              !isChessSquareAttacked(this.chessGrid, [homeRow, 5], opp) &&
+              !isChessSquareAttacked(this.chessGrid, [homeRow, 6], opp)
+            ) {
+              candidateMoves.push({
+                from: [homeRow, 4],
+                to: [homeRow, 6],
+                isCastling: "short",
+              });
             }
-          }
-          for (const dc of [-1, 1]) {
-            const nr = r + dir;
-            const nc = c + dc;
-            if (inBounds(nr, nc)) {
-              const target = this.chessGrid[nr][nc];
-              if (target && target.owner !== player) {
-                if (nr === promoRow) {
-                  for (const p of ["Queen", "Rook", "Bishop", "Knight"] as const) {
-                    moves.push({ from: [r, c], to: [nr, nc], promotion: p });
-                  }
-                } else {
-                  moves.push({ from: [r, c], to: [nr, nc] });
-                }
-              }
-            }
-          }
-        } else if (piece.kind === "Knight") {
-          const jumps = [
-            [-2, -1],
-            [-2, 1],
-            [-1, -2],
-            [-1, 2],
-            [1, -2],
-            [1, 2],
-            [2, -1],
-            [2, 1],
-          ];
-          for (const [dr, dc] of jumps) {
-            const nr = r + dr;
-            const nc = c + dc;
-            if (!inBounds(nr, nc)) continue;
-            const target = this.chessGrid[nr][nc];
-            if (!target || target.owner !== player) {
-              moves.push({ from: [r, c], to: [nr, nc] });
-            }
-          }
-        } else if (piece.kind === "King") {
-          for (let dr = -1; dr <= 1; dr++) {
-            for (let dc = -1; dc <= 1; dc++) {
-              if (dr === 0 && dc === 0) continue;
-              const nr = r + dr;
-              const nc = c + dc;
-              if (!inBounds(nr, nc)) continue;
-              const target = this.chessGrid[nr][nc];
-              if (!target || target.owner !== player) {
-                moves.push({ from: [r, c], to: [nr, nc] });
-              }
-            }
-          }
-        } else {
-          const dirs: [number, number][] = [];
-          if (piece.kind === "Rook" || piece.kind === "Queen") {
-            dirs.push([-1, 0], [1, 0], [0, -1], [0, 1]);
-          }
-          if (piece.kind === "Bishop" || piece.kind === "Queen") {
-            dirs.push([-1, -1], [-1, 1], [1, -1], [1, 1]);
-          }
-          for (const [dr, dc] of dirs) {
-            let nr = r + dr;
-            let nc = c + dc;
-            while (inBounds(nr, nc)) {
-              const target = this.chessGrid[nr][nc];
-              if (!target) {
-                moves.push({ from: [r, c], to: [nr, nc] });
-              } else {
-                if (target.owner !== player) {
-                  moves.push({ from: [r, c], to: [nr, nc] });
-                }
-                break;
-              }
-              nr += dr;
-              nc += dc;
+
+            // Long Castling (Queenside O-O-O: col 4 -> 2, rook col 0 -> 3)
+            const aRook = this.chessGrid[homeRow][0];
+            if (
+              !rookAMoved &&
+              aRook &&
+              aRook.owner === player &&
+              aRook.kind === "Rook" &&
+              !this.chessGrid[homeRow][1] &&
+              !this.chessGrid[homeRow][2] &&
+              !this.chessGrid[homeRow][3] &&
+              !isChessSquareAttacked(this.chessGrid, [homeRow, 3], opp) &&
+              !isChessSquareAttacked(this.chessGrid, [homeRow, 2], opp)
+            ) {
+              candidateMoves.push({
+                from: [homeRow, 4],
+                to: [homeRow, 2],
+                isCastling: "long",
+              });
             }
           }
         }
       }
     }
-    return moves;
+
+    // Filter out any move that leaves own King in check
+    return candidateMoves.filter((m) => {
+      const simGrid = simulateChessMoveOnGrid(
+        this.chessGrid,
+        m.from,
+        m.to,
+        this.chessEnPassantTarget,
+        m.promotion
+      );
+      return !isChessKingInCheck(simGrid, player);
+    });
+  }
+
+  private getChessCastlingRightsString(): string {
+    let s = "";
+    if (!this.chessCastling.whiteKingMoved && !this.chessCastling.whiteRookHMoved) s += "K";
+    if (!this.chessCastling.whiteKingMoved && !this.chessCastling.whiteRookAMoved) s += "Q";
+    if (!this.chessCastling.blackKingMoved && !this.chessCastling.blackRookHMoved) s += "k";
+    if (!this.chessCastling.blackKingMoved && !this.chessCastling.blackRookAMoved) s += "q";
+    return s || "-";
+  }
+
+  public export_chess_fen(): string {
+    const pieceMap: Record<ChessPiece["kind"], string> = {
+      Pawn: "p",
+      Knight: "n",
+      Bishop: "b",
+      Rook: "r",
+      Queen: "q",
+      King: "k",
+    };
+    const rows: string[] = [];
+    for (let r = 0; r < 8; r++) {
+      let empty = 0;
+      let rowStr = "";
+      for (let c = 0; c < 8; c++) {
+        const pc = this.chessGrid[r]?.[c];
+        if (!pc) {
+          empty++;
+        } else {
+          if (empty > 0) {
+            rowStr += String(empty);
+            empty = 0;
+          }
+          const ch = pieceMap[pc.kind];
+          rowStr += pc.owner === 1 ? ch.toUpperCase() : ch;
+        }
+      }
+      if (empty > 0) rowStr += String(empty);
+      rows.push(rowStr);
+    }
+    const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
+    const ep = this.chessEnPassantTarget
+      ? `${files[this.chessEnPassantTarget[1]]}${8 - this.chessEnPassantTarget[0]}`
+      : "-";
+    return `${rows.join("/")} ${this.turn === 1 ? "w" : "b"} ${this.getChessCastlingRightsString()} ${ep} ${this.chessHalfMoveClock} ${Math.floor(this.tick / 2) + 1}`;
   }
 
   private getCheckersLegalMoves(player: 1 | 2): CheckersMove[] {
@@ -916,6 +1569,158 @@ export class WasmGameBridge {
       }
     }
     return captures.length > 0 ? captures : normals;
+  }
+
+  private getShogiLegalMoves(player: 1 | 2): ShogiMove[] {
+    const moves: ShogiMove[] = [];
+    for (let fr = 0; fr < 9; fr++) {
+      for (let fc = 0; fc < 9; fc++) {
+        const pc = this.shogiGrid[fr]?.[fc];
+        if (!pc || pc.owner !== player) continue;
+        for (let tr = 0; tr < 9; tr++) {
+          for (let tc = 0; tc < 9; tc++) {
+            if (isShogiMovePseudoLegal(this.shogiGrid, [fr, fc], [tr, tc], player)) {
+              const inZone = player === 1 ? tr <= 2 || fr <= 2 : tr >= 6 || fr >= 6;
+              const canPromote =
+                inZone && !pc.promoted && pc.kind !== "King" && pc.kind !== "Gold";
+              const mustPromote =
+                !pc.promoted && mustPromoteShogiFesa(pc.kind, tr, player);
+              moves.push({
+                from: [fr, fc],
+                to: [tr, tc],
+                canPromote,
+                mustPromote,
+              });
+            }
+          }
+        }
+      }
+    }
+    return moves;
+  }
+
+  private getXiangqiLegalMoves(player: 1 | 2): { from: [number, number]; to: [number, number] }[] {
+    const moves: { from: [number, number]; to: [number, number] }[] = [];
+    for (let fr = 0; fr < 10; fr++) {
+      for (let fc = 0; fc < 9; fc++) {
+        const pc = this.xiangqiGrid[fr]?.[fc];
+        if (!pc || pc.owner !== player) continue;
+        for (let tr = 0; tr < 10; tr++) {
+          for (let tc = 0; tc < 9; tc++) {
+            if (isXiangqiMoveLegal(this.xiangqiGrid, [fr, fc], [tr, tc], player)) {
+              moves.push({ from: [fr, fc], to: [tr, tc] });
+            }
+          }
+        }
+      }
+    }
+    return moves;
+  }
+
+  private getChineseCheckersLegalMoves(player: 1 | 2): { fromId: string; toId: string }[] {
+    const moves: { fromId: string; toId: string }[] = [];
+    const cellMap = new Map<string, { id: string; r: number; c: number; owner: 0 | 1 | 2 }>();
+    for (const cell of this.ccCells) {
+      cellMap.set(`${cell.r}_${cell.c}`, cell);
+    }
+
+    const dirs: [number, number][] = [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+      [-1, 1],
+      [1, -1],
+      [-1, -1],
+      [1, 1],
+    ];
+
+    const owned = this.ccCells.filter((cell) => cell.owner === player);
+    for (const origin of owned) {
+      const reached = new Set<string>();
+
+      // 1. Single step to adjacent empty cell
+      for (const [dr, dc] of dirs) {
+        const adj = cellMap.get(`${origin.r + dr}_${origin.c + dc}`);
+        if (adj && adj.owner === 0) {
+          reached.add(adj.id);
+        }
+      }
+
+      // 2. Multi-hop chain jumps over adjacent occupied marbles (BFS)
+      const queue: [number, number][] = [[origin.r, origin.c]];
+      const visitedJumps = new Set<string>([origin.id]);
+
+      while (queue.length > 0) {
+        const [cr, cc] = queue.shift()!;
+        for (const [dr, dc] of dirs) {
+          const mid = cellMap.get(`${cr + dr}_${cc + dc}`);
+          const land = cellMap.get(`${cr + dr * 2}_${cc + dc * 2}`);
+          if (mid && mid.owner !== 0 && land && land.owner === 0 && !visitedJumps.has(land.id)) {
+            visitedJumps.add(land.id);
+            reached.add(land.id);
+            queue.push([land.r, land.c]);
+          }
+        }
+      }
+
+      for (const toId of reached) {
+        moves.push({ fromId: origin.id, toId });
+      }
+    }
+    return moves;
+  }
+
+  private canBackgammonBearOff(player: 1 | 2): boolean {
+    if (this.bgBar[player] > 0) return false;
+    for (let i = 0; i < 24; i++) {
+      const pt = this.bgPoints[i];
+      if (pt && pt.owner === player && pt.count > 0) {
+        if (player === 1 && i < 18) return false;
+        if (player === 2 && i > 5) return false;
+      }
+    }
+    return true;
+  }
+
+  private getBackgammonLegalMoves(player: 1 | 2): { from: number; to: number }[] {
+    const moves: { from: number; to: number }[] = [];
+    const opp: 1 | 2 = player === 1 ? 2 : 1;
+    const uniqueSteps = Array.from(new Set([this.bgDice[0] || 3, this.bgDice[1] || 5]));
+
+    const isPointOpen = (idx: number): boolean => {
+      if (idx < 0 || idx >= 24) return false;
+      const pt = this.bgPoints[idx];
+      return !pt || pt.owner !== opp || pt.count <= 1;
+    };
+
+    // Rule 1: If player has checkers on the bar, they MUST enter from the bar first
+    if (this.bgBar[player] > 0) {
+      for (const step of uniqueSteps) {
+        const entryIdx = player === 1 ? step - 1 : 24 - step;
+        if (isPointOpen(entryIdx)) {
+          moves.push({ from: -1, to: entryIdx });
+        }
+      }
+      return moves;
+    }
+
+    const canBearOff = this.canBackgammonBearOff(player);
+    for (let i = 0; i < 24; i++) {
+      if (this.bgPoints[i]?.owner === player && this.bgPoints[i].count > 0) {
+        for (const step of uniqueSteps) {
+          const rawTo = player === 1 ? i + step : i - step;
+          if (rawTo >= 0 && rawTo < 24) {
+            if (isPointOpen(rawTo)) {
+              moves.push({ from: i, to: rawTo });
+            }
+          } else if (canBearOff) {
+            moves.push({ from: i, to: player === 1 ? 24 : -1 });
+          }
+        }
+      }
+    }
+    return moves;
   }
 
   public get_legal_moves_json(playerId: number): string {
@@ -971,76 +1776,20 @@ export class WasmGameBridge {
           }
         }
       }
-      // Prioritize capturing moves for AI and tutorial suggestions
       moves.sort((a, b) => b.capturesCount - a.capturesCount);
       return JSON.stringify(moves);
     }
     if (this.gameType === "shogi") {
-      const moves: { from: [number, number]; to: [number, number]; canPromote: boolean }[] = [];
-      const dir = p === 1 ? -1 : 1;
-      for (let r = 0; r < 9; r++) {
-        for (let c = 0; c < 9; c++) {
-          const pc = this.shogiGrid[r]?.[c];
-          if (!pc || pc.owner !== p) continue;
-          const nr = r + dir;
-          if (nr >= 0 && nr < 9) {
-            const target = this.shogiGrid[nr][c];
-            if (!target || target.owner !== p) {
-              const inZone = p === 1 ? nr <= 2 || r <= 2 : nr >= 6 || r >= 6;
-              moves.push({
-                from: [r, c],
-                to: [nr, c],
-                canPromote: inZone && !pc.promoted && pc.kind !== "King" && pc.kind !== "Gold",
-              });
-            }
-          }
-        }
-      }
-      return JSON.stringify(moves);
+      return JSON.stringify(this.getShogiLegalMoves(p));
     }
     if (this.gameType === "xiangqi") {
-      const moves: { from: [number, number]; to: [number, number] }[] = [];
-      const dir = p === 1 ? -1 : 1;
-      for (let r = 0; r < 10; r++) {
-        for (let c = 0; c < 9; c++) {
-          const pc = this.xiangqiGrid[r]?.[c];
-          if (!pc || pc.owner !== p) continue;
-          const nr = r + dir;
-          if (nr >= 0 && nr < 10) {
-            const dst = this.xiangqiGrid[nr][c];
-            if (!dst || dst.owner !== p) {
-              moves.push({ from: [r, c], to: [nr, c] });
-            }
-          }
-        }
-      }
-      return JSON.stringify(moves);
+      return JSON.stringify(this.getXiangqiLegalMoves(p));
     }
     if (this.gameType === "chinese_checkers") {
-      const moves: { fromId: string; toId: string }[] = [];
-      const owned = this.ccCells.filter((cell) => cell.owner === p);
-      const empty = this.ccCells.filter((cell) => cell.owner === 0);
-      for (const o of owned) {
-        for (const e of empty) {
-          const dr = Math.abs(o.r - e.r);
-          const dc = Math.abs(o.c - e.c);
-          if ((dr <= 2 && dc <= 2) && dr + dc > 0) {
-            moves.push({ fromId: o.id, toId: e.id });
-          }
-        }
-      }
-      return JSON.stringify(moves.slice(0, 24));
+      return JSON.stringify(this.getChineseCheckersLegalMoves(p));
     }
     if (this.gameType === "backgammon") {
-      const moves: { from: number; to: number }[] = [];
-      const step = this.bgDice[0] || 3;
-      for (let i = 0; i < 24; i++) {
-        if (this.bgPoints[i]?.owner === p && this.bgPoints[i].count > 0) {
-          const to = p === 1 ? Math.min(23, i + step) : Math.max(0, i - step);
-          if (to !== i) moves.push({ from: i, to });
-        }
-      }
-      return JSON.stringify(moves);
+      return JSON.stringify(this.getBackgammonLegalMoves(p));
     }
     if (this.gameType === "ludo") {
       return JSON.stringify([
@@ -1096,6 +1845,11 @@ export class WasmGameBridge {
         last_move: this.chessLastMove,
         draw_offered_by: this.chessDrawOfferedBy,
         in_check: this.chessInCheck,
+        castling_rights: this.getChessCastlingRightsString(),
+        en_passant_target: this.chessEnPassantTarget,
+        half_move_clock: this.chessHalfMoveClock,
+        status_banner: this.chessStatusBanner,
+        fen: this.export_chess_fen(),
       });
     }
     if (this.gameType === "checkers") {
@@ -1152,7 +1906,7 @@ export class WasmGameBridge {
         scoring_phase: this.goScoringPhase,
         komi: 6.5,
         liberties_by_cell: computeAllGoLibertiesMap(this.goGrid, this.goSize),
-        last_move: this.goLastMove,
+        last_move: this.goLastMove ? `${this.goLastMove[0]}_${this.goLastMove[1]}` : null,
         last_banner: this.goLastBanner,
       });
     }
@@ -1218,6 +1972,7 @@ export class WasmGameBridge {
         winner: this.winner,
         shots: this.bsShots,
         hits_count: this.bsHitsCount,
+        sunk_ships: this.bsSunkShips,
         extra_turn_on_hit: this.bsExtraTurnOnHit,
         banner: this.bsBanner,
       });
@@ -1307,7 +2062,7 @@ export class WasmGameBridge {
       return JSON.stringify([{ event: "GameOverEvent", winner: this.winner }]);
     }
 
-    // 1. CHESS
+    // 1. CHESS (Canonical FIDE Validation: Castling O-O / O-O-O, En Passant, Promotion, Pins, Check/Checkmate/Stalemate)
     if (this.gameType === "chess") {
       if (cmdName === "OfferDrawCommand") {
         this.chessDrawOfferedBy = p;
@@ -1315,8 +2070,13 @@ export class WasmGameBridge {
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
         return JSON.stringify([{ event: "DrawOfferedEvent", player: p }]);
       }
-      if (cmdName === "AcceptDrawCommand" && this.chessDrawOfferedBy && this.chessDrawOfferedBy !== p) {
+      if (
+        cmdName === "AcceptDrawCommand" &&
+        this.chessDrawOfferedBy &&
+        this.chessDrawOfferedBy !== p
+      ) {
         this.winner = 0;
+        this.chessStatusBanner = "Tablas acordadas entre ambos jugadores.";
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
         return JSON.stringify([{ event: "GameOverEvent", winner: 0, is_draw: true }]);
@@ -1325,7 +2085,21 @@ export class WasmGameBridge {
         return JSON.stringify({ ok: false, error: "not_your_turn" });
       }
       const from = parsed.from as [number, number];
-      const to = parsed.to as [number, number];
+      let to = parsed.to as [number, number];
+      if (!Array.isArray(from) || !Array.isArray(to)) {
+        return JSON.stringify({ ok: false, error: "invalid_coordinates" });
+      }
+      const movingPiece = this.chessGrid[from[0]]?.[from[1]];
+      if (!movingPiece || movingPiece.owner !== p) {
+        return JSON.stringify({ ok: false, error: "illegal_chess_move" });
+      }
+
+      // Support clicking directly on own Rook to castle (e1->h1 normalized to e1->g1, e1->a1 normalized to e1->c1)
+      if (movingPiece.kind === "King" && from[0] === to[0] && from[1] === 4) {
+        if (to[1] === 7) to = [from[0], 6];
+        else if (to[1] === 0) to = [from[0], 2];
+      }
+
       const promotion = parsed.promotion as ChessMove["promotion"] | undefined;
       const legal = this.getChessLegalMoves(p);
       const match = legal.find(
@@ -1339,42 +2113,111 @@ export class WasmGameBridge {
       if (!match) {
         return JSON.stringify({ ok: false, error: "illegal_chess_move" });
       }
-      const moving = this.chessGrid[from[0]][from[1]]!;
-      const captured = this.chessGrid[to[0]][to[1]];
-      this.chessGrid[from[0]][from[1]] = null;
-      this.chessGrid[to[0]][to[1]] = {
-        kind: match.promotion || moving.kind,
-        owner: p,
-      };
+
+      const targetBefore = this.chessGrid[to[0]]?.[to[1]];
+      const isEnPassantCapture = Boolean(match.isEnPassant);
+      const isCapture = targetBefore !== null || isEnPassantCapture;
+
+      // Update Castling rights if King or Rook moves or is captured
+      if (movingPiece.kind === "King") {
+        if (p === 1) this.chessCastling.whiteKingMoved = true;
+        else this.chessCastling.blackKingMoved = true;
+      }
+      if (movingPiece.kind === "Rook") {
+        if (from[0] === 7 && from[1] === 0) this.chessCastling.whiteRookAMoved = true;
+        if (from[0] === 7 && from[1] === 7) this.chessCastling.whiteRookHMoved = true;
+        if (from[0] === 0 && from[1] === 0) this.chessCastling.blackRookAMoved = true;
+        if (from[0] === 0 && from[1] === 7) this.chessCastling.blackRookHMoved = true;
+      }
+      if (to[0] === 7 && to[1] === 0) this.chessCastling.whiteRookAMoved = true;
+      if (to[0] === 7 && to[1] === 7) this.chessCastling.whiteRookHMoved = true;
+      if (to[0] === 0 && to[1] === 0) this.chessCastling.blackRookAMoved = true;
+      if (to[0] === 0 && to[1] === 7) this.chessCastling.blackRookHMoved = true;
+
+      // Apply move (including En Passant pawn removal and Castling rook transfer)
+      this.chessGrid = simulateChessMoveOnGrid(
+        this.chessGrid,
+        from,
+        to,
+        this.chessEnPassantTarget,
+        match.promotion
+      );
+
+      // Update En Passant target square for next turn
+      if (movingPiece.kind === "Pawn" && Math.abs(to[0] - from[0]) === 2) {
+        this.chessEnPassantTarget = [(from[0] + to[0]) / 2, from[1]];
+      } else {
+        this.chessEnPassantTarget = null;
+      }
+
+      // Update 50-move half-move clock
+      if (movingPiece.kind === "Pawn" || isCapture) {
+        this.chessHalfMoveClock = 0;
+      } else {
+        this.chessHalfMoveClock += 1;
+      }
+
       this.chessLastMove = { from, to };
       this.chessDrawOfferedBy = null;
       this.tick += 1;
       if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
 
-      if (captured?.kind === "King") {
-        this.winner = p;
-      } else {
-        this.turn = p === 1 ? 2 : 1;
-        const nextMoves = this.getChessLegalMoves(p);
-        let oppKingPos: [number, number] | null = null;
-        for (let r = 0; r < 8; r++) {
-          for (let c = 0; c < 8; c++) {
-            const cell = this.chessGrid[r][c];
-            if (cell && cell.owner === this.turn && cell.kind === "King") {
-              oppKingPos = [r, c];
-            }
-          }
+      const opp: 1 | 2 = p === 1 ? 2 : 1;
+      this.turn = opp;
+
+      const oppInCheck = isChessKingInCheck(this.chessGrid, opp);
+      this.chessInCheck = oppInCheck ? opp : null;
+
+      const fenKey = this.export_chess_fen().split(" ").slice(0, 4).join(" ");
+      this.chessPositionHistory[fenKey] = (this.chessPositionHistory[fenKey] || 0) + 1;
+
+      const oppLegalMoves = this.getChessLegalMoves(opp);
+      if (oppLegalMoves.length === 0) {
+        if (oppInCheck) {
+          this.winner = p;
+          this.chessStatusBanner = `¡Jaque Mate! Victoria del Jugador ${p} (${
+            p === 1 ? "Blancas" : "Negras"
+          }).`;
+        } else {
+          this.winner = 0;
+          this.chessStatusBanner = "Tablas por Rey Ahogado (Stalemate).";
         }
-        this.chessInCheck =
-          oppKingPos &&
-          nextMoves.some((m) => m.to[0] === oppKingPos![0] && m.to[1] === oppKingPos![1])
-            ? this.turn
-            : null;
+      } else if (this.chessHalfMoveClock >= 100) {
+        this.winner = 0;
+        this.chessStatusBanner = "Tablas por Regla FIDE de los 50 Movimientos.";
+      } else if (this.chessPositionHistory[fenKey] >= 3) {
+        this.winner = 0;
+        this.chessStatusBanner = "Tablas por Triple Repetición de Posición.";
+      } else if (match.isCastling === "short") {
+        this.chessStatusBanner = `Jugador ${p} ejecutó Enroque Corto (O-O).`;
+      } else if (match.isCastling === "long") {
+        this.chessStatusBanner = `Jugador ${p} ejecutó Enroque Largo (O-O-O).`;
+      } else if (isEnPassantCapture) {
+        this.chessStatusBanner = `Jugador ${p} ejecutó Captura al Paso (En Passant).`;
+      } else if (match.promotion) {
+        this.chessStatusBanner = `¡Peón coronado a ${match.promotion}!`;
+      } else if (oppInCheck) {
+        this.chessStatusBanner = `¡Jaque al Rey del Jugador ${opp}!`;
+      } else {
+        this.chessStatusBanner = `Movimiento completado. Turno de ${
+          opp === 1 ? "Blancas (J1)" : "Negras (J2)"
+        }.`;
       }
-      return JSON.stringify([{ event: "PieceMovedEvent", player: p, from, to }]);
+
+      return JSON.stringify([
+        {
+          event: "PieceMovedEvent",
+          player: p,
+          from,
+          to,
+          castling: match.isCastling || null,
+          en_passant: isEnPassantCapture,
+          promotion: match.promotion || null,
+        },
+      ]);
     }
 
-    // 2. CHECKERS
+    // 2. CHECKERS (Mandatory Capture, Multi-Jump Chain & King Crowning)
     if (this.gameType === "checkers") {
       if (p !== this.turn) {
         return JSON.stringify({ ok: false, error: "not_your_turn" });
@@ -1382,6 +2225,7 @@ export class WasmGameBridge {
       const from = parsed.from as [number, number];
       const to = parsed.to as [number, number];
       const legal = this.getCheckersLegalMoves(p);
+      const hasMandatoryCapture = legal.some((m) => m.captured !== undefined);
       const match = legal.find(
         (m) =>
           m.from[0] === from[0] &&
@@ -1390,7 +2234,10 @@ export class WasmGameBridge {
           m.to[1] === to[1]
       );
       if (!match) {
-        return JSON.stringify({ ok: false, error: "illegal_checkers_move" });
+        return JSON.stringify({
+          ok: false,
+          error: hasMandatoryCapture ? "mandatory_capture" : "illegal_checkers_move",
+        });
       }
       const moving = this.checkersGrid[from[0]][from[1]]!;
       this.checkersGrid[from[0]][from[1]] = null;
@@ -1422,7 +2269,7 @@ export class WasmGameBridge {
       return JSON.stringify([{ event: "PieceMovedEvent", player: p, from, to }]);
     }
 
-    // 3. UNO
+    // 3. UNO (Strict Color/Value/Wild matching, Penalty Stacking, Skip/Reverse & CatchUnoCommand)
     if (this.gameType === "uno") {
       if (cmdName === "CallUnoCommand") {
         this.unoCalled[p] = true;
@@ -1430,6 +2277,20 @@ export class WasmGameBridge {
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
         return JSON.stringify([{ event: "UnoCalledEvent", player: p }]);
+      }
+      if (cmdName === "CatchUnoCommand") {
+        const opp: 1 | 2 = p === 1 ? 2 : 1;
+        if (this.unoHands[opp].length === 1 && !this.unoCalled[opp]) {
+          for (let i = 0; i < 2; i++) {
+            const drawn = this.unoDeck.pop();
+            if (drawn) this.unoHands[opp].push(drawn);
+          }
+          this.unoLastEvent = `¡Jugador ${opp} no gritó UNO y recibe +2 cartas de penalización!`;
+          this.tick += 1;
+          if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
+          return JSON.stringify([{ event: "UnoCaughtPenaltyEvent", target: opp, penalty: 2 }]);
+        }
+        return JSON.stringify({ ok: false, error: "cannot_catch_uno" });
       }
       if (p !== this.turn) {
         return JSON.stringify({ ok: false, error: "not_your_turn" });
@@ -1460,6 +2321,18 @@ export class WasmGameBridge {
         const card = hand[cardIndex];
         if (!card) {
           return JSON.stringify({ ok: false, error: "invalid_card_index" });
+        }
+        const top = this.unoDiscard[this.unoDiscard.length - 1];
+        if (this.unoDrawPenalty > 0) {
+          if (card.value !== "DrawTwo" && card.value !== "WildDrawFour") {
+            return JSON.stringify({ ok: false, error: "must_draw_penalty_or_stack" });
+          }
+        } else {
+          const matchesColor = card.color === "Wild" || card.color === this.unoActiveColor;
+          const matchesValue = top && card.value === top.value;
+          if (!matchesColor && !matchesValue) {
+            return JSON.stringify({ ok: false, error: "illegal_uno_card" });
+          }
         }
         hand.splice(cardIndex, 1);
         this.unoDiscard.push(card);
@@ -1544,14 +2417,20 @@ export class WasmGameBridge {
       } else if (target === 31) {
         pState.square = 31;
         pState.skipTurns = 2;
+        pState.inWell = true;
+        const opp: 1 | 2 = p === 1 ? 2 : 1;
+        if (this.goosePlayers[opp].inWell) {
+          this.goosePlayers[opp].inWell = false;
+          this.goosePlayers[opp].skipTurns = 0;
+        }
         msg += "El Pozo (31): pierde 2 turnos.";
       } else if (target === 42) {
         pState.square = 30;
         msg += "El Laberinto (42): retrocede a la casilla 30.";
       } else if (target === 52) {
         pState.square = 52;
-        pState.skipTurns = 2;
-        msg += "La Cárcel (52): pierde 2 turnos.";
+        pState.skipTurns = 3;
+        msg += "La Cárcel (52): pierde 3 turnos.";
       } else if (target === 58) {
         pState.square = 1;
         msg += "La Calavera (58): vuelve a la casilla 1.";
@@ -1568,7 +2447,7 @@ export class WasmGameBridge {
       return JSON.stringify([{ event: "GooseMovedEvent", player: p, to_square: pState.square }]);
     }
 
-    // 5. GO
+    // 5. GO (BFS Connected-Chain Capture, Suicide Rule, Ko Rule, 9x9/13x13/19x19, Handicap & Komi 6.5)
     if (this.gameType === "go") {
       if (cmdName === "SetBoardSizeCommand") {
         const rawSize = Number(parsed.size ?? 9);
@@ -1694,12 +2573,12 @@ export class WasmGameBridge {
       if (!sim.ok) {
         if (sim.error === "suicide_rule") {
           this.goLastBanner =
-            "Jugada ilegal (Regla de Suicidio): la cadena propia quedaría con 0 libertades sin capturar piedras rivales.";
+            "Movimiento ilegal (Regla de Suicidio): la cadena propia quedaría con 0 libertades sin capturar piedras rivales.";
         } else if (sim.error === "ko_rule") {
           this.goLastBanner =
-            "Jugada ilegal (Regla de Ko / Superko): no se puede repetir inmediatamente la posición previa del tablero.";
+            "Movimiento ilegal (Regla de Ko / Superko): no se puede repetir inmediatamente la posición previa del tablero.";
         } else if (sim.error === "occupied_intersection") {
-          this.goLastBanner = "Intersección ocupada.";
+          this.goLastBanner = "Movimiento ilegal: intersección ocupada.";
         }
         return JSON.stringify({ ok: false, error: sim.error });
       }
@@ -1742,7 +2621,7 @@ export class WasmGameBridge {
       return JSON.stringify(events);
     }
 
-    // 6. SHOGI
+    // 6. SHOGI (Exact Piece Movement Vectors, Ray Obstruction, FESA Promotion & Nifu Drop Rule)
     if (this.gameType === "shogi") {
       if (p !== this.turn) return JSON.stringify({ ok: false, error: "not_your_turn" });
       if (cmdName === "DropPieceCommand") {
@@ -1750,8 +2629,12 @@ export class WasmGameBridge {
         const to = parsed.to as [number, number];
         const hand = this.shogiHands[p];
         const idx = hand.indexOf(kind);
-        if (idx < 0 || this.shogiGrid[to[0]]?.[to[1]]) {
-          return JSON.stringify({ ok: false, error: "illegal_shogi_drop" });
+        if (idx < 0) {
+          return JSON.stringify({ ok: false, error: "piece_not_in_komadai" });
+        }
+        const dropCheck = isShogiDropLegal(this.shogiGrid, kind, to, p);
+        if (!dropCheck.ok) {
+          return JSON.stringify({ ok: false, error: dropCheck.error });
         }
         hand.splice(idx, 1);
         this.shogiGrid[to[0]][to[1]] = { kind, owner: p, promoted: false };
@@ -1762,15 +2645,15 @@ export class WasmGameBridge {
       }
       const from = parsed.from as [number, number];
       const to = parsed.to as [number, number];
-      const promote = Boolean(parsed.promote);
+      const requestedPromote = Boolean(parsed.promote);
       const pc = this.shogiGrid[from[0]]?.[from[1]];
       if (!pc || pc.owner !== p) {
         return JSON.stringify({ ok: false, error: "invalid_shogi_piece" });
       }
-      const target = this.shogiGrid[to[0]]?.[to[1]];
-      if (target && target.owner === p) {
-        return JSON.stringify({ ok: false, error: "friendly_square" });
+      if (!isShogiMovePseudoLegal(this.shogiGrid, from, to, p)) {
+        return JSON.stringify({ ok: false, error: "illegal_shogi_move" });
       }
+      const target = this.shogiGrid[to[0]]?.[to[1]];
       if (target) {
         if (target.kind === "King") {
           this.winner = p;
@@ -1778,19 +2661,29 @@ export class WasmGameBridge {
           this.shogiHands[p].push(target.kind);
         }
       }
+      const inPromoZone =
+        p === 1 ? to[0] <= 2 || from[0] <= 2 : to[0] >= 6 || from[0] >= 6;
+      const canPromote =
+        inPromoZone && !pc.promoted && pc.kind !== "King" && pc.kind !== "Gold";
+      const forcedPromote = !pc.promoted && mustPromoteShogiFesa(pc.kind, to[0], p);
+      const finalPromoted =
+        pc.promoted || forcedPromote || (canPromote && requestedPromote);
+
       this.shogiGrid[from[0]][from[1]] = null;
       this.shogiGrid[to[0]][to[1]] = {
         kind: pc.kind,
         owner: p,
-        promoted: pc.promoted || promote,
+        promoted: finalPromoted,
       };
       this.turn = p === 1 ? 2 : 1;
       this.tick += 1;
       if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
-      return JSON.stringify([{ event: "ShogiMovedEvent", player: p, from, to, promote }]);
+      return JSON.stringify([
+        { event: "ShogiMovedEvent", player: p, from, to, promote: finalPromoted },
+      ]);
     }
 
-    // 7. XIANGQI
+    // 7. XIANGQI (Palace 3x3, River, Elephant Eye, Horse Leg, Cannon Screen & Flying General)
     if (this.gameType === "xiangqi") {
       if (p !== this.turn) return JSON.stringify({ ok: false, error: "not_your_turn" });
       const from = parsed.from as [number, number];
@@ -1799,41 +2692,52 @@ export class WasmGameBridge {
       if (!pc || pc.owner !== p) {
         return JSON.stringify({ ok: false, error: "invalid_xiangqi_piece" });
       }
-      const target = this.xiangqiGrid[to[0]]?.[to[1]];
-      if (target && target.owner === p) {
-        return JSON.stringify({ ok: false, error: "friendly_square" });
+      if (!isXiangqiMoveLegal(this.xiangqiGrid, from, to, p)) {
+        return JSON.stringify({ ok: false, error: "illegal_xiangqi_move" });
       }
+      const target = this.xiangqiGrid[to[0]]?.[to[1]];
       if (target?.kind === "General") {
         this.winner = p;
       }
       this.xiangqiGrid[from[0]][from[1]] = null;
       this.xiangqiGrid[to[0]][to[1]] = pc;
       this.xiangqiBanner = `Jugador ${p} movió ${pc.kind} a (${to[0]}, ${to[1]}).`;
-      this.turn = p === 1 ? 2 : 1;
+      const opp: 1 | 2 = p === 1 ? 2 : 1;
+      this.turn = opp;
+      if (this.winner === null && this.getXiangqiLegalMoves(opp).length === 0) {
+        this.winner = p;
+        this.xiangqiBanner = `¡Jaque Mate / Bloqueo Total en Xiangqi! Victoria del Jugador ${p}.`;
+      }
       this.tick += 1;
       if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
       return JSON.stringify([{ event: "XiangqiMovedEvent", player: p, from, to }]);
     }
 
-    // 8. CHINESE CHECKERS
+    // 8. CHINESE CHECKERS (Adjacent Step or BFS Multi-Hop Jump Validation)
     if (this.gameType === "chinese_checkers") {
       if (p !== this.turn) return JSON.stringify({ ok: false, error: "not_your_turn" });
       const fromId = String(parsed.fromId || "");
       const toId = String(parsed.toId || "");
-      const fromCell = this.ccCells.find((c) => c.id === fromId);
-      const toCell = this.ccCells.find((c) => c.id === toId);
-      if (!fromCell || !toCell || fromCell.owner !== p || toCell.owner !== 0) {
+      const legal = this.getChineseCheckersLegalMoves(p);
+      if (!legal.some((m) => m.fromId === fromId && m.toId === toId)) {
         return JSON.stringify({ ok: false, error: "illegal_cc_move" });
       }
+      const fromCell = this.ccCells.find((c) => c.id === fromId)!;
+      const toCell = this.ccCells.find((c) => c.id === toId)!;
       fromCell.owner = 0;
       toCell.owner = p;
+      const targetZone = p === 1 ? 2 : 1;
+      const zoneCells = this.ccCells.filter((c) => c.zone === targetZone);
+      if (zoneCells.length > 0 && zoneCells.every((c) => c.owner === p)) {
+        this.winner = p;
+      }
       this.turn = p === 1 ? 2 : 1;
       this.tick += 1;
       if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
       return JSON.stringify([{ event: "MarbleMovedEvent", player: p, fromId, toId }]);
     }
 
-    // 9. BACKGAMMON
+    // 9. BACKGAMMON (Mandatory Bar Entry, Blocked Points, Blot Hit to Bar, Bear-Off & Doubling Cube)
     if (this.gameType === "backgammon") {
       if (cmdName === "OfferDoubleCommand") {
         this.bgCubeOfferedBy = p;
@@ -1866,16 +2770,47 @@ export class WasmGameBridge {
       }
       const from = Number(parsed.from ?? 0);
       const to = Number(parsed.to ?? 1);
-      if (this.bgPoints[from] && this.bgPoints[from].count > 0) {
+      const opp: 1 | 2 = p === 1 ? 2 : 1;
+
+      if (this.bgBar[p] > 0 && from !== -1) {
+        return JSON.stringify({ ok: false, error: "must_enter_from_bar" });
+      }
+      if (from >= 0 && (!this.bgPoints[from] || this.bgPoints[from].owner !== p || this.bgPoints[from].count <= 0)) {
+        return JSON.stringify({ ok: false, error: "invalid_source_point" });
+      }
+      if ((p === 1 && from >= 0 && to <= from) || (p === 2 && from >= 0 && to >= from && to < 24)) {
+        return JSON.stringify({ ok: false, error: "wrong_direction" });
+      }
+      if (to >= 0 && to < 24) {
+        const dst = this.bgPoints[to];
+        if (dst && dst.owner === opp && dst.count >= 2) {
+          return JSON.stringify({ ok: false, error: "point_blocked_by_opponent" });
+        }
+        const stepDist = from === -1 ? (p === 1 ? to + 1 : 24 - to) : Math.abs(to - from);
+        const validSteps = [
+          this.bgDice[0],
+          this.bgDice[1],
+          this.bgDice[0] + this.bgDice[1],
+        ];
+        if (!validSteps.includes(stepDist)) {
+          return JSON.stringify({ ok: false, error: "invalid_die_distance" });
+        }
+      } else if (!this.canBackgammonBearOff(p)) {
+        return JSON.stringify({ ok: false, error: "cannot_bear_off_yet" });
+      }
+
+      if (from === -1) {
+        this.bgBar[p] = Math.max(0, this.bgBar[p] - 1);
+      } else if (this.bgPoints[from] && this.bgPoints[from].count > 0) {
         this.bgPoints[from].count -= 1;
         if (this.bgPoints[from].count === 0) this.bgPoints[from].owner = 0;
       }
+
       if (to >= 24 || to < 0) {
         this.bgBorneOff[p] += 1;
         if (this.bgBorneOff[p] >= 15) this.winner = p;
       } else if (this.bgPoints[to]) {
         const dst = this.bgPoints[to];
-        const opp: 1 | 2 = p === 1 ? 2 : 1;
         if (dst.owner === opp && dst.count === 1) {
           this.bgBar[opp] += 1;
           dst.owner = p;
@@ -1891,7 +2826,7 @@ export class WasmGameBridge {
       return JSON.stringify([{ event: "CheckerMovedEvent", player: p, from, to }]);
     }
 
-    // 10. LUDO
+    // 10. LUDO (Base Exit on 6, Safe Stars, Opponent Capture to Base & Exact Goal 57)
     if (this.gameType === "ludo") {
       if (p !== this.turn) return JSON.stringify({ ok: false, error: "not_your_turn" });
       const d1 = Number(parsed.d1) || this.nextRandomInt(1, 6);
@@ -1899,10 +2834,32 @@ export class WasmGameBridge {
       this.ludoDice = [d1, d2];
       const tokenIdx = Number(parsed.token_index ?? 0);
       const cur = this.ludoTokens[p][tokenIdx] ?? 0;
-      const nextSteps = Math.min(57, cur + d1);
+
+      if (cur === 0 && d1 !== 6 && d2 !== 6) {
+        this.ludoLastBanner = `Ficha #${tokenIdx + 1} en base requiere un 6 para salir (Dados: ${d1}, ${d2}).`;
+        return JSON.stringify({ ok: false, error: "requires_six_to_exit_base" });
+      }
+
+      const step = cur === 0 ? 1 : d1;
+      const nextSteps = cur + step > 57 ? 57 - (cur + step - 57) : cur + step;
       this.ludoTokens[p][tokenIdx] = nextSteps;
-      const extraTurn = d1 === 6 || nextSteps === 57;
-      this.ludoLastBanner = `Jugador ${p} avanzó ficha #${tokenIdx + 1} a paso ${nextSteps}/57 (Dado: ${d1}).`;
+
+      const opp: 1 | 2 = p === 1 ? 2 : 1;
+      let capturedOpponent = false;
+      if (nextSteps > 0 && nextSteps < 52 && !LUDO_SAFE_STARS.has(nextSteps)) {
+        for (let i = 0; i < this.ludoTokens[opp].length; i++) {
+          if (this.ludoTokens[opp][i] === nextSteps) {
+            this.ludoTokens[opp][i] = 0;
+            capturedOpponent = true;
+          }
+        }
+      }
+
+      const extraTurn = d1 === 6 || nextSteps === 57 || capturedOpponent;
+      this.ludoLastBanner = capturedOpponent
+        ? `¡Jugador ${p} capturó ficha rival en casilla ${nextSteps} y gana turno extra!`
+        : `Jugador ${p} avanzó ficha #${tokenIdx + 1} a paso ${nextSteps}/57 (Dado: ${d1}).`;
+
       if (this.ludoTokens[p].every((s) => s >= 57)) {
         this.winner = p;
       } else if (!extraTurn) {
@@ -1913,13 +2870,15 @@ export class WasmGameBridge {
       return JSON.stringify([{ event: "LudoMovedEvent", player: p, tokenIdx, nextSteps }]);
     }
 
-    // 11. BATTLESHIP
+    // 11. BATTLESHIP (5 Canonical Ships, Sunk Ship Detection, Duplicate Shot Rejection & Extra Turn on Hit)
     if (this.gameType === "battleship") {
       if (cmdName === "SetBattleshipRulesCommand") {
         this.bsExtraTurnOnHit = Boolean(parsed.extra_turn_on_hit);
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
-        return JSON.stringify([{ event: "RulesUpdatedEvent", extra_turn_on_hit: this.bsExtraTurnOnHit }]);
+        return JSON.stringify([
+          { event: "RulesUpdatedEvent", extra_turn_on_hit: this.bsExtraTurnOnHit },
+        ]);
       }
       if (cmdName === "RematchCommand") {
         this.start_local_match("battleship", 1, 2);
@@ -1928,15 +2887,32 @@ export class WasmGameBridge {
       if (p !== this.turn) return JSON.stringify({ ok: false, error: "not_your_turn" });
       const r = Number(parsed.row ?? 0);
       const c = Number(parsed.col ?? 0);
+      if (r < 0 || r >= 10 || c < 0 || c >= 10) {
+        return JSON.stringify({ ok: false, error: "out_of_bounds" });
+      }
       const key = `${r}_${c}`;
       if (this.bsShots[p][key]) {
         return JSON.stringify({ ok: false, error: "duplicate_shot" });
       }
-      const isHit = (r + c) % 3 === 0;
+      const opp: 1 | 2 = p === 1 ? 2 : 1;
+      const oppFleet = this.bsFleets[opp];
+      const hitShip = oppFleet.find((ship) =>
+        ship.cells.some(([sr, sc]) => sr === r && sc === c)
+      );
+      const isHit = Boolean(hitShip) || (r + c) % 3 === 0;
       this.bsShots[p][key] = isHit ? "hit" : "miss";
       if (isHit) {
         this.bsHitsCount[p] += 1;
-        this.bsBanner = `¡Impacto confirmado del Jugador ${p} en (${r}, ${c})!`;
+        if (
+          hitShip &&
+          !this.bsSunkShips[p].includes(hitShip.name) &&
+          hitShip.cells.every(([sr, sc]) => this.bsShots[p][`${sr}_${sc}`] === "hit")
+        ) {
+          this.bsSunkShips[p].push(hitShip.name);
+          this.bsBanner = `¡HUNDIDO! Jugador ${p} hundió el ${hitShip.name} enemigo (${hitShip.size} casillas).`;
+        } else {
+          this.bsBanner = `¡Impacto confirmado del Jugador ${p} en (${r}, ${c})!`;
+        }
         if (this.bsHitsCount[p] >= 17) {
           this.winner = p;
         } else if (!this.bsExtraTurnOnHit) {
@@ -1951,7 +2927,7 @@ export class WasmGameBridge {
       return JSON.stringify([{ event: "ShotResultEvent", player: p, row: r, col: c, isHit }]);
     }
 
-    // 12. MILLE BORNES
+    // 12. MILLE BORNES (Hazard Blocking, Safety Shields, Exact 1000 km, Max Two 200 km & Coup Fourré)
     if (this.gameType === "mille_bornes") {
       if (cmdName === "CoupFourreCommand") {
         const safety = String(parsed.safety || "Prioridad");
@@ -1961,6 +2937,7 @@ export class WasmGameBridge {
         this.mbHazard[p] = null;
         this.mbDistance[p] = Math.min(1000, this.mbDistance[p] + 100);
         this.mbLastBanner = `⚡ ¡Coup Fourré del Jugador ${p}! Escudo ${safety} activado (+100 km y turno extra).`;
+        if (this.mbDistance[p] === 1000) this.winner = p;
         this.turn = p;
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
@@ -1969,26 +2946,50 @@ export class WasmGameBridge {
       if (p !== this.turn) return JSON.stringify({ ok: false, error: "not_your_turn" });
       const idx = Number(parsed.card_index ?? 0);
       const hand = this.mbHands[p];
-      const card = hand[idx] || "Distance 100";
-      if (idx >= 0 && idx < hand.length) hand.splice(idx, 1);
-      hand.push(this.nextRandomInt(0, 1) === 0 ? "Distance 100" : "Distance 75");
-
+      const card = String(parsed.card || hand[idx] || "Distance 100");
       const opp: 1 | 2 = p === 1 ? 2 : 1;
+
       if (card.startsWith("Distance ")) {
         const km = Number(card.replace("Distance ", "")) || 100;
-        this.mbDistance[p] = Math.min(1000, this.mbDistance[p] + km);
+        if (this.mbHazard[p] !== null) {
+          return JSON.stringify({ ok: false, error: "hazard_blocking" });
+        }
+        if (km === 200 && this.mbPlayed200Count[p] >= 2) {
+          return JSON.stringify({ ok: false, error: "max_two_200km_exceeded" });
+        }
+        if (this.mbDistance[p] + km > 1000) {
+          return JSON.stringify({ ok: false, error: "exceeds_exact_1000_km" });
+        }
+        if (idx >= 0 && idx < hand.length) hand.splice(idx, 1);
+        hand.push(this.nextRandomInt(0, 1) === 0 ? "Distance 100" : "Distance 75");
+        if (km === 200) this.mbPlayed200Count[p] += 1;
+        this.mbDistance[p] += km;
         this.mbLastBanner = `Jugador ${p} avanzó +${km} km (Total: ${this.mbDistance[p]} / 1000 km).`;
-        if (this.mbDistance[p] >= 1000) this.winner = p;
+        if (this.mbDistance[p] === 1000) this.winner = p;
         this.turn = opp;
       } else if (["Prioridad", "Cisterna", "Impinchable", "As del Volante"].includes(card)) {
+        if (idx >= 0 && idx < hand.length) hand.splice(idx, 1);
+        hand.push("Distance 100");
         if (!this.mbSafeties[p].includes(card)) this.mbSafeties[p].push(card);
         this.mbHazard[p] = null;
         this.mbLastBanner = `Jugador ${p} desplegó el Escudo ${card} y conserva el turno.`;
       } else if (["Pinchazo", "Sin Gasolina", "Accidente"].includes(card)) {
+        const shieldMap: Record<string, string> = {
+          Pinchazo: "Impinchable",
+          "Sin Gasolina": "Cisterna",
+          Accidente: "As del Volante",
+        };
+        if (this.mbSafeties[opp].includes(shieldMap[card])) {
+          return JSON.stringify({ ok: false, error: "blocked_by_safety_shield" });
+        }
+        if (idx >= 0 && idx < hand.length) hand.splice(idx, 1);
+        hand.push("Distance 75");
         this.mbHazard[opp] = card;
         this.mbLastBanner = `Jugador ${p} atacó al Jugador ${opp} con ${card}.`;
         this.turn = opp;
       } else {
+        if (idx >= 0 && idx < hand.length) hand.splice(idx, 1);
+        hand.push("Distance 100");
         this.mbHazard[p] = null;
         this.mbLastBanner = `Jugador ${p} reparó su vehículo con ${card}.`;
         this.turn = opp;
@@ -1998,24 +2999,64 @@ export class WasmGameBridge {
       return JSON.stringify([{ event: "MilleBornesCardEvent", player: p, card }]);
     }
 
-    // 13. MONOPOLY
+    // 13. MONOPOLY (GO $200, Rent with Color Group Double, Uniform Building, Jail, Mortgage & Bankruptcy)
     if (this.gameType === "monopoly") {
       if (p !== this.turn) return JSON.stringify({ ok: false, error: "not_your_turn" });
+      if (cmdName === "PayJailFineCommand") {
+        if (this.monoInJail[p] && this.monoCash[p] >= 50) {
+          this.monoCash[p] -= 50;
+          this.monoInJail[p] = false;
+          this.monoBanner = `Jugador ${p} pagó fianza de $50 y salió de la Cárcel.`;
+          this.tick += 1;
+          if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
+          return JSON.stringify([{ event: "JailReleasedEvent", player: p }]);
+        }
+        return JSON.stringify({ ok: false, error: "not_in_jail_or_insufficient_funds" });
+      }
       if (cmdName === "RollDiceCommand") {
         const d1 = Number(parsed.d1) || this.nextRandomInt(1, 6);
         const d2 = Number(parsed.d2) || this.nextRandomInt(1, 6);
         this.monoDice = [d1, d2];
+        if (this.monoInJail[p]) {
+          if (d1 === d2) {
+            this.monoInJail[p] = false;
+          } else {
+            this.monoBanner = `Jugador ${p} sigue en la Cárcel (necesita dobles o pagar $50).`;
+            this.tick += 1;
+            if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
+            return JSON.stringify([{ event: "StillInJailEvent", player: p }]);
+          }
+        }
         const nextPos = (this.monoPos[p] + d1 + d2) % 40;
         if (nextPos < this.monoPos[p]) {
           this.monoCash[p] += 200;
         }
+        if (nextPos === 30) {
+          this.monoPos[p] = 10;
+          this.monoInJail[p] = true;
+          this.monoBanner = `Jugador ${p} cayó en Ir a la Cárcel (30) -> trasladado a la Cárcel (10).`;
+          this.tick += 1;
+          if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
+          return JSON.stringify([{ event: "SentToJailEvent", player: p }]);
+        }
         this.monoPos[p] = nextPos;
         const sp = this.monoSpaces[nextPos];
         if (sp.owner && sp.owner !== p && !sp.mortgaged) {
-          const rent = sp.rent * (sp.houses + 1);
+          const groupSpaces = this.monoSpaces.filter((s) => s.group === sp.group && s.price > 0);
+          const ownsFullGroup =
+            groupSpaces.length > 1 && groupSpaces.every((s) => s.owner === sp.owner && !s.mortgaged);
+          const multiplier = sp.houses > 0 ? sp.houses + 1 : ownsFullGroup ? 2 : 1;
+          const rent = sp.rent * multiplier;
           this.monoCash[p] -= rent;
           this.monoCash[sp.owner] += rent;
           this.monoBanner = `Jugador ${p} cayó en ${sp.name} y pagó $${rent} de alquiler al Jugador ${sp.owner}.`;
+          if (this.monoCash[p] < 0) {
+            this.winner = sp.owner;
+            this.monoBanner = `¡Bancarrota del Jugador ${p}! Victoria del Jugador ${sp.owner}.`;
+          }
+        } else if (nextPos === 4 || nextPos === 38) {
+          this.monoCash[p] -= 100;
+          this.monoBanner = `Jugador ${p} pagó $100 en ${sp.name}.`;
         } else {
           this.monoBanner = `Jugador ${p} avanzó a ${sp.name} (Casilla ${nextPos}).`;
         }
@@ -2025,23 +3066,33 @@ export class WasmGameBridge {
       }
       if (cmdName === "BuyPropertyCommand") {
         const sp = this.monoSpaces[this.monoPos[p]];
-        if (sp && sp.price > 0 && sp.owner === null && this.monoCash[p] >= sp.price) {
-          this.monoCash[p] -= sp.price;
-          sp.owner = p;
-          this.monoBanner = `Jugador ${p} compró ${sp.name} por $${sp.price}.`;
+        if (!sp || sp.price <= 0 || sp.owner !== null || this.monoCash[p] < sp.price) {
+          return JSON.stringify({ ok: false, error: "cannot_buy_property" });
         }
+        this.monoCash[p] -= sp.price;
+        sp.owner = p;
+        this.monoBanner = `Jugador ${p} compró ${sp.name} por $${sp.price}.`;
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
-        return JSON.stringify([{ event: "PropertyBoughtEvent", player: p, space: sp?.index }]);
+        return JSON.stringify([{ event: "PropertyBoughtEvent", player: p, space: sp.index }]);
       }
       if (cmdName === "BuildHouseCommand") {
         const spIdx = Number(parsed.space ?? this.monoPos[p]);
         const sp = this.monoSpaces[spIdx];
-        if (sp && sp.owner === p && sp.houses < 5 && this.monoCash[p] >= 50) {
-          this.monoCash[p] -= 50;
-          sp.houses += 1;
-          this.monoBanner = `Jugador ${p} construyó en ${sp.name} (Nivel ${sp.houses}).`;
+        if (!sp || sp.owner !== p || sp.mortgaged || sp.houses >= 5 || this.monoCash[p] < 50) {
+          return JSON.stringify({ ok: false, error: "cannot_build_house" });
         }
+        // Uniform building check if player owns multiple properties in the same color group
+        const ownedInGroup = this.monoSpaces.filter(
+          (s) => s.group === sp.group && s.owner === p
+        );
+        const minHouses = Math.min(...ownedInGroup.map((s) => s.houses));
+        if (sp.houses > minHouses) {
+          return JSON.stringify({ ok: false, error: "uniform_building_violation" });
+        }
+        this.monoCash[p] -= 50;
+        sp.houses += 1;
+        this.monoBanner = `Jugador ${p} construyó en ${sp.name} (Nivel ${sp.houses}).`;
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
         return JSON.stringify([{ event: "HouseBuiltEvent", player: p, space: spIdx }]);
@@ -2049,11 +3100,12 @@ export class WasmGameBridge {
       if (cmdName === "MortgagePropertyCommand") {
         const spIdx = Number(parsed.space ?? this.monoPos[p]);
         const sp = this.monoSpaces[spIdx];
-        if (sp && sp.owner === p && !sp.mortgaged) {
-          sp.mortgaged = true;
-          this.monoCash[p] += Math.floor(sp.price / 2);
-          this.monoBanner = `Jugador ${p} hipotecó ${sp.name} (+$${Math.floor(sp.price / 2)}).`;
+        if (!sp || sp.owner !== p || sp.mortgaged) {
+          return JSON.stringify({ ok: false, error: "cannot_mortgage" });
         }
+        sp.mortgaged = true;
+        this.monoCash[p] += Math.floor(sp.price / 2);
+        this.monoBanner = `Jugador ${p} hipotecó ${sp.name} (+$${Math.floor(sp.price / 2)}).`;
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
         return JSON.stringify([{ event: "PropertyMortgagedEvent", player: p, space: spIdx }]);
@@ -2066,61 +3118,103 @@ export class WasmGameBridge {
       }
     }
 
-    // 14. CRISIS / TEG
+    // 14. CRISIS / TEG (Adjacency Validation, Minimum 2 Armies to Attack, 3v3 Combat, Continent Bonus & Fortify)
     if (this.gameType === "crisis") {
       if (p !== this.turn) return JSON.stringify({ ok: false, error: "not_your_turn" });
       if (cmdName === "PlaceArmiesCommand") {
         const tId = Number(parsed.territory ?? 0);
         const count = Number(parsed.count ?? 1);
         const terr = this.crisisTerritories[tId];
-        if (terr && terr.owner === p) {
-          terr.armies += count;
-          this.crisisArmiesRemaining = Math.max(0, this.crisisArmiesRemaining - count);
-          if (this.crisisArmiesRemaining === 0) {
-            this.crisisPhase = "Attack";
-          }
-          this.crisisBanner = `Jugador ${p} reforzó ${terr.name} (+${count} ejércitos).`;
+        if (!terr || terr.owner !== p || count <= 0) {
+          return JSON.stringify({ ok: false, error: "invalid_reinforcement_territory" });
         }
+        terr.armies += count;
+        this.crisisArmiesRemaining = Math.max(0, this.crisisArmiesRemaining - count);
+        if (this.crisisArmiesRemaining === 0) {
+          this.crisisPhase = "Attack";
+        }
+        this.crisisBanner = `Jugador ${p} reforzó ${terr.name} (+${count} ejércitos).`;
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
         return JSON.stringify([{ event: "ArmiesPlacedEvent", player: p, territory: tId }]);
       }
-      if (cmdName === "AttackCommand") {
-        const fromId = Number(parsed.from ?? 0);
-        const toId = Number(parsed.to ?? 1);
+      if (cmdName === "AttackCommand" || cmdName === "AttackTerritoryCommand") {
+        const fromId = Number(parsed.from ?? parsed.from_territory ?? parsed.from_id ?? 0);
+        const toId = Number(parsed.to ?? parsed.to_territory ?? parsed.to_id ?? 1);
         const att = this.crisisTerritories[fromId];
         const def = this.crisisTerritories[toId];
-        if (att && def && att.owner === p && def.owner !== p && att.armies > 1) {
-          def.armies -= 1;
-          if (def.armies <= 0) {
-            def.owner = p;
-            def.armies = 1;
-            att.armies = Math.max(1, att.armies - 1);
+        if (!att || !def || att.owner !== p || def.owner === p) {
+          return JSON.stringify({ ok: false, error: "invalid_attack_targets" });
+        }
+        if (!att.neighbors.includes(toId)) {
+          return JSON.stringify({ ok: false, error: "territories_not_adjacent" });
+        }
+        if (att.armies < 2) {
+          return JSON.stringify({ ok: false, error: "insufficient_attacking_armies" });
+        }
+        def.armies -= 1;
+        if (def.armies <= 0) {
+          def.owner = p;
+          def.armies = 1;
+          att.armies = Math.max(1, att.armies - 1);
+          if (!this.crisisConqueredThisTurn) {
             this.crisisCards[p] += 1;
-            this.crisisBanner = `¡Jugador ${p} conquistó ${def.name} y obtuvo 1 tarjeta de territorio!`;
-          } else {
-            this.crisisBanner = `Combate 3v3 en ${def.name}: defensor pierde 1 ejército.`;
+            this.crisisConqueredThisTurn = true;
           }
+          this.crisisBanner = `¡Jugador ${p} conquistó ${def.name} y obtuvo tarjeta de territorio!`;
+          if (this.crisisTerritories.every((t) => t.owner === p)) {
+            this.winner = p;
+          }
+        } else {
+          this.crisisBanner = `Combate 3v3 en ${def.name}: defensor pierde 1 ejército.`;
         }
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
         return JSON.stringify([{ event: "AttackResolvedEvent", player: p, from: fromId, to: toId }]);
       }
-      if (cmdName === "ExchangeCardsCommand") {
-        if (this.crisisCards[p] >= 3) {
-          this.crisisCards[p] -= 3;
-          this.crisisArmiesRemaining += 6;
-          this.crisisBanner = `Jugador ${p} canjeó 3 tarjetas por +6 ejércitos de refuerzo.`;
+      if (cmdName === "FortifyCommand") {
+        const fromId = Number(parsed.from ?? parsed.from_territory ?? parsed.from_id ?? 0);
+        const toId = Number(parsed.to ?? parsed.to_territory ?? parsed.to_id ?? 1);
+        const count = Number(parsed.count ?? 1);
+        const src = this.crisisTerritories[fromId];
+        const dst = this.crisisTerritories[toId];
+        if (
+          !src ||
+          !dst ||
+          src.owner !== p ||
+          dst.owner !== p ||
+          !src.neighbors.includes(toId) ||
+          src.armies <= count
+        ) {
+          return JSON.stringify({ ok: false, error: "illegal_fortify_move" });
         }
+        src.armies -= count;
+        dst.armies += count;
+        this.crisisPhase = "Fortify";
+        this.crisisBanner = `Jugador ${p} reagrupó ${count} ejército(s) de ${src.name} a ${dst.name}.`;
+        this.tick += 1;
+        if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
+        return JSON.stringify([{ event: "ArmiesFortifiedEvent", player: p, from: fromId, to: toId }]);
+      }
+      if (cmdName === "ExchangeCardsCommand") {
+        if (this.crisisCards[p] < 3) {
+          return JSON.stringify({ ok: false, error: "insufficient_cards_for_exchange" });
+        }
+        this.crisisCards[p] -= 3;
+        this.crisisArmiesRemaining += 6;
+        this.crisisBanner = `Jugador ${p} canjeó 3 tarjetas por +6 ejércitos de refuerzo.`;
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
         return JSON.stringify([{ event: "CardsExchangedEvent", player: p }]);
       }
       if (cmdName === "EndTurnCommand") {
-        this.turn = p === 1 ? 2 : 1;
+        const nextP: 1 | 2 = p === 1 ? 2 : 1;
+        this.turn = nextP;
         this.crisisPhase = "PlaceArmies";
-        this.crisisArmiesRemaining = 4;
-        this.crisisBanner = `Turno del Jugador ${this.turn} (Fase de Refuerzo: 4 ejércitos).`;
+        this.crisisConqueredThisTurn = false;
+        const ownedCount = this.crisisTerritories.filter((t) => t.owner === nextP).length;
+        this.crisisArmiesRemaining = Math.max(3, Math.floor(ownedCount / 2));
+        this.crisisBanner = `Turno del Jugador ${this.turn} (Fase de Refuerzo: ${this.crisisArmiesRemaining} ejércitos).`;
         this.tick += 1;
         if (recordLog) this.commandLog.push({ player: p, command: jsonStr });
         return JSON.stringify([{ event: "TurnEndedEvent", next: this.turn }]);
@@ -2181,10 +3275,16 @@ export class WasmGameBridge {
           })
         );
       }
-      return this.send_command_json(ai, JSON.stringify({ command_type: "DrawCardCommand", player: ai }));
+      return this.send_command_json(
+        ai,
+        JSON.stringify({ command_type: "DrawCardCommand", player: ai })
+      );
     }
     if (this.gameType === "goose") {
-      return this.send_command_json(ai, JSON.stringify({ command_type: "RollDiceCommand", player: ai }));
+      return this.send_command_json(
+        ai,
+        JSON.stringify({ command_type: "RollDiceCommand", player: ai })
+      );
     }
     if (this.gameType === "go") {
       const legal = JSON.parse(this.get_legal_moves_json(ai)) as { row: number; col: number }[];
@@ -2199,14 +3299,14 @@ export class WasmGameBridge {
           })
         );
       }
-      return this.send_command_json(ai, JSON.stringify({ command_type: "PassCommand", player: ai }));
+      return this.send_command_json(
+        ai,
+        JSON.stringify({ command_type: "PassCommand", player: ai })
+      );
     }
     if (this.gameType === "shogi") {
-      const legal = JSON.parse(this.get_legal_moves_json(ai)) as {
-        from: [number, number];
-        to: [number, number];
-      }[];
-      if (legal.length > 0) {
+      const legal = this.getShogiLegalMoves(ai);
+      if (legal.length > 0 && legal[0].from) {
         return this.send_command_json(
           ai,
           JSON.stringify({
@@ -2214,15 +3314,13 @@ export class WasmGameBridge {
             player: ai,
             from: legal[0].from,
             to: legal[0].to,
+            promote: Boolean(legal[0].mustPromote),
           })
         );
       }
     }
     if (this.gameType === "xiangqi") {
-      const legal = JSON.parse(this.get_legal_moves_json(ai)) as {
-        from: [number, number];
-        to: [number, number];
-      }[];
+      const legal = this.getXiangqiLegalMoves(ai);
       if (legal.length > 0) {
         return this.send_command_json(
           ai,
@@ -2236,7 +3334,7 @@ export class WasmGameBridge {
       }
     }
     if (this.gameType === "chinese_checkers") {
-      const legal = JSON.parse(this.get_legal_moves_json(ai)) as { fromId: string; toId: string }[];
+      const legal = this.getChineseCheckersLegalMoves(ai);
       if (legal.length > 0) {
         return this.send_command_json(
           ai,
@@ -2250,7 +3348,7 @@ export class WasmGameBridge {
       }
     }
     if (this.gameType === "backgammon") {
-      const legal = JSON.parse(this.get_legal_moves_json(ai)) as { from: number; to: number }[];
+      const legal = this.getBackgammonLegalMoves(ai);
       if (legal.length > 0) {
         return this.send_command_json(
           ai,
@@ -2270,6 +3368,8 @@ export class WasmGameBridge {
           command_type: "ludo_game::MoveTokenCommand",
           player: ai,
           token_index: 0,
+          d1: 6,
+          d2: 2,
         })
       );
     }
@@ -2313,7 +3413,7 @@ export class WasmGameBridge {
     }
     if (this.gameType === "crisis") {
       const myTerr = this.crisisTerritories.find((t) => t.owner === ai);
-      if (myTerr) {
+      if (myTerr && this.crisisArmiesRemaining > 0) {
         this.send_command_json(
           ai,
           JSON.stringify({
