@@ -29,8 +29,16 @@
     />
     <script>
       if ("serviceWorker" in navigator) {
+        if ("caches" in window) {
+          caches.delete("opentable-pwa-v1.0.0").catch(function () {});
+        }
         window.addEventListener("load", function () {
-          navigator.serviceWorker.register("/sw.js").catch(function () {});
+          navigator.serviceWorker
+            .register("/sw.js")
+            .then(function (reg) {
+              reg.update();
+            })
+            .catch(function () {});
         });
       }
     </script>
