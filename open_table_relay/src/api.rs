@@ -251,7 +251,7 @@ mod tests {
         let parsed: HealthResponse = serde_json::from_str(body).unwrap();
 
         assert_eq!(parsed.status, "ok");
-        assert_eq!(parsed.version, "0.1.0");
+        assert_eq!(parsed.version, env!("CARGO_PKG_VERSION"));
         assert_eq!(parsed.active_rooms, 4);
 
         handle.abort();
