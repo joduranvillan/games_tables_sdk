@@ -62,7 +62,11 @@ import {
 import { RelayChatPanel } from "./components/common/RelayChatPanel";
 import { MatchmakingQueuePanel } from "./components/common/MatchmakingQueuePanel";
 import { PostMatchAnalyzerPanel } from "./components/common/PostMatchAnalyzerPanel";
+import { SystemDiagnosticsPanel } from "./components/common/SystemDiagnosticsPanel";
+import { DocumentationCenterModal } from "./components/common/DocumentationCenterModal";
 import {
+  Activity,
+  BookOpen,
   Bot,
   Eye,
   QrCode,
@@ -238,8 +242,15 @@ export const App: React.FC = () => {
   const matchOutcomeRecordedRef = useRef<boolean>(false);
 
   const [activeTab, setActiveTab] = useState<
-    "play" | "catalog" | "tournaments" | "elo" | "analyzer" | "network"
+    | "play"
+    | "catalog"
+    | "tournaments"
+    | "elo"
+    | "analyzer"
+    | "network"
+    | "diagnostics"
   >("play");
+  const [isDocsModalOpen, setIsDocsModalOpen] = useState<boolean>(false);
   const [selectedGameId, setSelectedGameId] = useState<string>("chess");
   const [matchMode, setMatchMode] = useState<MatchMode>("hotseat");
   const [aiDifficulty, setAiDifficulty] = useState<number>(1);
@@ -908,7 +919,7 @@ export const App: React.FC = () => {
               onChange={setThemeConfig}
             />
 
-            <div className="flex items-center gap-3 text-xs text-slate-300 font-mono tabular-nums">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 font-mono tabular-nums">
               <span>
                 ELO {activeGameMeta.title}:{" "}
                 <strong className="text-emerald-400">
@@ -930,6 +941,27 @@ export const App: React.FC = () => {
                   {ACHIEVEMENTS_CATALOG.length}
                 </strong>
               </span>
+              <span aria-hidden="true">·</span>
+              <button
+                type="button"
+                onClick={() => setActiveTab("diagnostics")}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-sans font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  activeTab === "diagnostics"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800"
+                }`}
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>Diagnóstico E2E</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDocsModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-sans font-semibold bg-slate-900 hover:bg-slate-800 text-sky-400 border border-slate-800 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Guía y Docs React</span>
+              </button>
             </div>
           </div>
         </section>
@@ -1474,7 +1506,24 @@ export const App: React.FC = () => {
             />
           </section>
         )}
+
+        {activeTab === "diagnostics" && (
+          <SystemDiagnosticsPanel
+            activeGameId={selectedGameId}
+            relayState={relayState}
+            onSelectGameAndPlay={(gid) => {
+              startGameSession(gid, matchMode, aiDifficulty);
+              setActiveTab("play");
+            }}
+            onOpenDocsModal={() => setIsDocsModalOpen(true)}
+          />
+        )}
       </main>
+
+      <DocumentationCenterModal
+        isOpen={isDocsModalOpen}
+        onClose={() => setIsDocsModalOpen(false)}
+      />
     </div>
   );
 };
