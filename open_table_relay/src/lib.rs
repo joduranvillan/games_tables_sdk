@@ -520,11 +520,11 @@ async fn handle_connection(
     ws_config.max_message_size = Some(MAX_WS_MESSAGE_BYTES);
     ws_config.max_frame_size = Some(MAX_WS_MESSAGE_BYTES);
 
-    let ws_stream =
-        match tokio_tungstenite::accept_async_with_config(stream, Some(ws_config)).await {
-            Ok(ws) => ws,
-            Err(_) => return,
-        };
+    let ws_stream = match tokio_tungstenite::accept_async_with_config(stream, Some(ws_config)).await
+    {
+        Ok(ws) => ws,
+        Err(_) => return,
+    };
 
     global_metrics().inc_connections_active();
 
