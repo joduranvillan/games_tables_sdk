@@ -51,8 +51,12 @@ use std::time::Duration;
 use tls::TlsConfig;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex};
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::tungstenite::Message;
 use tournament::{Tournament, TournamentManager};
+
+/// Tamaño máximo permitido para un mensaje o trama WebSocket entrante (256 KiB).
+pub const MAX_WS_MESSAGE_BYTES: usize = 256 * 1024;
 
 /// Estado compartido entre todas las conexiones WebSocket del Relay.
 #[derive(Clone)]
@@ -512,10 +516,15 @@ async fn handle_connection(
         }
     }
 
-    let ws_stream = match tokio_tungstenite::accept_async(stream).await {
-        Ok(ws) => ws,
-        Err(_) => return,
-    };
+    let mut ws_config = WebSocketConfig::default();
+    ws_config.max_message_size = Some(MAX_WS_MESSAGE_BYTES);
+    ws_config.max_frame_size = Some(MAX_WS_MESSAGE_BYTES);
+
+    let ws_stream =
+        match tokio_tungstenite::accept_async_with_config(stream, Some(ws_config)).await {
+            Ok(ws) => ws,
+            Err(_) => return,
+        };
 
     global_metrics().inc_connections_active();
 
@@ -916,8 +925,26 @@ async fn process_text_message(
             loser,
             game_id,
         } => {
+            let w = winner.trim();
+            let l = loser.trim();
+            let g = game_id.trim();
+            if w.is_empty()
+                || l.is_empty()
+                || g.is_empty()
+                || w == l
+                || w.len() > 128
+                || l.len() > 128
+                || g.len() > 64
+            {
+                send_response(tx, &RelayResponse::error_reason("invalid_report_result"));
+                return;
+            }
             let report_check = {
                 let mut mgr = state.manager.lock().await;
+                if state.auth_config.is_enabled() && mgr.participant_info(conn_id).is_none() {
+                    send_response(tx, &RelayResponse::error_reason("not_in_room"));
+                    return;
+                }
                 mgr.check_manual_report_result(conn_id)
             };
             match report_check {

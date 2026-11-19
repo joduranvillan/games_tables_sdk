@@ -34,13 +34,16 @@ impl RandomService {
     /// Entero uniforme en `[min, max]` inclusive.
     pub fn range(&mut self, min: u32, max: u32) -> u32 {
         debug_assert!(max >= min);
-        let span = max - min + 1;
-        min + (self.next_u32() % span)
+        if max <= min {
+            return min;
+        }
+        let span = (u64::from(max) - u64::from(min)) + 1;
+        min + ((u64::from(self.next_u32()) % span) as u32)
     }
 
     /// Tirada de dado de `sides` caras, resultado en `[1, sides]`.
     pub fn roll_die(&mut self, sides: u32) -> u32 {
-        self.range(1, sides)
+        self.range(1, sides.max(1))
     }
 
     /// Baraja un slice in-place con Fisher-Yates determinista.

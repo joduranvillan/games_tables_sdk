@@ -166,6 +166,30 @@ impl AntiCheatSession {
             .unwrap_or(1)
     }
 
+    /// Indica si `data` es un mensaje de control/chat/sincronización entre pares y no un comando de jugada.
+    pub fn is_control_or_sync_payload(data: &Value) -> bool {
+        let cmd_val: Value = match data {
+            Value::String(s) => {
+                let trimmed = s.trim();
+                if !trimmed.starts_with('{') {
+                    return true;
+                }
+                match serde_json::from_str(trimmed) {
+                    Ok(v) => v,
+                    Err(_) => return false,
+                }
+            }
+            Value::Object(_) => data.clone(),
+            _ => return false,
+        };
+        if let Some(action) = cmd_val.get("action").and_then(|v| v.as_str()) {
+            if action == "request_sync" || action == "sync_log" {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Deserializa y aplica un comando sobre la `Session` local del juego.
     /// Devuelve `Ok(())` si el comando es legal y fue aplicado, o `Err("illegal_move")` si viola las reglas o el turno activo.
     pub fn validate_and_apply(

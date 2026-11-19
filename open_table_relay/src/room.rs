@@ -746,19 +746,24 @@ impl RoomManager {
         }
         let sender_player_id = participant.player_id;
 
+        let now = Instant::now();
         if let Some(ac) = room.anticheat.as_mut() {
+            let is_control = AntiCheatSession::is_control_or_sync_payload(payload);
             if ac.validate_and_apply(sender_player_id, payload).is_err() {
                 return Err(RoomError::IllegalMove);
             }
-            room.active_turn_seat = ac.active_turn_seat();
+            if !is_control {
+                room.active_turn_seat = ac.active_turn_seat();
+                room.last_move_at = now;
+                room.command_log.push(payload.clone());
+            }
         } else {
             room.active_turn_seat = if sender_player_id == 1 { 2 } else { 1 };
+            room.last_move_at = now;
+            room.command_log.push(payload.clone());
         }
 
-        let now = Instant::now();
-        room.last_move_at = now;
         room.last_activity_at = now;
-        room.command_log.push(payload.clone());
         room.broadcast_except(conn_id, outbound_json);
         Ok((code, sender_player_id))
     }
@@ -902,6 +907,13 @@ impl RoomManager {
         let Some(room) = self.rooms.get_mut(&code) else {
             return ReportResultCheck::Allowed;
         };
+        if room
+            .participants
+            .get(&conn_id)
+            .is_some_and(|p| p.role == ParticipantRole::Spectator)
+        {
+            return ReportResultCheck::MatchNotFinished;
+        }
         if room.elo_reported {
             return ReportResultCheck::AlreadyReported;
         }
@@ -1713,5 +1725,36 @@ mod tests {
         assert!(!is_new_3);
         assert_eq!(code_3, code_1);
         assert_eq!(pid_3, 2);
+    }
+
+    #[test]
+    fn test_control_message_does_not_reset_turn_clock_or_pollute_command_log() {
+        let mut manager = RoomManager::new();
+        let (tx1, _rx1) = mpsc::unbounded_channel();
+        let (tx2, _rx2) = mpsc::unbounded_channel();
+
+        let code =
+            manager.create_room_with_timeout(1, tx1, Some("chess".to_string()), false, Some(10));
+        manager.join_room(2, tx2, &code).unwrap();
+
+        let past = Instant::now() - Duration::from_secs(12);
+        if let Some(room) = manager.rooms.get_mut(&code) {
+            room.last_move_at = past;
+        }
+
+        // Un mensaje de control no-JSON no debe reiniciar last_move_at ni agregarse al command_log
+        let control_payload = serde_json::json!("ping_keepalive");
+        manager
+            .validate_and_relay(1, &control_payload, r#"{"op":"relay"}"#)
+            .unwrap();
+
+        let room = manager.rooms.get(&code).unwrap();
+        assert!(room.command_log.is_empty());
+        assert_eq!(room.last_move_at, past);
+
+        // El reloj de turno sigue expirado porque el mensaje de control no lo reinició
+        let timed_out = manager.expire_turn_timeouts();
+        assert_eq!(timed_out.len(), 1);
+        assert_eq!(timed_out[0].winner, "player2");
     }
 }

@@ -180,18 +180,26 @@ impl EloStore {
     }
 
     fn flush_to_disk(&self) -> std::io::Result<()> {
-        let mut file = fs::File::create(&self.db_path)?;
-        writeln!(
-            file,
-            "-- CREATE TABLE IF NOT EXISTS ratings(player_id TEXT PRIMARY KEY, game_id TEXT, elo INTEGER DEFAULT 1200, wins INTEGER, losses INTEGER);"
-        )?;
-        for record in self.records.values() {
-            if let Ok(json) = serde_json::to_string(record) {
-                writeln!(file, "{json}")?;
+        let tmp_path = self.db_path.with_extension("db.tmp");
+        {
+            let mut file = fs::File::create(&tmp_path)?;
+            writeln!(
+                file,
+                "-- CREATE TABLE IF NOT EXISTS ratings(player_id TEXT PRIMARY KEY, game_id TEXT, elo INTEGER DEFAULT 1200, wins INTEGER, losses INTEGER);"
+            )?;
+            for record in self.records.values() {
+                if let Ok(json) = serde_json::to_string(record) {
+                    writeln!(file, "{json}")?;
+                }
             }
+            file.flush()?;
+            file.sync_all()?;
         }
-        file.flush()?;
-        file.sync_all()
+        if fs::rename(&tmp_path, &self.db_path).is_err() {
+            fs::copy(&tmp_path, &self.db_path)?;
+            let _ = fs::remove_file(&tmp_path);
+        }
+        Ok(())
     }
 
     /// Ejecuta un flush completo y sincronización de almacenamiento (`WAL checkpoint`) antes de apagar el servidor.

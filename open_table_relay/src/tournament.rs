@@ -165,6 +165,9 @@ impl Tournament {
     }
 }
 
+/// Límite máximo de torneos retenidos en memoria antes de purgar torneos finalizados.
+pub const MAX_ACTIVE_TOURNAMENTS: usize = 512;
+
 /// Gestor de múltiples torneos en memoria para el servidor Relay.
 #[derive(Debug, Default)]
 pub struct TournamentManager {
@@ -184,8 +187,23 @@ impl TournamentManager {
         game_id: impl Into<String>,
         max_players: usize,
     ) -> Result<String, TournamentError> {
+        if self.tournaments.len() >= MAX_ACTIVE_TOURNAMENTS {
+            self.tournaments.retain(|_, t| t.champion.is_none());
+        }
         self.seq = self.seq.wrapping_add(1);
-        let code = format!("T-{:04X}", (self.seq.wrapping_mul(0xAB12)) & 0xFFFF);
+        let code = loop {
+            let mut rnd = [0u8; 2];
+            let raw_u16 = if getrandom::fill(&mut rnd).is_ok() {
+                u16::from_le_bytes(rnd) ^ (self.seq as u16)
+            } else {
+                ((self.seq.wrapping_mul(0xAB12)) & 0xFFFF) as u16
+            };
+            let candidate = format!("T-{raw_u16:04X}");
+            if !self.tournaments.contains_key(&candidate) {
+                break candidate;
+            }
+            self.seq = self.seq.wrapping_add(1);
+        };
         let tournament = Tournament::new(code.clone(), game_id, max_players)?;
         self.tournaments.insert(code.clone(), tournament);
         Ok(code)
