@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-51b9bb82.js";
+            window.path_to_searchindex_js = "searchindex-03f86050.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-6c7957f0.js"></script>
+        <script src="toc-6d18024d.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -398,6 +398,336 @@ func _on_move_rejected(reason: String) -&gt; void:
 <li><strong>Transports &amp; Relay (<code>open_table_transport_*</code>, <code>open_table_relay</code>)</strong>: TCP, WebSocket, and Native P2P transports plus matchmaking, persistent SQLite ELO ratings, and tournament brackets.</li>
 <li><strong>Godot Bridge (<code>open_table_godot</code>)</strong>: Exposes <code>OpenTableBridge</code> to GDScript so UI boards remain thin, reactive views driven by engine events.</li>
 </ol>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="manual-de-uso--opentable-web--pwa-14-juegos-de-mesa-canónicos"><a class="header" href="#manual-de-uso--opentable-web--pwa-14-juegos-de-mesa-canónicos">Manual de Uso — OpenTable Web &amp; PWA (14 Juegos de Mesa Canónicos)</a></h1>
+<p>Bienvenido al manual oficial de uso de <strong>OpenTable Web</strong>, la aplicación progresiva (PWA) construida con <strong>React 19, TypeScript, Tailwind CSS y WebAssembly (<code>open_table_wasm</code>)</strong> que ejecuta los <strong>14 motores de juegos de mesa canónicos</strong> de OpenTable SDK directamente en el navegador.</p>
+<hr>
+<h2 id="1-cómo-garantizar-que-la-aplicación-está-100-funcional"><a class="header" href="#1-cómo-garantizar-que-la-aplicación-está-100-funcional">1. Cómo Garantizar que la Aplicación Está 100% Funcional</a></h2>
+<p>Puedes comprobar la salud operativa de toda la aplicación en cualquier momento por dos vías:</p>
+<h3 id="a-desde-la-interfaz-gráfica-en-vivo-en-el-navegador"><a class="header" href="#a-desde-la-interfaz-gráfica-en-vivo-en-el-navegador">A. Desde la Interfaz Gráfica (En Vivo en el Navegador)</a></h3>
+<ol>
+<li>En la barra de herramientas superior (debajo de la cabecera principal), haz clic en el botón <strong><code>Diagnóstico E2E</code></strong>.</li>
+<li>Pulsa <strong><code>Ejecutar Diagnóstico Completo (14 Juegos)</code></strong>.</li>
+<li>El sistema instanciará en segundo plano los <strong>14 motores de juego</strong>, verificará:
+<ul>
+<li>Inicialización del tablero y turno inicial (<code>Jugador 1</code>).</li>
+<li>Cálculo de jugadas legales (<code>get_legal_moves_json</code>).</li>
+<li>Ejecución de un comando válido del Jugador 1 y respuesta automática de la IA (<code>step_ai_if_needed</code>).</li>
+<li>Evaluación posicional normalizada ($[-100, +100]$) para el Analizador Post-Partida.</li>
+<li>Exportación e importación determinista del registro de repetición (<code>export_log_json</code> / <code>apply_sync_log_json</code>).</li>
+<li>Subsistemas del navegador: <strong>ELO FIDE K=32</strong>, <strong>Torneos Berger/Knockout</strong>, <strong>LocalStorage</strong>, <strong>Web Audio API</strong>, <strong>Service Worker PWA</strong> y <strong>Relay WebSocket</strong>.</li>
+</ul>
+</li>
+<li>Puedes descargar el certificado de verificación con el botón <strong><code>Exportar Reporte</code></strong> (<code>.json</code>).</li>
+</ol>
+<h3 id="b-desde-la-terminal-script-de-garantía-funcional-cli"><a class="header" href="#b-desde-la-terminal-script-de-garantía-funcional-cli">B. Desde la Terminal (Script de Garantía Funcional CLI)</a></h3>
+<p>Ejecuta el script maestro de verificación del cliente Web:</p>
+<pre><code class="language-bash">bash games_tables_sdk/tools/verify_web_client.sh
+</code></pre>
+<p>Este comando valida sin intervención manual:</p>
+<ol>
+<li>Tipado estático de TypeScript (<code>tsc --noEmit</code>).</li>
+<li>Las <strong>6 suites automatizadas en Vitest</strong> (regresión de los 14 juegos, Fases 3, 4 y 5, y autodiagnóstico E2E).</li>
+<li>El empaquetado de producción de la PWA (<code>vite build</code>).</li>
+<li>La presencia e integridad de la documentación de uso y desarrollo.</li>
+</ol>
+<hr>
+<h2 id="2-modos-de-juego-disponibles"><a class="header" href="#2-modos-de-juego-disponibles">2. Modos de Juego Disponibles</a></h2>
+<p>Desde el selector de modo en la barra superior puedes alternar instantáneamente entre <strong>4 modos de juego</strong>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Modo</th><th style="text-align: left">Descripción</th><th style="text-align: left">Cuándo Usarlo</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><strong>Hotseat Local</strong></td><td style="text-align: left">Dos jugadores humanos comparten la pantalla alternando turnos en el mismo dispositivo.</td><td style="text-align: left">Partidas presenciales en tablet, portátil o escritorio.</td></tr>
+<tr><td style="text-align: left"><strong>vs IA Rust</strong></td><td style="text-align: left">Juegas como Jugador 1 contra el motor de IA determinista con <strong>4 niveles de dificultad</strong>: Fácil (<code>1000 ELO</code>), Media (<code>1200 ELO</code>), Difícil (<code>1450 ELO</code>) y Maestra (<code>1700 ELO</code>).</td><td style="text-align: left">Entrenamiento individual o partidas rápidas sin conexión.</td></tr>
+<tr><td style="text-align: left"><strong>Online Relay / QR</strong></td><td style="text-align: left">Conecta con el servidor <code>open_table_relay</code> (o sincroniza pestañas locales via <code>BroadcastChannel</code>) mediante un código de sala de 6 caracteres y código QR SVG instantáneo.</td><td style="text-align: left">Partidas multijugador en red local o internet (Cross-Play con Godot).</td></tr>
+<tr><td style="text-align: left"><strong>Espectador</strong></td><td style="text-align: left">Observa cualquier sala en vivo en modo de solo lectura con actualización automática del tablero y acceso al chat de sala.</td><td style="text-align: left">Retransmisión de torneos o seguimiento de partidas de amigos.</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="3-cola-de-matchmaking-automático-por-rango-elo"><a class="header" href="#3-cola-de-matchmaking-automático-por-rango-elo">3. Cola de Matchmaking Automático por Rango ELO</a></h2>
+<p>En la pestaña <strong><code>Salas Online</code></strong>:</p>
+<ol>
+<li>Revisa tu <strong>ELO actual</strong> para el juego seleccionado.</li>
+<li>Elige la <strong>Tolerancia ELO Inicial</strong>:
+<ul>
+<li><code>±100 ELO (Estricto)</code>: Busca rivales de nivel muy cercano.</li>
+<li><code>±200 ELO (Estándar)</code>: Balance óptimo entre velocidad y equilibrio competitivo.</li>
+<li><code>±400 ELO (Amplio)</code>: Emparejamiento rápido.</li>
+</ul>
+</li>
+<li>Pulsa <strong><code>Buscar Partida Online</code></strong>.</li>
+<li>Si no aparece un oponente en los primeros 10 segundos, la ventana se expande automáticamente (<code>±100 → ±200 → ±400</code>) y se sincroniza con <code>open_table_relay</code>.</li>
+<li>Si deseas jugar sin esperar a otro humano en línea, pulsa <strong><code>Jugar vs IA Calibrada Ahora</code></strong> para iniciar inmediatamente contra el nivel de IA que mejor se ajusta a tu ELO.</li>
+</ol>
+<hr>
+<h2 id="4-organizador-de-torneos-y-ranking-elo-fide-k32"><a class="header" href="#4-organizador-de-torneos-y-ranking-elo-fide-k32">4. Organizador de Torneos y Ranking ELO FIDE ($K=32$)</a></h2>
+<h3 id="a-pestaña-torneos"><a class="header" href="#a-pestaña-torneos">A. Pestaña <code>Torneos</code></a></h3>
+<ul>
+<li><strong>Formatos Soportados</strong>:
+<ul>
+<li><strong>Liga Round-Robin (Tablas de Berger)</strong>: Todos contra todos. Otorga <code>1.0</code> punto por victoria, <code>0.5</code> por empate y <code>0.0</code> por derrota, ordenando la clasificación por puntos, coeficiente <strong>Sonneborn-Berger (SB)</strong> y victorias.</li>
+<li><strong>Eliminatoria Directa (Knockout)</strong>: Cuadro eliminatorio con avance automático del ganador a la siguiente ronda hasta coronar al campeón.</li>
+</ul>
+</li>
+<li><strong>Participantes Mixtos (2 a 8)</strong>: Combina jugadores humanos y bots de IA de cualquier dificultad.</li>
+<li><strong>Integración con el Tablero</strong>: Pulsa <strong><code>Jugar en Tablero</code></strong> en cualquier enfrentamiento pendiente para disputarlo en vivo; al concluir la partida, el ganador se registra automáticamente en el cuadro del torneo.</li>
+</ul>
+<h3 id="b-pestaña-ranking-elo"><a class="header" href="#b-pestaña-ranking-elo">B. Pestaña <code>Ranking ELO</code></a></h3>
+<ul>
+<li>Calcula la variación de rating tras cada partida con la fórmula oficial FIDE ($K=32$):
+$$E_A = \frac{1}{1 + 10^{(R_B - R_A)/400}}, \quad \Delta R = \text{round}(32 \times (S - E_A))$$</li>
+<li>Desbloquea automáticamente <strong>7 logros competitivos</strong> (<em>Primera Victoria</em>, <em>Racha Imparable</em>, <em>Conquistador Polivalente</em>, <em>Maestro Táctico 1300+</em>, <em>Gran Maestro 1500+</em>, <em>Vencedor de IA Maestra</em> y <em>Campeón de Torneo</em>).</li>
+<li>Permite <strong>Exportar / Importar</strong> tu perfil completo en JSON y <strong>Sincronizar tu ELO</strong> con la sala Relay activa.</li>
+</ul>
+<hr>
+<h2 id="5-analizador-post-partida-y-visor-de-repeticiones"><a class="header" href="#5-analizador-post-partida-y-visor-de-repeticiones">5. Analizador Post-Partida y Visor de Repeticiones</a></h2>
+<h3 id="a-pestaña-analizador"><a class="header" href="#a-pestaña-analizador">A. Pestaña <code>Analizador</code></a></h3>
+<p>Evalúa todas las jugadas de la partida actual (o de una partida de demostración/JSON importado) para cualquiera de los <strong>14 juegos</strong>:</p>
+<ul>
+<li><strong>Gráfico SVG de Ventaja Posicional ($[-100, +100]$)</strong>: Muestra la evolución de la ventaja turno a turno (valores positivos favorecen al Jugador 1; negativos al Jugador 2).</li>
+<li><strong>Clasificación Automática de Jugadas</strong>:
+<ul>
+<li><code>★ Óptima</code>: Ganancia neta $\ge +5$ puntos de ventaja.</li>
+<li><code>✓ Buena</code>: Mantiene la ventaja (pérdida $\le 4$ puntos).</li>
+<li><code>? Imprecisión</code>: Caída moderada de ventaja ($4 &lt; \text{pérdida} &lt; 15$).</li>
+<li><code>?? Error Crítico</code>: Caída severa de ventaja ($\ge 15$ puntos).</li>
+</ul>
+</li>
+<li>Haz clic en cualquier punto de la gráfica o fila de la tabla y pulsa <strong><code>Cargar Estado de Este Turno en el Tablero Principal</code></strong> para explorar variantes desde esa posición.</li>
+</ul>
+<h3 id="b-barra-de-replay-en-el-tablero-principal"><a class="header" href="#b-barra-de-replay-en-el-tablero-principal">B. Barra de Replay en el Tablero Principal</a></h3>
+<p>Situada encima del tablero activo, permite desplazarse a cualquier paso (<code>|&lt;&lt;</code>, <code>&lt;</code>, slider, <code>&gt;</code>, <code>&gt;&gt;|</code>), exportar el historial completo a <code>.json</code> o cargar una partida guardada.</p>
+<hr>
+<h2 id="6-guía-rápida-de-controles-de-los-14-juegos"><a class="header" href="#6-guía-rápida-de-controles-de-los-14-juegos">6. Guía Rápida de Controles de los 14 Juegos</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: center">#</th><th style="text-align: left">Juego</th><th style="text-align: left">Controles en el Tablero React</th><th style="text-align: left">Reglas Especiales Activas</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: center">01</td><td style="text-align: left"><strong>Ajedrez</strong> (<code>chess</code>)</td><td style="text-align: left">Clic en pieza propia → clic en casilla iluminada. Selector emergente al coronar peón.</td><td style="text-align: left">Enroque corto/largo, captura al paso (<em>en passant</em>), detección de jaque/mate y coronación FIDE.</td></tr>
+<tr><td style="text-align: center">02</td><td style="text-align: left"><strong>Damas</strong> (<code>checkers</code>)</td><td style="text-align: left">Clic en ficha propia → clic en diagonal iluminada.</td><td style="text-align: left">Captura obligatoria, saltos múltiples y coronación a Dama (<em>King</em>).</td></tr>
+<tr><td style="text-align: center">03</td><td style="text-align: left"><strong>UNO</strong> (<code>uno</code>)</td><td style="text-align: left">Clic en carta compatible de tu mano, selector de color en comodines, botón <code>¡UNO!</code> y botón <code>Robar Carta</code>.</td><td style="text-align: left">Mazo de 108 cartas, <code>+2</code>, <code>+4</code>, <code>Skip</code>, <code>Reverse</code> y penalización por no cantar UNO.</td></tr>
+<tr><td style="text-align: center">04</td><td style="text-align: left"><strong>El Juego de la Oca</strong> (<code>goose</code>)</td><td style="text-align: left">Botón <code>Lanzar Dado</code> (con animación de dado y avance automático por la espiral de 63 casillas).</td><td style="text-align: left">Saltos <em>De Oca a Oca</em>, Puentes, Posada, Pozo, Laberinto (retroceso a 30), Calavera (vuelta a 1) y rebote en 63.</td></tr>
+<tr><td style="text-align: center">05</td><td style="text-align: left"><strong>Go</strong> (<code>go</code>)</td><td style="text-align: left">Clic en cualquier intersección libre del goban 9×9 o botón <code>Pasar Turno</code>.</td><td style="text-align: left">Captura de cadenas sin libertades, prohibición de suicidio, regla de Ko y puntuación final con Komi 6.5.</td></tr>
+<tr><td style="text-align: center">06</td><td style="text-align: left"><strong>Shogi</strong> (<code>shogi</code>)</td><td style="text-align: left">Clic en pieza del tablero 9×9 o de tu banco de capturas (<em>Komadai</em>) → clic en casilla destino.</td><td style="text-align: left">Reingreso de piezas capturadas (<em>Drop</em>), promoción en las 3 últimas filas, prohibición de <em>Nifu</em>.</td></tr>
+<tr><td style="text-align: center">07</td><td style="text-align: left"><strong>Xiangqi</strong> (<code>xiangqi</code>)</td><td style="text-align: left">Clic en pieza propia → clic en intersección destino iluminada en el tablero 9×10.</td><td style="text-align: left">Río central (elefantes no cruzan, soldados avanzan lateralmente tras cruzar), Palacios 3×3, Cañón con pantalla y General Volador.</td></tr>
+<tr><td style="text-align: center">08</td><td style="text-align: left"><strong>Damas Chinas</strong> (<code>chinese_checkers</code>)</td><td style="text-align: left">Clic en canica propia → clic en casilla hexagonal destino en la estrella de 121 posiciones.</td><td style="text-align: left">Movimiento adyacente y saltos encadenados sobre canicas propias o rivales hasta completar el triángulo opuesto.</td></tr>
+<tr><td style="text-align: center">09</td><td style="text-align: left"><strong>Backgammon</strong> (<code>backgammon</code>)</td><td style="text-align: left">Botón <code>Tirar Dados</code> → lista de movimientos legales de picos, barra o Bear-Off + Cubo de Doblaje.</td><td style="text-align: left">24 picos, capturas a la barra (<em>Blot</em>), reingreso obligatorio, tiradas dobles (4 movimientos) y <em>Bear-Off</em>.</td></tr>
+<tr><td style="text-align: center">10</td><td style="text-align: left"><strong>Ludo</strong> (<code>ludo</code>)</td><td style="text-align: left">Botón <code>Tirar Dado</code> → clic en la ficha elegible para salir de base (con un 6) o avanzar en el circuito.</td><td style="text-align: left">Circuito de 52 casillas + pasillo de meta, 8 casillas seguras estrella, capturas y turno extra al sacar 6.</td></tr>
+<tr><td style="text-align: center">11</td><td style="text-align: left"><strong>Batalla Naval</strong> (<code>battleship</code>)</td><td style="text-align: left">Fase 1: Colocar los 5 buques (o despliegue rápido). Fase 2: Clic en coordenada de la cuadrícula de radar enemigo 10×10.</td><td style="text-align: left">Flota canónica (Portaaviones 5, Acorazado 4, Crucero 3, Submarino 3, Destructor 2), detección de hundimiento y victoria al hundir los 17 segmentos.</td></tr>
+<tr><td style="text-align: center">12</td><td style="text-align: left"><strong>Mil Millas</strong> (<code>mille_bornes</code>)</td><td style="text-align: left">Clic en <code>Jugar</code> o <code>Descartar</code> sobre cada carta de tu mano de 6 cartas.</td><td style="text-align: left">Cartas de distancia (25–200 km, límite de dos cartas de 200 km), ataques, defensas y las 4 cartas de Seguridad (<em>Safeties</em>) con <em>¡Coup Fourré!</em> (+100 km).</td></tr>
+<tr><td style="text-align: center">13</td><td style="text-align: left"><strong>Monopoly</strong> (<code>monopoly</code>)</td><td style="text-align: left">Botones contextuales: <code>Lanzar Dados y Avanzar</code>, <code>Comprar Propiedad</code>, <code>Construir Casa/Hotel</code> y <code>Terminar Turno</code>.</td><td style="text-align: left">40 casillas, cobro de $200 al pasar por Salida, alquileres escalados por casas/hotel, Cárcel, Impuestos, Suerte/Arca y bancarrota.</td></tr>
+<tr><td style="text-align: center">14</td><td style="text-align: left"><strong>Crisis / TEG</strong> (<code>crisis</code>)</td><td style="text-align: left">Botones de acción según la fase activa (<code>Reforzar Territorio</code>, <code>Atacar Frontera 3v3</code>, <code>Reagrupar</code> y <code>Avanzar Fase</code>).</td><td style="text-align: left">Mapa de territorios interconectados en 6 continentes, bonificación por ejércitos, combate con dados ordenados y conquista territorial.</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="7-temas-visuales-modo-daltónico-okabe-ito-audio-e-instalación-pwa"><a class="header" href="#7-temas-visuales-modo-daltónico-okabe-ito-audio-e-instalación-pwa">7. Temas Visuales, Modo Daltónico Okabe-Ito, Audio e Instalación PWA</a></h2>
+<ul>
+<li><strong>Selector de Tema</strong>: En la barra superior puedes elegir entre <strong>Piedra Oscura</strong>, <strong>Noche Profunda</strong> y <strong>Mesa Jade</strong>.</li>
+<li><strong>Botón <code>Okabe-Ito (Daltónico)</code></strong>: Activa la paleta científica de alto contraste libre de ambigüedad rojo/verde en todos los tableros, relojes y gráficas del analizador.</li>
+<li><strong>Botón <code>Audio Web</code> + Control de Volumen</strong>: Activa o silencia el sintetizador procedural Web Audio API.</li>
+<li><strong>Instalación Offline (PWA)</strong>: Haz clic en <strong><code>Instalar App</code></strong> en la esquina superior derecha para instalar la aplicación en tu sistema operativo y jugar los 14 juegos sin conexión a internet.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="guía-de-desarrollo-complementario-para-web-react--typescript--webassembly"><a class="header" href="#guía-de-desarrollo-complementario-para-web-react--typescript--webassembly">Guía de Desarrollo Complementario para Web (React + TypeScript + WebAssembly)</a></h1>
+<p>Esta guía técnica documenta la arquitectura, los contratos de datos, el flujo de extensión de tableros SVG, el protocolo de red con <code>open_table_relay</code> y el pipeline de verificación y despliegue del cliente Web (<code>games_tables_sdk/web_client</code>) y su puente WebAssembly (<code>games_tables_sdk/open_table_wasm</code>).</p>
+<hr>
+<h2 id="1-arquitectura-general-react-19--puente-rust-wasm--motor-isomórfico-ts"><a class="header" href="#1-arquitectura-general-react-19--puente-rust-wasm--motor-isomórfico-ts">1. Arquitectura General: React 19 + Puente Rust WASM + Motor Isomórfico TS</a></h2>
+<pre><code>┌────────────────────────────────────────────────────────────────────────────┐
+│                   React 19 + Tailwind CSS v4 (src/App.tsx)                 │
+├──────────────────────────┬─────────────────────────┬───────────────────────┤
+│ 14 Tableros SVG React    │ Ecosistema Competitivo  │ Transporte &amp; Salud    │
+│ src/components/boards/*  │ - EloAndAchievements    │ - RelayWebSocketClient│
+│ - ChessBoard.tsx         │ - TournamentManager     │ - MatchmakingQueue    │
+│ - CheckersBoard.tsx      │ - PostMatchAnalyzer     │ - RelayChatPanel      │
+│ - ShogiBoard.tsx ...     │ - TournamentClock       │ - SystemDiagnostics   │
+└────────────┬─────────────┴────────────┬────────────┴───────────┬───────────┘
+             │                          │                        │
+             ▼                          ▼                        ▼
+┌────────────────────────────────────────────────────┐ ┌─────────────────────┐
+│        WasmGameBridge (src/wasm_pkg/index.ts)      │ │  open_table_relay   │
+│ - Contrato JSON unificado para los 14 juegos       │ │  (Servidor Rust WS) │
+│ - Delegación a binario open_table_wasm_bg.wasm     │ │ - Salas 6 chars     │
+│ - Fallback determinista isomórfico en TypeScript   │ │ - Matchmaking ELO   │
+└────────────────────────┬───────────────────────────┘ └─────────────────────┘
+                         │
+                         ▼
+┌────────────────────────────────────────────────────┐
+│     open_table_wasm (open_table_wasm/src/lib.rs)   │
+│ - #[wasm_bindgen] sobre open_table_engine::Session │
+│ - Enlaza los 14 crates Rust (&lt;juego&gt;_game) + QR    │
+└────────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="contrato-de-métodos-de-wasmgamebridge"><a class="header" href="#contrato-de-métodos-de-wasmgamebridge">Contrato de Métodos de <code>WasmGameBridge</code></a></h3>
+<p>Tanto <code>open_table_wasm/src/lib.rs</code> (en Rust compilado a <code>wasm32-unknown-unknown</code>) como <code>web_client/src/wasm_pkg/index.ts</code> (en TypeScript) exponen exactamente la misma firma pública:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th style="text-align: left">Método</th><th style="text-align: left">Firma</th><th style="text-align: left">Propósito</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left"><code>start_local_match</code></td><td style="text-align: left"><code>(game_type: string, p1: number, p2: number) =&gt; boolean</code></td><td style="text-align: left">Inicia una sesión local Hotseat o Relay para cualquiera de los 14 juegos.</td></tr>
+<tr><td style="text-align: left"><code>start_ai_match</code></td><td style="text-align: left"><code>(game_type: string, human_id: number, ai_id: number, difficulty: number) =&gt; boolean</code></td><td style="text-align: left">Inicia una sesión contra la IA (<code>difficulty</code>: <code>0</code> Fácil, <code>1</code> Media, <code>2</code> Difícil, <code>3</code> Maestra). En <code>battleship</code>, despliega automáticamente la flota de la IA.</td></tr>
+<tr><td style="text-align: left"><code>current_player</code></td><td style="text-align: left"><code>() =&gt; number</code></td><td style="text-align: left">Devuelve el identificador del jugador con el turno activo (<code>1</code> o <code>2</code>).</td></tr>
+<tr><td style="text-align: left"><code>current_tick</code></td><td style="text-align: left"><code>() =&gt; number</code></td><td style="text-align: left">Devuelve el número de tick/turno determinista de la sesión.</td></tr>
+<tr><td style="text-align: left"><code>get_state_json</code></td><td style="text-align: left"><code>() =&gt; string</code></td><td style="text-align: left">Serializa el estado completo del tablero actual en JSON canónico.</td></tr>
+<tr><td style="text-align: left"><code>get_legal_moves_json</code></td><td style="text-align: left"><code>(player_id: number) =&gt; string</code></td><td style="text-align: left">Devuelve la lista JSON de movimientos legales disponibles para <code>player_id</code>.</td></tr>
+<tr><td style="text-align: left"><code>send_command_json</code></td><td style="text-align: left"><code>(player_id: number, json_str: string) =&gt; string</code></td><td style="text-align: left">Valida y ejecuta un comando JSON sobre la sesión, registrando un nuevo paso en el historial de Replay.</td></tr>
+<tr><td style="text-align: left"><code>step_ai_if_needed</code></td><td style="text-align: left"><code>() =&gt; string</code></td><td style="text-align: left">Si es el turno de la IA, calcula y aplica <code>best_move</code> (incluyendo fases de dados o robo de cartas).</td></tr>
+<tr><td style="text-align: left"><code>export_log_json</code></td><td style="text-align: left"><code>() =&gt; string</code></td><td style="text-align: left">Exporta la secuencia completa de comandos y estados para Replay, Analizador o <code>SyncState</code>.</td></tr>
+<tr><td style="text-align: left"><code>apply_sync_log_json</code></td><td style="text-align: left"><code>(game_type: string, log_json: string) =&gt; boolean</code></td><td style="text-align: left">Reconstruye de forma determinista una sesión completa a partir de un log JSON exportado.</td></tr>
+<tr><td style="text-align: left"><code>generate_join_qr_svg</code></td><td style="text-align: left"><code>(join_code: string, host_name: string, game_type: string) =&gt; string</code></td><td style="text-align: left">Genera un código QR en SVG limpio para compartir salas Relay.</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="2-guía-paso-a-paso-cómo-crear-o-extender-tableros-svg-y-motores-de-juego"><a class="header" href="#2-guía-paso-a-paso-cómo-crear-o-extender-tableros-svg-y-motores-de-juego">2. Guía Paso a Paso: Cómo Crear o Extender Tableros SVG y Motores de Juego</a></h2>
+<h3 id="a-flujo-unidireccional-de-datos-en-los-tableros-react"><a class="header" href="#a-flujo-unidireccional-de-datos-en-los-tableros-react">A. Flujo Unidireccional de Datos en los Tableros React</a></h3>
+<p>Todos los tableros en <code>web_client/src/components/boards/&lt;Game&gt;Board.tsx</code> son <strong>componentes puros controlados por estado JSON</strong>. Ningún componente de tablero muta reglas localmente; todo cambio pasa por <code>onDispatchCommand(cmdJson)</code>:</p>
+<pre><code class="language-tsx">export interface StandardBoardProps {
+  stateJson: string;
+  legalMovesJson: string;
+  isLocalTurnAllowed: boolean;
+  localPlayerId: 1 | 2;
+  onDispatchCommand: (cmdJson: string) =&gt; void;
+}
+</code></pre>
+<ol>
+<li><strong>Lectura del Estado</strong>: El componente parsea <code>JSON.parse(stateJson)</code> y <code>JSON.parse(legalMovesJson)</code>.</li>
+<li><strong>Resaltado de Jugadas Legales</strong>: Cuando el usuario selecciona una pieza o casilla origen <code>(r, c)</code>, el tablero filtra <code>legalMoves</code> para iluminar únicamente los destinos válidos <code>(to_r, to_c)</code>.</li>
+<li><strong>Bloqueo de Turno (<code>isLocalTurnAllowed</code>)</strong>:
+<ul>
+<li>En modo <code>spectator</code> o cuando el visor de Replay está en un turno histórico (<code>!isReplayAtLiveHead</code>), <code>isLocalTurnAllowed</code> es <code>false</code> y el tablero bloquea cualquier disparo de comandos.</li>
+<li>En modo <code>online_relay</code>, solo permite actuar cuando <code>currentTurn === localPlayerId</code>.</li>
+</ul>
+</li>
+<li><strong>Despacho del Comando</strong>: Al confirmar la acción, el tablero llama a:
+<pre><code class="language-ts">onDispatchCommand(JSON.stringify({
+  command_type: "MovePieceCommand",
+  from: [fromRow, fromCol],
+  to: [toRow, toCol],
+}));
+</code></pre>
+</li>
+</ol>
+<h3 id="b-checklist-para-añadir-o-extender-un-juego"><a class="header" href="#b-checklist-para-añadir-o-extender-un-juego">B. Checklist para Añadir o Extender un Juego</a></h3>
+<p>Si deseas extender un juego existente o incorporar una nueva variante:</p>
+<ol>
+<li><strong>Motor Rust (<code>&lt;juego&gt;_game</code> y <code>open_table_wasm/src/lib.rs</code>)</strong>:
+<ul>
+<li>Registra el constructor de sesión en <code>create_session_for_players</code> y el prefijo de comandos en <code>parse_command_json</code> dentro de <code>open_table_wasm/src/lib.rs</code>.</li>
+<li>Añade la rama de IA en <code>step_ai_if_needed</code>.</li>
+</ul>
+</li>
+<li><strong>Puente Isomórfico (<code>web_client/src/wasm_pkg/index.ts</code>)</strong>:
+<ul>
+<li>Asegúrate de que <code>resetGameState</code>, <code>get_legal_moves_json</code>, <code>send_command_json</code> y <code>step_ai_if_needed</code> manejen el <code>game_type</code> con el mismo contrato JSON.</li>
+</ul>
+</li>
+<li><strong>Componente de Tablero (<code>web_client/src/components/boards/&lt;Juego&gt;Board.tsx</code>)</strong>:
+<ul>
+<li>Renderiza el tablero en SVG vectorial responsivo con etiquetas <code>aria-label</code> y soporte para el atributo global <code>[data-okabe-ito="true"]</code> si utiliza indicadores de color.</li>
+</ul>
+</li>
+<li><strong>Evaluador Posicional (<code>PostMatchAnalyzerPanel.tsx</code>)</strong>:
+<ul>
+<li>Registra la función de evaluación normalizada ($[-100, +100]$) en <code>evaluateBoardAdvantageForPlayer1(gameType, state)</code>.</li>
+</ul>
+</li>
+<li><strong>Autodiagnóstico y Tests (<code>SystemDiagnosticsPanel.tsx</code> y <code>src/__tests__/</code>)</strong>:
+<ul>
+<li>Añade el juego a la matriz de regresión para que tanto el Panel de Diagnóstico en vivo como Vitest lo verifiquen en cada commit.</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2 id="3-protocolo-websocket-relay-matchmaking-elo-y-sincronización"><a class="header" href="#3-protocolo-websocket-relay-matchmaking-elo-y-sincronización">3. Protocolo WebSocket Relay, Matchmaking ELO y Sincronización</a></h2>
+<p>El módulo <code>web_client/src/bridge/relayClient.ts</code> (<code>RelayWebSocketClient</code>) implementa el protocolo completo del servidor Rust <code>open_table_relay</code> (<code>open_table_relay/src/lib.rs</code> y <code>open_table_relay/src/room.rs</code>).</p>
+<h3 id="a-mensajes-cliente--servidor-relayrequest"><a class="header" href="#a-mensajes-cliente--servidor-relayrequest">A. Mensajes Cliente → Servidor (<code>RelayRequest</code>)</a></h3>
+<pre><code class="language-json">// 1. Crear sala privada de 6 caracteres (asigna player_id: 1)
+{ "action": "create" }
+
+// 2. Unirse como Jugador 2 a una sala existente
+{ "action": "join", "code": "AB12CD" }
+
+// 3. Unirse como Espectador en vivo (solo lectura, player_id: 0)
+{ "action": "spectate", "code": "AB12CD" }
+
+// 4. Entrar en Cola de Matchmaking Automático con filtro por Rango ELO (Fase 5)
+{
+  "action": "queue",
+  "game_type": "chess",
+  "elo": 1248,
+  "max_elo_delta": 200
+}
+
+// 5. Retransmitir comando, snapshot SyncState, ELO o mensaje de chat a la sala
+{
+  "action": "relay",
+  "payload": "{\"kind\":\"command\",\"playerId\":1,\"cmdJson\":\"{...}\"}"
+}
+</code></pre>
+<h3 id="b-eventos-servidor--cliente-relayresponse"><a class="header" href="#b-eventos-servidor--cliente-relayresponse">B. Eventos Servidor → Cliente (<code>RelayResponse</code>)</a></h3>
+<ul>
+<li><code>{"event": "created", "code": "AB12CD", "player_id": 1}</code></li>
+<li><code>{"event": "joined", "code": "AB12CD", "player_id": 2}</code></li>
+<li><code>{"event": "spectating", "code": "AB12CD"}</code></li>
+<li><code>{"event": "queued", "game_type": "chess"}</code></li>
+<li><code>{"event": "matched", "code": "X9M2K1", "player_id": 2}</code></li>
+<li><code>{"event": "peer_joined", "player_id": 2}</code> (Dispara el envío automático de <code>SyncState</code> con <code>export_log_json()</code> desde el Host).</li>
+<li><code>{"event": "relayed", "from": 1, "payload": "..."}</code></li>
+</ul>
+<h3 id="c-sobres-internos-en-payload-relayenvelope"><a class="header" href="#c-sobres-internos-en-payload-relayenvelope">C. Sobres Internos en <code>payload</code> (<code>RelayEnvelope</code>)</a></h3>
+<p>Para mantener compatibilidad total con <code>open_table_relay</code> sin alterar el framing del servidor, <code>RelayWebSocketClient</code> encapsula dentro de <code>payload</code> cuatro tipos de sobre JSON:</p>
+<ol>
+<li><strong><code>kind: "command"</code></strong>: <code>{ kind: "command", playerId, cmdJson }</code> — aplica el comando en el <code>WasmGameBridge</code> remoto.</li>
+<li><strong><code>kind: "sync_state"</code></strong>: <code>{ kind: "sync_state", gameType, logJson }</code> — sincroniza a jugadores recién conectados o espectadores tardíos mediante <code>apply_sync_log_json</code>.</li>
+<li><strong><code>kind: "chat"</code></strong>: <code>{ kind: "chat", message: { id, senderName, senderRole, text, timestamp } }</code> — alimenta el panel <code>RelayChatPanel</code>.</li>
+<li><strong><code>kind: "elo_sync"</code></strong>: <code>{ kind: "elo_sync", playerId, rating, playerName }</code> — muestra el ELO del rival en la sala y lo usa para el cálculo K=32 al terminar la partida.</li>
+</ol>
+<hr>
+<h2 id="4-pipeline-de-compilación-wasm-bindgen-testing-vitest-y-despliegue-pwa"><a class="header" href="#4-pipeline-de-compilación-wasm-bindgen-testing-vitest-y-despliegue-pwa">4. Pipeline de Compilación <code>wasm-bindgen</code>, Testing Vitest y Despliegue PWA</a></h2>
+<h3 id="a-compilación-del-crate-rust-open_table_wasm"><a class="header" href="#a-compilación-del-crate-rust-open_table_wasm">A. Compilación del Crate Rust <code>open_table_wasm</code></a></h3>
+<p>El script <code>games_tables_sdk/tools/build_wasm.sh</code> (ejecutado también en <code>.github/workflows/ci.yml</code>, <code>release.yml</code> y <code>docs.yml</code>) compila los 14 motores de Rust a WebAssembly:</p>
+<pre><code class="language-bash"># 1. Compilar el binario .wasm en modo release
+cargo build --manifest-path games_tables_sdk/open_table_wasm/Cargo.toml \
+  --target wasm32-unknown-unknown --release
+
+# 2. Generar bindings JS/TS para la web en web_client/public/wasm/
+wasm-bindgen --target web \
+  --out-dir games_tables_sdk/web_client/public/wasm \
+  games_tables_sdk/open_table_wasm/target/wasm32-unknown-unknown/release/open_table_wasm.wasm
+</code></pre>
+<h3 id="b-suites-de-pruebas-automatizadas-en-vitest-web_clientsrc__tests__"><a class="header" href="#b-suites-de-pruebas-automatizadas-en-vitest-web_clientsrc__tests__">B. Suites de Pruebas Automatizadas en Vitest (<code>web_client/src/__tests__/</code>)</a></h3>
+<p>Ejecuta <code>npm --prefix games_tables_sdk/web_client test</code> para correr las <strong>6 suites de verificación</strong>:</p>
+<ol>
+<li><strong><code>boards_14_games.test.tsx</code></strong>: Verifica el renderizado SVG y el despacho de una jugada legal en cada uno de los <strong>14 tableros React</strong>.</li>
+<li><strong><code>network_turn_lock_and_persistence.test.ts</code></strong>: Verifica el bloqueo de turnos en red (<code>computeIsLocalTurnAllowed</code>), modo espectador y reconexión.</li>
+<li><strong><code>phase3_features.test.ts</code></strong>: Verifica relojes de torneo FIDE/Byo-yomi, visor de repeticiones paso a paso y tutoriales interactivos.</li>
+<li><strong><code>phase4_ecosystem.test.ts</code></strong>: Verifica el motor ELO FIDE ($K=32$), los 7 logros, los torneos Round-Robin Berger y Eliminatoria Directa, temas Okabe-Ito y chat Relay.</li>
+<li><strong><code>phase5_matchmaking_and_analyzer.test.ts</code></strong>: Verifica la cola de Matchmaking por rango ELO y el Analizador Post-Partida ($[-100, +100]$) en los 14 juegos.</li>
+<li><strong><code>self_diagnostics_and_docs.test.ts</code></strong>: Verifica el motor de autodiagnóstico en vivo (<code>runFullSystemDiagnostics</code>) sobre los 14 juegos y la integridad del centro de documentación.</li>
+</ol>
+<h3 id="c-empaquetado-pwa-offline-y-despliegue-en-github-pages"><a class="header" href="#c-empaquetado-pwa-offline-y-despliegue-en-github-pages">C. Empaquetado PWA Offline y Despliegue en GitHub Pages</a></h3>
+<ul>
+<li><strong>Service Worker y Manifiesto</strong>:
+<ul>
+<li><code>web_client/public/manifest.webmanifest</code> define iconos, colores y modo <code>standalone</code>.</li>
+<li><code>web_client/public/sw.js</code> implementa caché <em>Stale-While-Revalidate</em> para precachear el shell HTML/JS/CSS y el binario <code>.wasm</code>, permitiendo jugar los 14 juegos 100% offline.</li>
+</ul>
+</li>
+<li><strong>Despliegue Continuo (<code>.github/workflows/docs.yml</code>)</strong>:
+<ul>
+<li>En cada push a <code>main</code>, GitHub Actions compila <code>open_table_wasm</code>, construye <code>web_client/dist</code>, compila el libro <code>mdBook</code> (<code>docs/book</code>) junto con <code>cargo doc</code>, y publica la PWA en la raíz (<code>/</code>) de <code>gh-pages</code> y la documentación técnica en <code>/docs</code>.</li>
+</ul>
+</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="rust-api-reference-cargo-doc"><a class="header" href="#rust-api-reference-cargo-doc">Rust API Reference (<code>cargo doc</code>)</a></h1>
 <p>The full Rust API documentation for the workspace is generated automatically via <code>cargo doc --workspace --exclude open_table_godot --no-deps</code> and published under <a href="api/open_table_core/index.html"><code>api/</code></a>.</p>

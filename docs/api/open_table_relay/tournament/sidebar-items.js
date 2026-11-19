@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["TournamentError"],"struct":["BracketMatch","Tournament","TournamentManager"]};
+window.SIDEBAR_ITEMS = {"constant":["MAX_ACTIVE_TOURNAMENTS"],"enum":["TournamentError"],"struct":["BracketMatch","Tournament","TournamentManager"]};

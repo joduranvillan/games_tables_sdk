@@ -76,6 +76,12 @@ export class WasmGameBridge {
         }
     }
     /**
+     * @param {number} winner_id
+     */
+    force_timeout_win(winner_id) {
+        wasm.wasmgamebridge_force_timeout_win(this.__wbg_ptr, winner_id);
+    }
+    /**
      * @param {string} join_code
      * @param {string} host_name
      * @param {string} game_type
@@ -108,6 +114,28 @@ export class WasmGameBridge {
         }
     }
     /**
+     * @returns {string}
+     */
+    get_current_game_type() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.wasmgamebridge_get_current_game_type(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free_command_export(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * @returns {number}
+     */
+    get_current_replay_step() {
+        const ret = wasm.wasmgamebridge_get_current_replay_step(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * @param {number} player_id
      * @returns {string}
      */
@@ -123,11 +151,48 @@ export class WasmGameBridge {
             wasm.__wbindgen_free_command_export(deferred1_0, deferred1_1, 1);
         }
     }
+    /**
+     * @returns {number}
+     */
+    get_replay_step_count() {
+        const ret = wasm.wasmgamebridge_get_replay_step_count(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {string}
+     */
+    get_state_json() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.wasmgamebridge_get_state_json(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free_command_export(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * @returns {boolean}
+     */
+    is_replay_at_live_head() {
+        const ret = wasm.wasmgamebridge_is_replay_at_live_head(this.__wbg_ptr);
+        return ret !== 0;
+    }
     constructor() {
         const ret = wasm.wasmgamebridge_new();
         this.__wbg_ptr = ret;
         WasmGameBridgeFinalization.register(this, this.__wbg_ptr, this);
         return this;
+    }
+    /**
+     * @param {number} step_index
+     * @returns {boolean}
+     */
+    seek_replay_step(step_index) {
+        const ret = wasm.wasmgamebridge_seek_replay_step(this.__wbg_ptr, step_index);
+        return ret !== 0;
     }
     /**
      * @param {number} player_id

@@ -180,23 +180,31 @@
 <a href=#180 id=180 data-nosnippet>180</a>    }
 <a href=#181 id=181 data-nosnippet>181</a>
 <a href=#182 id=182 data-nosnippet>182</a>    <span class="kw">fn </span>flush_to_disk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; std::io::Result&lt;()&gt; {
-<a href=#183 id=183 data-nosnippet>183</a>        <span class="kw">let </span><span class="kw-2">mut </span>file = fs::File::create(<span class="kw-2">&amp;</span><span class="self">self</span>.db_path)<span class="question-mark">?</span>;
-<a href=#184 id=184 data-nosnippet>184</a>        <span class="macro">writeln!</span>(
-<a href=#185 id=185 data-nosnippet>185</a>            file,
-<a href=#186 id=186 data-nosnippet>186</a>            <span class="string">"-- CREATE TABLE IF NOT EXISTS ratings(player_id TEXT PRIMARY KEY, game_id TEXT, elo INTEGER DEFAULT 1200, wins INTEGER, losses INTEGER);"
-<a href=#187 id=187 data-nosnippet>187</a>        </span>)<span class="question-mark">?</span>;
-<a href=#188 id=188 data-nosnippet>188</a>        <span class="kw">for </span>record <span class="kw">in </span><span class="self">self</span>.records.values() {
-<a href=#189 id=189 data-nosnippet>189</a>            <span class="kw">if let </span><span class="prelude-val">Ok</span>(json) = serde_json::to_string(record) {
-<a href=#190 id=190 data-nosnippet>190</a>                <span class="macro">writeln!</span>(file, <span class="string">"{json}"</span>)<span class="question-mark">?</span>;
-<a href=#191 id=191 data-nosnippet>191</a>            }
-<a href=#192 id=192 data-nosnippet>192</a>        }
-<a href=#193 id=193 data-nosnippet>193</a>        file.flush()<span class="question-mark">?</span>;
-<a href=#194 id=194 data-nosnippet>194</a>        file.sync_all()
-<a href=#195 id=195 data-nosnippet>195</a>    }
-<a href=#196 id=196 data-nosnippet>196</a>
-<a href=#197 id=197 data-nosnippet>197</a>    <span class="doccomment">/// Ejecuta un flush completo y sincronización de almacenamiento (`WAL checkpoint`) antes de apagar el servidor.
-<a href=#198 id=198 data-nosnippet>198</a>    </span><span class="kw">pub fn </span>wal_checkpoint_and_flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; std::io::Result&lt;()&gt; {
-<a href=#199 id=199 data-nosnippet>199</a>        <span class="self">self</span>.flush_to_disk()
-<a href=#200 id=200 data-nosnippet>200</a>    }
-<a href=#201 id=201 data-nosnippet>201</a>}
+<a href=#183 id=183 data-nosnippet>183</a>        <span class="kw">let </span>tmp_path = <span class="self">self</span>.db_path.with_extension(<span class="string">"db.tmp"</span>);
+<a href=#184 id=184 data-nosnippet>184</a>        {
+<a href=#185 id=185 data-nosnippet>185</a>            <span class="kw">let </span><span class="kw-2">mut </span>file = fs::File::create(<span class="kw-2">&amp;</span>tmp_path)<span class="question-mark">?</span>;
+<a href=#186 id=186 data-nosnippet>186</a>            <span class="macro">writeln!</span>(
+<a href=#187 id=187 data-nosnippet>187</a>                file,
+<a href=#188 id=188 data-nosnippet>188</a>                <span class="string">"-- CREATE TABLE IF NOT EXISTS ratings(player_id TEXT PRIMARY KEY, game_id TEXT, elo INTEGER DEFAULT 1200, wins INTEGER, losses INTEGER);"
+<a href=#189 id=189 data-nosnippet>189</a>            </span>)<span class="question-mark">?</span>;
+<a href=#190 id=190 data-nosnippet>190</a>            <span class="kw">for </span>record <span class="kw">in </span><span class="self">self</span>.records.values() {
+<a href=#191 id=191 data-nosnippet>191</a>                <span class="kw">if let </span><span class="prelude-val">Ok</span>(json) = serde_json::to_string(record) {
+<a href=#192 id=192 data-nosnippet>192</a>                    <span class="macro">writeln!</span>(file, <span class="string">"{json}"</span>)<span class="question-mark">?</span>;
+<a href=#193 id=193 data-nosnippet>193</a>                }
+<a href=#194 id=194 data-nosnippet>194</a>            }
+<a href=#195 id=195 data-nosnippet>195</a>            file.flush()<span class="question-mark">?</span>;
+<a href=#196 id=196 data-nosnippet>196</a>            file.sync_all()<span class="question-mark">?</span>;
+<a href=#197 id=197 data-nosnippet>197</a>        }
+<a href=#198 id=198 data-nosnippet>198</a>        <span class="kw">if </span>fs::rename(<span class="kw-2">&amp;</span>tmp_path, <span class="kw-2">&amp;</span><span class="self">self</span>.db_path).is_err() {
+<a href=#199 id=199 data-nosnippet>199</a>            fs::copy(<span class="kw-2">&amp;</span>tmp_path, <span class="kw-2">&amp;</span><span class="self">self</span>.db_path)<span class="question-mark">?</span>;
+<a href=#200 id=200 data-nosnippet>200</a>            <span class="kw">let _ </span>= fs::remove_file(<span class="kw-2">&amp;</span>tmp_path);
+<a href=#201 id=201 data-nosnippet>201</a>        }
+<a href=#202 id=202 data-nosnippet>202</a>        <span class="prelude-val">Ok</span>(())
+<a href=#203 id=203 data-nosnippet>203</a>    }
+<a href=#204 id=204 data-nosnippet>204</a>
+<a href=#205 id=205 data-nosnippet>205</a>    <span class="doccomment">/// Ejecuta un flush completo y sincronización de almacenamiento (`WAL checkpoint`) antes de apagar el servidor.
+<a href=#206 id=206 data-nosnippet>206</a>    </span><span class="kw">pub fn </span>wal_checkpoint_and_flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; std::io::Result&lt;()&gt; {
+<a href=#207 id=207 data-nosnippet>207</a>        <span class="self">self</span>.flush_to_disk()
+<a href=#208 id=208 data-nosnippet>208</a>    }
+<a href=#209 id=209 data-nosnippet>209</a>}
 </code></pre></div></section></main></body></html>
