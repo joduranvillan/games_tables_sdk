@@ -233,7 +233,7 @@ impl WasmGameBridge {
         let tick = sess.current_tick().0;
         let winner: Option<u32> = self.forced_winner.or_else(|| {
             sess.world()
-                .get_resource::<open_table_engine::resources::WinnerResource>()
+                .get_resource::<open_table_engine::session::WinnerResource>()
                 .and_then(|w| w.0.map(|pid| pid.0))
         });
 
