@@ -125,18 +125,26 @@ pub struct WasmGameBridge {
     current_game_type: String,
     ai_player: Option<PlayerId>,
     ai_difficulty: AiDifficulty,
+    replay_log: Vec<(u32, String)>,
+    replay_cursor: usize,
+    forced_winner: Option<u32>,
 }
 
 #[wasm_bindgen]
 impl WasmGameBridge {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        Self {
+        let mut bridge = Self {
             session: None,
             current_game_type: "chess".to_string(),
             ai_player: None,
             ai_difficulty: AiDifficulty::Medium,
-        }
+            replay_log: Vec::new(),
+            replay_cursor: 0,
+            forced_winner: None,
+        };
+        bridge.start_local_match("chess", 1, 2);
+        bridge
     }
 
     pub fn start_local_match(&mut self, game_type: &str, p1: u32, p2: u32) -> bool {
@@ -147,6 +155,9 @@ impl WasmGameBridge {
             self.current_game_type = gtype;
             self.session = Some(sess);
             self.ai_player = None;
+            self.replay_log.clear();
+            self.replay_cursor = 0;
+            self.forced_winner = None;
             true
         } else {
             false
@@ -179,6 +190,9 @@ impl WasmGameBridge {
             self.session = Some(sess);
             self.ai_player = Some(p_ai);
             self.ai_difficulty = AiDifficulty::from_i64(difficulty);
+            self.replay_log.clear();
+            self.replay_cursor = 0;
+            self.forced_winner = None;
             true
         } else {
             false
@@ -199,12 +213,38 @@ impl WasmGameBridge {
             .unwrap_or(0)
     }
 
+    pub fn get_current_game_type(&self) -> String {
+        self.current_game_type.clone()
+    }
+
     pub fn get_legal_moves_json(&self, player_id: u32) -> String {
         let Some(sess) = &self.session else {
             return "[]".to_string();
         };
         let moves = sess.get_legal_moves(PlayerId(player_id.max(1)));
         serde_json::to_string(&moves).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    pub fn get_state_json(&self) -> String {
+        let Some(sess) = &self.session else {
+            return r#"{"error":"no_active_session"}"#.to_string();
+        };
+        let turn = sess.current_player().0;
+        let tick = sess.current_tick().0;
+        let winner: Option<u32> = self.forced_winner.or_else(|| {
+            sess.world()
+                .get_resource::<open_table_engine::session::WinnerResource>()
+                .and_then(|w| w.0.map(|pid| pid.0))
+        });
+
+        let payload = serde_json::json!({
+            "game_type": self.current_game_type,
+            "turn": turn,
+            "tick": tick,
+            "winner": winner,
+            "legal_moves": sess.get_legal_moves(sess.current_player()),
+        });
+        serde_json::to_string(&payload).unwrap_or_else(|_| "{}".to_string())
     }
 
     pub fn send_command_json(&mut self, player_id: u32, json_str: &str) -> String {
@@ -216,7 +256,14 @@ impl WasmGameBridge {
             return r#"{"ok":false,"error":"no_active_session"}"#.to_string();
         };
         match sess.process_command(PlayerId(player_id.max(1)), cmd) {
-            Ok(events) => serde_json::to_string(&events).unwrap_or_else(|_| "[]".to_string()),
+            Ok(events) => {
+                if self.replay_cursor < self.replay_log.len() {
+                    self.replay_log.truncate(self.replay_cursor);
+                }
+                self.replay_log.push((player_id.max(1), json_str.to_string()));
+                self.replay_cursor = self.replay_log.len();
+                serde_json::to_string(&events).unwrap_or_else(|_| "[]".to_string())
+            }
             Err(e) => format!(r#"{{"ok":false,"error":{:?}}}"#, e.to_string()),
         }
     }
@@ -256,6 +303,40 @@ impl WasmGameBridge {
         self.current_game_type = gtype;
         self.session = Some(sess);
         true
+    }
+
+    pub fn get_replay_step_count(&self) -> usize {
+        self.replay_log.len()
+    }
+
+    pub fn get_current_replay_step(&self) -> usize {
+        self.replay_cursor
+    }
+
+    pub fn is_replay_at_live_head(&self) -> bool {
+        self.replay_cursor >= self.replay_log.len()
+    }
+
+    pub fn seek_replay_step(&mut self, step_index: usize) -> bool {
+        let target = step_index.min(self.replay_log.len());
+        let saved_log = self.replay_log.clone();
+        let gtype = self.current_game_type.clone();
+        let Some(mut sess) = create_session_for_players(&gtype, PlayerId(1), PlayerId(2)) else {
+            return false;
+        };
+        for (pid, cmd_str) in saved_log.iter().take(target) {
+            if let Ok(cmd) = parse_command_json(cmd_str, &gtype) {
+                let _ = sess.process_command(PlayerId(*pid), cmd);
+            }
+        }
+        self.session = Some(sess);
+        self.replay_log = saved_log;
+        self.replay_cursor = target;
+        true
+    }
+
+    pub fn force_timeout_win(&mut self, winner_id: u32) {
+        self.forced_winner = Some(winner_id.max(1));
     }
 
     pub fn export_chess_fen(&self) -> String {

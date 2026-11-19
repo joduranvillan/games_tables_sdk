@@ -1,6 +1,6 @@
 [package]
 name = "open_table_relay"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
 rust-version = "1.82"
 description = "Servidor de salas y retransmisión WebSocket standalone para OpenTable SDK."
@@ -13,8 +13,8 @@ categories = ["network-programming", "game-engines"]
 # Servicio ELO persistente (./data/ratings.db), API HTTP (8081), TLS/WSS (rustls = "0.23", tokio-rustls = "0.26"),
 # JWT HS256 (jsonwebtoken = "9"), Rate Limiting GCRA (governor = "0.6"), Anti-Cheat (chess_game, checkers_game)
 # y Métricas Prometheus (metrics = "0.23", metrics-exporter-prometheus = "0.15")
-open_table_core = { version = "1.0.0", path = "../open_table_core" }
-open_table_engine = { version = "1.0.0", path = "../open_table_engine" }
+open_table_core = { version = "1.1.0", path = "../open_table_core" }
+open_table_engine = { version = "1.1.0", path = "../open_table_engine" }
 chess_game = { path = "../chess_game" }
 checkers_game = { path = "../checkers_game" }
 go_game = { path = "../go_game" }

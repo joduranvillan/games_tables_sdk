@@ -3,6 +3,8 @@
 - [Introduction](./introduction.md)
 - [SDK Quickstart (15 min)](./quickstart.md)
 - [Architecture Overview](./architecture.md)
+- [Web & PWA User Guide (14 Games)](./web_user_guide.md)
+- [Web Developer Guide (React + TypeScript + WASM)](./web_react_developer_guide.md)
 - [Rust API Reference (`cargo doc`)](./api_reference.md)
 - [Included Board Games](./games/README.md)
   - [Chess (Ajedrez)](./games/chess.md)

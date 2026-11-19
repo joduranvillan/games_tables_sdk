@@ -15,9 +15,13 @@ use crate::elo::EloStore;
 use crate::metrics::global_metrics;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
+
+/// Tiempo máximo permitido para leer una solicitud HTTP entrante (5 segundos).
+pub const HTTP_READ_TIMEOUT_SECS: u64 = 5;
 
 /// Respuesta JSON del endpoint de diagnóstico `GET /health`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -48,9 +52,13 @@ async fn handle_http_connection(
     mut stream: TcpStream,
     elo_store: Arc<Mutex<EloStore>>,
 ) -> std::io::Result<()> {
+    let read_timeout = Duration::from_secs(HTTP_READ_TIMEOUT_SECS);
     let mut raw = Vec::with_capacity(4096);
     let mut chunk = [0u8; 4096];
-    let n = stream.read(&mut chunk).await?;
+    let n = match tokio::time::timeout(read_timeout, stream.read(&mut chunk)).await {
+        Ok(res) => res?,
+        Err(_) => return Ok(()),
+    };
     if n == 0 {
         return Ok(());
     }
@@ -59,7 +67,10 @@ async fn handle_http_connection(
     // Si es una petición POST con Content-Length y el cuerpo viene en un segundo paquete TCP, completar lectura.
     if let Some((headers_end, content_len)) = parse_headers_and_content_length(&raw) {
         while raw.len() < headers_end + content_len && raw.len() < 65_536 {
-            let m = stream.read(&mut chunk).await?;
+            let m = match tokio::time::timeout(read_timeout, stream.read(&mut chunk)).await {
+                Ok(res) => res?,
+                Err(_) => break,
+            };
             if m == 0 {
                 break;
             }
@@ -251,7 +262,7 @@ mod tests {
         let parsed: HealthResponse = serde_json::from_str(body).unwrap();
 
         assert_eq!(parsed.status, "ok");
-        assert_eq!(parsed.version, "0.1.0");
+        assert_eq!(parsed.version, env!("CARGO_PKG_VERSION"));
         assert_eq!(parsed.active_rooms, 4);
 
         handle.abort();

@@ -1052,13 +1052,22 @@ impl Session {
             .map_err(|e| EngineError::IoError(format!("error al finalizar compresión de log: {e}")))
     }
 
+    /// Tamaño máximo permitido al descomprimir un log Gzip (16 MiB) para prevenir bombas de descompresión.
+    pub const MAX_DECOMPRESSED_LOG_BYTES: u64 = 16 * 1024 * 1024;
+
     /// Reproduce los comandos de un log comprimido con gzip sobre esta sesión.
     pub fn replay_from_compressed(&mut self, bytes: &[u8]) -> EngineResult<Vec<Box<dyn Event>>> {
-        let mut decoder = GzDecoder::new(bytes);
+        let decoder = GzDecoder::new(bytes);
+        let mut limited = decoder.take(Self::MAX_DECOMPRESSED_LOG_BYTES + 1);
         let mut uncompressed = Vec::new();
-        decoder
+        limited
             .read_to_end(&mut uncompressed)
             .map_err(|e| EngineError::Replay(format!("error al descomprimir log: {e}")))?;
+        if uncompressed.len() as u64 > Self::MAX_DECOMPRESSED_LOG_BYTES {
+            return Err(EngineError::Replay(
+                "log descomprimido excede el límite máximo permitido (16 MiB)".into(),
+            ));
+        }
         self.replay_from(&uncompressed, 0)
     }
 
@@ -1070,11 +1079,17 @@ impl Session {
         rules: RuleEngine,
         bytes: &[u8],
     ) -> EngineResult<Session> {
-        let mut decoder = GzDecoder::new(bytes);
+        let decoder = GzDecoder::new(bytes);
+        let mut limited = decoder.take(Self::MAX_DECOMPRESSED_LOG_BYTES + 1);
         let mut uncompressed = Vec::new();
-        decoder
+        limited
             .read_to_end(&mut uncompressed)
             .map_err(|e| EngineError::Replay(format!("error al descomprimir log: {e}")))?;
+        if uncompressed.len() as u64 > Self::MAX_DECOMPRESSED_LOG_BYTES {
+            return Err(EngineError::Replay(
+                "log descomprimido excede el límite máximo permitido (16 MiB)".into(),
+            ));
+        }
         Self::replay(id, seed, players, rules, &uncompressed)
     }
 

@@ -7,19 +7,33 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 BUMP_TYPE="patch"
+EXPLICIT_VER=""
 
-for arg in "$@"; do
-    case $arg in
+while [ $# -gt 0 ]; do
+    case "$1" in
         --major)
             BUMP_TYPE="major"
+            shift
             ;;
         --minor)
             BUMP_TYPE="minor"
+            shift
             ;;
         --patch)
             BUMP_TYPE="patch"
+            shift
+            ;;
+        --sync)
+            BUMP_TYPE="sync"
+            shift
+            ;;
+        --set)
+            BUMP_TYPE="set"
+            EXPLICIT_VER="${2:-}"
+            shift 2 || shift
             ;;
         *)
+            shift
             ;;
     esac
 done
@@ -45,25 +59,37 @@ case "$BUMP_TYPE" in
         MAJOR=$((MAJOR + 1))
         MINOR=0
         PATCH=0
+        NEW_VER="${MAJOR}.${MINOR}.${PATCH}"
         ;;
     minor)
         MINOR=$((MINOR + 1))
         PATCH=0
+        NEW_VER="${MAJOR}.${MINOR}.${PATCH}"
         ;;
     patch)
         PATCH=$((PATCH + 1))
+        NEW_VER="${MAJOR}.${MINOR}.${PATCH}"
+        ;;
+    sync)
+        NEW_VER="$CURRENT_VER"
+        ;;
+    set)
+        if [ -z "$EXPLICIT_VER" ]; then
+            echo "Error: --set requiere especificar una versión (ej. --set 1.1.0)." >&2
+            exit 1
+        fi
+        NEW_VER="$EXPLICIT_VER"
         ;;
 esac
-
-NEW_VER="${MAJOR}.${MINOR}.${PATCH}"
 
 echo "Sincronizando versión de $CURRENT_VER a $NEW_VER ($BUMP_TYPE)..."
 
 find "$ROOT_DIR" -name "Cargo.toml" -not -path "*/target/*" | while read -r cargo_file; do
     sed -i -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"$NEW_VER\"/" "$cargo_file"
+    sed -i -E "/path = \"\.\.\//s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"$NEW_VER\"/g" "$cargo_file"
 done
 
-echo "Todos los archivos Cargo.toml actualizados a versión $NEW_VER."
+echo "Todos los archivos Cargo.toml ([package] y dependencias path internas) actualizados a versión $NEW_VER."
 
 if command -v cargo >/dev/null 2>&1; then
     echo "Verificando el workspace con cargo check..."

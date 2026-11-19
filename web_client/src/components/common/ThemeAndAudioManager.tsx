@@ -1,5 +1,6 @@
 import React from "react";
 import { Eye, Palette, Volume2, VolumeX } from "lucide-react";
+import { useI18n } from "../../i18n";
 
 export type VisualThemeId = "piedra_oscura" | "noche_azul" | "jade_verde";
 
@@ -283,49 +284,50 @@ export const ThemeAndAudioToolbar: React.FC<ThemeAndAudioToolbarProps> = ({
   config,
   onChange,
 }) => {
+  const { t } = useI18n();
   const update = (patch: Partial<ThemeAndAudioConfig>) => {
     const next = saveThemeAndAudioConfig({ ...config, ...patch });
     onChange(next);
   };
 
+  const themeLabels: Record<VisualThemeId, string> = {
+    piedra_oscura: t("theme.dark_stone"),
+    noche_azul: t("theme.blue_night"),
+    jade_verde: t("theme.green_jade"),
+  };
+
   return (
-    <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
-      <div className="inline-flex items-center gap-1.5 text-slate-300 pl-1">
-        <Palette className="w-3.5 h-3.5 text-emerald-400" />
-        <span className="font-medium">Tema:</span>
-      </div>
-
-      {(Object.keys(VISUAL_THEMES) as VisualThemeId[]).map((id) => {
-        const item = VISUAL_THEMES[id];
-        const active = config.themeId === id;
-        return (
-          <button
-            key={id}
-            type="button"
-            onClick={() => {
-              update({ themeId: id });
-              playProceduralSound("move", config);
-            }}
-            className={`px-2.5 py-1 rounded-md font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              active
-                ? "bg-white text-slate-950 font-semibold"
-                : "bg-slate-800/80 text-slate-300 hover:text-white"
-            }`}
-          >
-            {item.label}
-          </button>
-        );
-      })}
-
-      <span aria-hidden="true" className="text-slate-700">
-        ·
-      </span>
+    <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
+      <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-200">
+        <Palette className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <span className="font-medium text-slate-300">{t("theme.label")}</span>
+        <select
+          aria-label={t("theme.label")}
+          value={config.themeId}
+          onChange={(e) => {
+            const nextId = e.target.value as VisualThemeId;
+            update({ themeId: nextId });
+            playProceduralSound("move", config);
+          }}
+          className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+        >
+          {(Object.keys(VISUAL_THEMES) as VisualThemeId[]).map((id) => (
+            <option
+              key={id}
+              value={id}
+              className="bg-slate-950 text-white"
+            >
+              {themeLabels[id]}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <button
         type="button"
         onClick={() => update({ okabeIto: !config.okabeIto })}
         aria-pressed={config.okabeIto}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
           config.okabeIto
             ? "bg-[#0072B2] text-white font-semibold"
             : "bg-slate-800/80 text-slate-300 hover:text-white"
@@ -333,13 +335,9 @@ export const ThemeAndAudioToolbar: React.FC<ThemeAndAudioToolbarProps> = ({
       >
         <Eye className="w-3.5 h-3.5" />
         <span>
-          {config.okabeIto ? "Okabe-Ito: Activo" : "Modo Daltónico Okabe-Ito"}
+          {config.okabeIto ? t("theme.okabe_active") : t("theme.okabe_enable")}
         </span>
       </button>
-
-      <span aria-hidden="true" className="text-slate-700">
-        ·
-      </span>
 
       <button
         type="button"
@@ -354,7 +352,7 @@ export const ThemeAndAudioToolbar: React.FC<ThemeAndAudioToolbarProps> = ({
             playProceduralSound("move", nextCfg);
           }
         }}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
           config.soundEnabled
             ? "bg-emerald-600/90 text-white"
             : "bg-slate-800/80 text-slate-400 hover:text-white"
@@ -365,8 +363,11 @@ export const ThemeAndAudioToolbar: React.FC<ThemeAndAudioToolbarProps> = ({
         ) : (
           <VolumeX className="w-3.5 h-3.5" />
         )}
-        <span>{config.soundEnabled ? "Audio FX: ON" : "Audio FX: OFF"}</span>
+        <span>
+          {config.soundEnabled ? t("theme.audio_on") : t("theme.audio_off")}
+        </span>
       </button>
     </div>
   );
 };
+

@@ -21,6 +21,7 @@ const XIANGQI_HANZI: Record<XiangqiPiece["kind"], [string, string]> = {
 
 export const XiangqiBoard: React.FC<XiangqiBoardProps> = ({
   stateJson,
+  legalMovesJson,
   isLocalTurnAllowed,
   localPlayerId,
   onDispatchCommand,
@@ -33,6 +34,18 @@ export const XiangqiBoard: React.FC<XiangqiBoardProps> = ({
     grid: (XiangqiPiece | null)[][];
     banner: string;
   };
+
+  const legalMoves = JSON.parse(legalMovesJson) as Array<{
+    command_type: string;
+    from: [number, number];
+    to: [number, number];
+  }>;
+
+  const selectedTargets = selected
+    ? legalMoves.filter(
+        (m) => m.from[0] === selected[0] && m.from[1] === selected[1]
+      )
+    : [];
 
   const handlePointClick = (r: number, c: number) => {
     if (!isLocalTurnAllowed || state.winner !== null) return;
@@ -82,6 +95,9 @@ export const XiangqiBoard: React.FC<XiangqiBoardProps> = ({
             <div className="grid grid-cols-9 gap-1.5">
               {row.map((pc, c) => {
                 const isSel = selected?.[0] === r && selected?.[1] === c;
+                const isTarget = selectedTargets.some(
+                  (m) => m.to[0] === r && m.to[1] === c
+                );
                 const palace = isPalace(r, c);
                 return (
                   <button
@@ -89,9 +105,11 @@ export const XiangqiBoard: React.FC<XiangqiBoardProps> = ({
                     type="button"
                     onClick={() => handlePointClick(r, c)}
                     disabled={!isLocalTurnAllowed || state.winner !== null}
-                    className={`w-10 h-10 sm:w-11 sm:h-11 rounded-lg border flex items-center justify-center transition-colors cursor-pointer ${
+                    className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-lg border flex items-center justify-center transition-colors cursor-pointer ${
                       isSel
                         ? "bg-emerald-500/40 border-emerald-400"
+                        : isTarget
+                        ? "bg-emerald-800/60 border-emerald-400"
                         : palace
                         ? "bg-amber-900/80 border-amber-500/60"
                         : "bg-amber-950/70 border-amber-800/70 hover:bg-amber-900"
@@ -108,6 +126,9 @@ export const XiangqiBoard: React.FC<XiangqiBoardProps> = ({
                         {XIANGQI_HANZI[pc.kind][pc.owner === 1 ? 0 : 1]}
                       </span>
                     )}
+                    {isTarget && !pc && (
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                    )}
                   </button>
                 );
               })}
@@ -120,7 +141,7 @@ export const XiangqiBoard: React.FC<XiangqiBoardProps> = ({
       <div className="flex-1 w-full p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-4">
         <div>
           <div className="text-xs text-slate-400">
-            Xiangqi (Ajedrez Chino) · Tablero 9×10 y Palacios 3×3
+            Xiangqi (Ajedrez Chino) · Tablero 9×10, Palacios 3×3 y General Volador
           </div>
           <h3 className="text-lg font-bold text-white mt-0.5">
             {state.winner !== null

@@ -1,6 +1,6 @@
 [package]
 name = "open_table_qr"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
 rust-version = "1.82"
 description = "Generación de código QR de invitación a una sala de juego en OpenTable SDK."
@@ -10,7 +10,7 @@ keywords = ["qr", "qrcode", "invitation", "board-games", "opentable"]
 categories = ["game-engines", "multimedia"]
 
 [dependencies]
-open_table_core = { path = "../open_table_core", version = "1.0.0" }
+open_table_core = { path = "../open_table_core", version = "1.1.0" }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

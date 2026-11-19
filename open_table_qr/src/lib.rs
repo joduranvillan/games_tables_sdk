@@ -85,7 +85,8 @@ pub fn generate_join_qr_svg(payload: &JoinPayload) -> Result<String, QrError> {
         .quiet_zone(true)
         .build();
 
-    svg.push_str(&format!("<!--OPENTABLE_QR_JSON:{json}-->"));
+    let safe_comment_json = json.replace("--", r"\u002d\u002d");
+    svg.push_str(&format!("<!--OPENTABLE_QR_JSON:{safe_comment_json}-->"));
     Ok(svg)
 }
 
@@ -101,7 +102,8 @@ pub fn generate_lan_join_qr_svg(payload: &LanJoinPayload) -> Result<String, QrEr
         .quiet_zone(true)
         .build();
 
-    svg.push_str(&format!("<!--OPENTABLE_QR_JSON:{json}-->"));
+    let safe_comment_json = json.replace("--", r"\u002d\u002d");
+    svg.push_str(&format!("<!--OPENTABLE_QR_JSON:{safe_comment_json}-->"));
     Ok(svg)
 }
 
@@ -123,7 +125,8 @@ pub fn extract_qr_payload_json(input: &str) -> Option<String> {
     if let Some(start_idx) = trimmed.find("<!--OPENTABLE_QR_JSON:") {
         let rest = &trimmed[start_idx + "<!--OPENTABLE_QR_JSON:".len()..];
         if let Some(end_idx) = rest.find("-->") {
-            return Some(rest[..end_idx].trim().to_string());
+            let raw_json = rest[..end_idx].trim().replace(r"\u002d\u002d", "--");
+            return Some(raw_json);
         }
     }
     if trimmed.starts_with('{') && trimmed.ends_with('}') {

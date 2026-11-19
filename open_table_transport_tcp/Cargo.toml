@@ -1,6 +1,6 @@
 [package]
 name = "open_table_transport_tcp"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
 rust-version = "1.82"
 description = "Implementación de Transport sobre TCP para desktop en OpenTable SDK."
@@ -10,20 +10,20 @@ keywords = ["networking", "tcp", "transport", "board-games", "opentable"]
 categories = ["network-programming", "game-engines"]
 
 [dependencies]
-open_table_core = { path = "../open_table_core", version = "1.0.0" }
+open_table_core = { path = "../open_table_core", version = "1.1.0" }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 getrandom = "0.4"
 
 [dev-dependencies]
-checkers_game = { path = "../checkers_game", version = "0.1.0" }
+checkers_game = { path = "../checkers_game" }
 
-chess_game = { path = "../chess_game", version = "0.1.0" }
+chess_game = { path = "../chess_game" }
 
-go_game = { path = "../go_game", version = "0.1.0" }
+go_game = { path = "../go_game" }
 
-open_table_engine = { version = "1.0.0", path = "../open_table_engine" }
+open_table_engine = { path = "../open_table_engine" }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

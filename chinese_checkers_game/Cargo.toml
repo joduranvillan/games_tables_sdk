@@ -1,6 +1,6 @@
 [package]
 name = "chinese_checkers_game"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
 rust-version = "1.82"
 description = "Juego de referencia del OpenTable SDK: damas chinas (Chinese Checkers)."
@@ -10,11 +10,11 @@ keywords = ["game", "board-game", "chinese-checkers", "rules", "opentable"]
 categories = ["game-engines", "games"]
 
 [dependencies]
-open_table_core = { path = "../open_table_core", version = "1.0.0" }
+open_table_core = { path = "../open_table_core", version = "1.1.0" }
 
-open_table_engine = { version = "1.0.0", path = "../open_table_engine" }
+open_table_engine = { version = "1.1.0", path = "../open_table_engine" }
 
-open_table_macros = { version = "1.0.0", path = "../open_table_macros" }
+open_table_macros = { version = "1.1.0", path = "../open_table_macros" }
 
 serde = { version = "1", features = ["derive"] }
 typetag = "0.2"

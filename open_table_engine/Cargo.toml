@@ -1,6 +1,6 @@
 [package]
 name = "open_table_engine"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["joduranvillan"]
 edition = "2021"
 rust-version = "1.82"
@@ -11,7 +11,7 @@ keywords = ["board-game", "game-engine", "ecs", "sdk", "rules"]
 categories = ["game-engines", "game-development"]
 
 [dependencies]
-open_table_core = { version = "1.0.0", path = "../open_table_core" }
+open_table_core = { version = "1.1.0", path = "../open_table_core" }
 
 bevy_ecs = "0.20"
 serde = { version = "1", features = ["derive"] }

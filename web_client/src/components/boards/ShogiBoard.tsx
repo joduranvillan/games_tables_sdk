@@ -22,6 +22,7 @@ const SHOGI_LABELS: Record<ShogiPiece["kind"], string> = {
 
 export const ShogiBoard: React.FC<ShogiBoardProps> = ({
   stateJson,
+  legalMovesJson,
   isLocalTurnAllowed,
   localPlayerId,
   onDispatchCommand,
@@ -36,6 +37,29 @@ export const ShogiBoard: React.FC<ShogiBoardProps> = ({
     grid: (ShogiPiece | null)[][];
     hands: Record<1 | 2, ShogiPiece["kind"][]>;
   };
+
+  const legalMoves = JSON.parse(legalMovesJson) as Array<{
+    command_type: string;
+    from?: [number, number];
+    to: [number, number];
+    kind?: ShogiPiece["kind"];
+    promote?: boolean;
+  }>;
+
+  const validTargets = selectedSquare
+    ? legalMoves.filter(
+        (m) =>
+          m.command_type === "shogi_game::MovePieceCommand" &&
+          m.from?.[0] === selectedSquare[0] &&
+          m.from?.[1] === selectedSquare[1]
+      )
+    : selectedDropKind
+    ? legalMoves.filter(
+        (m) =>
+          m.command_type === "shogi_game::DropPieceCommand" &&
+          m.kind === selectedDropKind
+      )
+    : [];
 
   const handleCellClick = (r: number, c: number) => {
     if (!isLocalTurnAllowed || state.winner !== null) return;
@@ -96,15 +120,20 @@ export const ShogiBoard: React.FC<ShogiBoardProps> = ({
             row.map((pc, c) => {
               const isSel =
                 selectedSquare?.[0] === r && selectedSquare?.[1] === c;
+              const isTarget = validTargets.some(
+                (m) => m.to[0] === r && m.to[1] === c
+              );
               return (
                 <button
                   key={`${r}_${c}`}
                   type="button"
                   onClick={() => handleCellClick(r, c)}
                   disabled={!isLocalTurnAllowed || state.winner !== null}
-                  className={`w-10 h-11 sm:w-12 sm:h-13 rounded border flex flex-col items-center justify-center transition-colors cursor-pointer ${
+                  className={`relative w-10 h-11 sm:w-12 sm:h-13 rounded border flex flex-col items-center justify-center transition-colors cursor-pointer ${
                     isSel
                       ? "bg-emerald-300 border-emerald-700"
+                      : isTarget
+                      ? "bg-emerald-200/90 border-emerald-600"
                       : "bg-amber-200/80 hover:bg-amber-300 border-amber-800/50"
                   }`}
                 >
@@ -122,6 +151,9 @@ export const ShogiBoard: React.FC<ShogiBoardProps> = ({
                       </span>
                     </div>
                   )}
+                  {isTarget && !pc && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-600/80" />
+                  )}
                 </button>
               );
             })
@@ -133,7 +165,7 @@ export const ShogiBoard: React.FC<ShogiBoardProps> = ({
       <div className="flex-1 w-full p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-5">
         <div>
           <div className="text-xs text-slate-400">
-            Shogi · Bandejas Komadai y Promoción FESA
+            Shogi · Bandejas Komadai, Regla Nifu y Promoción FESA
           </div>
           <h3 className="text-lg font-bold text-white mt-0.5">
             {state.winner !== null
