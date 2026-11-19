@@ -28,7 +28,7 @@ echo "=== 3. Publish dry-run ==="
 if command -v cargo &>/dev/null; then
     cargo publish --dry-run -p open_table_core --allow-dirty
 else
-    grep -q 'version = "1.0.0"' open_table_core/Cargo.toml
+    grep -qE 'version = "1\.[0-9]+\.[0-9]+"' open_table_core/Cargo.toml
     grep -q 'license = "MIT"' open_table_core/Cargo.toml
 fi
 

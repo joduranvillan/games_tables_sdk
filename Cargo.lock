@@ -95,7 +95,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "backgammon_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -109,7 +109,7 @@ dependencies = [
 
 [[package]]
 name = "battleship_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -360,7 +360,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn 3.0.10",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -386,7 +386,7 @@ checksum = "fc0e56a716f1e132ff6bf4bdac1c944a3fcdc1cae65f70a4a2a1ac3b401d2d1f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.10",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -442,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "checkers_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -456,7 +456,7 @@ dependencies = [
 
 [[package]]
 name = "chess_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -469,7 +469,7 @@ dependencies = [
 
 [[package]]
 name = "chinese_checkers_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -590,7 +590,7 @@ dependencies = [
 
 [[package]]
 name = "crisis_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -870,7 +870,7 @@ checksum = "9fb9654ba8355388abeb8dcb4fc62f511300867002afc858860463bdd9fe0c44"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.10",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -934,7 +934,7 @@ dependencies = [
 
 [[package]]
 name = "go_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -1023,7 +1023,7 @@ dependencies = [
 
 [[package]]
 name = "goose_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -1201,7 +1201,7 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "ludo_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -1220,7 +1220,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "mille_bornes_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -1254,7 +1254,7 @@ dependencies = [
 
 [[package]]
 name = "monopoly_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -1328,7 +1328,7 @@ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
 name = "open_table_core"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "rand_chacha",
  "rand_core 0.6.4",
@@ -1340,7 +1340,7 @@ dependencies = [
 
 [[package]]
 name = "open_table_engine"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "backgammon_game",
  "bevy_ecs",
@@ -1350,6 +1350,7 @@ dependencies = [
  "chinese_checkers_game",
  "crisis_game",
  "criterion",
+ "ctutils",
  "flate2",
  "go_game",
  "hmac",
@@ -1357,6 +1358,7 @@ dependencies = [
  "mille_bornes_game",
  "monopoly_game",
  "open_table_core",
+ "open_table_macros",
  "serde",
  "serde_json",
  "sha2",
@@ -1368,7 +1370,7 @@ dependencies = [
 
 [[package]]
 name = "open_table_godot"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "backgammon_game",
  "battleship_game",
@@ -1397,20 +1399,21 @@ dependencies = [
 
 [[package]]
 name = "open_table_macros"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
  "open_table_engine",
+ "proc-macro2",
  "quote",
  "serde",
- "syn 3.0.10",
+ "syn 3.0.9",
  "typetag",
 ]
 
 [[package]]
 name = "open_table_qr"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "open_table_core",
  "qrcode",
@@ -1421,7 +1424,7 @@ dependencies = [
 
 [[package]]
 name = "open_table_relay"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "backgammon_game",
  "battleship_game",
@@ -1429,6 +1432,7 @@ dependencies = [
  "chess_game",
  "chinese_checkers_game",
  "crisis_game",
+ "ctutils",
  "futures-util",
  "getrandom",
  "go_game",
@@ -1451,7 +1455,7 @@ dependencies = [
 
 [[package]]
 name = "open_table_transport_native_bridge"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "getrandom",
  "open_table_core",
@@ -1461,7 +1465,7 @@ dependencies = [
 
 [[package]]
 name = "open_table_transport_tcp"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "checkers_game",
  "chess_game",
@@ -1477,7 +1481,7 @@ dependencies = [
 
 [[package]]
 name = "open_table_transport_websocket"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "checkers_game",
  "chess_game",
@@ -1861,7 +1865,7 @@ checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.10",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -1907,7 +1911,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "shogi_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -2008,9 +2012,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "3.0.10"
+version = "3.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ae9ccbea3a7b0b09443036490c8f34a8b1b760fd345e5c0dae0aac718faea79"
+checksum = "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2047,7 +2051,7 @@ checksum = "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.10",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -2094,7 +2098,7 @@ checksum = "78773a2a397f451582ce068015985c33193cf6dea8b74d2a639fe457b2f07b0e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.10",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -2188,7 +2192,7 @@ checksum = "f153acc4e99a5f2a5aefa09fb078be54e26271b2813f6041200b224c098d8328"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.10",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -2217,7 +2221,7 @@ checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
 name = "uno_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",
@@ -2474,7 +2478,7 @@ dependencies = [
 
 [[package]]
 name = "xiangqi_game"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "bevy_ecs",
  "open_table_core",

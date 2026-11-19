@@ -3,6 +3,22 @@
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.1.0] — 2026-11-19
+
+### Added
+- **Internacionalización Completa en 9 Idiomas (`es`, `en`, `pt`, `it`, `de`, `ja`, `fr`, `ko`, `zh`)**:
+  - Paridad 100 % en las 108 claves de interfaz de usuario, los 14 tableros de juego, el Panel de Autodiagnóstico E2E y el instalador PWA.
+  - Traducción integral de la **Guía Interactiva** de los 14 juegos (5 pasos + consejo estratégico por juego en los 9 idiomas) y de las **11 secciones del Centro de Documentación** (Guía de Uso, Reglas de los 14 Juegos y Arquitectura para Desarrolladores).
+- **Selector de Temas Visuales en Lista Desplegable (`<select>`)**: Conversión del selector de temas (`Piedra Oscura`, `Noche Azul`, `Jade Verde`) a un combo list accesible con preservación de la paleta daltónica Okabe-Ito y sintetizador de audio Web Audio API.
+- **Sincronización de Versión Unificada `1.1.0`**: Actualización coordinada de todos los crates del workspace Rust (`open_table_core`, `open_table_engine`, `open_table_macros`, `open_table_qr`, `open_table_relay`, `open_table_transport_*`, `open_table_godot`, `open_table_wasm` y los 14 crates `*_game`) a la versión semántica `1.1.0`.
+
+### Security
+- **Protección contra OOM DoS en TCP y WebSocket**: Límite estricto `MAX_TCP_FRAME_BYTES = 256 KiB` en `open_table_transport_tcp` y `MAX_WS_MESSAGE_BYTES = 256 KiB` en `open_table_relay`.
+- **Protección contra Bombas de Descompresión Gzip**: Lectura acotada a `MAX_DECOMPRESSED_LOG_BYTES = 16 MiB` en `Session::replay_from_compressed` y `Session::replay_compressed`.
+- **Blindaje de Reloj de Turno, `command_log` y Reporte ELO en `open_table_relay`**: Separación de mensajes de control/sincronización (`is_control_or_sync_payload`) para impedir reinicio malicioso de `last_move_at`, bloqueo de reportes de resultados por espectadores y escritura atómica de base de datos ELO (`.db.tmp` + `sync_all` + `rename`).
+- **Sanitización XML/SVG en Códigos QR (`open_table_qr`)**: Escape seguro de secuencias `--` en comentarios `<!--OPENTABLE_QR_JSON:...-->`.
+- **Endurecimiento de `RandomService::range` y Timeout HTTP**: Aritmética de `span` en `u64` sin riesgo de desbordamiento y `HTTP_READ_TIMEOUT_SECS = 5` contra ataques Slowloris.
+
 ## [1.0.0] — 2026-04-23
 
 ### Added

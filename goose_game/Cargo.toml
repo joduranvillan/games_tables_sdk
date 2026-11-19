@@ -3,7 +3,7 @@
 
 [package]
 name = "goose_game"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
 rust-version = "1.82"
 description = "El Juego de la Oca clásico de 63 casillas para 2 o más jugadores sobre OpenTable Engine."
@@ -11,9 +11,9 @@ license = "GPL-3.0-or-later"
 publish = false
 
 [dependencies]
-open_table_core = { version = "1.0.0", path = "../open_table_core" }
-open_table_engine = { version = "1.0.0", path = "../open_table_engine" }
-open_table_macros = { version = "1.0.0", path = "../open_table_macros" }
+open_table_core = { version = "1.1.0", path = "../open_table_core" }
+open_table_engine = { version = "1.1.0", path = "../open_table_engine" }
+open_table_macros = { version = "1.1.0", path = "../open_table_macros" }
 serde = { version = "1.0", features = ["derive"] }
 typetag = "0.2"
 bevy_ecs = "0.20"
