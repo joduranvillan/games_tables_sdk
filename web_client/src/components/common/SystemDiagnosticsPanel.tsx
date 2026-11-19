@@ -6,6 +6,7 @@ import {
   loadEloProfile,
 } from "./EloAndAchievementsPanel";
 import { createTournament } from "./TournamentManagerPanel";
+import { GAME_CATALOG_TRANSLATIONS, useI18n } from "../../i18n";
 import {
   Activity,
   CheckCircle2,
@@ -98,7 +99,6 @@ export function runSingleGameSelfTest(gameId: string): GameDiagnosticResult {
 
     const initialTurn = bridge.current_player();
     const initialStateStr = bridge.get_state_json();
-    const initialState = JSON.parse(initialStateStr);
     const legalMovesRaw = JSON.parse(bridge.get_legal_moves_json(1));
     const legalMovesCount = Array.isArray(legalMovesRaw)
       ? legalMovesRaw.length
@@ -300,11 +300,16 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
   onSelectGameAndPlay,
   onOpenDocsModal,
 }) => {
+  const { locale, tr } = useI18n();
   const [report, setReport] = useState<SystemDiagnosticReport>(() =>
     runFullSystemDiagnostics(relayState)
   );
   const [copiedJson, setCopiedJson] = useState<boolean>(false);
   const [singleTestNotice, setSingleTestNotice] = useState<string | null>(null);
+
+  const getLocalizedGameTitle = (gameId: string, fallbackTitle: string) => {
+    return GAME_CATALOG_TRANSLATIONS[locale]?.[gameId]?.title || tr(fallbackTitle);
+  };
 
   const handleRunFullAudit = () => {
     const fresh = runFullSystemDiagnostics(relayState);
@@ -321,8 +326,9 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
         item.gameId === activeGameId ? single : item
       ),
     }));
+    const localizedTitle = getLocalizedGameTitle(single.gameId, single.gameTitle);
     setSingleTestNotice(
-      `Verificación en vivo de ${single.gameTitle}: ${single.status} (${single.initialLegalMovesCount} jugadas legales en ${single.durationMs} ms)`
+      `${tr("Verificación en vivo de")} ${localizedTitle}: ${single.status} (${single.initialLegalMovesCount} ${tr("jugadas legales en")} ${single.durationMs} ms)`
     );
   };
 
@@ -348,24 +354,20 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
 
   return (
     <section
-      aria-label="Panel de Diagnóstico y Garantía Funcional"
+      aria-label={tr("Panel de Diagnóstico y Garantía Funcional")}
       className="flex flex-col gap-6"
     >
       {/* Header & Action Bar */}
       <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="text-xs text-slate-400">
-            Auditoría Funcional en Tiempo Real · 14 Motores Canónicos +
-            Subsistemas Web
+            {tr("Auditoría Funcional en Tiempo Real · 14 Motores Canónicos + Subsistemas Web")}
           </div>
           <h2 className="text-xl font-bold text-white font-display mt-1">
-            Centro de Diagnóstico y Garantía Funcional (Self-Test E2E)
+            {tr("Centro de Diagnóstico y Garantía Funcional (Self-Test E2E)")}
           </h2>
           <p className="text-xs text-slate-300 mt-1 max-w-3xl leading-relaxed">
-            Verifica con un clic que los 14 juegos inicializan su sesión,
-            calculan jugadas legales, procesan comandos del jugador, ejecutan
-            la IA, evalúan la ventaja posicional y sincronizan historiales JSON
-            sin errores.
+            {tr("Verifica con un clic que los 14 juegos inicializan su sesión, calculan jugadas legales, procesan comandos del jugador, ejecutan la IA, evalúan la ventaja posicional y sincronizan historiales JSON sin errores.")}
           </p>
         </div>
 
@@ -376,7 +378,7 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Ejecutar Diagnóstico Completo (14 Juegos)</span>
+            <span>{tr("Ejecutar Diagnóstico Completo (14 Juegos)")}</span>
           </button>
 
           <button
@@ -385,7 +387,7 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
             className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Activity className="w-3.5 h-3.5" />
-            <span>Probar Juego Actual</span>
+            <span>{tr("Probar Juego Actual")}</span>
           </button>
 
           <button
@@ -394,7 +396,7 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
             className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Copy className="w-3.5 h-3.5" />
-            <span>{copiedJson ? "JSON Copiado" : "Copiar JSON"}</span>
+            <span>{copiedJson ? tr("JSON Copiado") : tr("Copiar JSON")}</span>
           </button>
 
           <button
@@ -403,7 +405,7 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
             className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Exportar Reporte</span>
+            <span>{tr("Exportar Reporte")}</span>
           </button>
         </div>
       </div>
@@ -416,7 +418,7 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
             onClick={() => setSingleTestNotice(null)}
             className="text-slate-400 hover:text-white cursor-pointer"
           >
-            Cerrar
+            {tr("Cerrar")}
           </button>
         </div>
       )}
@@ -424,49 +426,52 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
       {/* Summary KPI Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
-          <div className="text-xs text-slate-400">Estado Global del Sistema</div>
+          <div className="text-xs text-slate-400">
+            {tr("Estado Global del Sistema")}
+          </div>
           <div className="mt-1.5 flex items-center gap-2 text-lg font-bold text-emerald-400 font-mono tabular-nums">
             <ShieldCheck className="w-5 h-5 shrink-0" />
             <span>
               {report.allPassed
-                ? "PASS · 100% OPERATIVO"
-                : "REVISIÓN REQUERIDA"}
+                ? tr("PASS · 100% OPERATIVO")
+                : tr("REVISIÓN REQUERIDA")}
             </span>
           </div>
           <div className="text-xs text-slate-400 mt-1 font-mono tabular-nums">
-            Última ejecución: {new Date(report.timestamp).toLocaleTimeString()}
+            {tr("Última ejecución:")}{" "}
+            {new Date(report.timestamp).toLocaleTimeString()}
           </div>
         </div>
 
         <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
           <div className="text-xs text-slate-400">
-            Motores de Juego Verificados
+            {tr("Motores de Juego Verificados")}
           </div>
           <div className="mt-1.5 text-lg font-bold text-white font-mono tabular-nums">
-            {report.totalGamesVerified} / 14 Juegos Canónicos
+            {report.totalGamesVerified} {tr("/ 14 Juegos Canónicos")}
           </div>
           <div className="text-xs text-slate-400 mt-1">
-            Inicialización + Jugada Legal + IA + SyncLog
+            {tr("Inicialización + Jugada Legal + IA + SyncLog")}
           </div>
         </div>
 
         <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
           <div className="text-xs text-slate-400">
-            Tiempo Total de Auditoría E2E
+            {tr("Tiempo Total de Auditoría E2E")}
           </div>
           <div className="mt-1.5 text-lg font-bold text-sky-400 font-mono tabular-nums">
             {report.totalDurationMs.toFixed(2)} ms
           </div>
           <div className="text-xs text-slate-400 mt-1">
-            Promedio:{" "}
+            {tr("Promedio:")}{" "}
             {(report.totalDurationMs / report.gameResults.length).toFixed(2)}{" "}
-            ms/juego
+            {tr("ms/juego")}
           </div>
         </div>
 
         <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
           <div className="text-xs text-slate-400">
-            Documentación de Uso y Desarrollo React
+            {tr("Documentación de Uso y Desarrollo React")}
           </div>
           <div className="mt-2">
             <button
@@ -474,7 +479,7 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
               onClick={onOpenDocsModal}
               className="w-full px-3.5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors cursor-pointer"
             >
-              Abrir Manual de Uso y Guía React/WASM
+              {tr("Abrir Manual de Uso y Guía React/WASM")}
             </button>
           </div>
         </div>
@@ -483,7 +488,7 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
       {/* Environment & Subsystems Checks */}
       <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-3">
         <h3 className="text-sm font-semibold text-white">
-          01. Verificación de Subsistemas del Navegador y Ecosistema
+          {tr("01. Verificación de Subsistemas del Navegador y Ecosistema")}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {report.environmentChecks.map((chk) => (
@@ -493,14 +498,14 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-white">
-                  {chk.label}
+                  {tr(chk.label)}
                 </span>
                 <span className="text-xs font-mono font-semibold text-emerald-400">
                   {chk.status}
                 </span>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                {chk.detail}
+                {tr(chk.detail)}
               </p>
             </div>
           ))}
@@ -511,12 +516,10 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
       <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-white">
-            02. Matriz de Auditoría Funcional de los 14 Juegos (Ejecución en
-            Vivo)
+            {tr("02. Matriz de Auditoría Funcional de los 14 Juegos (Ejecución en Vivo)")}
           </h3>
           <span className="text-xs text-slate-400 font-mono">
-            Comando CLI equivalente: bash
-            games_tables_sdk/tools/verify_web_client.sh
+            {tr("Comando CLI equivalente: bash games_tables_sdk/tools/verify_web_client.sh")}
           </span>
         </div>
 
@@ -525,23 +528,27 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
             <thead>
               <tr className="border-b border-slate-800 text-slate-400">
                 <th className="py-2.5 px-3 font-medium">#</th>
-                <th className="py-2.5 px-3 font-medium">Juego</th>
-                <th className="py-2.5 px-3 font-medium">Crate Rust</th>
+                <th className="py-2.5 px-3 font-medium">{tr("Juego")}</th>
+                <th className="py-2.5 px-3 font-medium">{tr("Crate Rust")}</th>
                 <th className="py-2.5 px-3 font-medium text-right">
-                  Jugadas Legales
+                  {tr("Jugadas Legales")}
                 </th>
                 <th className="py-2.5 px-3 font-medium">
-                  Comando J1 + Turno IA
+                  {tr("Comando J1 + Turno IA")}
                 </th>
                 <th className="py-2.5 px-3 font-medium text-right">
-                  Eval. Posicional
+                  {tr("Eval. Posicional")}
                 </th>
-                <th className="py-2.5 px-3 font-medium">Replay SyncLog</th>
+                <th className="py-2.5 px-3 font-medium">
+                  {tr("Replay SyncLog")}
+                </th>
                 <th className="py-2.5 px-3 font-medium text-right">
-                  Tiempo (ms)
+                  {tr("Tiempo (ms)")}
                 </th>
-                <th className="py-2.5 px-3 font-medium">Estado</th>
-                <th className="py-2.5 px-3 font-medium text-right">Acción</th>
+                <th className="py-2.5 px-3 font-medium">{tr("Estado")}</th>
+                <th className="py-2.5 px-3 font-medium text-right">
+                  {tr("Acción")}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/70 font-mono tabular-nums">
@@ -554,7 +561,7 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
                     {String(idx + 1).padStart(2, "0")}
                   </td>
                   <td className="py-2.5 px-3 font-sans font-semibold text-white">
-                    {res.gameTitle}
+                    {getLocalizedGameTitle(res.gameId, res.gameTitle)}
                   </td>
                   <td className="py-2.5 px-3 text-slate-300">
                     {res.crateName}
@@ -563,8 +570,8 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
                     {res.initialLegalMovesCount}
                   </td>
                   <td className="py-2.5 px-3 text-slate-300 font-sans">
-                    {res.humanMoveDispatched ? "J1 OK" : "Fallo J1"} ·{" "}
-                    {res.aiStepExecuted ? "IA OK" : "IA Espera"}
+                    {res.humanMoveDispatched ? tr("J1 OK") : tr("Fallo J1")} ·{" "}
+                    {res.aiStepExecuted ? tr("IA OK") : tr("IA Espera")}
                   </td>
                   <td className="py-2.5 px-3 text-right text-sky-400">
                     {res.positionalEvalScore >= 0
@@ -572,7 +579,7 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
                       : res.positionalEvalScore}
                   </td>
                   <td className="py-2.5 px-3 text-slate-300 font-sans">
-                    {res.syncLogVerified ? "Verificado" : "Error"}
+                    {res.syncLogVerified ? tr("Verificado") : tr("Error")}
                   </td>
                   <td className="py-2.5 px-3 text-right text-slate-300">
                     {res.durationMs.toFixed(2)} ms
@@ -590,7 +597,7 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium cursor-pointer"
                     >
                       <Play className="w-3 h-3" />
-                      <span>Abrir</span>
+                      <span>{tr("Abrir")}</span>
                     </button>
                   </td>
                 </tr>
@@ -602,3 +609,4 @@ export const SystemDiagnosticsPanel: React.FC<SystemDiagnosticsPanelProps> = ({
     </section>
   );
 };
+

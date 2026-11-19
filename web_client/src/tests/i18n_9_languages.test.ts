@@ -134,4 +134,103 @@ for (const loc of expectedLocales) {
   }
 }
 console.log("✔ 4. Browser locale detection and dynamic board phrase translation verified");
+
+// 5. Verify SystemDiagnosticsPanel, PWAInstallButton, Panels & Technical Acronym Preservation (PASS, ELO, JSON, WASM)
+const diagnosticStringsToVerify = [
+  "Auditoría Funcional en Tiempo Real · 14 Motores Canónicos + Subsistemas Web",
+  "Centro de Diagnóstico y Garantía Funcional (Self-Test E2E)",
+  "Verifica con un clic que los 14 juegos inicializan su sesión, calculan jugadas legales, procesan comandos del jugador, ejecutan la IA, evalúan la ventaja posicional y sincronizan historiales JSON sin errores.",
+  "Ejecutar Diagnóstico Completo (14 Juegos)",
+  "Probar Juego Actual",
+  "Copiar JSON",
+  "Exportar Reporte",
+  "Estado Global del Sistema",
+  "PASS · 100% OPERATIVO",
+  "Motores de Juego Verificados",
+  "Inicialización + Jugada Legal + IA + SyncLog",
+  "Tiempo Total de Auditoría E2E",
+  "Documentación de Uso y Desarrollo React",
+  "Abrir Manual de Uso y Guía React/WASM",
+  "01. Verificación de Subsistemas del Navegador y Ecosistema",
+  "Puente WasmGameBridge (14 Motores)",
+  "Subsistema ELO K=32 y Torneos Berger/KO",
+  "Persistencia LocalStorage (Perfil y Partidas)",
+  "Síntesis Web Audio API & Capacidad PWA",
+  "Cliente WebSocket Relay & Cola Matchmaking",
+  "02. Matriz de Auditoría Funcional de los 14 Juegos (Ejecución en Vivo)",
+  "Instalar PWA",
+];
+
+for (const loc of expectedLocales) {
+  if (loc === "es") continue;
+  for (const phrase of diagnosticStringsToVerify) {
+    const translated = translateDynamicPhrase(phrase, loc);
+    // In Portuguese and Italian, certain technical phrases are exact cognates with Spanish
+    if (
+      (loc === "pt" &&
+        (phrase === "Copiar JSON" || phrase === "Instalar PWA")) ||
+      (loc === "it" && phrase === "PASS · 100% OPERATIVO")
+    ) {
+      assert.equal(translated, phrase);
+      continue;
+    }
+    assert.notEqual(
+      translated,
+      phrase,
+      `Phrase "${phrase}" must be translated in locale="${loc}"`
+    );
+  }
+
+  // Verify technical acronyms PASS, ELO, JSON, WASM are preserved
+  assert.ok(
+    translateDynamicPhrase("PASS · 100% OPERATIVO", loc).includes("PASS"),
+    `Technical acronym PASS must be preserved in locale="${loc}"`
+  );
+  assert.ok(
+    translateDynamicPhrase("Copiar JSON", loc).includes("JSON"),
+    `Technical acronym JSON must be preserved in locale="${loc}"`
+  );
+  assert.ok(
+    translateDynamicPhrase("Subsistema ELO K=32 y Torneos Berger/KO", loc).includes("ELO"),
+    `Technical acronym ELO must be preserved in locale="${loc}"`
+  );
+  assert.ok(
+    translateDynamicPhrase("Abrir Manual de Uso y Guía React/WASM", loc).includes("WASM"),
+    `Technical acronym WASM must be preserved in locale="${loc}"`
+  );
+}
+console.log(
+  "✔ 5. SystemDiagnosticsPanel, PWAInstallButton & technical acronyms (PASS, ELO, JSON, WASM) verified across all 9 languages"
+);
+
+// 6. Verify 14-Game Board HUD & Rule Phrases across all 9 languages
+const boardHudPhrases = [
+  "Estrella Hexagonal Canónica (121 Casillas)",
+  "Tablero Cruz 15×15 Canónico",
+  "Recorrido en Espiral de 63 Casillas",
+  "Tu Flota (5 Buques Ilustrados)",
+  "Radar de Ataque (Flota Enemiga)",
+  "Mano del Jugador Activo",
+  "Finalizar Turno",
+];
+
+for (const loc of expectedLocales) {
+  if (loc === "es") continue;
+  for (const phrase of boardHudPhrases) {
+    const translated = translateDynamicPhrase(phrase, loc);
+    if (loc === "pt" && phrase === "Finalizar Turno") {
+      assert.equal(translated, "Finalizar Turno");
+      continue;
+    }
+    assert.notEqual(
+      translated,
+      phrase,
+      `Board HUD phrase "${phrase}" must be translated in locale="${loc}"`
+    );
+  }
+}
+console.log("✔ 6. All 14 game board HUD phrases verified across all 9 languages");
 console.log("=== ALL 9-LANGUAGE I18N TESTS PASSED ===");
+
+
+
