@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { CATALOG_14_GAMES } from "../App";
+import { DOCUMENTATION_SECTIONS } from "../components/common/DocumentationCenterModal";
 import { filterAndGroupCatalogGames } from "../components/common/GameListNavigation";
+import { TUTORIALS_14_GAMES } from "../components/common/InteractiveTutorialPanel";
 import {
   GAME_CATALOG_TRANSLATIONS,
   getLocalizedCatalogGames,
@@ -14,6 +16,12 @@ import {
   UI_DICTIONARIES,
   UiTranslationKey,
 } from "../i18n";
+import {
+  DOC_MODAL_UI_BY_LOCALE,
+  getLocalizedDocumentationSections,
+  getLocalizedTutorialContent,
+  TUTORIAL_UI_BY_LOCALE,
+} from "../i18n/tutorialsAndDocsI18n";
 
 console.log("=== Running 9-Language i18n Translation Parity Suite ===");
 
@@ -230,7 +238,76 @@ for (const loc of expectedLocales) {
   }
 }
 console.log("✔ 6. All 14 game board HUD phrases verified across all 9 languages");
+
+// 7. Verify Interactive Tutorial Guide (14 Games) and Documentation Center Modal (11 Sections) across all 9 languages
+for (const loc of expectedLocales) {
+  const tutUi = TUTORIAL_UI_BY_LOCALE[loc];
+  assert.ok(tutUi && tutUi.kicker.length > 0, `Missing TUTORIAL_UI_BY_LOCALE for ${loc}`);
+  if (loc !== "es") {
+    assert.notEqual(
+      tutUi.kicker,
+      TUTORIAL_UI_BY_LOCALE.es.kicker,
+      `Tutorial kicker must be localized for ${loc}`
+    );
+    assert.notEqual(
+      tutUi.executeTutorBtn,
+      TUTORIAL_UI_BY_LOCALE.es.executeTutorBtn,
+      `Tutorial execute button must be localized for ${loc}`
+    );
+  }
+
+  for (const game of CATALOG_14_GAMES) {
+    const baseSpec = TUTORIALS_14_GAMES[game.id];
+    assert.ok(baseSpec, `Missing base tutorial spec for ${game.id}`);
+    const localizedTutorial = getLocalizedTutorialContent(game.id, loc, baseSpec);
+    assert.ok(localizedTutorial.title.length > 0);
+    assert.ok(localizedTutorial.objective.length > 0);
+    assert.equal(localizedTutorial.steps.length, 3, `Game ${game.id} must have 3 tutorial steps in ${loc}`);
+    assert.ok(localizedTutorial.tournamentRules.length > 0);
+
+    if (loc !== "es") {
+      assert.notEqual(
+        localizedTutorial.objective,
+        baseSpec.objective,
+        `Tutorial objective for ${game.id} must be translated in ${loc}`
+      );
+      assert.notEqual(
+        localizedTutorial.steps[0],
+        baseSpec.steps[0],
+        `Tutorial step 1 for ${game.id} must be translated in ${loc}`
+      );
+    }
+  }
+
+  const docUi = DOC_MODAL_UI_BY_LOCALE[loc];
+  assert.ok(docUi && docUi.headerTitle.length > 0, `Missing DOC_MODAL_UI_BY_LOCALE for ${loc}`);
+  const localizedDocs = getLocalizedDocumentationSections(loc, DOCUMENTATION_SECTIONS);
+  assert.equal(localizedDocs.length, DOCUMENTATION_SECTIONS.length);
+  for (let i = 0; i < localizedDocs.length; i++) {
+    const sec = localizedDocs[i];
+    const baseSec = DOCUMENTATION_SECTIONS[i];
+    assert.ok(sec.title.length > 0);
+    assert.ok(sec.subtitle.length > 0);
+    assert.ok(sec.paragraphs.length > 0);
+    if (loc !== "es") {
+      assert.notEqual(
+        sec.title,
+        baseSec.title,
+        `Doc section ${sec.id} title must be translated in ${loc}`
+      );
+      assert.notEqual(
+        sec.paragraphs[0],
+        baseSec.paragraphs[0],
+        `Doc section ${sec.id} paragraph must be translated in ${loc}`
+      );
+    }
+  }
+}
+console.log(
+  "✔ 7. Interactive Guide (14 games × 9 locales) & Documentation Center (11 sections × 9 locales) verified"
+);
 console.log("=== ALL 9-LANGUAGE I18N TESTS PASSED ===");
+
 
 
 

@@ -1,5 +1,10 @@
 import React, { useState } from "react";
 import { BookOpen, Sparkles, X } from "lucide-react";
+import { useI18n } from "../../i18n";
+import {
+  getLocalizedTutorialContent,
+  TUTORIAL_UI_BY_LOCALE,
+} from "../../i18n/tutorialsAndDocsI18n";
 
 export interface GameTutorialSpec {
   id: string;
@@ -323,8 +328,11 @@ export const InteractiveTutorialPanel: React.FC<InteractiveTutorialPanelProps> =
   hideToggleButton = false,
   onClose,
 }) => {
+  const { locale } = useI18n();
   const [isOpen, setIsOpen] = useState<boolean>(defaultOpen);
   const spec = TUTORIALS_14_GAMES[gameId] || TUTORIALS_14_GAMES.chess;
+  const ui = TUTORIAL_UI_BY_LOCALE[locale];
+  const localizedSpec = getLocalizedTutorialContent(gameId, locale, spec);
 
   const handleApplySuggestion = () => {
     if (!isLocalTurnAllowed) return;
@@ -345,7 +353,7 @@ export const InteractiveTutorialPanel: React.FC<InteractiveTutorialPanelProps> =
           className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-amber-300 transition-colors cursor-pointer"
         >
           <BookOpen className="w-3.5 h-3.5" />
-          <span>{isOpen ? "Ocultar Tutorial Interactivo" : "Tutorial y Jugada Sugerida"}</span>
+          <span>{isOpen ? ui.hideTutorialBtn : ui.showTutorialBtn}</span>
         </button>
       )}
 
@@ -354,11 +362,11 @@ export const InteractiveTutorialPanel: React.FC<InteractiveTutorialPanelProps> =
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-xs font-mono text-amber-400">
-                GUÍA INTERACTIVA (14/14 JUEGOS CANÓNICOS)
+                {ui.kicker}
               </div>
-              <h3 className="text-base font-bold text-white mt-0.5">{spec.title}</h3>
+              <h3 className="text-base font-bold text-white mt-0.5">{localizedSpec.title}</h3>
               <p className="text-xs text-slate-300 mt-1">
-                <strong>Objetivo:</strong> {spec.objective}
+                <strong>{ui.objectiveLabel}</strong> {localizedSpec.objective}
               </p>
             </div>
             <button
@@ -377,7 +385,7 @@ export const InteractiveTutorialPanel: React.FC<InteractiveTutorialPanelProps> =
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {spec.steps.map((step, i) => (
+            {localizedSpec.steps.map((step, i) => (
               <div
                 key={i}
                 className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 leading-relaxed"
@@ -389,7 +397,7 @@ export const InteractiveTutorialPanel: React.FC<InteractiveTutorialPanelProps> =
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-800">
             <span className="text-xs text-slate-400">
-              <strong>Reglas de Torneo:</strong> {spec.tournamentRules}
+              <strong>{ui.tournamentRulesLabel}</strong> {localizedSpec.tournamentRules}
             </span>
 
             <button
@@ -399,7 +407,7 @@ export const InteractiveTutorialPanel: React.FC<InteractiveTutorialPanelProps> =
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 text-xs font-bold shadow cursor-pointer shrink-0"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Ejecutar Jugada Sugerida por Tutor WASM</span>
+              <span>{ui.executeTutorBtn}</span>
             </button>
           </div>
         </div>

@@ -8,6 +8,11 @@ import {
   Terminal,
   X,
 } from "lucide-react";
+import { useI18n } from "../../i18n";
+import {
+  DOC_MODAL_UI_BY_LOCALE,
+  getLocalizedDocumentationSections,
+} from "../../i18n/tutorialsAndDocsI18n";
 
 export type DocCategory = "usage" | "games" | "developer";
 
@@ -306,14 +311,21 @@ interface DocumentationCenterModalProps {
 export const DocumentationCenterModal: React.FC<
   DocumentationCenterModalProps
 > = ({ isOpen, onClose, initialCategory = "usage" }) => {
+  const { locale } = useI18n();
+  const ui = DOC_MODAL_UI_BY_LOCALE[locale];
   const [activeCategory, setActiveCategory] =
     useState<DocCategory>(initialCategory);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  const localizedSections = useMemo(
+    () => getLocalizedDocumentationSections(locale, DOCUMENTATION_SECTIONS),
+    [locale]
+  );
+
   const filteredSections = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return DOCUMENTATION_SECTIONS.filter((sec) => {
+    return localizedSections.filter((sec) => {
       if (!q && sec.category !== activeCategory) return false;
       if (!q) return true;
       const haystack = [
@@ -328,7 +340,7 @@ export const DocumentationCenterModal: React.FC<
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, localizedSections]);
 
   if (!isOpen) return null;
 
@@ -344,7 +356,7 @@ export const DocumentationCenterModal: React.FC<
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Centro de Documentación de Uso y Desarrollo Web React + WASM"
+      aria-label={ui.dialogAriaLabel}
       className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
     >
       <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
@@ -352,18 +364,17 @@ export const DocumentationCenterModal: React.FC<
         <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-4">
           <div>
             <div className="text-xs text-slate-400">
-              Documentación Oficial Integrada · docs/WEB_USER_GUIDE.md &
-              docs/WEB_REACT_DEVELOPER_GUIDE.md
+              {ui.headerKicker}
             </div>
             <h2 className="text-lg font-bold text-white font-display">
-              Manual de Uso y Guía de Desarrollo Web (React + TypeScript + WASM)
+              {ui.headerTitle}
             </h2>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            aria-label="Cerrar documentación"
+            aria-label={ui.closeAriaLabel}
             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -386,7 +397,7 @@ export const DocumentationCenterModal: React.FC<
               }`}
             >
               <BookOpen className="w-3.5 h-3.5" />
-              <span>Manual de Uso</span>
+              <span>{ui.tabUsage}</span>
             </button>
 
             <button
@@ -402,7 +413,7 @@ export const DocumentationCenterModal: React.FC<
               }`}
             >
               <Gamepad2 className="w-3.5 h-3.5" />
-              <span>Reglas 14 Juegos</span>
+              <span>{ui.tabGames}</span>
             </button>
 
             <button
@@ -418,7 +429,7 @@ export const DocumentationCenterModal: React.FC<
               }`}
             >
               <Code2 className="w-3.5 h-3.5" />
-              <span>Desarrollo React + WASM</span>
+              <span>{ui.tabDeveloper}</span>
             </button>
           </div>
 
@@ -428,7 +439,7 @@ export const DocumentationCenterModal: React.FC<
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar (ej. WASM, Relay, ELO, Shogi, SVG...)"
+              placeholder={ui.searchPlaceholder}
               className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-500"
             />
           </div>
@@ -438,10 +449,7 @@ export const DocumentationCenterModal: React.FC<
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
           {filteredSections.length === 0 ? (
             <div className="p-8 rounded-xl bg-slate-950 border border-slate-800 text-center text-xs text-slate-400">
-              No se encontraron secciones para "{searchQuery}". Prueba con
-              términos como <code>WASM</code>, <code>Relay</code>,{" "}
-              <code>Torneos</code>, <code>ELO</code> o el nombre de cualquiera
-              de los 14 juegos.
+              {ui.emptySearchPrefix} "{searchQuery}". {ui.emptySearchSuffix}
             </div>
           ) : (
             filteredSections.map((sec) => (
@@ -452,10 +460,10 @@ export const DocumentationCenterModal: React.FC<
                 <div>
                   <div className="text-xs text-slate-400">
                     {sec.category === "usage"
-                      ? "Manual de Uso"
+                      ? ui.categoryBadgeUsage
                       : sec.category === "games"
-                      ? "Catálogo Canónico 14 Juegos"
-                      : "Ingeniería Web (React + TypeScript + WASM)"}{" "}
+                      ? ui.categoryBadgeGames
+                      : ui.categoryBadgeDeveloper}{" "}
                     · {sec.subtitle}
                   </div>
                   <h3 className="text-base font-bold text-white font-display mt-0.5">
@@ -498,7 +506,7 @@ export const DocumentationCenterModal: React.FC<
                       >
                         <Copy className="w-3 h-3" />
                         <span>
-                          {copiedId === sec.id ? "Copiado" : "Copiar"}
+                          {copiedId === sec.id ? ui.copiedBtn : ui.copyBtn}
                         </span>
                       </button>
                     </div>
@@ -514,16 +522,13 @@ export const DocumentationCenterModal: React.FC<
 
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between text-xs text-slate-400">
-          <span>
-            Documentación sincronizada con <code>docs/WEB_USER_GUIDE.md</code> y{" "}
-            <code>docs/WEB_REACT_DEVELOPER_GUIDE.md</code>
-          </span>
+          <span>{ui.footerSyncText}</span>
           <button
             type="button"
             onClick={onClose}
             className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold cursor-pointer"
           >
-            Cerrar
+            {ui.closeBtn}
           </button>
         </div>
       </div>
