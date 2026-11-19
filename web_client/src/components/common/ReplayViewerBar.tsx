@@ -9,6 +9,7 @@ import {
   SkipForward,
   Upload,
 } from "lucide-react";
+import { useI18n } from "../../i18n";
 
 interface ReplayViewerBarProps {
   currentStep: number;
@@ -27,6 +28,7 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
   onExportJson,
   onImportJson,
 }) => {
+  const { t } = useI18n();
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
   const [importText, setImportText] = useState<string>("");
@@ -56,9 +58,9 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      setStatusMessage("Partida descargada (.opentable.json)");
+      setStatusMessage("(.opentable.json)");
     } catch {
-      setStatusMessage("JSON exportado listo");
+      setStatusMessage("JSON OK");
     }
   };
 
@@ -69,9 +71,9 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
     reader.onload = () => {
       const content = String(reader.result || "");
       if (onImportJson(content)) {
-        setStatusMessage(`Partida cargada (${file.name})`);
+        setStatusMessage(`OK (${file.name})`);
       } else {
-        setStatusMessage("Error al importar archivo JSON");
+        setStatusMessage("JSON Error");
       }
     };
     reader.readAsText(file);
@@ -83,7 +85,7 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
         {/* Step-by-Step Timeline Controls */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold text-slate-300 mr-1">
-            Visor de Repeticiones:
+            {t("replay.title")}
           </span>
 
           <button
@@ -93,7 +95,6 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
               setIsPlaying(false);
               onSeekStep(0);
             }}
-            title="Ir al Inicio (Paso 0)"
             className="p-2 rounded-lg bg-slate-950 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 text-slate-200 cursor-pointer"
           >
             <SkipBack className="w-3.5 h-3.5" />
@@ -106,7 +107,6 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
               setIsPlaying(false);
               onSeekStep(currentStep - 1);
             }}
-            title="Jugada Anterior"
             className="p-2 rounded-lg bg-slate-950 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 text-slate-200 cursor-pointer"
           >
             <Rewind className="w-3.5 h-3.5" />
@@ -126,12 +126,12 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
             {isPlaying ? (
               <>
                 <Pause className="w-3.5 h-3.5" />
-                <span>Pausar</span>
+                <span>{t("replay.pause")}</span>
               </>
             ) : (
               <>
                 <Play className="w-3.5 h-3.5" />
-                <span>Reproducir</span>
+                <span>{t("replay.play")}</span>
               </>
             )}
           </button>
@@ -143,7 +143,6 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
               setIsPlaying(false);
               onSeekStep(currentStep + 1);
             }}
-            title="Jugada Siguiente"
             className="p-2 rounded-lg bg-slate-950 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 text-slate-200 cursor-pointer"
           >
             <FastForward className="w-3.5 h-3.5" />
@@ -156,19 +155,18 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
               setIsPlaying(false);
               onSeekStep(totalSteps);
             }}
-            title="Ir al Final (En Vivo)"
             className="p-2 rounded-lg bg-slate-950 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 text-slate-200 cursor-pointer"
           >
             <SkipForward className="w-3.5 h-3.5" />
           </button>
 
           <span className="px-2.5 py-1 rounded bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 tabular-nums">
-            Jugada {currentStep} / {totalSteps}
+            {t("replay.move_counter")} {currentStep} / {totalSteps}
           </span>
 
           {currentStep < totalSteps && (
             <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-[11px] font-semibold text-amber-300">
-              Modo Histórico (Avanza al final o mueve para ramificar)
+              {t("replay.history_badge")}
             </span>
           )}
         </div>
@@ -181,12 +179,12 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Guardar JSON</span>
+            <span>{t("replay.save_json")}</span>
           </button>
 
           <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium cursor-pointer">
             <Upload className="w-3.5 h-3.5 text-sky-400" />
-            <span>Cargar Archivo JSON</span>
+            <span>{t("replay.load_json_file")}</span>
             <input
               type="file"
               accept=".json,application/json"
@@ -203,7 +201,9 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
             }}
             className="px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium cursor-pointer"
           >
-            {showImportModal ? "Cerrar Editor JSON" : "Pegar / Ver JSON"}
+            {showImportModal
+              ? t("replay.close_json_editor")
+              : t("replay.paste_view_json")}
           </button>
         </div>
       </div>
@@ -214,10 +214,6 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
 
       {showImportModal && (
         <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2">
-          <div className="text-xs text-slate-400">
-            Pega o edita un registro determinista JSON (<code>SyncState</code> / Replay)
-            para restaurar la partida:
-          </div>
           <textarea
             rows={4}
             value={importText}
@@ -229,15 +225,15 @@ export const ReplayViewerBar: React.FC<ReplayViewerBarProps> = ({
               type="button"
               onClick={() => {
                 if (onImportJson(importText)) {
-                  setStatusMessage("Partida restaurada desde JSON pegado");
+                  setStatusMessage("JSON OK");
                   setShowImportModal(false);
                 } else {
-                  setStatusMessage("JSON inválido");
+                  setStatusMessage("JSON Error");
                 }
               }}
               className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold cursor-pointer"
             >
-              Aplicar JSON a la Mesa
+              {t("replay.apply_json")}
             </button>
           </div>
         </div>

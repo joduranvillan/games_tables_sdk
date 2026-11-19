@@ -1,5 +1,6 @@
 import React from "react";
 import { Eye, Palette, Volume2, VolumeX } from "lucide-react";
+import { useI18n } from "../../i18n";
 
 export type VisualThemeId = "piedra_oscura" | "noche_azul" | "jade_verde";
 
@@ -283,20 +284,26 @@ export const ThemeAndAudioToolbar: React.FC<ThemeAndAudioToolbarProps> = ({
   config,
   onChange,
 }) => {
+  const { t } = useI18n();
   const update = (patch: Partial<ThemeAndAudioConfig>) => {
     const next = saveThemeAndAudioConfig({ ...config, ...patch });
     onChange(next);
+  };
+
+  const themeLabels: Record<VisualThemeId, string> = {
+    piedra_oscura: t("theme.dark_stone"),
+    noche_azul: t("theme.blue_night"),
+    jade_verde: t("theme.green_jade"),
   };
 
   return (
     <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
       <div className="inline-flex items-center gap-1.5 text-slate-300 pl-1">
         <Palette className="w-3.5 h-3.5 text-emerald-400" />
-        <span className="font-medium">Tema:</span>
+        <span className="font-medium">{t("theme.label")}</span>
       </div>
 
       {(Object.keys(VISUAL_THEMES) as VisualThemeId[]).map((id) => {
-        const item = VISUAL_THEMES[id];
         const active = config.themeId === id;
         return (
           <button
@@ -312,7 +319,7 @@ export const ThemeAndAudioToolbar: React.FC<ThemeAndAudioToolbarProps> = ({
                 : "bg-slate-800/80 text-slate-300 hover:text-white"
             }`}
           >
-            {item.label}
+            {themeLabels[id]}
           </button>
         );
       })}
@@ -333,7 +340,7 @@ export const ThemeAndAudioToolbar: React.FC<ThemeAndAudioToolbarProps> = ({
       >
         <Eye className="w-3.5 h-3.5" />
         <span>
-          {config.okabeIto ? "Okabe-Ito: Activo" : "Modo Daltónico Okabe-Ito"}
+          {config.okabeIto ? t("theme.okabe_active") : t("theme.okabe_enable")}
         </span>
       </button>
 
@@ -365,7 +372,9 @@ export const ThemeAndAudioToolbar: React.FC<ThemeAndAudioToolbarProps> = ({
         ) : (
           <VolumeX className="w-3.5 h-3.5" />
         )}
-        <span>{config.soundEnabled ? "Audio FX: ON" : "Audio FX: OFF"}</span>
+        <span>
+          {config.soundEnabled ? t("theme.audio_on") : t("theme.audio_off")}
+        </span>
       </button>
     </div>
   );

@@ -80,6 +80,7 @@ import {
   ChevronDown,
   Clock,
   Eye,
+  Globe,
   History,
   Layers,
   Menu,
@@ -94,6 +95,14 @@ import {
   Wifi,
   X,
 } from "lucide-react";
+import {
+  applyDomSubtreeLocalization,
+  getLocalizedCatalogGames,
+  getLocalizedCategoryGroups,
+  I18nProvider,
+  SupportedLocale,
+  useI18n,
+} from "./i18n";
 
 interface GameCatalogItem {
   id: string;
@@ -253,7 +262,9 @@ export function computeIsLocalTurnAllowed(
   return currentTurn === localPlayerId;
 }
 
-export const App: React.FC = () => {
+const AppShell: React.FC = () => {
+  const { locale, setLocale, t, locales } = useI18n();
+  const rootDomRef = useRef<HTMLDivElement | null>(null);
   const bridgeRef = useRef<WasmGameBridge>(new WasmGameBridge());
   const relayRef = useRef<RelayWebSocketClient | null>(null);
   const matchOutcomeRecordedRef = useRef<boolean>(false);
@@ -705,16 +716,43 @@ export const App: React.FC = () => {
     }
   })();
 
+  const localizedCatalog = getLocalizedCatalogGames(CATALOG_14_GAMES, locale);
+  const localizedCategoryGroups = getLocalizedCategoryGroups(locale);
+  const localizedGameTitlesMap: Record<string, string> = Object.fromEntries(
+    localizedCatalog.map((g) => [g.id, g.title])
+  );
+
   const activeGameMeta =
-    CATALOG_14_GAMES.find((g) => g.id === selectedGameId) ||
-    CATALOG_14_GAMES[0];
+    localizedCatalog.find((g) => g.id === selectedGameId) ||
+    localizedCatalog[0];
 
   const currentTheme =
     VISUAL_THEMES[themeConfig.themeId] || VISUAL_THEMES.piedra_oscura;
 
+  useEffect(() => {
+    const rootEl = rootDomRef.current;
+    if (!rootEl) return;
+    applyDomSubtreeLocalization(rootEl, locale);
+    if (locale === "es" || typeof MutationObserver === "undefined") return;
+    let applying = false;
+    const observer = new MutationObserver(() => {
+      if (applying) return;
+      applying = true;
+      applyDomSubtreeLocalization(rootEl, locale);
+      applying = false;
+    });
+    observer.observe(rootEl, {
+      childList: true,
+      subtree: true,
+    });
+    return () => observer.disconnect();
+  }, [locale, activeTab, selectedGameId, stateJson, isTopRightMenuOpen, isDocsModalOpen]);
+
   return (
     <div
+      ref={rootDomRef}
       data-theme={themeConfig.themeId}
+      data-locale={locale}
       data-okabe-ito={themeConfig.okabeIto ? "true" : "false"}
       className={`min-h-screen flex flex-col transition-colors ${currentTheme.rootBgClass}`}
     >
@@ -722,7 +760,7 @@ export const App: React.FC = () => {
 
       {/* Strict 3-Zone Top Bar Contract */}
       <header
-        className={`sticky top-0 z-30 flex items-center justify-between gap-4 sm:gap-8 px-4 sm:px-6 py-3 sm:py-4 border-b backdrop-blur-md ${currentTheme.headerBgClass}`}
+        className={`sticky top-0 z-30 flex items-center justify-between gap-3 sm:gap-6 px-4 sm:px-6 py-3 sm:py-4 border-b backdrop-blur-md ${currentTheme.headerBgClass}`}
       >
         <a
           href="#top"
@@ -732,10 +770,10 @@ export const App: React.FC = () => {
           }}
           className="text-base sm:text-lg font-bold tracking-tight text-white font-display whitespace-nowrap shrink-0"
         >
-          OpenTable Web
+          {t("app.brand")}
         </a>
 
-        <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-300">
+        <nav className="hidden lg:flex items-center gap-5 text-sm font-medium text-slate-300">
           <button
             type="button"
             onClick={() => setActiveTab("play")}
@@ -745,7 +783,7 @@ export const App: React.FC = () => {
                 : ""
             }`}
           >
-            Tablero Activo
+            {t("nav.active_board")}
           </button>
           <button
             type="button"
@@ -756,7 +794,7 @@ export const App: React.FC = () => {
                 : ""
             }`}
           >
-            14 Juegos
+            {t("nav.catalog_14")}
           </button>
           <button
             type="button"
@@ -767,7 +805,7 @@ export const App: React.FC = () => {
                 : ""
             }`}
           >
-            Salas Online
+            {t("nav.online_rooms")}
           </button>
           <button
             type="button"
@@ -778,7 +816,7 @@ export const App: React.FC = () => {
                 : ""
             }`}
           >
-            Torneos
+            {t("nav.tournaments")}
           </button>
           <button
             type="button"
@@ -789,7 +827,7 @@ export const App: React.FC = () => {
                 : ""
             }`}
           >
-            Ranking ELO
+            {t("nav.elo_ranking")}
           </button>
           <button
             type="button"
@@ -800,11 +838,32 @@ export const App: React.FC = () => {
                 : ""
             }`}
           >
-            Analizador
+            {t("nav.analyzer")}
           </button>
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Top Bar 9-Language Selector */}
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[40px] rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-200">
+            <Globe className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <select
+              aria-label={t("nav.language_label")}
+              value={locale}
+              onChange={(e) => setLocale(e.target.value as SupportedLocale)}
+              className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+            >
+              {locales.map((loc) => (
+                <option
+                  key={loc.code}
+                  value={loc.code}
+                  className="bg-slate-950 text-white"
+                >
+                  {loc.flag} {loc.shortLabel} · {loc.nativeName}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <PWAInstallButton />
           <button
             type="button"
@@ -813,12 +872,12 @@ export const App: React.FC = () => {
             }
             className={`hidden sm:inline-flex items-center justify-center min-h-[40px] px-3.5 sm:px-4 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${currentTheme.accentBtnClass}`}
           >
-            Reiniciar Partida
+            {t("nav.restart_match")}
           </button>
           <button
             type="button"
             onClick={() => setIsTopRightMenuOpen((prev) => !prev)}
-            aria-label="Abrir menú superior derecho de Temas, Tutoriales y Herramientas"
+            aria-label={t("menu.title")}
             aria-expanded={isTopRightMenuOpen}
             className={`min-h-[40px] inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 text-xs font-semibold rounded-lg border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               isTopRightMenuOpen
@@ -827,17 +886,17 @@ export const App: React.FC = () => {
             }`}
           >
             <Menu className="w-4 h-4" />
-            <span>Menú</span>
+            <span>{t("nav.menu")}</span>
           </button>
         </div>
       </header>
 
-      {/* Unified Top-Right Menu Drawer (Themes, Audio, Interactive Tutorial, Replay Viewer, Tournament Clock & Docs) */}
+      {/* Unified Top-Right Menu Drawer (Language, Themes, Audio, Interactive Tutorial, Replay Viewer, Tournament Clock & Docs) */}
       {isTopRightMenuOpen && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Menú Superior Derecho de Temas, Tutoriales y Herramientas"
+          aria-label={t("menu.title")}
           className="fixed inset-0 z-50 flex justify-end"
         >
           <div
@@ -848,21 +907,50 @@ export const App: React.FC = () => {
             <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-800">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
-                  Centro de Control · {activeGameMeta.title}
+                  {t("menu.control_center")} · {activeGameMeta.title}
                 </div>
                 <h2 className="text-base sm:text-lg font-bold text-white font-display">
-                  Menú: Tutorial, Temas y Herramientas
+                  {t("menu.title")}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setIsTopRightMenuOpen(false)}
-                aria-label="Cerrar menú superior derecho"
+                aria-label={t("menu.close")}
                 className="min-h-[38px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
               >
                 <X className="w-4 h-4" />
-                <span>Cerrar</span>
+                <span>{t("menu.close")}</span>
               </button>
+            </div>
+
+            {/* 0. 9-Language Tactile Grid Switcher inside Top-Right Menu Drawer */}
+            <div className="flex flex-col gap-2 p-3 rounded-2xl bg-slate-900/90 border border-slate-800">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300">
+                <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{t("menu.language_section")}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {locales.map((loc) => {
+                  const isCurrentLocale = loc.code === locale;
+                  return (
+                    <button
+                      key={loc.code}
+                      type="button"
+                      onClick={() => setLocale(loc.code)}
+                      aria-pressed={isCurrentLocale}
+                      className={`min-h-[38px] px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                        isCurrentLocale
+                          ? "bg-emerald-600 text-white border-emerald-400 shadow-sm"
+                          : "bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800"
+                      }`}
+                    >
+                      <span>{loc.flag}</span>
+                      <span>{loc.nativeName}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Quick Global Actions */}
@@ -876,7 +964,7 @@ export const App: React.FC = () => {
                 className="min-h-[42px] px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-sky-400 text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <BookOpen className="w-4 h-4 shrink-0" />
-                <span>Guía y Docs React</span>
+                <span>{t("menu.guide_docs")}</span>
               </button>
 
               <button
@@ -888,7 +976,7 @@ export const App: React.FC = () => {
                 className="min-h-[42px] px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-emerald-400 text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Activity className="w-4 h-4 shrink-0" />
-                <span>Diagnóstico E2E</span>
+                <span>{t("menu.diagnostics_e2e")}</span>
               </button>
 
               <button
@@ -900,7 +988,7 @@ export const App: React.FC = () => {
                 className="min-h-[42px] px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <RotateCcw className="w-4 h-4 shrink-0" />
-                <span>Reiniciar Partida</span>
+                <span>{t("nav.restart_match")}</span>
               </button>
             </div>
 
@@ -908,7 +996,9 @@ export const App: React.FC = () => {
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
                 <BookOpen className="w-3.5 h-3.5" />
-                <span>1. Tutorial Interactivo y Sugerencia IA ({activeGameMeta.title})</span>
+                <span>
+                  {t("menu.tutorial_section")} ({activeGameMeta.title})
+                </span>
               </div>
               <InteractiveTutorialPanel
                 gameId={selectedGameId}
@@ -927,7 +1017,7 @@ export const App: React.FC = () => {
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
                 <Palette className="w-3.5 h-3.5 text-emerald-400" />
-                <span>2. Temas Visuales, Accesibilidad Okabe-Ito y Audio FX</span>
+                <span>{t("menu.themes_section")}</span>
               </div>
               <ThemeAndAudioToolbar
                 config={themeConfig}
@@ -939,7 +1029,7 @@ export const App: React.FC = () => {
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
                 <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                <span>3. Reloj de Torneo (FIDE Blitz, Rápido y Byo-yomi)</span>
+                <span>{t("menu.clock_section")}</span>
               </div>
               <TournamentClock
                 clockState={clockState}
@@ -957,7 +1047,8 @@ export const App: React.FC = () => {
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
                 <History className="w-3.5 h-3.5 text-emerald-400" />
                 <span>
-                  4. Visor de Repeticiones ({replayCurrentStep}/{replayTotalSteps}) y JSON
+                  {t("menu.replay_section")} ({replayCurrentStep}/
+                  {replayTotalSteps})
                 </span>
               </div>
               <ReplayViewerBar
@@ -977,7 +1068,7 @@ export const App: React.FC = () => {
       <MobileGameListDrawer
         isOpen={isGameDrawerOpen}
         onClose={() => setIsGameDrawerOpen(false)}
-        catalog={CATALOG_14_GAMES}
+        catalog={localizedCatalog}
         selectedGameId={selectedGameId}
         searchQuery={gameSearchQuery}
         categoryFilter={gameCategoryFilter}
@@ -1000,11 +1091,11 @@ export const App: React.FC = () => {
       <main className="flex-1 max-w-[1440px] w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-6 pb-20 lg:pb-8 flex flex-col lg:flex-row gap-5 lg:gap-6 items-start">
         {/* Persistent Categorized Game List Sidebar on Desktop (lg: >= 1024px) */}
         <aside
-          aria-label="Lista de los 14 juegos por categoría"
+          aria-label={t("sidebar.games_list")}
           className="hidden lg:flex flex-col w-80 shrink-0 sticky top-20 max-h-[calc(100vh-6rem)] rounded-2xl bg-slate-900/90 border border-slate-800 overflow-hidden"
         >
           <CategorizedGameListContent
-            catalog={CATALOG_14_GAMES}
+            catalog={localizedCatalog}
             selectedGameId={selectedGameId}
             searchQuery={gameSearchQuery}
             categoryFilter={gameCategoryFilter}
@@ -1038,7 +1129,7 @@ export const App: React.FC = () => {
                 onClick={() => setRecentAchievementBanner(null)}
                 className="text-slate-400 hover:text-white font-medium cursor-pointer"
               >
-                Cerrar
+                {t("menu.close")}
               </button>
             </div>
           )}
@@ -1064,7 +1155,7 @@ export const App: React.FC = () => {
                 </div>
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold whitespace-nowrap shrink-0">
                   <Layers className="w-3.5 h-3.5" />
-                  <span>Lista (14)</span>
+                  <span>{t("sidebar.list_14_button")}</span>
                   <ChevronDown className="w-3.5 h-3.5" />
                 </span>
               </button>
@@ -1072,17 +1163,19 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsDocsModalOpen(true)}
-                aria-label="Abrir Guía y Documentación"
+                aria-label={t("menu.guide_docs")}
                 className="min-h-[44px] px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-sky-400 text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <BookOpen className="w-4 h-4" />
-                <span className="hidden sm:inline">Guía</span>
+                <span className="hidden sm:inline">
+                  {t("sidebar.guide_short")}
+                </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab("diagnostics")}
-                aria-label="Abrir Diagnóstico E2E"
+                aria-label={t("menu.diagnostics_e2e")}
                 className={`min-h-[44px] px-3 py-2 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === "diagnostics"
                     ? "bg-emerald-600 text-white border-emerald-500"
@@ -1102,7 +1195,7 @@ export const App: React.FC = () => {
                   onClick={() => setActiveTab("play")}
                   className="min-h-[38px] px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer"
                 >
-                  ← Volver al Tablero ({activeGameMeta.title})
+                  {t("sidebar.back_to_board")} ({activeGameMeta.title})
                 </button>
                 <button
                   type="button"
@@ -1113,7 +1206,7 @@ export const App: React.FC = () => {
                       : "bg-slate-900 text-slate-300 border border-slate-800"
                   }`}
                 >
-                  Catálogo 14 Juegos
+                  {t("nav.catalog_14")}
                 </button>
                 <button
                   type="button"
@@ -1124,7 +1217,7 @@ export const App: React.FC = () => {
                       : "bg-slate-900 text-slate-300 border border-slate-800"
                   }`}
                 >
-                  Ranking ELO
+                  {t("nav.elo_ranking")}
                 </button>
                 <button
                   type="button"
@@ -1135,7 +1228,7 @@ export const App: React.FC = () => {
                       : "bg-slate-900 text-slate-300 border border-slate-800"
                   }`}
                 >
-                  Analizador Post-Partida
+                  {t("nav.analyzer")}
                 </button>
               </div>
             )}
@@ -1160,7 +1253,7 @@ export const App: React.FC = () => {
                         ·
                       </span>
                       <span className="text-xs font-mono tabular-nums text-emerald-400 font-semibold">
-                        Turno: Jugador {currentTurn}
+                        {t("hud.turn_player")} {currentTurn}
                       </span>
                       {matchMode === "spectator" && (
                         <>
@@ -1168,14 +1261,14 @@ export const App: React.FC = () => {
                             ·
                           </span>
                           <span className="text-xs font-semibold text-amber-400">
-                            Modo Espectador
+                            {t("hud.spectator_mode")}
                           </span>
                         </>
                       )}
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">
-                      {activeGameMeta.summary} · Motor: {activeGameMeta.crateName}{" "}
-                      (WASM)
+                      {activeGameMeta.summary} · {t("hud.engine_label")}:{" "}
+                      {activeGameMeta.crateName} (WASM)
                     </p>
                   </div>
 
@@ -1192,7 +1285,7 @@ export const App: React.FC = () => {
                         }`}
                       >
                         <Users className="w-3.5 h-3.5 shrink-0" />
-                        <span>Hotseat Local</span>
+                        <span>{t("mode.hotseat")}</span>
                       </button>
                       <button
                         type="button"
@@ -1206,7 +1299,7 @@ export const App: React.FC = () => {
                         }`}
                       >
                         <Bot className="w-3.5 h-3.5 shrink-0" />
-                        <span>vs IA Rust</span>
+                        <span>{t("mode.ai_rust")}</span>
                       </button>
                       <button
                         type="button"
@@ -1218,7 +1311,7 @@ export const App: React.FC = () => {
                         }`}
                       >
                         <Wifi className="w-3.5 h-3.5 shrink-0" />
-                        <span>Online Relay / QR</span>
+                        <span>{t("mode.online_relay")}</span>
                       </button>
                       <button
                         type="button"
@@ -1232,13 +1325,13 @@ export const App: React.FC = () => {
                         }`}
                       >
                         <Eye className="w-3.5 h-3.5 shrink-0" />
-                        <span>Espectador</span>
+                        <span>{t("mode.spectator")}</span>
                       </button>
                     </div>
 
                     {matchMode === "ai" && (
                       <select
-                        aria-label="Dificultad de IA"
+                        aria-label="AI Difficulty"
                         value={aiDifficulty}
                         onChange={(e) => {
                           const nextDiff = Number(e.target.value);
@@ -1247,10 +1340,10 @@ export const App: React.FC = () => {
                         }}
                         className="min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-950 border border-slate-800 text-slate-200"
                       >
-                        <option value={0}>IA Fácil</option>
-                        <option value={1}>IA Media</option>
-                        <option value={2}>IA Difícil</option>
-                        <option value={3}>IA Maestra</option>
+                        <option value={0}>{t("ai.easy")}</option>
+                        <option value={1}>{t("ai.medium")}</option>
+                        <option value={2}>{t("ai.hard")}</option>
+                        <option value={3}>{t("ai.master")}</option>
                       </select>
                     )}
                   </div>
@@ -1261,7 +1354,7 @@ export const App: React.FC = () => {
                   matchMode === "spectator") && (
                   <div className="pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
                     <span className="text-slate-300 font-mono">
-                      Sala Activa:{" "}
+                      {t("relay.active_room")}:{" "}
                       <strong className="text-white">
                         {roomCode || "LOCAL"}
                       </strong>
@@ -1280,7 +1373,7 @@ export const App: React.FC = () => {
                             : "bg-slate-800 text-slate-300"
                         }`}
                       >
-                        J1 (Host)
+                        {t("relay.host_p1")}
                       </button>
                       <button
                         type="button"
@@ -1295,7 +1388,7 @@ export const App: React.FC = () => {
                             : "bg-slate-800 text-slate-300"
                         }`}
                       >
-                        J2 (Cliente)
+                        {t("relay.client_p2")}
                       </button>
                       <button
                         type="button"
@@ -1306,7 +1399,7 @@ export const App: React.FC = () => {
                             : "bg-slate-800 text-slate-300"
                         }`}
                       >
-                        Espectador
+                        {t("mode.spectator")}
                       </button>
                     </div>
                   </div>
@@ -1333,7 +1426,7 @@ export const App: React.FC = () => {
                 {!isReplayAtLiveHead && !isTopRightMenuOpen && (
                   <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs">
                     <span className="text-amber-300 font-medium">
-                      Viendo jugada histórica ({replayCurrentStep}/
+                      {t("replay.viewing_history")} ({replayCurrentStep}/
                       {replayTotalSteps})
                     </span>
                     <div className="flex items-center gap-2">
@@ -1342,14 +1435,14 @@ export const App: React.FC = () => {
                         onClick={() => handleSeekReplayStep(replayTotalSteps)}
                         className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-semibold cursor-pointer"
                       >
-                        Ir a Turno en Vivo
+                        {t("replay.go_live_turn")}
                       </button>
                       <button
                         type="button"
                         onClick={() => setIsTopRightMenuOpen(true)}
                         className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 font-medium cursor-pointer"
                       >
-                        Abrir Controles en Menú ☰
+                        {t("replay.open_menu_controls")}
                       </button>
                     </div>
                   </div>
@@ -1521,12 +1614,10 @@ export const App: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="text-xl sm:text-2xl font-bold text-white font-display">
-                      Catálogo de los 14 Juegos por Categoría
+                      {t("catalog.heading")}
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                      Selecciona cualquier juego para abrir su tablero
-                      interactivo WASM con tutorial guiado, reloj FIDE/Byo-yomi
-                      y ranking ELO K=32.
+                      {t("catalog.subheading")}
                     </p>
                   </div>
                 </div>
@@ -1539,7 +1630,7 @@ export const App: React.FC = () => {
                       type="text"
                       value={gameSearchQuery}
                       onChange={(e) => setGameSearchQuery(e.target.value)}
-                      placeholder="Buscar por nombre, categoría o regla canónica..."
+                      placeholder={t("catalog.search_placeholder")}
                       className="w-full min-h-[42px] pl-10 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white placeholder:text-slate-500"
                     />
                   </div>
@@ -1554,9 +1645,9 @@ export const App: React.FC = () => {
                           : "text-slate-400 hover:text-white"
                       }`}
                     >
-                      Todos (14)
+                      {t("catalog.all_14")}
                     </button>
-                    {GAME_CATEGORY_GROUPS.map((grp) => (
+                    {localizedCategoryGroups.map((grp) => (
                       <button
                         key={grp.id}
                         type="button"
@@ -1575,9 +1666,10 @@ export const App: React.FC = () => {
               </div>
 
               {filterAndGroupCatalogGames(
-                CATALOG_14_GAMES,
+                localizedCatalog,
                 gameSearchQuery,
-                gameCategoryFilter
+                gameCategoryFilter,
+                locale
               ).map((section) => (
                 <div key={section.groupId} className="flex flex-col gap-3">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -1586,14 +1678,16 @@ export const App: React.FC = () => {
                     </h3>
                     <span className="text-xs text-slate-400 font-mono tabular-nums">
                       {section.games.length}{" "}
-                      {section.games.length === 1 ? "juego" : "juegos"}
+                      {section.games.length === 1
+                        ? t("catalog.game_singular")
+                        : t("catalog.game_plural")}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                     {section.games.map((item) => {
                       const idx =
-                        CATALOG_14_GAMES.findIndex((g) => g.id === item.id) + 1;
+                        localizedCatalog.findIndex((g) => g.id === item.id) + 1;
                       const isCurrent = item.id === selectedGameId;
                       return (
                         <div
@@ -1637,7 +1731,9 @@ export const App: React.FC = () => {
                               }}
                               className="min-h-[38px] px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                             >
-                              {isCurrent ? "En Tablero Activo" : "Jugar Ahora"}
+                              {isCurrent
+                                ? t("catalog.on_active_board")
+                                : t("catalog.play_now")}
                             </button>
                           </div>
                         </div>
@@ -1652,7 +1748,7 @@ export const App: React.FC = () => {
           {activeTab === "tournaments" && (
             <TournamentManagerPanel
               tournament={tournamentState}
-              gameTitles={GAME_TITLES_MAP}
+              gameTitles={localizedGameTitlesMap}
               activeMatchId={activeTournamentMatchId}
               onUpdateTournament={setTournamentState}
               onLaunchMatchOnBoard={handleLaunchTournamentMatch}
@@ -1662,9 +1758,7 @@ export const App: React.FC = () => {
                   const { updatedProfile, newlyUnlocked } =
                     recordTournamentVictoryInProfile(prev);
                   if (newlyUnlocked.length > 0) {
-                    setRecentAchievementBanner(
-                      "¡Logro desbloqueado: Campeón de Torneo!"
-                    );
+                    setRecentAchievementBanner(t("toast.tournament_champion"));
                   }
                   return updatedProfile;
                 });
@@ -1675,7 +1769,7 @@ export const App: React.FC = () => {
           {activeTab === "elo" && (
             <EloAndAchievementsPanel
               profile={eloProfile}
-              gameTitles={GAME_TITLES_MAP}
+              gameTitles={localizedGameTitlesMap}
               peerEloInfo={peerEloInfo}
               onUpdateProfile={setEloProfile}
               onSyncEloToRelay={() => {
@@ -1707,7 +1801,7 @@ export const App: React.FC = () => {
               {/* Mobile/Desktop Return to Board Banner */}
               <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
                 <div className="text-xs text-slate-300">
-                  Juego seleccionado para sala o matchmaking:{" "}
+                  {t("network.selected_game_banner")}{" "}
                   <strong className="text-white">{activeGameMeta.title}</strong>{" "}
                   · ELO{" "}
                   <span className="font-mono tabular-nums text-emerald-400 font-semibold">
@@ -1720,14 +1814,14 @@ export const App: React.FC = () => {
                     onClick={() => setIsGameDrawerOpen(true)}
                     className="lg:hidden min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium cursor-pointer"
                   >
-                    Cambiar Juego
+                    {t("network.change_game")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveTab("play")}
                     className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold cursor-pointer"
                   >
-                    Ver Tablero Activo
+                    {t("network.view_active_board")}
                   </button>
                 </div>
               </div>
@@ -1756,13 +1850,10 @@ export const App: React.FC = () => {
                 <div className="p-5 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-5">
                   <div>
                     <h2 className="text-lg sm:text-xl font-bold text-white font-display">
-                      Crear o Unirse a Sala Online Relay (Jugador o Espectador)
+                      {t("network.room_heading")}
                     </h2>
                     <p className="text-xs text-slate-400 mt-1">
-                      Compatible con <code>open_table_relay</code> (Cross-Play
-                      entre clientes Godot y clientes Web React) con envío
-                      automático de <code>SyncState</code>, bloqueo de turno
-                      local, sincronización ELO y chat en tiempo real.
+                      {t("network.room_subheading")}
                     </p>
                   </div>
 
@@ -1771,7 +1862,7 @@ export const App: React.FC = () => {
                     className="flex flex-col gap-2"
                   >
                     <label className="text-xs font-medium text-slate-300">
-                      URL del Servidor Relay WebSocket (Persistente)
+                      {t("network.relay_url_label")}
                     </label>
                     <div className="flex flex-wrap items-center gap-2">
                       <input
@@ -1786,7 +1877,7 @@ export const App: React.FC = () => {
                         className="min-h-[42px] inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium cursor-pointer"
                       >
                         <Settings className="w-3.5 h-3.5" />
-                        <span>Guardar URL</span>
+                        <span>{t("network.save_url")}</span>
                       </button>
                       <button
                         type="button"
@@ -1798,7 +1889,7 @@ export const App: React.FC = () => {
                         className="min-h-[42px] inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs cursor-pointer"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Restaurar</span>
+                        <span>{t("network.restore_url")}</span>
                       </button>
                     </div>
                   </form>
@@ -1810,7 +1901,7 @@ export const App: React.FC = () => {
                       className="min-h-[44px] inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors cursor-pointer"
                     >
                       <QrCode className="w-4 h-4" />
-                      <span>Crear Sala Online (Host J1)</span>
+                      <span>{t("network.create_room_host")}</span>
                     </button>
 
                     <button
@@ -1822,13 +1913,13 @@ export const App: React.FC = () => {
                       className="min-h-[44px] inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
                     >
                       <RefreshCw className="w-4 h-4" />
-                      <span>Probar Reconexión Automática</span>
+                      <span>{t("network.test_autoreconnect")}</span>
                     </button>
                   </div>
 
                   <div className="border-t border-slate-800 pt-4 flex flex-col gap-3">
                     <label className="text-xs font-medium text-slate-300">
-                      Unirse con Código de 6 Caracteres (Cliente J2 o Espectador)
+                      {t("network.join_code_label")}
                     </label>
                     <div className="flex flex-wrap items-center gap-2">
                       <input
@@ -1838,7 +1929,7 @@ export const App: React.FC = () => {
                         onChange={(e) =>
                           setJoinCodeInput(e.target.value.toUpperCase())
                         }
-                        placeholder="Ej. AB12CD"
+                        placeholder="AB12CD"
                         className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white font-mono uppercase"
                       />
                       <button
@@ -1846,7 +1937,7 @@ export const App: React.FC = () => {
                         onClick={handleJoinRelayRoom}
                         className="min-h-[44px] px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                       >
-                        Unirse como J2
+                        {t("network.join_as_p2")}
                       </button>
                       <button
                         type="button"
@@ -1854,7 +1945,7 @@ export const App: React.FC = () => {
                         className="min-h-[44px] inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
-                        <span>Observar (Espectador)</span>
+                        <span>{t("network.observe_spectator")}</span>
                       </button>
                     </div>
                   </div>
@@ -1863,7 +1954,7 @@ export const App: React.FC = () => {
                 {/* QR Code & Status Card */}
                 <div className="p-5 sm:p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col items-center justify-center gap-4 text-center">
                   <div className="text-xs text-slate-400">
-                    Estado de Transporte:{" "}
+                    {t("network.transport_state")}{" "}
                     <strong className="text-white">{relayState}</strong>
                   </div>
                   <div className="text-sm font-medium text-slate-200">
@@ -1877,7 +1968,7 @@ export const App: React.FC = () => {
                         dangerouslySetInnerHTML={{ __html: qrSvg }}
                       />
                       <div className="text-xs text-slate-300 font-mono">
-                        Código de Sala:{" "}
+                        {t("network.room_code_label")}{" "}
                         <strong className="text-emerald-400 text-sm">
                           {roomCode}
                         </strong>
@@ -1885,8 +1976,7 @@ export const App: React.FC = () => {
                     </div>
                   ) : (
                     <div className="p-6 sm:p-8 rounded-xl border border-dashed border-slate-800 text-xs text-slate-400">
-                      Crea una sala online para generar el código QR instantáneo
-                      de invitación.
+                      {t("network.qr_empty_hint")}
                     </div>
                   )}
                 </div>
@@ -1936,5 +2026,11 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
+export const App: React.FC = () => (
+  <I18nProvider>
+    <AppShell />
+  </I18nProvider>
+);
 
 export default App;

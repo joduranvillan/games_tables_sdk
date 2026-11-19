@@ -12,6 +12,11 @@ import {
   Wifi,
   X,
 } from "lucide-react";
+import {
+  getLocalizedCategoryGroups,
+  SupportedLocale,
+  useI18n,
+} from "../../i18n";
 
 export interface CatalogGameEntry {
   id: string;
@@ -73,7 +78,8 @@ export interface GroupedGamesSection {
 export function filterAndGroupCatalogGames(
   catalog: CatalogGameEntry[],
   searchQuery: string,
-  categoryFilter: CategoryFilterId
+  categoryFilter: CategoryFilterId,
+  locale: SupportedLocale = "es"
 ): GroupedGamesSection[] {
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -88,8 +94,12 @@ export function filterAndGroupCatalogGames(
   };
 
   const sections: GroupedGamesSection[] = [];
+  const groups =
+    locale === "es"
+      ? GAME_CATEGORY_GROUPS
+      : getLocalizedCategoryGroups(locale);
 
-  for (const group of GAME_CATEGORY_GROUPS) {
+  for (const group of groups) {
     if (categoryFilter !== "all" && categoryFilter !== group.id) {
       continue;
     }
@@ -141,10 +151,13 @@ export const CategorizedGameListContent: React.FC<GameListContentProps> = ({
   onOpenDiagnostics,
   onOpenDocs,
 }) => {
+  const { locale, t } = useI18n();
+  const localizedGroups = getLocalizedCategoryGroups(locale);
   const groupedSections = filterAndGroupCatalogGames(
     catalog,
     searchQuery,
-    categoryFilter
+    categoryFilter,
+    locale
   );
 
   const totalVisibleGames = groupedSections.reduce(
@@ -160,7 +173,7 @@ export const CategorizedGameListContent: React.FC<GameListContentProps> = ({
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-emerald-400 shrink-0" />
             <h2 className="text-sm font-bold text-white font-display tracking-tight">
-              Lista de Juegos ({totalVisibleGames}/14)
+              {t("sidebar.games_list")} ({totalVisibleGames}/14)
             </h2>
           </div>
           {onOpenCatalogGrid && (
@@ -169,7 +182,7 @@ export const CategorizedGameListContent: React.FC<GameListContentProps> = ({
               onClick={onOpenCatalogGrid}
               className="text-xs text-slate-400 hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
-              Ver cuadrícula
+              {t("sidebar.view_grid")}
             </button>
           )}
         </div>
@@ -181,15 +194,15 @@ export const CategorizedGameListContent: React.FC<GameListContentProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Buscar juego o regla..."
-            aria-label="Buscar juego o regla"
+            placeholder={t("sidebar.search_placeholder")}
+            aria-label={t("sidebar.search_placeholder")}
             className="w-full pl-8 pr-8 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => onSearchChange("")}
-              aria-label="Limpiar búsqueda"
+              aria-label={t("menu.close")}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
@@ -208,9 +221,9 @@ export const CategorizedGameListContent: React.FC<GameListContentProps> = ({
                 : "text-slate-400 hover:text-white"
             }`}
           >
-            Todos
+            {t("sidebar.filter_all")}
           </button>
-          {GAME_CATEGORY_GROUPS.map((grp) => (
+          {localizedGroups.map((grp) => (
             <button
               key={grp.id}
               type="button"
@@ -231,7 +244,7 @@ export const CategorizedGameListContent: React.FC<GameListContentProps> = ({
       <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60">
         {groupedSections.length === 0 ? (
           <div className="p-6 text-center text-xs text-slate-400">
-            No se encontraron juegos para "{searchQuery}".
+            {t("sidebar.no_games_found")} "{searchQuery}".
           </div>
         ) : (
           groupedSections.map((section) => (
@@ -307,11 +320,12 @@ export const CategorizedGameListContent: React.FC<GameListContentProps> = ({
       <div className="p-3 border-t border-slate-800 bg-slate-950/60 flex flex-col gap-2">
         <div className="flex items-center justify-between text-xs text-slate-300 font-mono tabular-nums">
           <span>
-            ELO Global: <strong className="text-white">{globalElo}</strong>
+            {t("sidebar.global_elo")}:{" "}
+            <strong className="text-white">{globalElo}</strong>
           </span>
           <span aria-hidden="true">·</span>
           <span>
-            Logros:{" "}
+            {t("sidebar.achievements")}:{" "}
             <strong className="text-amber-400">
               {unlockedAchievementsCount}/{totalAchievementsCount}
             </strong>
@@ -326,7 +340,7 @@ export const CategorizedGameListContent: React.FC<GameListContentProps> = ({
               className="min-h-[36px] px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800 text-[11px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Activity className="w-3.5 h-3.5 shrink-0" />
-              <span>Diagnóstico E2E</span>
+              <span>{t("menu.diagnostics_e2e")}</span>
             </button>
           )}
           {onOpenDocs && (
@@ -336,7 +350,7 @@ export const CategorizedGameListContent: React.FC<GameListContentProps> = ({
               className="min-h-[36px] px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-sky-400 border border-slate-800 text-[11px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <BookOpen className="w-3.5 h-3.5 shrink-0" />
-              <span>Guía y Docs</span>
+              <span>{t("sidebar.guide_short")}</span>
             </button>
           )}
         </div>
@@ -355,6 +369,7 @@ export const MobileGameListDrawer: React.FC<MobileGameDrawerProps> = ({
   onClose,
   ...contentProps
 }) => {
+  const { t } = useI18n();
   if (!isOpen) return null;
 
   return (
@@ -362,7 +377,7 @@ export const MobileGameListDrawer: React.FC<MobileGameDrawerProps> = ({
       className="fixed inset-0 z-50 lg:hidden flex flex-col justify-end sm:justify-start sm:flex-row bg-black/65 backdrop-blur-xs"
       role="dialog"
       aria-modal="true"
-      aria-label="Selector de los 14 juegos"
+      aria-label={t("sidebar.select_canonical_game")}
     >
       {/* Backdrop click target */}
       <div className="fixed inset-0" onClick={onClose} />
@@ -372,12 +387,12 @@ export const MobileGameListDrawer: React.FC<MobileGameDrawerProps> = ({
         <div className="flex items-center justify-between px-4 pt-3 pb-1 sm:py-3 border-b border-slate-800/80">
           <div className="w-10 h-1.5 bg-slate-700 rounded-full mx-auto sm:hidden" />
           <span className="hidden sm:inline text-xs font-semibold text-slate-300">
-            Seleccionar Juego Canónico
+            {t("sidebar.select_canonical_game")}
           </span>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Cerrar lista de juegos"
+            aria-label={t("menu.close")}
             className="min-h-[40px] min-w-[40px] -mr-2 inline-flex items-center justify-center text-slate-400 hover:text-white cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -446,9 +461,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onSelectTab,
   onToggleGameDrawer,
 }) => {
+  const { t } = useI18n();
   return (
     <nav
-      aria-label="Navegación principal móvil"
+      aria-label="Mobile bottom navigation"
       className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-slate-950/95 backdrop-blur-md border-t border-slate-800 grid grid-cols-5 items-center h-14 px-1"
     >
       <button
@@ -462,7 +478,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       >
         <Gamepad2 className="w-5 h-5" />
         <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">
-          Tablero
+          {t("nav.board_short")}
         </span>
       </button>
 
@@ -477,7 +493,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       >
         <Grid className="w-5 h-5" />
         <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">
-          14 Juegos
+          {t("nav.catalog_14")}
         </span>
       </button>
 
@@ -492,7 +508,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       >
         <Wifi className="w-5 h-5" />
         <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">
-          Salas Online
+          {t("nav.online_rooms")}
         </span>
         {hasActiveRoomOrQueue && (
           <span className="absolute top-1.5 right-4 w-2 h-2 rounded-full bg-emerald-400" />
@@ -510,7 +526,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       >
         <Trophy className="w-5 h-5" />
         <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">
-          Torneos
+          {t("nav.tournaments")}
         </span>
       </button>
 
@@ -530,9 +546,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       >
         <BarChart3 className="w-5 h-5" />
         <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">
-          {activeTab === "analyzer" ? "Analizador" : "ELO / Análisis"}
+          {activeTab === "analyzer"
+            ? t("nav.analyzer")
+            : t("nav.elo_short")}
         </span>
       </button>
     </nav>
   );
 };
+

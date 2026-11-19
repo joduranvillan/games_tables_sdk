@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { Clock } from "lucide-react";
+import { useI18n } from "../../i18n";
 
 export type ClockPresetId = "none" | "blitz_3_2" | "rapid_10_0" | "byoyomi_5_30";
 
@@ -158,6 +159,7 @@ export const TournamentClock: React.FC<TournamentClockProps> = ({
   onPresetChange,
   onTick,
 }) => {
+  const { t } = useI18n();
   useEffect(() => {
     if (clockState.preset === "none" || isPaused || clockState.flaggedWinner !== null) {
       return;
@@ -173,15 +175,15 @@ export const TournamentClock: React.FC<TournamentClockProps> = ({
       <div className="flex items-center gap-1.5 text-xs font-medium text-slate-300">
         <Clock className="w-3.5 h-3.5 text-emerald-400" />
         <select
-          aria-label="Reloj de Torneo"
+          aria-label={t("menu.clock_section")}
           value={clockState.preset}
           onChange={(e) => onPresetChange(e.target.value as ClockPresetId)}
           className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-200"
         >
-          <option value="none">Reloj: Sin Límite</option>
-          <option value="blitz_3_2">FIDE Blitz 3m + 2s</option>
-          <option value="rapid_10_0">FIDE Rápido 10m + 0s</option>
-          <option value="byoyomi_5_30">Byo-yomi 5m + 3×30s</option>
+          <option value="none">{t("clock.no_limit")}</option>
+          <option value="blitz_3_2">{t("clock.blitz")}</option>
+          <option value="rapid_10_0">{t("clock.rapid")}</option>
+          <option value="byoyomi_5_30">{t("clock.byoyomi")}</option>
         </select>
       </div>
 
