@@ -241,13 +241,23 @@ console.log("=== [6/14] Validando Reglas Canónicas de UNO, Oca, Damas Chinas, B
   const goodGoose = sendCmd(goose, 1, { command_type: "goose_game::RollDiceCommand", player: 1, d1: 2, d2: 3 });
   assert(goodGoose.ok === true, "Oca: Tirada en turno aceptada");
 
-  // 8. Chinese Checkers: Reject jump to non-adjacent non-hop square, accept legal move
+  // 8. Chinese Checkers: Verify 121-hole 6-pointed star geometry, 10 marbles per player, reject illegal jump, accept legal move
   const cc = createBridge("chinese_checkers");
+  const ccState = JSON.parse(cc.get_state_json());
+  assert(
+    Array.isArray(ccState.cells) && ccState.cells.length === 121,
+    `Damas Chinas: La estrella debe tener exactamente 121 casillas (actual: ${ccState.cells?.length})`
+  );
+  assert(
+    ccState.cells.filter((c: { owner: number }) => c.owner === 1).length === 10 &&
+      ccState.cells.filter((c: { owner: number }) => c.owner === 2).length === 10,
+    "Damas Chinas: Cada jugador debe iniciar con exactamente 10 canicas en su punta triangular"
+  );
   const badCc = sendCmd(cc, 1, {
     command_type: "chinese_checkers_game::MoveMarbleCommand",
     player: 1,
-    fromId: "7_7",
-    toId: "3_3",
+    fromId: "13_0",
+    toId: "8_4",
   });
   assert(badCc.ok === false, "Damas Chinas: Rechaza salto ilegal a distancia arbitraria");
   const legalCc = JSON.parse(cc.get_legal_moves_json(1));
@@ -300,8 +310,15 @@ console.log("=== [6/14] Validando Reglas Canónicas de UNO, Oca, Damas Chinas, B
   });
   assert(goodLudo.ok === true, "Ludo: Ficha en base sale con un 6");
 
-  // 11. Battleship: Reject firing out of bounds, accept valid shot
+  // 11. Battleship: Reject firing out of bounds, verify 5 contiguous ships (17 cells) and exact ship hit vs water miss
   const bs = createBridge("battleship");
+  const bsInit = JSON.parse(bs.get_state_json());
+  assert(
+    Array.isArray(bsInit.fleets?.[1]) &&
+      bsInit.fleets[1].length === 5 &&
+      bsInit.fleets[1].reduce((acc: number, s: { size: number }) => acc + s.size, 0) === 17,
+    "Batalla Naval: Flota debe contener exactamente 5 buques sumando 17 casillas"
+  );
   const badBs = sendCmd(bs, 1, {
     command_type: "battleship_game::FireShotCommand",
     player: 1,
@@ -309,13 +326,19 @@ console.log("=== [6/14] Validando Reglas Canónicas de UNO, Oca, Damas Chinas, B
     col: 12,
   });
   assert(badBs.ok === false, "Batalla Naval: Rechaza disparo fuera de la grilla 10x10");
-  const goodBs = sendCmd(bs, 1, {
+  // [0,1] is occupied by Player 2's Portaaviones -> must be a hit!
+  const hitBs = sendCmd(bs, 1, {
     command_type: "battleship_game::FireShotCommand",
     player: 1,
     row: 0,
     col: 1,
   });
-  assert(goodBs.ok === true, "Batalla Naval: Disparo válido en [0,1] aceptado");
+  assert(hitBs.ok === true, "Batalla Naval: Disparo válido en [0,1] aceptado");
+  const bsAfterHit = JSON.parse(bs.get_state_json());
+  assert(
+    bsAfterHit.shots[1]["0_1"] === "hit" && bsAfterHit.hits_count[1] === 1,
+    "Batalla Naval: Disparo sobre el Portaaviones enemigo en [0,1] registra impacto real"
+  );
 
   // 12. Mille Bornes: Play a valid card from hand
   const mb = createBridge("mille_bornes");

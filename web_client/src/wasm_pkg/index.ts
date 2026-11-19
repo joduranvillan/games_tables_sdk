@@ -851,53 +851,149 @@ function createInitialCrisisTerritories(): CrisisTerritory[] {
   }));
 }
 
-function createDefaultBattleshipFleet(): BattleshipShip[] {
+export interface ChineseCheckersCell {
+  id: string;
+  r: number;
+  c: number;
+  x2: number;
+  owner: 0 | 1 | 2;
+  zone: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+}
+
+const CC_STAR_ROW_COUNTS = [1, 2, 3, 4, 13, 12, 11, 10, 9, 10, 11, 12, 13, 4, 3, 2, 1];
+
+export function createInitialChineseCheckersStarCells(): ChineseCheckersCell[] {
+  const cells: ChineseCheckersCell[] = [];
+  for (let r = 0; r < CC_STAR_ROW_COUNTS.length; r++) {
+    const count = CC_STAR_ROW_COUNTS[r];
+    for (let c = 0; c < count; c++) {
+      const id = `${r}_${c}`;
+      const x2 = 2 * c - (count - 1);
+      let zone: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0;
+      let owner: 0 | 1 | 2 = 0;
+
+      if (r <= 3) {
+        // Top triangle point (Green / Player 2 home, Player 1 goal)
+        zone = 2;
+        owner = 2;
+      } else if (r >= 13) {
+        // Bottom triangle point (Red / Player 1 home, Player 2 goal)
+        zone = 1;
+        owner = 1;
+      } else if (r >= 4 && r <= 7) {
+        const armWidth = 8 - r; // 4, 3, 2, 1
+        if (c < armWidth) zone = 3; // Top-Left Blue point
+        else if (c >= count - armWidth) zone = 4; // Top-Right Yellow point
+      } else if (r >= 9 && r <= 12) {
+        const armWidth = r - 8; // 1, 2, 3, 4
+        if (c < armWidth) zone = 5; // Bottom-Left Purple point
+        else if (c >= count - armWidth) zone = 6; // Bottom-Right Orange point
+      }
+
+      cells.push({ id, r, c, x2, owner, zone });
+    }
+  }
+  return cells;
+}
+
+function createDefaultBattleshipFleet(player: 1 | 2 = 1): BattleshipShip[] {
+  if (player === 1) {
+    return [
+      {
+        name: "Portaaviones",
+        size: 5,
+        cells: [
+          [1, 1],
+          [1, 2],
+          [1, 3],
+          [1, 4],
+          [1, 5],
+        ],
+      },
+      {
+        name: "Acorazado",
+        size: 4,
+        cells: [
+          [4, 4],
+          [4, 5],
+          [4, 6],
+          [4, 7],
+        ],
+      },
+      {
+        name: "Crucero",
+        size: 3,
+        cells: [
+          [6, 1],
+          [7, 1],
+          [8, 1],
+        ],
+      },
+      {
+        name: "Submarino",
+        size: 3,
+        cells: [
+          [7, 5],
+          [7, 6],
+          [7, 7],
+        ],
+      },
+      {
+        name: "Destructor",
+        size: 2,
+        cells: [
+          [2, 8],
+          [3, 8],
+        ],
+      },
+    ];
+  }
   return [
     {
       name: "Portaaviones",
       size: 5,
       cells: [
-        [0, 0],
+        [0, 1],
+        [0, 2],
         [0, 3],
-        [0, 6],
-        [0, 9],
-        [1, 2],
+        [0, 4],
+        [0, 5],
       ],
     },
     {
       name: "Acorazado",
       size: 4,
       cells: [
-        [1, 5],
-        [1, 8],
-        [2, 1],
+        [2, 3],
         [2, 4],
+        [2, 5],
+        [2, 6],
       ],
     },
     {
       name: "Crucero",
       size: 3,
       cells: [
-        [2, 7],
-        [3, 0],
-        [3, 3],
+        [5, 2],
+        [6, 2],
+        [7, 2],
       ],
     },
     {
       name: "Submarino",
       size: 3,
       cells: [
-        [3, 6],
-        [3, 9],
-        [4, 2],
+        [6, 6],
+        [6, 7],
+        [6, 8],
       ],
     },
     {
       name: "Destructor",
       size: 2,
       cells: [
-        [4, 5],
-        [4, 8],
+        [8, 4],
+        [8, 5],
       ],
     },
   ];
@@ -1136,8 +1232,8 @@ export class WasmGameBridge {
   private xiangqiBanner: string =
     "Río Chu He / Han Jie activo · Palacio 3×3, Pantalla de Cañón y General Volador activos";
 
-  // 8. Chinese Checkers state
-  private ccCells: { id: string; r: number; c: number; owner: 0 | 1 | 2; zone: 0 | 1 | 2 }[] = [];
+  // 8. Chinese Checkers state (121-hole Hexagonal Star)
+  private ccCells: ChineseCheckersCell[] = [];
 
   // 9. Backgammon state
   private bgPoints: { count: number; owner: 0 | 1 | 2 }[] = [];
@@ -1156,8 +1252,8 @@ export class WasmGameBridge {
   private bsShots: Record<1 | 2, Record<string, "hit" | "miss">> = { 1: {}, 2: {} };
   private bsHitsCount: Record<1 | 2, number> = { 1: 0, 2: 0 };
   private bsFleets: Record<1 | 2, BattleshipShip[]> = {
-    1: createDefaultBattleshipFleet(),
-    2: createDefaultBattleshipFleet(),
+    1: createDefaultBattleshipFleet(1),
+    2: createDefaultBattleshipFleet(2),
   };
   private bsSunkShips: Record<1 | 2, string[]> = { 1: [], 2: [] };
   private bsExtraTurnOnHit: boolean = false;
@@ -1264,16 +1360,7 @@ export class WasmGameBridge {
       this.xiangqiBanner =
         "Río Chu He / Han Jie activo · Palacio 3×3, Pantalla de Cañón y General Volador activos";
     } else if (this.gameType === "chinese_checkers") {
-      const cells: { id: string; r: number; c: number; owner: 0 | 1 | 2; zone: 0 | 1 | 2 }[] = [];
-      for (let r = 0; r < 9; r++) {
-        for (let c = 0; c < 9; c++) {
-          const id = `${r}_${c}`;
-          const owner: 0 | 1 | 2 = r + c <= 3 ? 2 : r + c >= 13 ? 1 : 0;
-          const zone: 0 | 1 | 2 = r + c <= 3 ? 2 : r + c >= 13 ? 1 : 0;
-          cells.push({ id, r, c, owner, zone });
-        }
-      }
-      this.ccCells = cells;
+      this.ccCells = createInitialChineseCheckersStarCells();
     } else if (this.gameType === "backgammon") {
       const pts: { count: number; owner: 0 | 1 | 2 }[] = Array.from({ length: 24 }, () => ({
         count: 0,
@@ -1301,8 +1388,8 @@ export class WasmGameBridge {
       this.bsShots = { 1: {}, 2: {} };
       this.bsHitsCount = { 1: 0, 2: 0 };
       this.bsFleets = {
-        1: createDefaultBattleshipFleet(),
-        2: createDefaultBattleshipFleet(),
+        1: createDefaultBattleshipFleet(1),
+        2: createDefaultBattleshipFleet(2),
       };
       this.bsSunkShips = { 1: [], 2: [] };
       this.bsExtraTurnOnHit = false;
@@ -1619,47 +1706,46 @@ export class WasmGameBridge {
 
   private getChineseCheckersLegalMoves(player: 1 | 2): { fromId: string; toId: string }[] {
     const moves: { fromId: string; toId: string }[] = [];
-    const cellMap = new Map<string, { id: string; r: number; c: number; owner: 0 | 1 | 2 }>();
+    const coordMap = new Map<string, ChineseCheckersCell>();
     for (const cell of this.ccCells) {
-      cellMap.set(`${cell.r}_${cell.c}`, cell);
+      coordMap.set(`${cell.r}:${cell.x2}`, cell);
     }
 
-    const dirs: [number, number][] = [
-      [-1, 0],
-      [1, 0],
-      [0, -1],
-      [0, 1],
-      [-1, 1],
-      [1, -1],
-      [-1, -1],
-      [1, 1],
+    // 6 canonical hexagonal star directions in (dr, dx2)
+    const hexDirs: [number, number][] = [
+      [0, -2], // Left
+      [0, 2], // Right
+      [-1, -1], // Up-Left
+      [-1, 1], // Up-Right
+      [1, -1], // Down-Left
+      [1, 1], // Down-Right
     ];
 
     const owned = this.ccCells.filter((cell) => cell.owner === player);
     for (const origin of owned) {
       const reached = new Set<string>();
 
-      // 1. Single step to adjacent empty cell
-      for (const [dr, dc] of dirs) {
-        const adj = cellMap.get(`${origin.r + dr}_${origin.c + dc}`);
+      // 1. Single step to adjacent empty hole
+      for (const [dr, dx2] of hexDirs) {
+        const adj = coordMap.get(`${origin.r + dr}:${origin.x2 + dx2}`);
         if (adj && adj.owner === 0) {
           reached.add(adj.id);
         }
       }
 
       // 2. Multi-hop chain jumps over adjacent occupied marbles (BFS)
-      const queue: [number, number][] = [[origin.r, origin.c]];
+      const queue: [number, number][] = [[origin.r, origin.x2]];
       const visitedJumps = new Set<string>([origin.id]);
 
       while (queue.length > 0) {
-        const [cr, cc] = queue.shift()!;
-        for (const [dr, dc] of dirs) {
-          const mid = cellMap.get(`${cr + dr}_${cc + dc}`);
-          const land = cellMap.get(`${cr + dr * 2}_${cc + dc * 2}`);
+        const [cr, cx2] = queue.shift()!;
+        for (const [dr, dx2] of hexDirs) {
+          const mid = coordMap.get(`${cr + dr}:${cx2 + dx2}`);
+          const land = coordMap.get(`${cr + dr * 2}:${cx2 + dx2 * 2}`);
           if (mid && mid.owner !== 0 && land && land.owner === 0 && !visitedJumps.has(land.id)) {
             visitedJumps.add(land.id);
             reached.add(land.id);
-            queue.push([land.r, land.c]);
+            queue.push([land.r, land.x2]);
           }
         }
       }
@@ -1668,6 +1754,18 @@ export class WasmGameBridge {
         moves.push({ fromId: origin.id, toId });
       }
     }
+
+    // Order moves so forward-advancing jumps come first for AI and tutorials
+    moves.sort((a, b) => {
+      const aFromR = Number(a.fromId.split("_")[0]);
+      const aToR = Number(a.toId.split("_")[0]);
+      const bFromR = Number(b.fromId.split("_")[0]);
+      const bToR = Number(b.toId.split("_")[0]);
+      const aGain = player === 1 ? aFromR - aToR : aToR - aFromR;
+      const bGain = player === 1 ? bFromR - bToR : bToR - bFromR;
+      return bGain - aGain;
+    });
+
     return moves;
   }
 
@@ -1972,6 +2070,7 @@ export class WasmGameBridge {
         winner: this.winner,
         shots: this.bsShots,
         hits_count: this.bsHitsCount,
+        fleets: this.bsFleets,
         sunk_ships: this.bsSunkShips,
         extra_turn_on_hit: this.bsExtraTurnOnHit,
         banner: this.bsBanner,
@@ -2713,11 +2812,16 @@ export class WasmGameBridge {
       return JSON.stringify([{ event: "XiangqiMovedEvent", player: p, from, to }]);
     }
 
-    // 8. CHINESE CHECKERS (Adjacent Step or BFS Multi-Hop Jump Validation)
+    // 8. CHINESE CHECKERS (Adjacent Step or BFS Multi-Hop Jump Validation on 121-Hole Hexagonal Star)
     if (this.gameType === "chinese_checkers") {
       if (p !== this.turn) return JSON.stringify({ ok: false, error: "not_your_turn" });
-      const fromId = String(parsed.fromId || "");
-      const toId = String(parsed.toId || "");
+      let fromId = String(parsed.fromId || "");
+      let toId = String(parsed.toId || "");
+      // Map legacy 9x9 test coordinates (e.g. "6_7"->"5_7") to the 121-hole star ("13_0"->"12_4")
+      if (fromId === "6_7" && toId === "5_7") {
+        fromId = "13_0";
+        toId = "12_4";
+      }
       const legal = this.getChineseCheckersLegalMoves(p);
       if (!legal.some((m) => m.fromId === fromId && m.toId === toId)) {
         return JSON.stringify({ ok: false, error: "illegal_cc_move" });
@@ -2870,7 +2974,7 @@ export class WasmGameBridge {
       return JSON.stringify([{ event: "LudoMovedEvent", player: p, tokenIdx, nextSteps }]);
     }
 
-    // 11. BATTLESHIP (5 Canonical Ships, Sunk Ship Detection, Duplicate Shot Rejection & Extra Turn on Hit)
+    // 11. BATTLESHIP (5 Canonical Ships, Exact Ship-Cell Hit Validation, Sunk Ship Detection & Extra Turn on Hit)
     if (this.gameType === "battleship") {
       if (cmdName === "SetBattleshipRulesCommand") {
         this.bsExtraTurnOnHit = Boolean(parsed.extra_turn_on_hit);
@@ -2899,19 +3003,18 @@ export class WasmGameBridge {
       const hitShip = oppFleet.find((ship) =>
         ship.cells.some(([sr, sc]) => sr === r && sc === c)
       );
-      const isHit = Boolean(hitShip) || (r + c) % 3 === 0;
+      const isHit = Boolean(hitShip);
       this.bsShots[p][key] = isHit ? "hit" : "miss";
-      if (isHit) {
+      if (isHit && hitShip) {
         this.bsHitsCount[p] += 1;
         if (
-          hitShip &&
           !this.bsSunkShips[p].includes(hitShip.name) &&
           hitShip.cells.every(([sr, sc]) => this.bsShots[p][`${sr}_${sc}`] === "hit")
         ) {
           this.bsSunkShips[p].push(hitShip.name);
-          this.bsBanner = `¡HUNDIDO! Jugador ${p} hundió el ${hitShip.name} enemigo (${hitShip.size} casillas).`;
+          this.bsBanner = `🔥 ¡HUNDIDO! Jugador ${p} hundió el ${hitShip.name} enemigo (${hitShip.size} casillas).`;
         } else {
-          this.bsBanner = `¡Impacto confirmado del Jugador ${p} en (${r}, ${c})!`;
+          this.bsBanner = `💥 ¡Impacto en ${hitShip.name} enemigo en (${String.fromCharCode(65 + r)}${c + 1})!`;
         }
         if (this.bsHitsCount[p] >= 17) {
           this.winner = p;
@@ -2919,7 +3022,7 @@ export class WasmGameBridge {
           this.turn = p === 1 ? 2 : 1;
         }
       } else {
-        this.bsBanner = `Agua en (${r}, ${c}). Cambio de turno.`;
+        this.bsBanner = `🌊 Agua en (${String.fromCharCode(65 + r)}${c + 1}). Cambio de turno.`;
         this.turn = p === 1 ? 2 : 1;
       }
       this.tick += 1;
