@@ -891,7 +891,7 @@ const AppShell: React.FC = () => {
         </div>
       </header>
 
-      {/* Unified Top-Right Menu Drawer (Language, Themes, Audio, Interactive Tutorial, Replay Viewer, Tournament Clock & Docs) */}
+      {/* Simplified Top-Right Menu Drawer (Themes/Audio, Clock, Tutorial & Replay) */}
       {isTopRightMenuOpen && (
         <div
           role="dialog"
@@ -903,13 +903,13 @@ const AppShell: React.FC = () => {
             onClick={() => setIsTopRightMenuOpen(false)}
             className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm"
           />
-          <aside className="relative z-10 w-full max-w-md sm:max-w-lg bg-slate-950 border-l border-slate-800 h-full overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 shadow-2xl">
-            <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-800">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
-                  {t("menu.control_center")} · {activeGameMeta.title}
+          <aside className="relative z-10 w-full max-w-md bg-slate-950 border-l border-slate-800 h-full overflow-y-auto p-4 flex flex-col gap-3.5 shadow-2xl">
+            <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-slate-800">
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold text-emerald-400 truncate">
+                  {activeGameMeta.title}
                 </div>
-                <h2 className="text-base sm:text-lg font-bold text-white font-display">
+                <h2 className="text-base font-bold text-white font-display">
                   {t("menu.title")}
                 </h2>
               </div>
@@ -917,54 +917,25 @@ const AppShell: React.FC = () => {
                 type="button"
                 onClick={() => setIsTopRightMenuOpen(false)}
                 aria-label={t("menu.close")}
-                className="min-h-[38px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+                className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
               >
                 <X className="w-4 h-4" />
                 <span>{t("menu.close")}</span>
               </button>
             </div>
 
-            {/* 0. 9-Language Tactile Grid Switcher inside Top-Right Menu Drawer */}
-            <div className="flex flex-col gap-2 p-3 rounded-2xl bg-slate-900/90 border border-slate-800">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300">
-                <Globe className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{t("menu.language_section")}</span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {locales.map((loc) => {
-                  const isCurrentLocale = loc.code === locale;
-                  return (
-                    <button
-                      key={loc.code}
-                      type="button"
-                      onClick={() => setLocale(loc.code)}
-                      aria-pressed={isCurrentLocale}
-                      className={`min-h-[38px] px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                        isCurrentLocale
-                          ? "bg-emerald-600 text-white border-emerald-400 shadow-sm"
-                          : "bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800"
-                      }`}
-                    >
-                      <span>{loc.flag}</span>
-                      <span>{loc.nativeName}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* Quick Global Actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
               <button
                 type="button"
                 onClick={() => {
                   setIsTopRightMenuOpen(false);
                   setIsDocsModalOpen(true);
                 }}
-                className="min-h-[42px] px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-sky-400 text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                className="min-h-[38px] px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-sky-400 text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <BookOpen className="w-4 h-4 shrink-0" />
-                <span>{t("menu.guide_docs")}</span>
+                <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{t("menu.guide_docs")}</span>
               </button>
 
               <button
@@ -973,10 +944,10 @@ const AppShell: React.FC = () => {
                   setIsTopRightMenuOpen(false);
                   setActiveTab("diagnostics");
                 }}
-                className="min-h-[42px] px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-emerald-400 text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                className="min-h-[38px] px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-emerald-400 text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <Activity className="w-4 h-4 shrink-0" />
-                <span>{t("menu.diagnostics_e2e")}</span>
+                <Activity className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{t("menu.diagnostics_e2e")}</span>
               </button>
 
               <button
@@ -985,37 +956,16 @@ const AppShell: React.FC = () => {
                   startGameSession(selectedGameId, matchMode, aiDifficulty);
                   setIsTopRightMenuOpen(false);
                 }}
-                className="min-h-[42px] px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                className="min-h-[38px] px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <RotateCcw className="w-4 h-4 shrink-0" />
-                <span>{t("nav.restart_match")}</span>
+                <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{t("nav.restart_match")}</span>
               </button>
             </div>
 
-            {/* 1. Interactive Tutorial & WASM AI Move Suggestion */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>
-                  {t("menu.tutorial_section")} ({activeGameMeta.title})
-                </span>
-              </div>
-              <InteractiveTutorialPanel
-                gameId={selectedGameId}
-                currentTurn={(currentTurn === 2 ? 2 : 1) as 1 | 2}
-                legalMovesJson={legalMovesJson}
-                isLocalTurnAllowed={isLocalTurnAllowed}
-                onDispatchCommand={(cmd) => {
-                  handleDispatchCommand(cmd);
-                  setIsTopRightMenuOpen(false);
-                }}
-                hideToggleButton={true}
-              />
-            </div>
-
-            {/* 2. Visual Themes, Okabe-Ito Colorblind Mode & Procedural Audio */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+            {/* Visual Themes, Okabe-Ito Colorblind Mode & Procedural Audio */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
                 <Palette className="w-3.5 h-3.5 text-emerald-400" />
                 <span>{t("menu.themes_section")}</span>
               </div>
@@ -1025,9 +975,9 @@ const AppShell: React.FC = () => {
               />
             </div>
 
-            {/* 3. Tournament Clock (FIDE Blitz, Rapid, Oriental Byo-yomi) */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+            {/* Tournament Clock */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
                 <Clock className="w-3.5 h-3.5 text-emerald-400" />
                 <span>{t("menu.clock_section")}</span>
               </div>
@@ -1042,9 +992,28 @@ const AppShell: React.FC = () => {
               />
             </div>
 
-            {/* 4. Step-by-Step Replay Viewer & JSON Export/Import */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+            {/* Interactive Tutorial & WASM AI Move Suggestion */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>{t("menu.tutorial_section")}</span>
+              </div>
+              <InteractiveTutorialPanel
+                gameId={selectedGameId}
+                currentTurn={(currentTurn === 2 ? 2 : 1) as 1 | 2}
+                legalMovesJson={legalMovesJson}
+                isLocalTurnAllowed={isLocalTurnAllowed}
+                onDispatchCommand={(cmd) => {
+                  handleDispatchCommand(cmd);
+                  setIsTopRightMenuOpen(false);
+                }}
+                hideToggleButton={true}
+              />
+            </div>
+
+            {/* Step-by-Step Replay Viewer & JSON Export/Import */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
                 <History className="w-3.5 h-3.5 text-emerald-400" />
                 <span>
                   {t("menu.replay_section")} ({replayCurrentStep}/
