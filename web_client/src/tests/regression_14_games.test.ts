@@ -416,8 +416,111 @@ async function runRegression14Games() {
       `La IA de '${gId}' debe diferenciar sus jugadas entre los 4 niveles de dificultad (estados distintos: ${postAiStates.size})`
     );
   }
+
+  // E. Verificación E2E de IA Avanzada en los juegos restantes (Crisis multifase, Monopoly casas, Batalla Naval inferencia colineal, Damas Chinas, Backgammon y Mil Millas)
+  // 1. Crisis / TEG: Easy (0) sólo refuerza, mientras que Expert (3) refuerza frontera y ejecuta ataques multifase conquistando territorio
+  const crisisEasy = new WasmGameBridge();
+  crisisEasy.start_ai_match("crisis", 1, 2, 0);
+  crisisEasy.send_command_json(1, JSON.stringify(SAMPLE_FIRST_COMMANDS.crisis));
+  crisisEasy.step_ai_if_needed();
+  const crisisEasyOwned = JSON.parse(crisisEasy.get_state_json()).territories.filter(
+    (t: { owner: number }) => t.owner === 2
+  ).length;
+
+  const crisisExpert = new WasmGameBridge();
+  crisisExpert.start_ai_match("crisis", 1, 2, 3);
+  crisisExpert.send_command_json(1, JSON.stringify(SAMPLE_FIRST_COMMANDS.crisis));
+  crisisExpert.step_ai_if_needed();
+  const crisisExpertState = JSON.parse(crisisExpert.get_state_json());
+  const crisisExpertOwned = crisisExpertState.territories.filter(
+    (t: { owner: number }) => t.owner === 2
+  ).length;
+  assert(
+    crisisExpertOwned > crisisEasyOwned,
+    `Crisis IA Expert debe ejecutar ataques multifase y conquistar territorios (Easy=${crisisEasyOwned}, Expert=${crisisExpertOwned})`
+  );
+
+  // 2. Monopoly: Expert (3) compra propiedad y construye casas automáticamente cuando posee liquidez
+  const monoEasy = new WasmGameBridge();
+  monoEasy.start_ai_match("monopoly", 1, 2, 0);
+  for (let t = 0; t < 2; t++) {
+    monoEasy.send_command_json(1, JSON.stringify(SAMPLE_FIRST_COMMANDS.monopoly));
+    monoEasy.step_ai_if_needed();
+  }
+  const monoEasyHouses = JSON.parse(monoEasy.get_state_json()).spaces.reduce(
+    (acc: number, s: { owner: number | null; houses: number }) =>
+      acc + (s.owner === 2 ? s.houses : 0),
+    0
+  );
+
+  const monoExpert = new WasmGameBridge();
+  monoExpert.start_ai_match("monopoly", 1, 2, 3);
+  for (let t = 0; t < 2; t++) {
+    monoExpert.send_command_json(1, JSON.stringify(SAMPLE_FIRST_COMMANDS.monopoly));
+    monoExpert.step_ai_if_needed();
+  }
+  const monoExpertHouses = JSON.parse(monoExpert.get_state_json()).spaces.reduce(
+    (acc: number, s: { owner: number | null; houses: number }) =>
+      acc + (s.owner === 2 ? s.houses : 0),
+    0
+  );
+  assert(
+    monoExpertHouses > monoEasyHouses,
+    `Monopoly IA Expert debe edificar casas automáticamente tras adquirir propiedad (Easy=${monoEasyHouses}, Expert=${monoExpertHouses})`
+  );
+
+  // 3. Batalla Naval: Inferencia de línea colineal cuando existen >= 2 impactos alineados
+  const bsExpert = new WasmGameBridge();
+  bsExpert.start_ai_match("battleship", 1, 2, 3);
+  // Simulamos que la IA ya logró 2 impactos colineales en el Portaaviones de J1 ([1,1]..[1,5]) en (1,2) y (1,3)
+  bsExpert.send_command_json(
+    1,
+    JSON.stringify({ command_type: "battleship_game::FireShotCommand", player: 1, row: 9, col: 9 })
+  );
+  bsExpert.send_command_json(
+    2,
+    JSON.stringify({ command_type: "battleship_game::FireShotCommand", player: 2, row: 1, col: 2 })
+  );
+  bsExpert.send_command_json(
+    1,
+    JSON.stringify({ command_type: "battleship_game::FireShotCommand", player: 1, row: 9, col: 8 })
+  );
+  bsExpert.send_command_json(
+    2,
+    JSON.stringify({ command_type: "battleship_game::FireShotCommand", player: 2, row: 1, col: 3 })
+  );
+  bsExpert.send_command_json(
+    1,
+    JSON.stringify({ command_type: "battleship_game::FireShotCommand", player: 1, row: 9, col: 7 })
+  );
+  // Ahora en el turno de la IA Expert, debe rematar colinealmente en la fila 1 (col 4 o col 1)
+  bsExpert.step_ai_if_needed();
+  const bsShotsAfter = JSON.parse(bsExpert.get_state_json()).shots[2];
+  assert(
+    bsShotsAfter["1_4"] === "hit" || bsShotsAfter["1_1"] === "hit",
+    "Batalla Naval IA Expert debe inferir el eje horizontal de 2 impactos colineales (1,2)-(1,3) y disparar en (1,4) o (1,1)"
+  );
+
+  // 4. Damas Chinas, Backgammon y Mil Millas: diferenciación entre Easy (0) y Expert (3)
+  for (const extraGame of ["chinese_checkers", "backgammon", "mille_bornes"] as const) {
+    const b0 = new WasmGameBridge();
+    b0.start_ai_match(extraGame, 1, 2, 0);
+    b0.send_command_json(1, JSON.stringify(SAMPLE_FIRST_COMMANDS[extraGame]));
+    b0.step_ai_if_needed();
+
+    const b3 = new WasmGameBridge();
+    b3.start_ai_match(extraGame, 1, 2, 3);
+    b3.send_command_json(1, JSON.stringify(SAMPLE_FIRST_COMMANDS[extraGame]));
+    b3.step_ai_if_needed();
+
+    assert(
+      b0.get_state_json() !== b3.get_state_json(),
+      `La IA de '${extraGame}' debe diferenciar su jugada entre Easy (0) y Expert (3)`
+    );
+  }
+
   console.log(
-    "  [PASS] Niveles de dificultad de IA (0..3) y diferenciación táctica verificados en Chess, Go, Shogi, Xiangqi, Checkers y catálogo de 14 juegos"
+    "  [PASS] Niveles de dificultad de IA (0..3) y mejoras avanzadas (Crisis multifase, Monopoly casas, Batalla Naval densidad/colineal, Damas Chinas, Backgammon, Mil Millas) verificados"
   );
 
   console.log("=== SUITE DE REGRESIÓN DE LOS 14 JUEGOS COMPLETADA CON 0 ERRORES ===");

@@ -3574,23 +3574,41 @@ export class WasmGameBridge {
     }
 
     if (this.gameType === "uno") {
+      // On Hard/Expert, catch opponent if they have 1 card and forgot to call UNO
+      if (diff >= 2 && (this.unoHands[opp]?.length || 0) === 1 && !this.unoCalled[opp]) {
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "CatchUnoCommand", player: ai })
+        );
+      }
+
       const playableRaw = JSON.parse(this.get_legal_moves_json(ai)) as {
         card: UnoCard;
         index: number;
       }[];
       if (playableRaw.length > 0) {
         let chosenEntry = playableRaw[0];
+        const oppCount = this.unoHands[opp]?.length || 7;
         if (diff >= 1 && playableRaw.length > 1) {
           const scoreCard = (c: UnoCard): number => {
             if (diff === 1) {
               return c.color !== "Wild" ? 20 : 5;
             }
-            if (c.value === "DrawTwo") return 50;
-            if (c.value === "Skip" || c.value === "Reverse") return 40;
+            if (c.value === "WildDrawFour") return oppCount <= 3 ? 85 : 15;
+            if (c.value === "DrawTwo") return oppCount <= 3 ? 75 : 50;
+            if (c.value === "Skip" || c.value === "Reverse") return 42;
             if (c.color === "Wild") return diff === 3 ? 10 : 25;
             return 20 + (Number(c.value) || 0);
           };
           chosenEntry = [...playableRaw].sort((a, b) => scoreCard(b.card) - scoreCard(a.card))[0];
+        }
+
+        // Automatically call UNO when going from 2 cards to 1 card on Medium/Hard/Expert
+        if (diff >= 1 && (this.unoHands[ai]?.length || 0) === 2) {
+          this.send_command_json(
+            ai,
+            JSON.stringify({ command_type: "CallUnoCommand", player: ai })
+          );
         }
 
         // Choose most frequent color in AI's hand on Medium/Hard/Expert
@@ -3713,6 +3731,26 @@ export class WasmGameBridge {
     }
 
     if (this.gameType === "shogi") {
+      // On Hard/Expert, consider dropping a captured piece from Komadai onto an active central square
+      if (diff >= 2 && (this.shogiHands[ai]?.length || 0) > 0) {
+        const dropKind = this.shogiHands[ai][0];
+        const targetRow = ai === 2 ? 5 : 3;
+        for (const targetCol of [4, 3, 5, 2, 6]) {
+          const check = isShogiDropLegal(this.shogiGrid, dropKind, [targetRow, targetCol], ai);
+          if (check.ok) {
+            return this.send_command_json(
+              ai,
+              JSON.stringify({
+                command_type: "shogi_game::DropPieceCommand",
+                player: ai,
+                kind: dropKind,
+                to: [targetRow, targetCol],
+              })
+            );
+          }
+        }
+      }
+
       const legal = this.getShogiLegalMoves(ai);
       if (legal.length > 0 && legal[0].from) {
         const pieceVal: Record<ShogiPiece["kind"], number> = {
@@ -3740,6 +3778,28 @@ export class WasmGameBridge {
           }
           if (m.canPromote || m.mustPromote) {
             score += diff >= 1 ? 180 : 60;
+          }
+
+          // 1-ply Quiescence Recapture Check on Hard/Expert
+          if (diff >= 2 && mover) {
+            let recaptured = false;
+            for (let or = 0; or < 9 && !recaptured; or++) {
+              for (let oc = 0; oc < 9; oc++) {
+                const opc = this.shogiGrid[or]?.[oc];
+                if (
+                  opc &&
+                  opc.owner === opp &&
+                  (or !== m.to[0] || oc !== m.to[1]) &&
+                  isShogiMovePseudoLegal(this.shogiGrid, [or, oc], m.to, opp)
+                ) {
+                  recaptured = true;
+                  break;
+                }
+              }
+            }
+            if (recaptured) {
+              score -= (pieceVal[mover.kind] || 100) * (diff === 3 ? 1.05 : 0.8);
+            }
           }
 
           const centerCol = 4 - Math.abs(4 - m.to[1]);
@@ -3821,13 +3881,15 @@ export class WasmGameBridge {
               score += 120;
             }
           } else {
-            // Hard (2) & Expert (3): evaluate exchange safety (don't trade 500-pt Cannon for defended 450-pt Horse)
-            if (target && mover) {
-              const gain = pieceVal[target.kind] || 100;
+            // Hard (2) & Expert (3): 1-ply Quiescence Exchange Evaluation
+            if (mover) {
+              const gain = target ? pieceVal[target.kind] || 100 : 0;
               const risk = pieceVal[mover.kind] || 100;
-              // Check if destination square is on opponent's back rank or defended
-              const isDefendedBackRank = (ai === 2 && m.to[0] >= 7) || (ai === 1 && m.to[0] <= 2);
-              score += isDefendedBackRank ? gain - risk * 1.15 : gain * 1.2;
+              const isDefendedBackRank =
+                target !== null && ((ai === 2 && m.to[0] >= 7) || (ai === 1 && m.to[0] <= 2));
+              if (target) {
+                score += isDefendedBackRank ? gain - risk * 1.15 : gain * 1.2;
+              }
             }
 
             const centerCol = 4 - Math.abs(4 - m.to[1]);
@@ -3874,18 +3936,38 @@ export class WasmGameBridge {
         let chosen = legal[0];
         if (diff === 0 && legal.length > 1) {
           chosen = legal[legal.length - 1];
-        } else if (diff >= 2 && legal.length > 1) {
+        } else if (diff >= 1 && legal.length > 1) {
+          // Find furthest-back straggler row for quadratic straggler penalty on Expert
+          const myCells = this.ccCells.filter((c) => c.owner === ai);
+          const stragglerRow =
+            myCells.length > 0
+              ? ai === 1
+                ? Math.max(...myCells.map((c) => c.r))
+                : Math.min(...myCells.map((c) => c.r))
+              : 0;
+
           let bestScore = -Infinity;
           for (const m of legal) {
             const [fr, fx2] = m.fromId.split("_").map(Number);
             const [tr, tx2] = m.toId.split("_").map(Number);
             const gain = ai === 1 ? fr - tr : tr - fr;
+            const isChainJump = Math.abs(tr - fr) >= 2 || Math.abs(tx2 - fx2) >= 4;
             const centerBonus = 6 - Math.abs(tx2);
-            const trailingBonus = ai === 1 ? fr * 0.5 : (16 - fr) * 0.5;
-            const score =
-              gain * 20 +
-              centerBonus * (diff === 3 ? 4 : 2) +
-              (diff === 3 ? trailingBonus * 3 : - Math.abs(fx2));
+            const isMovingStraggler = fr === stragglerRow ? 1 : 0;
+            const trailingDist = ai === 1 ? fr : 16 - fr;
+            let score = gain * 22;
+            if (diff === 1) {
+              score += (isChainJump ? 15 : 0) - Math.abs(fx2);
+            } else if (diff === 2) {
+              score += centerBonus * 4 + (isChainJump ? 25 : 0);
+            } else {
+              // Expert: quadratic straggler priority + central bridge jumping
+              score +=
+                centerBonus * 5 +
+                (isChainJump ? 35 : 0) +
+                isMovingStraggler * 45 +
+                trailingDist * trailingDist * 0.4;
+            }
             if (score > bestScore) {
               bestScore = score;
               chosen = m;
@@ -3905,6 +3987,39 @@ export class WasmGameBridge {
     }
 
     if (this.gameType === "backgammon") {
+      // Calculate Pip Count for Doubling Cube and racing decisions
+      const calcPips = (p: 1 | 2): number => {
+        let pips = (this.bgBar[p] || 0) * 25;
+        for (let i = 0; i < 24; i++) {
+          const pt = this.bgPoints[i];
+          if (pt && pt.owner === p && pt.count > 0) {
+            pips += pt.count * (p === 1 ? 24 - i : i + 1);
+          }
+        }
+        return pips;
+      };
+      const myPips = calcPips(ai);
+      const oppPips = calcPips(opp);
+
+      // Respond if opponent offered the Doubling Cube
+      if (this.bgCubeOfferedBy && this.bgCubeOfferedBy !== ai) {
+        if (diff >= 2 && myPips > oppPips + 45) {
+          return this.send_command_json(
+            ai,
+            JSON.stringify({ command_type: "backgammon_game::RejectDoubleCommand", player: ai })
+          );
+        }
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "backgammon_game::AcceptDoubleCommand", player: ai })
+        );
+      } else if (diff >= 2 && !this.bgCubeOfferedBy && this.bgCubeValue < 4 && myPips + 18 <= oppPips) {
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "backgammon_game::OfferDoubleCommand", player: ai })
+        );
+      }
+
       const legal = this.getBackgammonLegalMoves(ai);
       if (legal.length > 0) {
         let chosen = legal[0];
@@ -3913,24 +4028,37 @@ export class WasmGameBridge {
         for (let idx = 0; idx < legal.length; idx++) {
           const m = legal[idx];
           const destPt = m.to >= 0 && m.to < 24 ? this.bgPoints[m.to] : null;
+          const srcPt = m.from >= 0 && m.from < 24 ? this.bgPoints[m.from] : null;
           let score = 0;
           if (diff === 0) {
             score = -idx;
           } else {
+            // Bar entry priority
+            if (m.from === -1) score += 95;
             // Hitting opponent blot
             if (destPt && destPt.owner === opp && destPt.count === 1) {
               score += 80 * diff;
             }
-            // Making a point (covering own blot)
+            // Making a secure point (covering own blot)
             if (destPt && destPt.owner === ai && destPt.count === 1) {
-              score += 65 * diff;
+              score += 70 * diff;
             }
             // Bearing off
             if (m.to === 24 || m.to === -1) {
-              score += 100;
+              score += 110;
+            }
+            // Penalize leaving an exposed single blot in opponent's inner board on Hard/Expert
+            if (diff >= 2) {
+              const inOppHome = ai === 2 ? m.to >= 12 : m.to < 12;
+              if (inOppHome && (!destPt || destPt.count === 0)) {
+                score -= 35;
+              }
+              if (srcPt && srcPt.owner === ai && srcPt.count === 2) {
+                score -= 25; // breaking an existing secure point
+              }
             }
             // Advancing back checkers on Expert
-            if (diff === 3) {
+            if (diff === 3 && m.from >= 0) {
               score += ai === 2 ? m.from * 2 : (23 - m.from) * 2;
             }
           }
@@ -3954,30 +4082,67 @@ export class WasmGameBridge {
 
     if (this.gameType === "ludo") {
       const tokens = this.ludoTokens[ai] || [1, 0, 0, 0];
+      const oppTokens = this.ludoTokens[opp] || [1, 0, 0, 0];
+      const d1 = 6;
+      const d2 = 2;
       let bestToken = 0;
-      if (diff >= 2) {
-        // Hard / Expert: prioritize exiting a yard token on a 6 or advancing lead token
-        const yardIdx = tokens.findIndex((pos) => pos === 0);
-        if (yardIdx >= 0 && diff === 3) {
-          bestToken = yardIdx;
-        } else {
-          let maxPos = -1;
-          tokens.forEach((pos, idx) => {
-            if (pos > 0 && pos < 57 && pos > maxPos) {
-              maxPos = pos;
-              bestToken = idx;
+
+      if (diff === 0) {
+        bestToken = 0;
+      } else {
+        let bestScore = -Infinity;
+        tokens.forEach((cur, idx) => {
+          if (cur >= 57) return;
+          const step = cur === 0 ? 1 : d1;
+          const nextPos = cur + step > 57 ? 57 - (cur + step - 57) : cur + step;
+          let score = nextPos * 2;
+
+          // Base exit on a 6
+          if (cur === 0) {
+            score += diff >= 2 ? 95 : 65;
+          }
+          // Reaching exact goal 57
+          if (nextPos === 57) {
+            score += 120;
+          }
+          // Capturing an opponent token on a non-star square
+          const isNextSafe = LUDO_SAFE_STARS.has(nextPos);
+          if (!isNextSafe && oppTokens.some((op) => op > 0 && op < 52 && op === nextPos)) {
+            score += 110;
+          }
+          // Safe star evaluation & capture threat lookahead on Hard/Expert
+          if (diff >= 2) {
+            if (isNextSafe) {
+              score += 45;
             }
-          });
-        }
+            if (cur > 0 && LUDO_SAFE_STARS.has(cur) && nextPos !== 57) {
+              score -= 30; // reluctant to abandon a safe star without capturing or scoring
+            }
+            if (diff === 3 && !isNextSafe && nextPos < 52) {
+              const threatened = oppTokens.some(
+                (op) => op > 0 && nextPos - op >= 1 && nextPos - op <= 6
+              );
+              if (threatened) {
+                score -= 55;
+              }
+            }
+          }
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestToken = idx;
+          }
+        });
       }
+
       return this.send_command_json(
         ai,
         JSON.stringify({
           command_type: "ludo_game::MoveTokenCommand",
           player: ai,
           token_index: bestToken,
-          d1: 6,
-          d2: 2,
+          d1,
+          d2,
         })
       );
     }
@@ -3989,11 +4154,53 @@ export class WasmGameBridge {
         const myShots = this.bsShots[ai] || {};
 
         if (diff >= 1) {
-          // 1. Target Mode: check orthogonal neighbors of any existing hit
-          let targetNeighbor: { row: number; col: number } | null = null;
+          // Identify active hit cells that belong to ships NOT yet sunk
+          const sunkNames = new Set(this.bsSunkShips[ai] || []);
+          const sunkCells = new Set<string>();
+          for (const ship of this.bsFleets[opp] || []) {
+            if (sunkNames.has(ship.name)) {
+              for (const [sr, sc] of ship.cells) {
+                sunkCells.add(`${sr}_${sc}`);
+              }
+            }
+          }
+
+          const activeHits: [number, number][] = [];
           for (const key of Object.keys(myShots)) {
-            if (myShots[key] === "hit") {
+            if (myShots[key] === "hit" && !sunkCells.has(key)) {
               const [hr, hc] = key.split("_").map(Number);
+              activeHits.push([hr, hc]);
+            }
+          }
+
+          let targetCell: { row: number; col: number } | null = null;
+
+          // 1a. Collinear Line Inference (Hard/Expert): if >=2 active hits share row or col, fire at line endpoints
+          if (diff >= 2 && activeHits.length >= 2) {
+            for (let i = 0; i < activeHits.length && !targetCell; i++) {
+              for (let j = i + 1; j < activeHits.length && !targetCell; j++) {
+                const [r1, c1] = activeHits[i];
+                const [r2, c2] = activeHits[j];
+                if (r1 === r2) {
+                  const minC = Math.min(c1, c2);
+                  const maxC = Math.max(c1, c2);
+                  const left = legal.find((m) => m.row === r1 && m.col === minC - 1);
+                  const right = legal.find((m) => m.row === r1 && m.col === maxC + 1);
+                  targetCell = right || left || null;
+                } else if (c1 === c2) {
+                  const minR = Math.min(r1, r2);
+                  const maxR = Math.max(r1, r2);
+                  const up = legal.find((m) => m.row === minR - 1 && m.col === c1);
+                  const down = legal.find((m) => m.row === maxR + 1 && m.col === c1);
+                  targetCell = down || up || null;
+                }
+              }
+            }
+          }
+
+          // 1b. Orthogonal Target Mode: check orthogonal neighbors of any active hit
+          if (!targetCell && activeHits.length > 0) {
+            for (const [hr, hc] of activeHits) {
               for (const [dr, dc] of [
                 [-1, 0],
                 [1, 0],
@@ -4002,30 +4209,86 @@ export class WasmGameBridge {
               ]) {
                 const cand = legal.find((m) => m.row === hr + dr && m.col === hc + dc);
                 if (cand) {
-                  targetNeighbor = cand;
+                  targetCell = cand;
                   break;
                 }
               }
+              if (targetCell) break;
             }
-            if (targetNeighbor) break;
           }
 
-          if (targetNeighbor) {
-            chosen = targetNeighbor;
+          if (targetCell) {
+            chosen = targetCell;
+          } else if (diff >= 2) {
+            // 2. Probability Density Map (Hard/Expert): count valid placements of remaining unsunk ship sizes
+            const remainingSizes = (this.bsFleets[opp] || [])
+              .filter((s) => !sunkNames.has(s.name))
+              .map((s) => s.size);
+            const shipSizes = remainingSizes.length > 0 ? remainingSizes : [5, 4, 3, 3, 2];
+            const density: number[][] = Array.from({ length: 10 }, () =>
+              Array.from({ length: 10 }, () => 0)
+            );
+
+            const isBlocked = (r: number, c: number) =>
+              myShots[`${r}_${c}`] === "miss" || sunkCells.has(`${r}_${c}`);
+
+            for (const size of shipSizes) {
+              // Horizontal placements
+              for (let r = 0; r < 10; r++) {
+                for (let c = 0; c <= 10 - size; c++) {
+                  let ok = true;
+                  for (let k = 0; k < size; k++) {
+                    if (isBlocked(r, c + k)) {
+                      ok = false;
+                      break;
+                    }
+                  }
+                  if (ok) {
+                    for (let k = 0; k < size; k++) density[r][c + k] += 1;
+                  }
+                }
+              }
+              // Vertical placements
+              for (let r = 0; r <= 10 - size; r++) {
+                for (let c = 0; c < 10; c++) {
+                  let ok = true;
+                  for (let k = 0; k < size; k++) {
+                    if (isBlocked(r + k, c)) {
+                      ok = false;
+                      break;
+                    }
+                  }
+                  if (ok) {
+                    for (let k = 0; k < size; k++) density[r + k][c] += 1;
+                  }
+                }
+              }
+            }
+
+            let bestScore = -Infinity;
+            for (const m of legal) {
+              const parity = (m.row + m.col) % 2 === 0 ? 15 : 0;
+              const diagBonus =
+                diff === 3
+                  ? m.row + m.col === 9
+                    ? 12
+                    : 0
+                  : m.row === m.col
+                    ? 10
+                    : 0;
+              const score = density[m.row][m.col] * 10 + parity + diagBonus;
+              if (score > bestScore) {
+                bestScore = score;
+                chosen = m;
+              }
+            }
           } else {
-            // 2. Hunt Mode: parity & center probability differentiation by difficulty
+            // Medium (diff === 1): checkerboard parity + center bias
             let bestScore = -Infinity;
             for (const m of legal) {
               const parity = (m.row + m.col) % 2 === 0 ? 25 : 0;
               const centerDist = Math.abs(4.5 - m.row) + Math.abs(4.5 - m.col);
-              let score = parity;
-              if (diff === 1) {
-                score += (9 - centerDist) * 3;
-              } else if (diff === 2) {
-                score += (9 - centerDist) * 8 + (m.row === m.col ? 12 : 0);
-              } else {
-                score += (9 - centerDist) * 10 + (m.row + m.col === 9 ? 18 : 0);
-              }
+              const score = parity + (9 - centerDist) * 3;
               if (score > bestScore) {
                 bestScore = score;
                 chosen = m;
@@ -4051,22 +4314,53 @@ export class WasmGameBridge {
       let bestIdx = 0;
       if (diff >= 1 && hand.length > 1) {
         let bestScore = -Infinity;
+        const myHazard = this.mbHazard[ai];
+        const oppHazard = this.mbHazard[opp];
+        const shieldMap: Record<string, string> = {
+          Pinchazo: "Impinchable",
+          "Sin Gasolina": "Cisterna",
+          Accidente: "As del Volante",
+        };
+        const remedyMap: Record<string, string> = {
+          Pinchazo: "Rueda de Auxilio",
+          "Sin Gasolina": "Gasolina",
+          Accidente: "Reparaciones",
+        };
+
         hand.forEach((card, idx) => {
           let score = 0;
           if (
             card === "As del Volante" ||
             card === "Cisterna" ||
+            card === "Impinchable" ||
             card === "Incorruptible" ||
             card === "Prioridad"
           ) {
-            score = diff >= 2 ? 180 : 90;
+            score = diff >= 2 ? 220 : 110;
+          } else if (
+            myHazard &&
+            (card === remedyMap[myHazard] ||
+              card === "Reparaciones" ||
+              card === "Gasolina" ||
+              card === "Rueda de Auxilio" ||
+              card === "Luz Verde")
+          ) {
+            score = 210;
           } else if (card.startsWith("Distance ")) {
             const km = Number(card.replace("Distance ", "")) || 50;
-            if (this.mbDistance[ai] + km <= 1000 && !this.mbHazard[ai]) {
-              score = km;
+            const within200Limit = km !== 200 || this.mbPlayed200Count[ai] < 2;
+            if (!myHazard && within200Limit && this.mbDistance[ai] + km <= 1000) {
+              score = km + (this.mbDistance[ai] + km === 1000 ? 150 : 0);
+            } else {
+              score = -50;
             }
           } else if (card === "Pinchazo" || card === "Sin Gasolina" || card === "Accidente") {
-            score = diff === 3 ? 160 : 75;
+            const blocked = this.mbSafeties[opp]?.includes(shieldMap[card]);
+            if (!blocked && !oppHazard) {
+              score = diff === 3 ? 195 : diff === 2 ? 140 : 75;
+            } else {
+              score = -80;
+            }
           }
           if (score > bestScore) {
             bestScore = score;
@@ -4085,16 +4379,76 @@ export class WasmGameBridge {
     }
 
     if (this.gameType === "monopoly") {
+      // 1. Strategic Jail release: pay $50 fine on Medium/Hard/Expert when unowned properties remain
+      if (this.monoInJail[ai] && diff >= 1 && this.monoCash[ai] >= 250) {
+        const unownedCount = this.monoSpaces.filter((s) => s.price > 0 && s.owner === null).length;
+        if (unownedCount >= 4 || diff === 1) {
+          this.send_command_json(
+            ai,
+            JSON.stringify({ command_type: "monopoly_game::PayJailFineCommand", player: ai })
+          );
+        }
+      }
+
+      // 2. Roll dice and advance
       this.send_command_json(
         ai,
         JSON.stringify({ command_type: "monopoly_game::RollDiceCommand", player: ai })
       );
-      if (diff >= 1 || this.monoCash[ai] >= 300) {
-        this.send_command_json(
-          ai,
-          JSON.stringify({ command_type: "monopoly_game::BuyPropertyCommand", player: ai })
+
+      // 3. Evaluate property purchase according to liquidity reserve & color-group monopoly priority
+      const curSpace = this.monoSpaces[this.monoPos[ai]];
+      if (curSpace && curSpace.price > 0 && curSpace.owner === null && this.monoCash[ai] >= curSpace.price) {
+        const groupSpaces = this.monoSpaces.filter(
+          (s) => s.group === curSpace.group && s.price > 0
         );
+        const completesMyGroup =
+          groupSpaces.length > 1 &&
+          groupSpaces.every((s) => s.index === curSpace.index || s.owner === ai);
+        const blocksOpponentGroup =
+          groupSpaces.length > 1 &&
+          groupSpaces.filter((s) => s.owner === opp).length === groupSpaces.length - 1;
+        const cashReserve = diff === 0 ? 0 : diff === 1 ? 100 : 150;
+
+        if (
+          diff === 0 ||
+          completesMyGroup ||
+          (diff >= 2 && blocksOpponentGroup) ||
+          this.monoCash[ai] - curSpace.price >= cashReserve
+        ) {
+          this.send_command_json(
+            ai,
+            JSON.stringify({ command_type: "monopoly_game::BuyPropertyCommand", player: ai })
+          );
+        }
       }
+
+      // 4. Build houses on Hard (2) & Expert (3) when holding developable properties and cash buffer
+      if (diff >= 2 && this.monoCash[ai] >= 250) {
+        const maxBuilds = diff === 3 ? 2 : 1;
+        for (let b = 0; b < maxBuilds && this.monoCash[ai] >= 200; b++) {
+          const ownedProps = this.monoSpaces
+            .filter((s) => s.owner === ai && !s.mortgaged && s.houses < 5 && s.price > 0)
+            .sort((a, bProp) => a.houses - bProp.houses || bProp.rent - a.rent);
+          let built = false;
+          for (const candidate of ownedProps) {
+            const resp = this.send_command_json(
+              ai,
+              JSON.stringify({
+                command_type: "monopoly_game::BuildHouseCommand",
+                player: ai,
+                space: candidate.index,
+              })
+            );
+            if (!resp.includes('"ok":false')) {
+              built = true;
+              break;
+            }
+          }
+          if (!built) break;
+        }
+      }
+
       return this.send_command_json(
         ai,
         JSON.stringify({ command_type: "monopoly_game::EndTurnCommand", player: ai })
@@ -4102,20 +4456,113 @@ export class WasmGameBridge {
     }
 
     if (this.gameType === "crisis") {
+      // 1. Exchange 3 cards for +6 reinforcement armies on Medium/Hard/Expert
+      if (diff >= 1 && (this.crisisCards[ai] || 0) >= 3) {
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "crisis_game::ExchangeCardsCommand", player: ai })
+        );
+      }
+
+      // 2. Place reinforcement armies on the frontline territory with highest tactical need/advantage
       const myTerrs = this.crisisTerritories.filter((t) => t.owner === ai);
-      const myTerr =
-        diff >= 2 ? [...myTerrs].sort((a, b) => b.armies - a.armies)[0] : myTerrs[0];
-      if (myTerr && this.crisisArmiesRemaining > 0) {
+      if (myTerrs.length > 0 && this.crisisArmiesRemaining > 0) {
+        let targetTerr = myTerrs[0];
+        if (diff >= 1) {
+          let bestTerrScore = -Infinity;
+          for (const t of myTerrs) {
+            const enemyNeighbors = t.neighbors
+              .map((nid) => this.crisisTerritories[nid])
+              .filter((nt) => nt && nt.owner !== ai);
+            if (enemyNeighbors.length === 0) continue;
+            const weakestEnemy = Math.min(...enemyNeighbors.map((nt) => nt.armies));
+            const totalEnemyThreat = enemyNeighbors.reduce((acc, nt) => acc + nt.armies, 0);
+            const score =
+              diff >= 2
+                ? (t.armies + this.crisisArmiesRemaining) / Math.max(1, weakestEnemy) * 20 +
+                  totalEnemyThreat * 2
+                : t.armies * 10 + enemyNeighbors.length * 5;
+            if (score > bestTerrScore) {
+              bestTerrScore = score;
+              targetTerr = t;
+            }
+          }
+        }
         this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "crisis_game::PlaceArmiesCommand",
             player: ai,
-            territory: myTerr.id,
+            territory: targetTerr.id,
             count: this.crisisArmiesRemaining,
           })
         );
       }
+
+      // 3. Multi-phase Attack execution based on difficulty superiority threshold
+      if (diff >= 1 && this.winner === null) {
+        const ratioThreshold = diff === 1 ? 1.5 : diff === 2 ? 1.3 : 1.15;
+        const maxAttackWaves = diff === 1 ? 2 : diff === 2 ? 4 : 6;
+        for (let wave = 0; wave < maxAttackWaves && this.winner === null; wave++) {
+          let bestAttack: { from: number; to: number; advantage: number } | null = null;
+          for (const att of this.crisisTerritories) {
+            if (att.owner !== ai || att.armies < 2) continue;
+            for (const nid of att.neighbors) {
+              const def = this.crisisTerritories[nid];
+              if (!def || def.owner === ai) continue;
+              const ratio = att.armies / Math.max(1, def.armies);
+              if (ratio >= ratioThreshold) {
+                const advantage = att.armies - def.armies + (def.armies === 1 ? 3 : 0);
+                if (!bestAttack || advantage > bestAttack.advantage) {
+                  bestAttack = { from: att.id, to: def.id, advantage };
+                }
+              }
+            }
+          }
+          if (!bestAttack) break;
+          this.send_command_json(
+            ai,
+            JSON.stringify({
+              command_type: "crisis_game::AttackCommand",
+              player: ai,
+              from: bestAttack.from,
+              to: bestAttack.to,
+            })
+          );
+        }
+      }
+
+      // 4. Fortify phase on Hard (2) & Expert (3): transfer surplus armies from rear territory to frontline border
+      if (diff >= 2 && this.winner === null) {
+        const hasEnemyNeighbor = (t: CrisisTerritory) =>
+          t.neighbors.some((nid) => this.crisisTerritories[nid]?.owner !== ai);
+
+        for (const src of this.crisisTerritories) {
+          if (src.owner !== ai || src.armies <= 2 || hasEnemyNeighbor(src)) continue;
+          const borderNeighborId = src.neighbors.find((nid) => {
+            const dst = this.crisisTerritories[nid];
+            return dst && dst.owner === ai && hasEnemyNeighbor(dst);
+          });
+          if (borderNeighborId !== undefined) {
+            this.send_command_json(
+              ai,
+              JSON.stringify({
+                command_type: "crisis_game::FortifyCommand",
+                player: ai,
+                from: src.id,
+                to: borderNeighborId,
+                count: src.armies - 1,
+              })
+            );
+            break;
+          }
+        }
+      }
+
+      if (this.winner !== null) {
+        return JSON.stringify([{ event: "GameOverEvent", winner: this.winner }]);
+      }
+
       return this.send_command_json(
         ai,
         JSON.stringify({ command_type: "crisis_game::EndTurnCommand", player: ai })
