@@ -51,8 +51,9 @@ pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
     let opponent = sides.opponent_of(player);
     let mut score = 0.0f32;
     let mut player_moves = 0usize;
+    let mut opponent_moves = 0usize;
 
-    // 1. Material + 2. Movilidad rápida sin clonar el tablero en nodos hoja
+    // 1. Material + 2. Movilidad diferencial y desarrollo posicional
     for (&pos, piece) in &board.pieces {
         let val = match piece.kind {
             PieceKind::Pawn => 1.0,
@@ -62,15 +63,24 @@ pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
             PieceKind::Queen => 9.0,
             PieceKind::King => 1000.0,
         };
+        let advancement = if piece.owner == sides.white {
+            f32::from(pos.row) * 0.03
+        } else {
+            f32::from(7u8.saturating_sub(pos.row)) * 0.03
+        };
+        let center_dist = (f32::from(pos.row) - 3.5).abs() + (f32::from(pos.col) - 3.5).abs();
+        let centrality = (7.0 - center_dist).max(0.0) * 0.02;
+
         if piece.owner == player {
-            score += val;
+            score += val + advancement + centrality;
             player_moves += piece_moves(board, sides, pos, *piece).len();
         } else if piece.owner == opponent {
-            score -= val;
+            score -= val + advancement + centrality;
+            opponent_moves += piece_moves(board, sides, pos, *piece).len();
         }
     }
 
-    score += 0.1 * (player_moves as f32);
+    score += 0.1 * (player_moves as f32) - 0.08 * (opponent_moves as f32);
 
     // 3. Control del centro: +0.15 por pieza en las 4 casillas centrales (d4, e4, d5, e5)
     // d4: (row 3, col 3), e4: (row 3, col 4), d5: (row 4, col 3), e5: (row 4, col 4)

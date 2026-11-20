@@ -136,6 +136,12 @@ pub fn best_move(
             .wrapping_add(1),
     );
 
+    let board_size = session
+        .world()
+        .get_resource::<BoardResource>()
+        .map(|b| b.size)
+        .unwrap_or(9);
+
     let mut best_move = None;
     let mut best_win_rate = -1.0f32;
     let mut best_net_score = f32::NEG_INFINITY;
@@ -143,6 +149,57 @@ pub fn best_move(
     for candidate in &candidates {
         let mut wins = 0.0f32;
         let mut total_score_diff = 0.0f32;
+
+        // Prioridad posicional (evitar primera línea (0,0) y favorecer 3ª/4ª línea y puntos Hoshi)
+        let edge_dist_x = candidate.x.min(board_size.saturating_sub(1 + candidate.x));
+        let edge_dist_y = candidate.y.min(board_size.saturating_sub(1 + candidate.y));
+        let min_edge = edge_dist_x.min(edge_dist_y);
+        let center = (board_size as f32 - 1.0) * 0.5;
+        let center_dist =
+            (candidate.x as f32 - center).abs() + (candidate.y as f32 - center).abs();
+        let positional_prior = match difficulty {
+            AiDifficulty::Easy => {
+                if min_edge == 0 {
+                    -0.15
+                } else {
+                    0.05 * (min_edge as f32)
+                }
+            }
+            AiDifficulty::Medium => {
+                let line_bonus = if min_edge == 2 {
+                    0.35
+                } else if min_edge == 1 {
+                    0.1
+                } else {
+                    -0.25
+                };
+                line_bonus - center_dist * 0.01
+            }
+            AiDifficulty::Hard => {
+                let is_hoshi = (edge_dist_x == 2 && edge_dist_y == 2)
+                    || (candidate.x * 2 + 1 == board_size && candidate.y * 2 + 1 == board_size);
+                let line_bonus = if is_hoshi {
+                    0.65
+                } else if min_edge >= 2 {
+                    0.3
+                } else {
+                    -0.4
+                };
+                line_bonus - center_dist * 0.015
+            }
+            AiDifficulty::Expert => {
+                let is_komoku_or_hoshi = (edge_dist_x == 2 && edge_dist_y == 3)
+                    || (edge_dist_x == 3 && edge_dist_y == 2);
+                let line_bonus = if is_komoku_or_hoshi {
+                    0.75
+                } else if min_edge >= 2 {
+                    0.4
+                } else {
+                    -0.5
+                };
+                line_bonus - center_dist * 0.012
+            }
+        };
 
         for _ in 0..rollouts_per_candidate {
             let mut sim_session = clone_go_session(session);
@@ -224,7 +281,7 @@ pub fn best_move(
                     (white_t as f32, black_t as f32)
                 };
 
-                total_score_diff += my_score - opp_score;
+                total_score_diff += (my_score - opp_score) + positional_prior;
                 if my_score > opp_score {
                     wins += 1.0;
                 } else if (my_score - opp_score).abs() < 1e-3 {

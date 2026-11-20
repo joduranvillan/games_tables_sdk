@@ -134,14 +134,93 @@ pub fn checkers_ai_pick_move(session: &Session, player: PlayerId) -> Option<Move
     Some(candidate_pool[idx].clone())
 }
 
-/// Selecciona la mejor jugada legal en Damas ajustando la profundidad según `AiDifficulty`.
+/// Evalúa heurísticamente el tablero de Damas para `player` (material, damas coronadas, avance y centro).
+pub fn evaluate_checkers_board(session: &Session, player: PlayerId) -> f32 {
+    let Some(board) = session.world().get_resource::<BoardResource>() else {
+        return 0.0;
+    };
+    let sides = session
+        .world()
+        .get_resource::<Sides>()
+        .copied()
+        .unwrap_or(Sides {
+            increasing: PlayerId(1),
+            decreasing: PlayerId(2),
+        });
+    let mut score = 0.0f32;
+    for r in 0..8u8 {
+        for c in 0..8u8 {
+            if let Some(piece) = board.get(Position::new(r, c)) {
+                let base = if piece.is_king { 2.6 } else { 1.0 };
+                let adv = if piece.owner == sides.increasing {
+                    f32::from(r) * 0.05
+                } else {
+                    f32::from(7u8.saturating_sub(r)) * 0.05
+                };
+                let center = (3.5 - (f32::from(c) - 3.5).abs()).max(0.0) * 0.02;
+                let edge_safe = if c == 0 || c == 7 { 0.04 } else { 0.0 };
+                let total = base + adv + center + edge_safe;
+                if piece.owner == player {
+                    score += total;
+                } else {
+                    score -= total;
+                }
+            }
+        }
+    }
+    score
+}
+
+/// Selecciona la mejor jugada legal en Damas ajustando la evaluación según `AiDifficulty`.
 pub fn best_move(
     session: &Session,
     player: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<MovePieceCommand> {
-    let _depth = difficulty.max_depth();
-    checkers_ai_pick_move(session, player)
+    if difficulty == AiDifficulty::Easy {
+        return checkers_ai_pick_move(session, player);
+    }
+    let legal = CheckersLegalMoveGenerator::generate_moves(session.world(), player);
+    if legal.is_empty() {
+        return checkers_ai_pick_move(session, player);
+    }
+    let mut best_cmd = None;
+    let mut best_score = f32::NEG_INFINITY;
+    for cmd in legal {
+        let mut next_session = clone_checkers_session(session);
+        if next_session
+            .process_command(player, Box::new(cmd.clone()))
+            .is_ok()
+        {
+            let mut score = evaluate_checkers_board(&next_session, player);
+            if matches!(difficulty, AiDifficulty::Hard | AiDifficulty::Expert) {
+                let opp = next_session.current_player();
+                if opp != player {
+                    let opp_moves =
+                        CheckersLegalMoveGenerator::generate_moves(next_session.world(), opp);
+                    let mut worst_reply = score;
+                    for opp_cmd in opp_moves.into_iter().take(8) {
+                        let mut reply_sess = clone_checkers_session(&next_session);
+                        if reply_sess
+                            .process_command(opp, Box::new(opp_cmd))
+                            .is_ok()
+                        {
+                            let reply_eval = evaluate_checkers_board(&reply_sess, player);
+                            if reply_eval < worst_reply {
+                                worst_reply = reply_eval;
+                            }
+                        }
+                    }
+                    score = worst_reply;
+                }
+            }
+            if score > best_score || best_cmd.is_none() {
+                best_score = score;
+                best_cmd = Some(cmd);
+            }
+        }
+    }
+    best_cmd.or_else(|| checkers_ai_pick_move(session, player))
 }
 
 #[cfg(test)]

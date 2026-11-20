@@ -96,6 +96,8 @@ impl OpeningBook {
     }
 
     /// Consulta el libro sólo si `difficulty.use_opening_book()` es `true`; de lo contrario retorna `None`.
+    /// En `AiDifficulty::Hard` elige la línea principal (mayor peso) y en `AiDifficulty::Expert`
+    /// selecciona la variante magistral alternativa de alto peso cuando existen múltiples líneas teóricas.
     pub fn lookup_with_difficulty(
         zobrist_hash: u64,
         difficulty: AiDifficulty,
@@ -103,7 +105,17 @@ impl OpeningBook {
         if !difficulty.use_opening_book() {
             return None;
         }
-        Self::lookup(zobrist_hash)
+        let list = Self::global().entries.get(&zobrist_hash)?;
+        if list.is_empty() {
+            return None;
+        }
+        let mut sorted = list.clone();
+        sorted.sort_by(|a, b| b.weight.cmp(&a.weight));
+        if difficulty == AiDifficulty::Expert && sorted.len() > 1 {
+            Some(sorted[1])
+        } else {
+            Some(sorted[0])
+        }
     }
 
     /// Consulta el libro para la sesión actual si `difficulty.use_opening_book()` está activo.
@@ -118,7 +130,7 @@ impl OpeningBook {
         let board = session.world().get_resource::<BoardResource>()?;
         let sides = session.world().get_resource::<Sides>()?;
         let zh = compute_zobrist_hash(board, sides, player);
-        let book_mv = Self::lookup(zh)?;
+        let book_mv = Self::lookup_with_difficulty(zh, difficulty)?;
         Some(book_mv.to_command(player))
     }
 

@@ -217,6 +217,10 @@ impl WasmGameBridge {
         self.current_game_type.clone()
     }
 
+    pub fn get_ai_difficulty(&self) -> i64 {
+        self.ai_difficulty as i64
+    }
+
     pub fn get_legal_moves_json(&self, player_id: u32) -> String {
         let Some(sess) = &self.session else {
             return "[]".to_string();
@@ -382,21 +386,8 @@ impl WasmGameBridge {
                 chinese_checkers_game::ai::best_move(sess, ai_p, self.ai_difficulty)
                     .map(|c| Box::new(c) as Box<dyn Command>)
             }
-            "backgammon" => {
-                let has_pending = sess
-                    .world()
-                    .get_resource::<backgammon_game::PendingDiceResource>()
-                    .and_then(|p| p.pending.get(&ai_p))
-                    .map(|d| !d.is_empty())
-                    .unwrap_or(false);
-                if !has_pending {
-                    Some(Box::new(backgammon_game::RollDiceCommand { player: ai_p })
-                        as Box<dyn Command>)
-                } else {
-                    backgammon_game::backgammon_ai_pick_move(sess, ai_p)
-                        .map(|c| Box::new(c) as Box<dyn Command>)
-                }
-            }
+            "backgammon" => backgammon_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                .map(|c| c.into_command()),
             "ludo" => {
                 let has_pending = sess
                     .world()

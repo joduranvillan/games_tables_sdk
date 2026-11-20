@@ -1451,6 +1451,10 @@ export class WasmGameBridge {
     return ok;
   }
 
+  public get_ai_difficulty(): number {
+    return this.aiDifficulty;
+  }
+
   public current_player(): number {
     return this.turn;
   }
@@ -3332,11 +3336,149 @@ export class WasmGameBridge {
       return "[]";
     }
     const ai = this.aiPlayer;
+    const opp: 1 | 2 = ai === 1 ? 2 : 1;
+    const diff = this.aiDifficulty; // 0 = Easy, 1 = Medium, 2 = Hard, 3 = Expert
 
     if (this.gameType === "chess") {
       const legal = this.getChessLegalMoves(ai);
       if (legal.length === 0) return "[]";
-      const chosen = legal[0];
+
+      const findMove = (fr: number, fc: number, tr: number, tc: number) =>
+        legal.find(
+          (m) => m.from[0] === fr && m.from[1] === fc && m.to[0] === tr && m.to[1] === tc
+        );
+
+      // Opening Book for Hard (2) & Expert (3) on turn 1-2
+      if (this.tick <= 2 && ai === 2 && diff >= 2 && this.chessLastMove) {
+        const [lfr, lfc] = this.chessLastMove.from;
+        const [ltr, ltc] = this.chessLastMove.to;
+        // 1. e4 ([6,4]->[4,4])
+        if (lfr === 6 && lfc === 4 && ltr === 4 && ltc === 4) {
+          const book =
+            diff === 3
+              ? findMove(1, 2, 3, 2) // 1...c5 (Sicilian Defense - Expert)
+              : findMove(1, 4, 3, 4); // 1...e5 (Open Game - Hard)
+          if (book) {
+            return this.send_command_json(
+              ai,
+              JSON.stringify({
+                command_type: "chess_game::MovePieceCommand",
+                player: ai,
+                from: book.from,
+                to: book.to,
+                promotion: book.promotion,
+              })
+            );
+          }
+        }
+        // 1. d4 ([6,3]->[4,3])
+        if (lfr === 6 && lfc === 3 && ltr === 4 && ltc === 3) {
+          const book =
+            diff === 3
+              ? findMove(0, 6, 2, 5) // 1...Nf6 (King's Indian - Expert)
+              : findMove(1, 3, 3, 3); // 1...d5 (Queen's Gambit / Closed - Hard)
+          if (book) {
+            return this.send_command_json(
+              ai,
+              JSON.stringify({
+                command_type: "chess_game::MovePieceCommand",
+                player: ai,
+                from: book.from,
+                to: book.to,
+                promotion: book.promotion,
+              })
+            );
+          }
+        }
+      }
+
+      const pieceVal: Record<ChessPiece["kind"], number> = {
+        Pawn: 100,
+        Knight: 320,
+        Bishop: 330,
+        Rook: 500,
+        Queen: 900,
+        King: 20000,
+      };
+
+      let chosen = legal[0];
+      let bestScore = -Infinity;
+
+      for (let idx = 0; idx < legal.length; idx++) {
+        const m = legal[idx];
+        const mover = this.chessGrid[m.from[0]]?.[m.from[1]];
+        const target = this.chessGrid[m.to[0]]?.[m.to[1]];
+        let score = 0;
+
+        if (target) {
+          score += pieceVal[target.kind] * 1.15 - (mover ? pieceVal[mover.kind] * 0.08 : 0);
+        } else if (m.isEnPassant) {
+          score += 105;
+        }
+        if (m.promotion) {
+          score += pieceVal[m.promotion] || 800;
+        }
+        if (m.isCastling) {
+          score += 65;
+        }
+
+        const centerDist = Math.abs(3.5 - m.to[0]) + Math.abs(3.5 - m.to[1]);
+        const adv = ai === 2 ? m.to[0] - m.from[0] : m.from[0] - m.to[0];
+
+        if (diff === 0) {
+          // Easy: prefers simple flank or single-step moves, low depth
+          score += (4 - Math.abs(adv)) * 4 - centerDist * 1.5 - idx * 0.25;
+        } else if (diff === 1) {
+          // Medium: classic knight/bishop development & center control
+          if (mover?.kind === "Knight" || mover?.kind === "Bishop") {
+            score += 48 + (7 - centerDist) * 8;
+          } else if (mover?.kind === "Pawn" && (m.from[1] === 3 || m.from[1] === 4)) {
+            score += 36 + Math.abs(adv) * 10;
+          } else {
+            score += (7 - centerDist) * 4;
+          }
+        } else {
+          // Hard (2) & Expert (3): central pawn break + tactical safety check on simGrid
+          const simGrid = simulateChessMoveOnGrid(
+            this.chessGrid,
+            m.from,
+            m.to,
+            this.chessEnPassantTarget,
+            m.promotion
+          );
+          if (isChessKingInCheck(simGrid, opp)) {
+            score += 45;
+          }
+          const landedAttacked = isChessSquareAttacked(simGrid, m.to, opp);
+          if (landedAttacked && mover) {
+            score -= pieceVal[mover.kind] * (diff === 3 ? 0.95 : 0.75);
+          }
+
+          if (diff === 2) {
+            // Hard: prefers central E/D file control and solid development
+            if (mover?.kind === "Pawn" && (m.from[1] === 4 || m.from[1] === 3)) {
+              score += 62 + Math.abs(adv) * 14;
+            } else if (mover?.kind === "Knight" || mover?.kind === "Bishop") {
+              score += 50 + (7 - centerDist) * 9;
+            }
+          } else {
+            // Expert: prefers asymmetrical counter-play (C-file / Knight pressure / active piece play)
+            if (mover?.kind === "Pawn" && m.from[1] === 2 && Math.abs(adv) === 2) {
+              score += 75;
+            } else if (mover?.kind === "Knight" && (m.to[1] === 5 || m.to[1] === 2)) {
+              score += 70 + (7 - centerDist) * 10;
+            } else if (mover?.kind === "Bishop" || mover?.kind === "Pawn") {
+              score += 48 + (7 - centerDist) * 9;
+            }
+          }
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          chosen = m;
+        }
+      }
+
       return this.send_command_json(
         ai,
         JSON.stringify({
@@ -3348,10 +3490,78 @@ export class WasmGameBridge {
         })
       );
     }
+
     if (this.gameType === "checkers") {
       const legal = this.getCheckersLegalMoves(ai);
       if (legal.length === 0) return "[]";
-      const chosen = legal[0];
+
+      let chosen = legal[0];
+      let bestScore = -Infinity;
+      const homeRow = ai === 2 ? 0 : 7;
+      const crownRow = ai === 2 ? 7 : 0;
+
+      for (let idx = 0; idx < legal.length; idx++) {
+        const m = legal[idx];
+        const mover = this.checkersGrid[m.from[0]]?.[m.from[1]];
+        let score = 0;
+        if (m.captured) {
+          score += 200;
+        }
+        if (!mover?.isKing && m.to[0] === crownRow) {
+          score += 140;
+        }
+
+        const centerColBonus = 3.5 - Math.abs(3.5 - m.to[1]);
+        const isSafeEdge = m.to[1] === 0 || m.to[1] === 7;
+
+        if (diff === 0) {
+          // Easy: leftmost legal move
+          score += -idx * 5;
+        } else if (diff === 1) {
+          // Medium: right-flank development (col 6 or safe edge)
+          score += (m.to[1] === 6 || m.to[1] === 1 ? 42 : isSafeEdge ? 20 : 0) + idx * 2;
+        } else if (diff === 2) {
+          // Hard: Old Faithful central column control (from col 3 -> col 4) and preserving back row
+          score +=
+            centerColBonus * 18 +
+            (m.from[1] === 3 && m.to[1] === 4 ? 25 : 0) -
+            (m.from[0] === homeRow ? 25 : 0);
+        } else {
+          // Expert: Single/Double Corner tactical diagonal (col 2 or 5->4) + lookahead safety against immediate jump
+          let unsafePenalty = 0;
+          const r = m.to[0];
+          const c = m.to[1];
+          for (const [dr, dc] of [
+            [-1, -1],
+            [-1, 1],
+            [1, -1],
+            [1, 1],
+          ]) {
+            const adj = this.checkersGrid[r + dr]?.[c + dc];
+            const land = this.checkersGrid[r - dr]?.[c - dc];
+            if (
+              adj &&
+              adj.owner === opp &&
+              land === null &&
+              r - dr >= 0 &&
+              r - dr < 8 &&
+              c - dc >= 0 &&
+              c - dc < 8
+            ) {
+              unsafePenalty += 120;
+            }
+          }
+          const tacticalCol =
+            m.to[1] === 2 || (m.from[1] === 5 && m.to[1] === 4) ? 45 : centerColBonus * 10;
+          score += tacticalCol - (m.from[0] === homeRow ? 30 : 0) - unsafePenalty;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          chosen = m;
+        }
+      }
+
       return this.send_command_json(
         ai,
         JSON.stringify({
@@ -3362,19 +3572,52 @@ export class WasmGameBridge {
         })
       );
     }
+
     if (this.gameType === "uno") {
       const playableRaw = JSON.parse(this.get_legal_moves_json(ai)) as {
         card: UnoCard;
         index: number;
       }[];
       if (playableRaw.length > 0) {
+        let chosenEntry = playableRaw[0];
+        if (diff >= 1 && playableRaw.length > 1) {
+          const scoreCard = (c: UnoCard): number => {
+            if (diff === 1) {
+              return c.color !== "Wild" ? 20 : 5;
+            }
+            if (c.value === "DrawTwo") return 50;
+            if (c.value === "Skip" || c.value === "Reverse") return 40;
+            if (c.color === "Wild") return diff === 3 ? 10 : 25;
+            return 20 + (Number(c.value) || 0);
+          };
+          chosenEntry = [...playableRaw].sort((a, b) => scoreCard(b.card) - scoreCard(a.card))[0];
+        }
+
+        // Choose most frequent color in AI's hand on Medium/Hard/Expert
+        const colors: ("Red" | "Yellow" | "Green" | "Blue")[] = ["Red", "Yellow", "Green", "Blue"];
+        let bestColor: "Red" | "Yellow" | "Green" | "Blue" = colors[diff % 4];
+        if (diff >= 1) {
+          const counts: Record<"Red" | "Yellow" | "Green" | "Blue", number> = {
+            Red: 0,
+            Yellow: 0,
+            Green: 0,
+            Blue: 0,
+          };
+          for (const c of this.unoHands[ai] || []) {
+            if (c.color !== "Wild") {
+              counts[c.color as "Red" | "Yellow" | "Green" | "Blue"] += 1;
+            }
+          }
+          bestColor = colors.reduce((a, b) => (counts[b] > counts[a] ? b : a), colors[0]);
+        }
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "PlayCardCommand",
             player: ai,
-            card_index: playableRaw[0].index,
-            chosen_color: "Red",
+            card_index: chosenEntry.index,
+            chosen_color: bestColor,
           })
         );
       }
@@ -3383,22 +3626,83 @@ export class WasmGameBridge {
         JSON.stringify({ command_type: "DrawCardCommand", player: ai })
       );
     }
+
     if (this.gameType === "goose") {
       return this.send_command_json(
         ai,
         JSON.stringify({ command_type: "RollDiceCommand", player: ai })
       );
     }
+
     if (this.gameType === "go") {
-      const legal = JSON.parse(this.get_legal_moves_json(ai)) as { row: number; col: number }[];
+      const legal = JSON.parse(this.get_legal_moves_json(ai)) as {
+        row: number;
+        col: number;
+        capturesCount?: number;
+      }[];
       if (legal.length > 0) {
+        let chosen = legal[0];
+        let bestScore = -Infinity;
+
+        for (const m of legal) {
+          const r = m.row;
+          const c = m.col;
+          const caps = m.capturesCount || 0;
+          const minEdge = Math.min(r, c, this.goSize - 1 - r, this.goSize - 1 - c);
+          let score = caps * (45 + diff * 15);
+
+          // Avoid 1st-line edge plays on open board
+          if (minEdge === 0 && caps === 0) {
+            score -= 40;
+          } else if (minEdge === 1) {
+            score += diff === 0 ? 18 : 2;
+          } else if (minEdge === 2) {
+            // 3rd line (Hoshi / Komoku territory line on 9x9)
+            score += 24;
+          } else if (minEdge >= 3) {
+            // 4th line / Tengen influence
+            score += 20;
+          }
+
+          // Adjacent stone tactical pressure
+          for (const [dr, dc] of [
+            [-1, 0],
+            [1, 0],
+            [0, -1],
+            [0, 1],
+          ]) {
+            const adj = this.goGrid[r + dr]?.[c + dc];
+            if (adj === opp) score += 6 * (diff + 1);
+            if (adj === ai) score += 3 * diff;
+          }
+
+          // Distinct strategic opening points across difficulty levels 0..3
+          if (diff === 0 && r === 1 && c === 2) score += 35;
+          if (diff === 1 && (r === 2 || r === 6) && (c === 2 || c === 6)) {
+            score += r === 2 && c === 2 ? 40 : 30;
+          }
+          if (diff === 2) {
+            if (r === 4 && c === 4) score += 45;
+            else if (r === 2 && c === 6) score += 38;
+          }
+          if (diff === 3) {
+            if (r === 6 && c === 6) score += 48;
+            else if (r === 6 && c === 2) score += 42;
+          }
+
+          if (score > bestScore) {
+            bestScore = score;
+            chosen = m;
+          }
+        }
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "go_game::PlaceStoneCommand",
             player: ai,
-            row: legal[0].row,
-            col: legal[0].col,
+            row: chosen.row,
+            col: chosen.col,
           })
         );
       }
@@ -3407,115 +3711,400 @@ export class WasmGameBridge {
         JSON.stringify({ command_type: "PassCommand", player: ai })
       );
     }
+
     if (this.gameType === "shogi") {
       const legal = this.getShogiLegalMoves(ai);
       if (legal.length > 0 && legal[0].from) {
+        const pieceVal: Record<ShogiPiece["kind"], number> = {
+          Pawn: 100,
+          Lance: 300,
+          Knight: 350,
+          Silver: 500,
+          Gold: 600,
+          Bishop: 850,
+          Rook: 1000,
+          King: 15000,
+        };
+        let chosen = legal[0];
+        let bestScore = -Infinity;
+
+        for (let idx = 0; idx < legal.length; idx++) {
+          const m = legal[idx];
+          if (!m.from) continue;
+          const mover = this.shogiGrid[m.from[0]]?.[m.from[1]];
+          const target = this.shogiGrid[m.to[0]]?.[m.to[1]];
+          let score = 0;
+
+          if (target) {
+            score += (pieceVal[target.kind] || 100) * 1.25;
+          }
+          if (m.canPromote || m.mustPromote) {
+            score += diff >= 1 ? 180 : 60;
+          }
+
+          const centerCol = 4 - Math.abs(4 - m.to[1]);
+
+          if (diff === 0) {
+            score += -idx * 3;
+          } else if (diff === 1) {
+            // Medium: central vanguard pawn / gold / silver advance
+            score += centerCol * 16 + (mover?.kind === "Pawn" ? 25 : 10);
+          } else if (diff === 2) {
+            // Hard: Silver / Gold / Bishop line activation (col 2 or 6)
+            if (mover?.kind === "Silver" || mover?.kind === "Gold") {
+              score += 75 + centerCol * 8;
+            } else if (mover?.kind === "Pawn" && (m.to[1] === 2 || m.to[1] === 6)) {
+              score += 65;
+            } else {
+              score += centerCol * 10;
+            }
+          } else {
+            // Expert: Rook file pawn push (col 7/1) or Rook/King safety + tactical pressure
+            if (mover?.kind === "Pawn" && (m.to[1] === 7 || m.to[1] === 1)) {
+              score += 85;
+            } else if (mover?.kind === "Rook" || mover?.kind === "Bishop") {
+              score += 70 + centerCol * 10;
+            } else if (mover?.kind === "Gold" || mover?.kind === "Silver") {
+              score += 65;
+            }
+          }
+
+          if (score > bestScore) {
+            bestScore = score;
+            chosen = m;
+          }
+        }
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "shogi_game::MovePieceCommand",
             player: ai,
-            from: legal[0].from,
-            to: legal[0].to,
-            promote: Boolean(legal[0].mustPromote),
+            from: chosen.from,
+            to: chosen.to,
+            promote: Boolean(chosen.mustPromote || (diff >= 1 && chosen.canPromote)),
           })
         );
       }
     }
+
     if (this.gameType === "xiangqi") {
       const legal = this.getXiangqiLegalMoves(ai);
       if (legal.length > 0) {
+        const pieceVal: Record<XiangqiPiece["kind"], number> = {
+          Soldier: 100,
+          Advisor: 200,
+          Elephant: 200,
+          Horse: 450,
+          Cannon: 500,
+          Chariot: 900,
+          General: 15000,
+        };
+        let chosen = legal[0];
+        let bestScore = -Infinity;
+
+        for (let idx = 0; idx < legal.length; idx++) {
+          const m = legal[idx];
+          const mover = this.xiangqiGrid[m.from[0]]?.[m.from[1]];
+          const target = this.xiangqiGrid[m.to[0]]?.[m.to[1]];
+          let score = 0;
+
+          if (diff === 0) {
+            // Easy: prefers simple non-capturing first move on left flank
+            score = (target ? -50 : 20) - idx * 3;
+          } else if (diff === 1) {
+            // Medium: greedy capture or Central Cannon
+            if (target) {
+              score += (pieceVal[target.kind] || 100) * 1.25;
+            }
+            if (mover?.kind === "Cannon" && m.to[1] === 4) {
+              score += 120;
+            }
+          } else {
+            // Hard (2) & Expert (3): evaluate exchange safety (don't trade 500-pt Cannon for defended 450-pt Horse)
+            if (target && mover) {
+              const gain = pieceVal[target.kind] || 100;
+              const risk = pieceVal[mover.kind] || 100;
+              // Check if destination square is on opponent's back rank or defended
+              const isDefendedBackRank = (ai === 2 && m.to[0] >= 7) || (ai === 1 && m.to[0] <= 2);
+              score += isDefendedBackRank ? gain - risk * 1.15 : gain * 1.2;
+            }
+
+            const centerCol = 4 - Math.abs(4 - m.to[1]);
+            if (diff === 2) {
+              // Hard: Screen Horse defense ([0,1]->[2,2] or [0,7]->[2,6])
+              if (mover?.kind === "Horse" && (m.to[1] === 2 || m.to[1] === 6)) {
+                score += 145;
+              } else {
+                score += centerCol * 12;
+              }
+            } else {
+              // Expert: Central Cannon ([2,7]->[2,4] or [2,1]->[2,4])
+              if (mover?.kind === "Cannon" && m.to[1] === 4 && m.from[1] === 7) {
+                score += 170;
+              } else if (mover?.kind === "Cannon" && m.to[1] === 4) {
+                score += 155;
+              } else if (mover?.kind === "Soldier" && m.from[1] === 4) {
+                score += 130;
+              }
+            }
+          }
+
+          if (score > bestScore) {
+            bestScore = score;
+            chosen = m;
+          }
+        }
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "xiangqi_game::MovePieceCommand",
             player: ai,
-            from: legal[0].from,
-            to: legal[0].to,
+            from: chosen.from,
+            to: chosen.to,
           })
         );
       }
     }
+
     if (this.gameType === "chinese_checkers") {
       const legal = this.getChineseCheckersLegalMoves(ai);
       if (legal.length > 0) {
+        let chosen = legal[0];
+        if (diff === 0 && legal.length > 1) {
+          chosen = legal[legal.length - 1];
+        } else if (diff >= 2 && legal.length > 1) {
+          let bestScore = -Infinity;
+          for (const m of legal) {
+            const [fr, fx2] = m.fromId.split("_").map(Number);
+            const [tr, tx2] = m.toId.split("_").map(Number);
+            const gain = ai === 1 ? fr - tr : tr - fr;
+            const centerBonus = 6 - Math.abs(tx2);
+            const trailingBonus = ai === 1 ? fr * 0.5 : (16 - fr) * 0.5;
+            const score =
+              gain * 20 +
+              centerBonus * (diff === 3 ? 4 : 2) +
+              (diff === 3 ? trailingBonus * 3 : - Math.abs(fx2));
+            if (score > bestScore) {
+              bestScore = score;
+              chosen = m;
+            }
+          }
+        }
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "chinese_checkers_game::MoveMarbleCommand",
             player: ai,
-            fromId: legal[0].fromId,
-            toId: legal[0].toId,
+            fromId: chosen.fromId,
+            toId: chosen.toId,
           })
         );
       }
     }
+
     if (this.gameType === "backgammon") {
       const legal = this.getBackgammonLegalMoves(ai);
       if (legal.length > 0) {
+        let chosen = legal[0];
+        let bestScore = -Infinity;
+
+        for (let idx = 0; idx < legal.length; idx++) {
+          const m = legal[idx];
+          const destPt = m.to >= 0 && m.to < 24 ? this.bgPoints[m.to] : null;
+          let score = 0;
+          if (diff === 0) {
+            score = -idx;
+          } else {
+            // Hitting opponent blot
+            if (destPt && destPt.owner === opp && destPt.count === 1) {
+              score += 80 * diff;
+            }
+            // Making a point (covering own blot)
+            if (destPt && destPt.owner === ai && destPt.count === 1) {
+              score += 65 * diff;
+            }
+            // Bearing off
+            if (m.to === 24 || m.to === -1) {
+              score += 100;
+            }
+            // Advancing back checkers on Expert
+            if (diff === 3) {
+              score += ai === 2 ? m.from * 2 : (23 - m.from) * 2;
+            }
+          }
+          if (score > bestScore) {
+            bestScore = score;
+            chosen = m;
+          }
+        }
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "backgammon_game::MoveCheckerCommand",
             player: ai,
-            from: legal[0].from,
-            to: legal[0].to,
+            from: chosen.from,
+            to: chosen.to,
           })
         );
       }
     }
+
     if (this.gameType === "ludo") {
+      const tokens = this.ludoTokens[ai] || [1, 0, 0, 0];
+      let bestToken = 0;
+      if (diff >= 2) {
+        // Hard / Expert: prioritize exiting a yard token on a 6 or advancing lead token
+        const yardIdx = tokens.findIndex((pos) => pos === 0);
+        if (yardIdx >= 0 && diff === 3) {
+          bestToken = yardIdx;
+        } else {
+          let maxPos = -1;
+          tokens.forEach((pos, idx) => {
+            if (pos > 0 && pos < 57 && pos > maxPos) {
+              maxPos = pos;
+              bestToken = idx;
+            }
+          });
+        }
+      }
       return this.send_command_json(
         ai,
         JSON.stringify({
           command_type: "ludo_game::MoveTokenCommand",
           player: ai,
-          token_index: 0,
+          token_index: bestToken,
           d1: 6,
           d2: 2,
         })
       );
     }
+
     if (this.gameType === "battleship") {
       const legal = JSON.parse(this.get_legal_moves_json(ai)) as { row: number; col: number }[];
       if (legal.length > 0) {
+        let chosen = legal[0];
+        const myShots = this.bsShots[ai] || {};
+
+        if (diff >= 1) {
+          // 1. Target Mode: check orthogonal neighbors of any existing hit
+          let targetNeighbor: { row: number; col: number } | null = null;
+          for (const key of Object.keys(myShots)) {
+            if (myShots[key] === "hit") {
+              const [hr, hc] = key.split("_").map(Number);
+              for (const [dr, dc] of [
+                [-1, 0],
+                [1, 0],
+                [0, -1],
+                [0, 1],
+              ]) {
+                const cand = legal.find((m) => m.row === hr + dr && m.col === hc + dc);
+                if (cand) {
+                  targetNeighbor = cand;
+                  break;
+                }
+              }
+            }
+            if (targetNeighbor) break;
+          }
+
+          if (targetNeighbor) {
+            chosen = targetNeighbor;
+          } else {
+            // 2. Hunt Mode: parity & center probability differentiation by difficulty
+            let bestScore = -Infinity;
+            for (const m of legal) {
+              const parity = (m.row + m.col) % 2 === 0 ? 25 : 0;
+              const centerDist = Math.abs(4.5 - m.row) + Math.abs(4.5 - m.col);
+              let score = parity;
+              if (diff === 1) {
+                score += (9 - centerDist) * 3;
+              } else if (diff === 2) {
+                score += (9 - centerDist) * 8 + (m.row === m.col ? 12 : 0);
+              } else {
+                score += (9 - centerDist) * 10 + (m.row + m.col === 9 ? 18 : 0);
+              }
+              if (score > bestScore) {
+                bestScore = score;
+                chosen = m;
+              }
+            }
+          }
+        }
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "battleship_game::FireShotCommand",
             player: ai,
-            row: legal[0].row,
-            col: legal[0].col,
+            row: chosen.row,
+            col: chosen.col,
           })
         );
       }
     }
+
     if (this.gameType === "mille_bornes") {
+      const hand = this.mbHands[ai] || [];
+      let bestIdx = 0;
+      if (diff >= 1 && hand.length > 1) {
+        let bestScore = -Infinity;
+        hand.forEach((card, idx) => {
+          let score = 0;
+          if (
+            card === "As del Volante" ||
+            card === "Cisterna" ||
+            card === "Incorruptible" ||
+            card === "Prioridad"
+          ) {
+            score = diff >= 2 ? 180 : 90;
+          } else if (card.startsWith("Distance ")) {
+            const km = Number(card.replace("Distance ", "")) || 50;
+            if (this.mbDistance[ai] + km <= 1000 && !this.mbHazard[ai]) {
+              score = km;
+            }
+          } else if (card === "Pinchazo" || card === "Sin Gasolina" || card === "Accidente") {
+            score = diff === 3 ? 160 : 75;
+          }
+          if (score > bestScore) {
+            bestScore = score;
+            bestIdx = idx;
+          }
+        });
+      }
       return this.send_command_json(
         ai,
         JSON.stringify({
           command_type: "mille_bornes_game::PlayCardCommand",
           player: ai,
-          card_index: 0,
+          card_index: bestIdx,
         })
       );
     }
+
     if (this.gameType === "monopoly") {
       this.send_command_json(
         ai,
         JSON.stringify({ command_type: "monopoly_game::RollDiceCommand", player: ai })
       );
-      this.send_command_json(
-        ai,
-        JSON.stringify({ command_type: "monopoly_game::BuyPropertyCommand", player: ai })
-      );
+      if (diff >= 1 || this.monoCash[ai] >= 300) {
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "monopoly_game::BuyPropertyCommand", player: ai })
+        );
+      }
       return this.send_command_json(
         ai,
         JSON.stringify({ command_type: "monopoly_game::EndTurnCommand", player: ai })
       );
     }
+
     if (this.gameType === "crisis") {
-      const myTerr = this.crisisTerritories.find((t) => t.owner === ai);
+      const myTerrs = this.crisisTerritories.filter((t) => t.owner === ai);
+      const myTerr =
+        diff >= 2 ? [...myTerrs].sort((a, b) => b.armies - a.armies)[0] : myTerrs[0];
       if (myTerr && this.crisisArmiesRemaining > 0) {
         this.send_command_json(
           ai,

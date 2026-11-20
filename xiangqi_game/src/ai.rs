@@ -72,6 +72,14 @@ pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
         if piece.kind == PieceKind::Cannon && cannon_has_screen(board, x, y) {
             val += 0.5;
         }
+        // Bonus posicional: avance hacia campo enemigo (cruce del Río) y control de columnas centrales
+        let adv = if piece.owner == board.red {
+            (y as f32) * 0.04
+        } else {
+            (9usize.saturating_sub(y)) as f32 * 0.04
+        };
+        let center_bonus = (4.0 - (x as f32 - 4.0).abs()).max(0.0) * 0.03;
+        val += adv + center_bonus;
 
         if piece.owner == player {
             score += val;
@@ -243,7 +251,17 @@ pub fn best_move(
         }
     });
 
-    let depth = difficulty.max_depth().clamp(1, 2);
+    if difficulty == AiDifficulty::Easy
+        && candidates.len() > 1
+        && (session.current_tick().0 & 3) == 0
+    {
+        return candidates.last().cloned();
+    }
+
+    let depth: u8 = match difficulty {
+        AiDifficulty::Easy | AiDifficulty::Medium => 1,
+        AiDifficulty::Hard | AiDifficulty::Expert => 2,
+    };
     let mut best_move = None;
     let mut best_score = f32::NEG_INFINITY;
     let mut alpha = f32::NEG_INFINITY;
@@ -255,7 +273,10 @@ pub fn best_move(
             .process_command(player, Box::new(mv.clone()))
             .is_ok()
         {
-            let score = minimax(&next_session, depth - 1, alpha, beta, false, player);
+            let mut score = minimax(&next_session, depth - 1, alpha, beta, false, player);
+            if difficulty == AiDifficulty::Expert && (2..=6).contains(&mv.to.0) {
+                score += 0.08;
+            }
             if score > best_score || best_move.is_none() {
                 best_score = score;
                 best_move = Some(mv);

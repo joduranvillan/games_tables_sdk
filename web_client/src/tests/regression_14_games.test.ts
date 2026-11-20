@@ -372,6 +372,54 @@ async function runRegression14Games() {
   assert(qr.includes("<svg") && qr.includes("</svg>"), "Generador QR debe producir SVG válido");
   relayClient.disconnect();
 
+  // D. Verificación E2E de niveles de dificultad de IA (0=Easy, 1=Medium, 2=Hard, 3=Expert)
+  for (const item of CATALOG_14_GAMES) {
+    for (const diff of [0, 1, 2, 3]) {
+      const diffBridge = new WasmGameBridge();
+      assert(
+        diffBridge.start_ai_match(item.id, 1, 2, diff),
+        `start_ai_match(${item.id}, 1, 2, ${diff}) debe inicializar correctamente`
+      );
+      assert(
+        diffBridge.get_ai_difficulty() === diff,
+        `get_ai_difficulty() en '${item.id}' debe devolver ${diff}, obtenido: ${diffBridge.get_ai_difficulty()}`
+      );
+    }
+  }
+
+  // Verificar diferenciación táctica real por nivel en Chess, Go, Shogi, Xiangqi y Checkers
+  const strategicGames = ["chess", "go", "shogi", "xiangqi", "checkers"] as const;
+  for (const gId of strategicGames) {
+    const postAiStates = new Set<string>();
+    for (const diff of [0, 1, 2, 3]) {
+      const b = new WasmGameBridge();
+      b.start_ai_match(gId, 1, 2, diff);
+      b.send_command_json(1, JSON.stringify(SAMPLE_FIRST_COMMANDS[gId]));
+      const aiEvents = JSON.parse(b.step_ai_if_needed());
+      assert(
+        Array.isArray(aiEvents) && aiEvents.length > 0,
+        `step_ai_if_needed() en '${gId}' (dificultad ${diff}) debe ejecutar una jugada válida`
+      );
+      const stateAfter = b.get_state_json();
+      postAiStates.add(stateAfter);
+
+      if (gId === "go") {
+        const parsedGo = JSON.parse(stateAfter);
+        assert(
+          parsedGo.grid[0][0] === 0,
+          `Go IA (dificultad ${diff}) no debe jugar estáticamente en la esquina 1ra línea (0,0) en apertura`
+        );
+      }
+    }
+    assert(
+      postAiStates.size >= 3,
+      `La IA de '${gId}' debe diferenciar sus jugadas entre los 4 niveles de dificultad (estados distintos: ${postAiStates.size})`
+    );
+  }
+  console.log(
+    "  [PASS] Niveles de dificultad de IA (0..3) y diferenciación táctica verificados en Chess, Go, Shogi, Xiangqi, Checkers y catálogo de 14 juegos"
+  );
+
   console.log("=== SUITE DE REGRESIÓN DE LOS 14 JUEGOS COMPLETADA CON 0 ERRORES ===");
 }
 

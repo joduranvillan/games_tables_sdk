@@ -143,6 +143,13 @@ export function runSingleGameSelfTest(gameId: string): GameDiagnosticResult {
       exportedLog
     );
 
+    // Verify end-to-end AI difficulty propagation (0=Easy, 1=Medium, 2=Hard, 3=Expert)
+    const aiDifficultyVerified = [0, 1, 2, 3].every((lvl) => {
+      const diffBridge = new WasmGameBridge();
+      const ok = diffBridge.start_ai_match(meta.id, 1, 2, lvl);
+      return ok && diffBridge.get_ai_difficulty() === lvl;
+    });
+
     const durationMs = Math.max(
       0.1,
       Number((performance.now() - t0).toFixed(2))
@@ -151,7 +158,8 @@ export function runSingleGameSelfTest(gameId: string): GameDiagnosticResult {
       initialTurn === 1 &&
       legalMovesCount > 0 &&
       humanMoveDispatched &&
-      syncLogVerified;
+      syncLogVerified &&
+      aiDifficultyVerified;
 
     return {
       gameId: meta.id,
@@ -166,8 +174,8 @@ export function runSingleGameSelfTest(gameId: string): GameDiagnosticResult {
       durationMs,
       status: passed ? "PASS" : "FAIL",
       detail: passed
-        ? `Motor OK · ${legalMovesCount} jugadas iniciales · SyncLog verificado`
-        : "Fallo en validación de contrato de estado o jugadas legales",
+        ? `Motor OK · ${legalMovesCount} jugadas iniciales · IA 4 niveles (0..3) + SyncLog verificados`
+        : "Fallo en validación de contrato de estado, dificultad IA o jugadas legales",
     };
   } catch (err) {
     return {
