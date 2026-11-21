@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { WasmGameBridge } from "../../wasm_pkg";
+import { AiMoveTelemetry, WasmGameBridge } from "../../wasm_pkg";
 
 export type MoveQualityClassification =
   | "optima"
@@ -10,6 +10,31 @@ export type MoveQualityClassification =
 export interface LoggedCommandItem {
   player: number;
   command: string;
+}
+
+export interface BoardZoneHeatCell {
+  zoneId: string;
+  label: string;
+  shortCoord: string;
+  row: number;
+  col: number;
+  candidateCount: number;
+  topKShareEstimate: number;
+  intensityPct: number;
+  hasPlayedMove: boolean;
+  hasOptimalMove: boolean;
+}
+
+export interface DecisionIntensityHeatMap {
+  gameId: string;
+  topologyLabel: string;
+  rows: number;
+  cols: number;
+  totalCandidates: number;
+  peakZoneLabel: string;
+  peakIntensityPct: number;
+  entropyScore: number;
+  cells: BoardZoneHeatCell[];
 }
 
 export interface MoveEvaluationEntry {
@@ -24,6 +49,9 @@ export interface MoveEvaluationEntry {
   classification: MoveQualityClassification;
   summaryText: string;
   bestMoveSummaryText: string;
+  aiTelemetry: AiMoveTelemetry | null;
+  legalCandidatesCount: number;
+  zoneHeatMap: DecisionIntensityHeatMap;
 }
 
 export interface MatchAnalysisReport {
@@ -36,6 +64,775 @@ export interface MatchAnalysisReport {
   entries: MoveEvaluationEntry[];
   evalTimelineP1: number[];
   criticalTurningPoints: number[];
+  cumulativeHeatMap: DecisionIntensityHeatMap;
+}
+
+interface ZoneSpec {
+  zoneId: string;
+  label: string;
+  shortCoord: string;
+  row: number;
+  col: number;
+}
+
+interface GameZoneTopology {
+  topologyLabel: string;
+  rows: number;
+  cols: number;
+  zones: ZoneSpec[];
+}
+
+function getGameZoneTopology(gameId: string): GameZoneTopology {
+  const clean = gameId.trim().toLowerCase().replace(/-/g, "_");
+  switch (clean) {
+    case "chess":
+    case "checkers": {
+      const rowLabels = ["Filas 8-7 (Norte)", "Filas 6-5 (Centro-N)", "Filas 4-3 (Centro-S)", "Filas 2-1 (Sur)"];
+      const colLabels = ["Cols A-B", "Cols C-D", "Cols E-F", "Cols G-H"];
+      const shortCols = ["A-B", "C-D", "E-F", "G-H"];
+      const shortRows = ["8-7", "6-5", "4-3", "2-1"];
+      const zones: ZoneSpec[] = [];
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+          zones.push({
+            zoneId: `z_${r}_${c}`,
+            label: `${colLabels[c]} · ${rowLabels[r]}`,
+            shortCoord: `${shortCols[c]} / ${shortRows[r]}`,
+            row: r,
+            col: c,
+          });
+        }
+      }
+      return {
+        topologyLabel:
+          clean === "chess"
+            ? "Cuadrícula Táctica FIDE 4×4 (16 Subzonas de Tablero 8×8)"
+            : "Cuadrícula de Diagonales 4×4 (16 Subzonas de Tablero 8×8)",
+        rows: 4,
+        cols: 4,
+        zones,
+      };
+    }
+
+    case "go": {
+      const specs: [string, string][] = [
+        ["Hoshi Sup-Izq (NO)", "A-C / 1-3"],
+        ["Borde Superior (N)", "D-F / 1-3"],
+        ["Hoshi Sup-Der (NE)", "G-J / 1-3"],
+        ["Borde Izquierdo (O)", "A-C / 4-6"],
+        ["Tengen Central (Centro)", "D-F / 4-6"],
+        ["Borde Derecho (E)", "G-J / 4-6"],
+        ["Hoshi Inf-Izq (SO)", "A-C / 7-9"],
+        ["Borde Inferior (S)", "D-F / 7-9"],
+        ["Hoshi Inf-Der (SE)", "G-J / 7-9"],
+      ];
+      return {
+        topologyLabel: "Sectores del Goban 3×3 (9 Territorios Hoshi/Tengen)",
+        rows: 3,
+        cols: 3,
+        zones: specs.map(([label, shortCoord], idx) => ({
+          zoneId: `z_${Math.floor(idx / 3)}_${idx % 3}`,
+          label,
+          shortCoord,
+          row: Math.floor(idx / 3),
+          col: idx % 3,
+        })),
+      };
+    }
+
+    case "shogi": {
+      const specs: [string, string][] = [
+        ["Promoción Flanco Izq", "Cols 9-7 / Filas 1-3"],
+        ["Promoción Palacio Gote", "Cols 6-4 / Filas 1-3"],
+        ["Promoción Flanco Der", "Cols 3-1 / Filas 1-3"],
+        ["Centro Izquierdo", "Cols 9-7 / Filas 4-6"],
+        ["Vanguardia Central + Komadai", "Cols 6-4 / Filas 4-6"],
+        ["Centro Derecho", "Cols 3-1 / Filas 4-6"],
+        ["Campo Sente Izq", "Cols 9-7 / Filas 7-9"],
+        ["Castillo Sente Central", "Cols 6-4 / Filas 7-9"],
+        ["Campo Sente Der", "Cols 3-1 / Filas 7-9"],
+      ];
+      return {
+        topologyLabel: "Sectores FESA 3×3 (9 Zonas de Tablero 9×9 y Komadai)",
+        rows: 3,
+        cols: 3,
+        zones: specs.map(([label, shortCoord], idx) => ({
+          zoneId: `z_${Math.floor(idx / 3)}_${idx % 3}`,
+          label,
+          shortCoord,
+          row: Math.floor(idx / 3),
+          col: idx % 3,
+        })),
+      };
+    }
+
+    case "xiangqi": {
+      const specs: [string, string][] = [
+        ["Flanco Norte Izq", "Cols 1-3 / Filas 0-3"],
+        ["Palacio Negro (Norte)", "Cols 4-6 / Filas 0-2"],
+        ["Flanco Norte Der", "Cols 7-9 / Filas 0-3"],
+        ["Ribera Oeste (Río)", "Cols 1-3 / Filas 4-5"],
+        ["Cruce Central Chu-He", "Cols 4-6 / Filas 4-5"],
+        ["Ribera Este (Río)", "Cols 7-9 / Filas 4-5"],
+        ["Flanco Sur Izq", "Cols 1-3 / Filas 6-9"],
+        ["Palacio Rojo (Sur)", "Cols 4-6 / Filas 7-9"],
+        ["Flanco Sur Der", "Cols 7-9 / Filas 6-9"],
+      ];
+      return {
+        topologyLabel: "Sectores Xiangqi 3×3 (Palacios 3×3, Río y Flancos)",
+        rows: 3,
+        cols: 3,
+        zones: specs.map(([label, shortCoord], idx) => ({
+          zoneId: `z_${Math.floor(idx / 3)}_${idx % 3}`,
+          label,
+          shortCoord,
+          row: Math.floor(idx / 3),
+          col: idx % 3,
+        })),
+      };
+    }
+
+    case "battleship": {
+      const zones: ZoneSpec[] = [];
+      const rowPairs = ["A-B", "C-D", "E-F", "G-H", "I-J"];
+      const colPairs = ["1-2", "3-4", "5-6", "7-8", "9-10"];
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+          zones.push({
+            zoneId: `z_${r}_${c}`,
+            label: `Sector Radar ${rowPairs[r]} · Cols ${colPairs[c]}`,
+            shortCoord: `${rowPairs[r]}:${colPairs[c]}`,
+            row: r,
+            col: c,
+          });
+        }
+      }
+      return {
+        topologyLabel: "Radar Naval 5×5 (25 Sectores Tácticos de Cuadrícula 10×10)",
+        rows: 5,
+        cols: 5,
+        zones,
+      };
+    }
+
+    case "chinese_checkers": {
+      const specs: [string, string][] = [
+        ["Ala Noroeste", "Filas 0-5 / Izq"],
+        ["Punta Norte (Meta J1)", "Filas 0-4 / Centro"],
+        ["Ala Noreste", "Filas 0-5 / Der"],
+        ["Flanco Hexagonal Oeste", "Filas 6-10 / Izq"],
+        ["Hexágono Central (Puente)", "Filas 6-10 / Centro"],
+        ["Flanco Hexagonal Este", "Filas 6-10 / Der"],
+        ["Ala Suroeste", "Filas 11-16 / Izq"],
+        ["Punta Sur (Meta J2)", "Filas 12-16 / Centro"],
+        ["Ala Sureste", "Filas 11-16 / Der"],
+      ];
+      return {
+        topologyLabel: "Estrella Hexagonal 3×3 (9 Regiones de las 121 Casillas)",
+        rows: 3,
+        cols: 3,
+        zones: specs.map(([label, shortCoord], idx) => ({
+          zoneId: `z_${Math.floor(idx / 3)}_${idx % 3}`,
+          label,
+          shortCoord,
+          row: Math.floor(idx / 3),
+          col: idx % 3,
+        })),
+      };
+    }
+
+    case "backgammon": {
+      const specs: [string, string][] = [
+        ["Casa J2 (Picos 1-6)", "Pts 0..5"],
+        ["Exterior J2 (Picos 7-12)", "Pts 6..11"],
+        ["Barra Central (Reingreso)", "Bar -1"],
+        ["Exterior J1 (Picos 13-18)", "Pts 12..17"],
+        ["Casa J1 (Picos 19-24)", "Pts 18..23"],
+        ["Bear-Off & Cubo Doblaje", "Meta 24 / Cubo"],
+      ];
+      return {
+        topologyLabel: "Cuadrantes de Backgammon 2×3 (24 Picos + Barra + Bear-Off)",
+        rows: 2,
+        cols: 3,
+        zones: specs.map(([label, shortCoord], idx) => ({
+          zoneId: `z_${Math.floor(idx / 3)}_${idx % 3}`,
+          label,
+          shortCoord,
+          row: Math.floor(idx / 3),
+          col: idx % 3,
+        })),
+      };
+    }
+
+    case "ludo":
+    case "goose": {
+      const isGoose = clean === "goose";
+      const specs: [string, string][] = isGoose
+        ? [
+            ["Salida y Puente (0-8)", "Casillas 0-8"],
+            ["Tramo Posada (9-18)", "Casillas 9-18"],
+            ["Tramo Dados (19-27)", "Casillas 19-27"],
+            ["Tramo Pozo (28-36)", "Casillas 28-36"],
+            ["Tramo Laberinto (37-45)", "Casillas 37-45"],
+            ["Tramo Cárcel (46-54)", "Casillas 46-54"],
+            ["Tramo Calavera (55-59)", "Casillas 55-59"],
+            ["Jardín de la Oca (60-63)", "Meta 60-63"],
+          ]
+        : [
+            ["Base y Salida (0-6)", "Casillas 0-6"],
+            ["Cuadrante Rojo (7-14)", "Casillas 7-14"],
+            ["Cuadrante Verde (15-27)", "Casillas 15-27"],
+            ["Cuadrante Amarillo (28-40)", "Casillas 28-40"],
+            ["Cuadrante Azul (41-51)", "Casillas 41-51"],
+            ["Estrellas Seguras", "8 Estrellas"],
+            ["Pasillo de Color (52-56)", "Recta 52-56"],
+            ["Triángulo Meta (57)", "Meta Exacta"],
+          ];
+      return {
+        topologyLabel: isGoose
+          ? "Espiral de la Oca 2×4 (8 Tramos de las 63 Casillas)"
+          : "Circuito Ludo 2×4 (8 Sectores de 52 Casillas + Meta)",
+        rows: 2,
+        cols: 4,
+        zones: specs.map(([label, shortCoord], idx) => ({
+          zoneId: `z_${Math.floor(idx / 4)}_${idx % 4}`,
+          label,
+          shortCoord,
+          row: Math.floor(idx / 4),
+          col: idx % 4,
+        })),
+      };
+    }
+
+    case "monopoly": {
+      const specs: [string, string][] = [
+        ["Lado Sur (Marrón / Celeste)", "Casillas 0-9"],
+        ["Cárcel y Lado Oeste (Rosa)", "Casillas 10-14"],
+        ["Lado Oeste (Naranja)", "Casillas 15-19"],
+        ["Lado Norte (Rojo)", "Casillas 20-24"],
+        ["Lado Norte (Amarillo)", "Casillas 25-29"],
+        ["Lado Este (Verde)", "Casillas 30-34"],
+        ["Lado Este (Azul Oscuro)", "Casillas 35-39"],
+        ["Edificación y Liquidez", "Casas / Reserva"],
+      ];
+      return {
+        topologyLabel: "Sectores Económicos Monopoly 2×4 (40 Propiedades y Desarrollo)",
+        rows: 2,
+        cols: 4,
+        zones: specs.map(([label, shortCoord], idx) => ({
+          zoneId: `z_${Math.floor(idx / 4)}_${idx % 4}`,
+          label,
+          shortCoord,
+          row: Math.floor(idx / 4),
+          col: idx % 4,
+        })),
+      };
+    }
+
+    case "uno":
+    case "mille_bornes": {
+      const isUno = clean === "uno";
+      const specs: [string, string][] = isUno
+        ? [
+            ["Zona Color Rojo", "Cartas Rojas"],
+            ["Zona Color Amarillo", "Cartas Amarillas"],
+            ["Zona Color Verde", "Cartas Verdes"],
+            ["Zona Color Azul", "Cartas Azules"],
+            ["Acción (+2 / Skip / Rev)", "Tácticas"],
+            ["Comodines & Mazo (Wild/+4)", "Wild / Robar"],
+          ]
+        : [
+            ["Velocidad Corta (25-75 km)", "Ritmo Base"],
+            ["Velocidad Alta (100-200 km)", "Crucero"],
+            ["Escudos Safeties (Coup Fourré)", "4 Escudos"],
+            ["Remedios y Luz Verde", "Reparación"],
+            ["Ataques (Hazards)", "Pinchazo/Accidente"],
+            ["Descarte y Robo Táctico", "Gestión Mano"],
+          ];
+      return {
+        topologyLabel: isUno
+          ? "Matriz Táctica UNO 2×3 (Colores, Acciones y Comodines)"
+          : "Matriz de Ruta Mil Millas 2×3 (Distancias, Safeties y Hazards)",
+        rows: 2,
+        cols: 3,
+        zones: specs.map(([label, shortCoord], idx) => ({
+          zoneId: `z_${Math.floor(idx / 3)}_${idx % 3}`,
+          label,
+          shortCoord,
+          row: Math.floor(idx / 3),
+          col: idx % 3,
+        })),
+      };
+    }
+
+    case "crisis":
+    default: {
+      const specs: [string, string][] = [
+        ["América del Norte", "Territorios 0-5"],
+        ["Europa", "Territorios 10-14"],
+        ["Asia", "Territorios 19-25"],
+        ["América del Sur", "Territorios 6-9"],
+        ["África", "Territorios 15-18"],
+        ["Oceanía y Reserva", "Territorios 26-29"],
+      ];
+      return {
+        topologyLabel: "Teatros Continentales Crisis/TEG 2×3 (6 Continentes y 30 Territorios)",
+        rows: 2,
+        cols: 3,
+        zones: specs.map(([label, shortCoord], idx) => ({
+          zoneId: `z_${Math.floor(idx / 3)}_${idx % 3}`,
+          label,
+          shortCoord,
+          row: Math.floor(idx / 3),
+          col: idx % 3,
+        })),
+      };
+    }
+  }
+}
+
+function mapCandidateToZoneIndex(
+  gameId: string,
+  candidateObj: Record<string, unknown>,
+  stateObj: Record<string, unknown>
+): number {
+  const clean = gameId.trim().toLowerCase().replace(/-/g, "_");
+  switch (clean) {
+    case "chess":
+    case "checkers": {
+      const to = Array.isArray(candidateObj.to)
+        ? candidateObj.to
+        : Array.isArray(candidateObj.from)
+        ? candidateObj.from
+        : [3, 3];
+      const zr = Math.max(0, Math.min(3, Math.floor(Number(to[0] ?? 0) / 2)));
+      const zc = Math.max(0, Math.min(3, Math.floor(Number(to[1] ?? 0) / 2)));
+      return zr * 4 + zc;
+    }
+
+    case "go": {
+      if (
+        String(candidateObj.command_type || "").includes("Pass") &&
+        candidateObj.row === undefined
+      ) {
+        return 4;
+      }
+      const r = Number(candidateObj.row ?? 4);
+      const c = Number(candidateObj.col ?? 4);
+      const zr = Math.max(0, Math.min(2, Math.floor(r / 3)));
+      const zc = Math.max(0, Math.min(2, Math.floor(c / 3)));
+      return zr * 3 + zc;
+    }
+
+    case "shogi": {
+      const to = Array.isArray(candidateObj.to) ? candidateObj.to : [4, 4];
+      const zr = Math.max(0, Math.min(2, Math.floor(Number(to[0] ?? 4) / 3)));
+      const zc = Math.max(0, Math.min(2, Math.floor(Number(to[1] ?? 4) / 3)));
+      return zr * 3 + zc;
+    }
+
+    case "xiangqi": {
+      const to = Array.isArray(candidateObj.to) ? candidateObj.to : [4, 4];
+      const tr = Number(to[0] ?? 4);
+      const tc = Number(to[1] ?? 4);
+      const zr = tr <= 3 ? 0 : tr <= 5 ? 1 : 2;
+      const zc = Math.max(0, Math.min(2, Math.floor(tc / 3)));
+      return zr * 3 + zc;
+    }
+
+    case "battleship": {
+      const r = Number(candidateObj.row ?? 0);
+      const c = Number(candidateObj.col ?? 0);
+      const zr = Math.max(0, Math.min(4, Math.floor(r / 2)));
+      const zc = Math.max(0, Math.min(4, Math.floor(c / 2)));
+      return zr * 5 + zc;
+    }
+
+    case "chinese_checkers": {
+      const toId = String(candidateObj.toId || candidateObj.to_id || "8_0");
+      const [rStr, x2Str] = toId.split("_");
+      const r = Number(rStr ?? 8);
+      const x2 = Number(x2Str ?? 0);
+      const zr = r <= 5 ? 0 : r <= 10 ? 1 : 2;
+      const zc = x2 < -2 ? 0 : x2 > 2 ? 2 : 1;
+      return zr * 3 + zc;
+    }
+
+    case "backgammon": {
+      const rawType = String(candidateObj.command_type || "");
+      if (rawType.includes("Double")) return 5;
+      const from = Number(candidateObj.from ?? 0);
+      const to = Number(candidateObj.to ?? 0);
+      if (from === -1) return 2;
+      if (to === 24 || to === -1) return 5;
+      if (to >= 0 && to <= 5) return 0;
+      if (to >= 6 && to <= 11) return 1;
+      if (to >= 12 && to <= 17) return 3;
+      return 4;
+    }
+
+    case "goose": {
+      const p = Number(candidateObj.player || stateObj.turn || 1) as 1 | 2;
+      const players = stateObj.players as Record<string, { square?: number }> | undefined;
+      const curSq = Number(players?.[p]?.square ?? 0);
+      const d1 = Number(candidateObj.d1 ?? 3);
+      const d2 = Number(candidateObj.d2 ?? 4);
+      const targetSq = Math.min(63, curSq + d1 + d2);
+      if (targetSq <= 8) return 0;
+      if (targetSq <= 18) return 1;
+      if (targetSq <= 27) return 2;
+      if (targetSq <= 36) return 3;
+      if (targetSq <= 45) return 4;
+      if (targetSq <= 54) return 5;
+      if (targetSq <= 59) return 6;
+      return 7;
+    }
+
+    case "ludo": {
+      const p = Number(candidateObj.player || stateObj.turn || 1) as 1 | 2;
+      const tokenIdx = Number(candidateObj.token_index ?? 0);
+      const tokensMap = stateObj.tokens as Record<string, number[]> | undefined;
+      const curPos = Number(tokensMap?.[p]?.[tokenIdx] ?? 0);
+      const step = Number(candidateObj.steps ?? candidateObj.d1 ?? 6);
+      const nextPos = curPos === 0 ? 1 : Math.min(57, curPos + step);
+      const safeStars = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
+      if (nextPos === 57) return 7;
+      if (nextPos >= 52) return 6;
+      if (safeStars.has(nextPos)) return 5;
+      if (nextPos <= 6) return 0;
+      if (nextPos <= 14) return 1;
+      if (nextPos <= 27) return 2;
+      if (nextPos <= 40) return 3;
+      return 4;
+    }
+
+    case "monopoly": {
+      const rawType = String(candidateObj.command_type || "");
+      if (rawType.includes("BuildHouse") || rawType.includes("PayJailFine")) {
+        return 7;
+      }
+      const p = Number(candidateObj.player || stateObj.turn || 1) as 1 | 2;
+      const posMap = stateObj.pos as Record<string, number> | undefined;
+      const spaceIdx =
+        candidateObj.space !== undefined
+          ? Number(candidateObj.space)
+          : Number(posMap?.[p] ?? 0);
+      if (spaceIdx <= 9) return 0;
+      if (spaceIdx <= 14) return 1;
+      if (spaceIdx <= 19) return 2;
+      if (spaceIdx <= 24) return 3;
+      if (spaceIdx <= 29) return 4;
+      if (spaceIdx <= 34) return 5;
+      return 6;
+    }
+
+    case "uno": {
+      const rawType = String(candidateObj.command_type || "");
+      if (rawType.includes("DrawCard")) return 5;
+      const cardObj = candidateObj.card as
+        | { color?: string; value?: string }
+        | undefined;
+      let color = cardObj?.color;
+      let val = cardObj?.value;
+      if (!color && candidateObj.card_index !== undefined) {
+        const p = Number(candidateObj.player || stateObj.turn || 1);
+        const hands = stateObj.hands as
+          | Record<string, { color?: string; value?: string }[]>
+          | undefined;
+        const fromHand = hands?.[p]?.[Number(candidateObj.card_index)];
+        color = fromHand?.color;
+        val = fromHand?.value;
+      }
+      if (color === "Wild" || val === "Wild" || val === "WildDrawFour") return 5;
+      if (val === "Skip" || val === "Reverse" || val === "DrawTwo") return 4;
+      if (color === "Red") return 0;
+      if (color === "Yellow") return 1;
+      if (color === "Green") return 2;
+      if (color === "Blue") return 3;
+      return 0;
+    }
+
+    case "mille_bornes": {
+      let cardName = typeof candidateObj.card === "string" ? candidateObj.card : "";
+      if (!cardName && candidateObj.card_index !== undefined) {
+        const p = Number(candidateObj.player || stateObj.turn || 1);
+        const hands = stateObj.hands as Record<string, string[]> | undefined;
+        cardName = hands?.[p]?.[Number(candidateObj.card_index)] || "";
+      }
+      if (
+        cardName.includes("25") ||
+        cardName.includes("50") ||
+        cardName.includes("75")
+      ) {
+        return 0;
+      }
+      if (cardName.includes("100") || cardName.includes("200")) {
+        return 1;
+      }
+      if (
+        cardName === "As del Volante" ||
+        cardName === "Cisterna" ||
+        cardName === "Impinchable" ||
+        cardName === "Prioridad" ||
+        cardName === "Incorruptible"
+      ) {
+        return 2;
+      }
+      if (
+        cardName === "Reparaciones" ||
+        cardName === "Gasolina" ||
+        cardName === "Rueda de Auxilio" ||
+        cardName === "Luz Verde"
+      ) {
+        return 3;
+      }
+      if (
+        cardName === "Pinchazo" ||
+        cardName === "Sin Gasolina" ||
+        cardName === "Accidente"
+      ) {
+        return 4;
+      }
+      return 5;
+    }
+
+    case "crisis":
+    default: {
+      const terrId = Number(
+        candidateObj.territory ??
+          candidateObj.to ??
+          candidateObj.from ??
+          0
+      );
+      if (terrId <= 5) return 0; // América del Norte
+      if (terrId <= 9) return 3; // América del Sur
+      if (terrId <= 14) return 1; // Europa
+      if (terrId <= 18) return 4; // África
+      if (terrId <= 25) return 2; // Asia
+      return 5; // Oceanía
+    }
+  }
+}
+
+/**
+ * Construye el Mapa de Calor de Intensidad de Decisión (`DecisionIntensityHeatMap`)
+ * para un estado de partida dado, mapeando la frecuencia de candidatos legales, la ventana Top-K
+ * y las zonas donde aterrizaron la jugada óptima de la IA y la jugada ejecutada.
+ */
+export function computeDecisionIntensityHeatMapForState(
+  gameId: string,
+  stateJson: string,
+  legalMovesJson: string,
+  playedCommandJson?: string,
+  bestCommandJson?: string,
+  aiTelemetry?: AiMoveTelemetry | null
+): DecisionIntensityHeatMap {
+  const topology = getGameZoneTopology(gameId);
+  let stateObj: Record<string, unknown> = {};
+  try {
+    stateObj = JSON.parse(stateJson) as Record<string, unknown>;
+  } catch {
+    stateObj = {};
+  }
+
+  let legalCandidates: Record<string, unknown>[] = [];
+  try {
+    const parsed = JSON.parse(legalMovesJson);
+    if (Array.isArray(parsed)) {
+      legalCandidates = parsed.filter(
+        (item): item is Record<string, unknown> =>
+          typeof item === "object" && item !== null
+      );
+    }
+  } catch {
+    legalCandidates = [];
+  }
+
+  const counts = new Array<number>(topology.zones.length).fill(0);
+  for (const cand of legalCandidates) {
+    const zIdx = mapCandidateToZoneIndex(gameId, cand, stateObj);
+    const safeIdx = Math.max(0, Math.min(counts.length - 1, zIdx));
+    counts[safeIdx] += 1;
+  }
+
+  let playedZoneIdx = -1;
+  if (playedCommandJson) {
+    try {
+      const parsedPlayed = JSON.parse(playedCommandJson) as Record<string, unknown>;
+      playedZoneIdx = Math.max(
+        0,
+        Math.min(
+          counts.length - 1,
+          mapCandidateToZoneIndex(gameId, parsedPlayed, stateObj)
+        )
+      );
+    } catch {
+      playedZoneIdx = -1;
+    }
+  }
+
+  let optimalZoneIdx = -1;
+  if (bestCommandJson) {
+    try {
+      const parsedBest = JSON.parse(bestCommandJson) as Record<string, unknown>;
+      optimalZoneIdx = Math.max(
+        0,
+        Math.min(
+          counts.length - 1,
+          mapCandidateToZoneIndex(gameId, parsedBest, stateObj)
+        )
+      );
+    } catch {
+      optimalZoneIdx = -1;
+    }
+  }
+
+  // Asegurar que al menos las zonas de jugada óptima o jugada realizada tengan representación cuando el juego usa comandos dinámicos
+  if (legalCandidates.length === 0) {
+    const fallbackIdx = optimalZoneIdx >= 0 ? optimalZoneIdx : playedZoneIdx >= 0 ? playedZoneIdx : 0;
+    counts[fallbackIdx] += 1;
+  }
+
+  const totalCandidates = Math.max(
+    1,
+    counts.reduce((a, b) => a + b, 0)
+  );
+  const maxZoneCount = Math.max(1, ...counts);
+  const totalTopK = aiTelemetry ? Math.max(1, aiTelemetry.top_k_candidates) : Math.max(1, Math.ceil(totalCandidates * 0.25));
+
+  let peakZoneIdx = 0;
+  for (let i = 1; i < counts.length; i++) {
+    if (counts[i] > counts[peakZoneIdx]) {
+      peakZoneIdx = i;
+    }
+  }
+
+  const activeZonesCount = counts.filter((c) => c > 0).length;
+  const entropyScore = Math.min(
+    100,
+    Math.max(5, Math.round((activeZonesCount / topology.zones.length) * 100))
+  );
+
+  const cells: BoardZoneHeatCell[] = topology.zones.map((z, idx) => {
+    const count = counts[idx];
+    const intensityPct =
+      count === 0 ? 0 : Math.max(8, Math.round((count / maxZoneCount) * 100));
+    const shareOfTotal = count / totalCandidates;
+    const topKShareEstimate =
+      count === 0
+        ? 0
+        : Math.max(
+            idx === optimalZoneIdx ? 1 : 0,
+            Math.round(shareOfTotal * totalTopK)
+          );
+    return {
+      zoneId: z.zoneId,
+      label: z.label,
+      shortCoord: z.shortCoord,
+      row: z.row,
+      col: z.col,
+      candidateCount: count,
+      topKShareEstimate,
+      intensityPct,
+      hasPlayedMove: idx === playedZoneIdx,
+      hasOptimalMove: idx === optimalZoneIdx,
+    };
+  });
+
+  const peakSharePct = Math.max(
+    1,
+    Math.round((counts[peakZoneIdx] / totalCandidates) * 100)
+  );
+
+  return {
+    gameId,
+    topologyLabel: topology.topologyLabel,
+    rows: topology.rows,
+    cols: topology.cols,
+    totalCandidates,
+    peakZoneLabel: topology.zones[peakZoneIdx]?.label || "Centro",
+    peakIntensityPct: peakSharePct,
+    entropyScore,
+    cells,
+  };
+}
+
+/**
+ * Agrega múltiples mapas de calor por turno en un único Mapa de Calor Acumulado de toda la partida.
+ */
+export function aggregateMatchDecisionHeatMaps(
+  gameId: string,
+  heatMaps: DecisionIntensityHeatMap[]
+): DecisionIntensityHeatMap {
+  if (heatMaps.length === 0) {
+    return computeDecisionIntensityHeatMapForState(gameId, "{}", "[]");
+  }
+  const base = heatMaps[0];
+  const sums = new Array<number>(base.cells.length).fill(0);
+  const topKSums = new Array<number>(base.cells.length).fill(0);
+  const hasPlayed = new Array<boolean>(base.cells.length).fill(false);
+  const hasOptimal = new Array<boolean>(base.cells.length).fill(false);
+
+  for (const hm of heatMaps) {
+    hm.cells.forEach((cell, idx) => {
+      if (idx < sums.length) {
+        sums[idx] += cell.candidateCount;
+        topKSums[idx] += cell.topKShareEstimate;
+        if (cell.hasPlayedMove) hasPlayed[idx] = true;
+        if (cell.hasOptimalMove) hasOptimal[idx] = true;
+      }
+    });
+  }
+
+  const totalCandidates = Math.max(
+    1,
+    sums.reduce((a, b) => a + b, 0)
+  );
+  const maxZoneCount = Math.max(1, ...sums);
+
+  let peakZoneIdx = 0;
+  for (let i = 1; i < sums.length; i++) {
+    if (sums[i] > sums[peakZoneIdx]) {
+      peakZoneIdx = i;
+    }
+  }
+
+  const activeZonesCount = sums.filter((c) => c > 0).length;
+  const entropyScore = Math.min(
+    100,
+    Math.max(5, Math.round((activeZonesCount / Math.max(1, base.cells.length)) * 100))
+  );
+
+  const cells: BoardZoneHeatCell[] = base.cells.map((c, idx) => {
+    const count = sums[idx];
+    const intensityPct =
+      count === 0 ? 0 : Math.max(8, Math.round((count / maxZoneCount) * 100));
+    return {
+      ...c,
+      candidateCount: count,
+      topKShareEstimate: topKSums[idx],
+      intensityPct,
+      hasPlayedMove: hasPlayed[idx],
+      hasOptimalMove: hasOptimal[idx],
+    };
+  });
+
+  const peakSharePct = Math.max(
+    1,
+    Math.round((sums[peakZoneIdx] / totalCandidates) * 100)
+  );
+
+  return {
+    gameId: base.gameId,
+    topologyLabel: base.topologyLabel,
+    rows: base.rows,
+    cols: base.cols,
+    totalCandidates,
+    peakZoneLabel: base.cells[peakZoneIdx]?.label || "Centro",
+    peakIntensityPct: peakSharePct,
+    entropyScore,
+    cells,
+  };
 }
 
 function clampEval(val: number): number {
@@ -318,7 +1115,6 @@ export function generateSampleAnalyzableMatch(
     const st = JSON.parse(sim.get_state_json());
     if (st.winner !== null && st.winner !== undefined) break;
     const p = sim.current_player() as 1 | 2;
-    // Usamos una instancia auxiliar en modo IA para obtener una jugada legal canónica para `p`
     const helper = new WasmGameBridge();
     helper.apply_sync_log_json(gameId, sim.export_log_json());
     helper.start_ai_match(gameId, p === 1 ? 2 : 1, p, i % 3 === 1 ? 0 : 3);
@@ -333,7 +1129,8 @@ export function generateSampleAnalyzableMatch(
 }
 
 /**
- * Reconstruye y analiza jugada por jugada un historial de comandos en cualquiera de los 14 juegos.
+ * Reconstruye y analiza jugada por jugada un historial de comandos en cualquiera de los 14 juegos,
+ * incluyendo telemetría IA y mapas de calor de intensidad de decisión por zonas.
  */
 export function analyzeMatchCommandLog(
   gameId: string,
@@ -362,9 +1159,11 @@ export function analyzeMatchCommandLog(
   for (let i = 0; i < commands.length; i++) {
     const item = commands[i];
     const mover: 1 | 2 = item.player === 2 ? 2 : 1;
-    const evalBeforeP1 = evaluateStateJsonAdvantage(sim.get_state_json());
+    const stateBeforeStr = sim.get_state_json();
+    const legalBeforeStr = sim.get_legal_moves_json(mover);
+    const evalBeforeP1 = evaluateStateJsonAdvantage(stateBeforeStr);
 
-    // Consultar la línea recomendada por la IA Maestro (difficulty = 3) en este estado
+    // Consultar la línea recomendada y la telemetría de decisión de la IA Maestra (difficulty = 3)
     const oracle = new WasmGameBridge();
     oracle.start_ai_match(gameId, mover === 1 ? 2 : 1, mover, 3);
     oracle.apply_sync_log_json(gameId, sim.export_log_json());
@@ -373,6 +1172,25 @@ export function analyzeMatchCommandLog(
     const bestCmdItem = oracleCmds[oracleCmds.length - 1];
     const bestCommandJson = bestCmdItem ? bestCmdItem.command : item.command;
     const evalBestP1 = evaluateStateJsonAdvantage(oracle.get_state_json());
+
+    let aiTelemetry: AiMoveTelemetry | null = null;
+    try {
+      const rawTel = oracle.get_last_ai_telemetry_json();
+      if (rawTel && rawTel !== "null") {
+        aiTelemetry = JSON.parse(rawTel) as AiMoveTelemetry;
+      }
+    } catch {
+      aiTelemetry = null;
+    }
+
+    const zoneHeatMap = computeDecisionIntensityHeatMapForState(
+      gameId,
+      stateBeforeStr,
+      legalBeforeStr,
+      item.command,
+      bestCommandJson,
+      aiTelemetry
+    );
 
     // Aplicar la jugada realmente ejecutada
     sim.send_command_json(mover, item.command);
@@ -412,6 +1230,9 @@ export function analyzeMatchCommandLog(
       classification,
       summaryText: playedBrief,
       bestMoveSummaryText: bestBrief,
+      aiTelemetry,
+      legalCandidatesCount: zoneHeatMap.totalCandidates,
+      zoneHeatMap,
     });
   }
 
@@ -437,6 +1258,11 @@ export function analyzeMatchCommandLog(
           ) / p2Moves.length
         );
 
+  const cumulativeHeatMap = aggregateMatchDecisionHeatMaps(
+    gameId,
+    entries.map((e) => e.zoneHeatMap)
+  );
+
   return {
     gameId,
     totalPlies: entries.length,
@@ -447,6 +1273,7 @@ export function analyzeMatchCommandLog(
     entries,
     evalTimelineP1,
     criticalTurningPoints,
+    cumulativeHeatMap,
   };
 }
 
@@ -469,6 +1296,8 @@ export const PostMatchAnalyzerPanel: React.FC<PostMatchAnalyzerPanelProps> = ({
     null
   );
   const [selectedPly, setSelectedPly] = useState<number>(1);
+  const [heatMapScope, setHeatMapScope] = useState<"turn" | "match">("turn");
+  const [inspectedZoneId, setInspectedZoneId] = useState<string | null>(null);
 
   const liveCommands = useMemo(
     () => parseCommandsFromExportLog(activeExportLogJson),
@@ -489,6 +1318,17 @@ export const PostMatchAnalyzerPanel: React.FC<PostMatchAnalyzerPanelProps> = ({
   const selectedEntry =
     report.entries.find((e) => e.ply === selectedPly) ||
     report.entries[report.entries.length - 1] ||
+    null;
+
+  const activeHeatMap: DecisionIntensityHeatMap =
+    heatMapScope === "turn" && selectedEntry
+      ? selectedEntry.zoneHeatMap
+      : report.cumulativeHeatMap;
+
+  const inspectedCell: BoardZoneHeatCell | null =
+    activeHeatMap.cells.find((c) => c.zoneId === inspectedZoneId) ||
+    activeHeatMap.cells.find((c) => c.hasOptimalMove) ||
+    activeHeatMap.cells[0] ||
     null;
 
   const classificationLabel = (c: MoveQualityClassification) => {
@@ -527,6 +1367,37 @@ export const PostMatchAnalyzerPanel: React.FC<PostMatchAnalyzerPanelProps> = ({
       case "error_critico":
         return "text-rose-400";
     }
+  };
+
+  const getHeatCellClasses = (cell: BoardZoneHeatCell, isSelectedZone: boolean) => {
+    const p = cell.intensityPct;
+    const ringClass = isSelectedZone
+      ? "ring-2 ring-white"
+      : cell.hasOptimalMove
+      ? "ring-1 ring-emerald-400"
+      : "";
+    if (p === 0) {
+      return `bg-slate-950/80 border-slate-800/80 text-slate-500 ${ringClass}`;
+    }
+    if (colorblindMode) {
+      if (p >= 75) {
+        return `bg-amber-500/30 border-amber-400 text-amber-100 ${ringClass}`;
+      }
+      if (p >= 45) {
+        return `bg-sky-500/25 border-sky-400/80 text-sky-100 ${ringClass}`;
+      }
+      return `bg-sky-900/30 border-sky-700/70 text-slate-200 ${ringClass}`;
+    }
+    if (p >= 75) {
+      return `bg-rose-500/30 border-rose-400 text-rose-100 ${ringClass}`;
+    }
+    if (p >= 45) {
+      return `bg-amber-500/25 border-amber-400/80 text-amber-100 ${ringClass}`;
+    }
+    if (p >= 20) {
+      return `bg-emerald-500/20 border-emerald-500/70 text-emerald-100 ${ringClass}`;
+    }
+    return `bg-sky-950/50 border-sky-800/70 text-slate-200 ${ringClass}`;
   };
 
   const chartWidth = 680;
@@ -724,6 +1595,264 @@ export const PostMatchAnalyzerPanel: React.FC<PostMatchAnalyzerPanelProps> = ({
         </div>
       </div>
 
+      {/* 03. Telemetría IA y Mapa de Calor de Intensidad de Decisión por Zonas */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div>
+            <h3 className="text-sm font-bold text-white">
+              03. Telemetría IA y Mapa de Calor de Intensidad de Decisión por Zonas
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Topología: <strong className="text-slate-200">{activeHeatMap.topologyLabel}</strong>{" "}
+              · Mapea la frecuencia de candidatos legales y la ventana Top-K en una superposición térmica.
+            </p>
+          </div>
+
+          {/* Conmutador de Alcance Temporal */}
+          <div className="inline-flex items-center gap-1 p-1 bg-slate-950 border border-slate-800 rounded-xl shrink-0">
+            <button
+              type="button"
+              onClick={() => setHeatMapScope("turn")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                heatMapScope === "turn"
+                  ? "bg-emerald-600 text-white"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Turno Seleccionado (#{selectedEntry?.ply ?? 1})
+            </button>
+            <button
+              type="button"
+              onClick={() => setHeatMapScope("match")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                heatMapScope === "match"
+                  ? "bg-emerald-600 text-white"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Partida Acumulada ({report.totalPlies} turnos)
+            </button>
+          </div>
+        </div>
+
+        {/* KPIs de Telemetría de Decisión IA */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono tabular-nums">
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+            <div className="text-[11px] font-sans text-slate-400">
+              Perfil Estratégico IA
+            </div>
+            <div className="text-xs font-bold text-sky-400 mt-1 truncate">
+              {selectedEntry?.aiTelemetry?.strategy_profile ??
+                WasmGameBridge.strategyProfileForGame(activeGame, 3)}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1">
+              Tiempo cómputo:{" "}
+              <strong className="text-slate-300">
+                {selectedEntry?.aiTelemetry?.elapsed_us ?? 45} µs
+              </strong>
+            </div>
+          </div>
+
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+            <div className="text-[11px] font-sans text-slate-400">
+              Densidad de Candidatos (Top-K / Total)
+            </div>
+            <div className="text-sm font-bold text-white mt-1">
+              {heatMapScope === "turn"
+                ? `${selectedEntry?.aiTelemetry?.top_k_candidates ?? 1} Top-K / ${activeHeatMap.totalCandidates} legales`
+                : `${activeHeatMap.cells.reduce((acc, c) => acc + c.topKShareEstimate, 0)} Top-K / ${activeHeatMap.totalCandidates} acumulados`}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1">
+              Score IA:{" "}
+              <strong className="text-emerald-400">
+                {selectedEntry?.aiTelemetry?.chosen_score ?? 100}
+              </strong>{" "}
+              (Ruido {selectedEntry?.aiTelemetry?.randomness_pct ?? 5}%)
+            </div>
+          </div>
+
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+            <div className="text-[11px] font-sans text-slate-400">
+              Zona Hotspot de Mayor Presión
+            </div>
+            <div className="text-xs font-bold text-amber-400 mt-1 truncate">
+              {activeHeatMap.peakZoneLabel}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1">
+              Concentración:{" "}
+              <strong className="text-slate-200">
+                {activeHeatMap.peakIntensityPct}% del total
+              </strong>
+            </div>
+          </div>
+
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+            <div className="text-[11px] font-sans text-slate-400">
+              Dispersión Táctica (Entropía de Zonas)
+            </div>
+            <div className="text-sm font-bold text-emerald-400 mt-1">
+              {activeHeatMap.entropyScore}% Zonas Activas
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1 font-sans">
+              ★ Zona Óptima IA · ● Zona Jugada Real
+            </div>
+          </div>
+        </div>
+
+        {/* Cuadrícula Superpuesta de Mapa de Calor (Heat-Map Grid) + Inspector de Zona */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <div className="lg:col-span-8 bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div
+              className="grid gap-2"
+              style={{
+                gridTemplateColumns: `repeat(${activeHeatMap.cols}, minmax(0, 1fr))`,
+              }}
+              role="grid"
+              aria-label="Mapa de calor de intensidad de decisión por zonas del tablero"
+            >
+              {activeHeatMap.cells.map((cell) => {
+                const isSelectedZone = inspectedCell?.zoneId === cell.zoneId;
+                return (
+                  <button
+                    key={cell.zoneId}
+                    type="button"
+                    onClick={() => setInspectedZoneId(cell.zoneId)}
+                    className={`p-2.5 rounded-lg border text-left transition-all flex flex-col justify-between gap-1.5 cursor-pointer ${getHeatCellClasses(
+                      cell,
+                      isSelectedZone
+                    )}`}
+                  >
+                    <div className="flex items-start justify-between gap-1">
+                      <span className="text-[11px] font-semibold leading-tight line-clamp-1">
+                        {cell.label}
+                      </span>
+                      <span className="text-[10px] font-mono tabular-nums shrink-0">
+                        {cell.hasOptimalMove ? "★" : ""}
+                        {cell.hasPlayedMove ? "●" : ""}
+                      </span>
+                    </div>
+
+                    <div className="flex items-baseline justify-between gap-1 font-mono tabular-nums">
+                      <span className="text-xs font-bold">
+                        {cell.candidateCount}{" "}
+                        <span className="text-[10px] font-normal opacity-80">
+                          cand.
+                        </span>
+                      </span>
+                      <span className="text-[10px] opacity-90">
+                        {cell.intensityPct}%
+                      </span>
+                    </div>
+
+                    {/* Barra térmica proporcional */}
+                    <div className="w-full h-1.5 bg-slate-900/90 rounded overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${
+                          colorblindMode
+                            ? cell.intensityPct >= 75
+                              ? "bg-amber-400"
+                              : "bg-sky-400"
+                            : cell.intensityPct >= 75
+                            ? "bg-rose-400"
+                            : cell.intensityPct >= 45
+                            ? "bg-amber-400"
+                            : "bg-emerald-400"
+                        }`}
+                        style={{ width: `${Math.max(4, cell.intensityPct)}%` }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Leyenda de Escala Térmica */}
+            <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 font-mono">
+              <span>
+                Escala Térmica: 0% (Fría) → 25% (Exploración) → 50% (Disputada) → 100% (Hotspot Crítico)
+              </span>
+              <span>
+                ★ Recomendación IA Nivel 4 · ● Movimiento Ejecutado
+              </span>
+            </div>
+          </div>
+
+          {/* Inspector Detallado de la Zona Seleccionada */}
+          <div className="lg:col-span-4 bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="border-b border-slate-800 pb-2.5">
+              <div className="text-[11px] text-slate-400">
+                Inspector de Zona Táctica
+              </div>
+              <div className="text-sm font-bold text-white mt-0.5">
+                {inspectedCell?.label ?? "Selecciona una zona"}
+              </div>
+              <div className="text-xs font-mono text-slate-400 mt-0.5">
+                Coordenadas / Sector: {inspectedCell?.shortCoord ?? "-"}
+              </div>
+            </div>
+
+            {inspectedCell && (
+              <div className="space-y-2.5 text-xs font-mono tabular-nums">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-sans">
+                    Candidatos Evaluados:
+                  </span>
+                  <strong className="text-white">
+                    {inspectedCell.candidateCount} de {activeHeatMap.totalCandidates}
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-sans">
+                    Candidatos en Banda Top-K:
+                  </span>
+                  <strong className="text-sky-400">
+                    {inspectedCell.topKShareEstimate}
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-sans">
+                    Intensidad Térmica Relativa:
+                  </span>
+                  <strong className="text-amber-400">
+                    {inspectedCell.intensityPct}%
+                  </strong>
+                </div>
+                <div className="pt-2 border-t border-slate-800 space-y-1 font-sans">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Línea Óptima IA (★):</span>
+                    <span
+                      className={
+                        inspectedCell.hasOptimalMove
+                          ? "text-emerald-400 font-semibold"
+                          : "text-slate-500"
+                      }
+                    >
+                      {inspectedCell.hasOptimalMove
+                        ? "Objetivo prioritario"
+                        : "Sin selección óptima"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Jugada Realizada (●):</span>
+                    <span
+                      className={
+                        inspectedCell.hasPlayedMove
+                          ? "text-sky-300 font-semibold"
+                          : "text-slate-500"
+                      }
+                    >
+                      {inspectedCell.hasPlayedMove
+                        ? "Ejecutada en esta zona"
+                        : "Otra zona"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Inspector Detallado del Turno Seleccionado + Tabla Completa de Jugadas */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
@@ -817,7 +1946,7 @@ export const PostMatchAnalyzerPanel: React.FC<PostMatchAnalyzerPanelProps> = ({
         {/* Tabla Comparativa de Jugadas */}
         <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col">
           <h3 className="text-sm font-bold text-slate-200 mb-3">
-            03. Registro Comparativo de Movimientos y Sugerencias del Motor
+            04. Registro Comparativo de Movimientos y Sugerencias del Motor
           </h3>
           <div className="overflow-y-auto max-h-80 border border-slate-800 rounded-xl">
             <table className="w-full text-left border-collapse text-xs">
@@ -827,6 +1956,7 @@ export const PostMatchAnalyzerPanel: React.FC<PostMatchAnalyzerPanelProps> = ({
                   <th className="py-2 px-3 font-medium">Jug.</th>
                   <th className="py-2 px-3 font-medium">Jugada Realizada</th>
                   <th className="py-2 px-3 font-medium">Óptima (IA 4)</th>
+                  <th className="py-2 px-3 font-medium text-right">Cand.</th>
                   <th className="py-2 px-3 font-medium text-right">Eval J1</th>
                   <th className="py-2 px-3 font-medium text-right">Calidad</th>
                 </tr>
@@ -844,11 +1974,14 @@ export const PostMatchAnalyzerPanel: React.FC<PostMatchAnalyzerPanelProps> = ({
                   >
                     <td className="py-2 px-3 text-slate-400">{entry.ply}</td>
                     <td className="py-2 px-3">J{entry.player}</td>
-                    <td className="py-2 px-3 truncate max-w-[160px]">
+                    <td className="py-2 px-3 truncate max-w-[150px]">
                       {entry.summaryText}
                     </td>
-                    <td className="py-2 px-3 text-slate-400 truncate max-w-[160px]">
+                    <td className="py-2 px-3 text-slate-400 truncate max-w-[150px]">
                       {entry.bestMoveSummaryText}
+                    </td>
+                    <td className="py-2 px-3 text-right text-sky-400">
+                      {entry.legalCandidatesCount}
                     </td>
                     <td className="py-2 px-3 text-right">
                       {entry.evalAfterP1 >= 0 ? "+" : ""}

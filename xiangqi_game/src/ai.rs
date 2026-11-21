@@ -224,6 +224,17 @@ pub fn best_move(
     player: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<MovePieceCommand> {
+    best_move_with_randomness(session, player, difficulty, 0, 0)
+}
+
+/// Selecciona la mejor jugada legal en Xiangqi con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<MovePieceCommand> {
     if session
         .world()
         .get_resource::<GameOverResource>()
@@ -252,6 +263,7 @@ pub fn best_move(
     });
 
     if difficulty == AiDifficulty::Easy
+        && randomness_pct == 0
         && candidates.len() > 1
         && (session.current_tick().0 & 3) == 0
     {
@@ -262,8 +274,8 @@ pub fn best_move(
         AiDifficulty::Easy | AiDifficulty::Medium => 1,
         AiDifficulty::Hard | AiDifficulty::Expert => 2,
     };
-    let mut best_move = None;
-    let mut best_score = f32::NEG_INFINITY;
+    let mut legal_moves = Vec::with_capacity(candidates.len());
+    let mut scores = Vec::with_capacity(candidates.len());
     let mut alpha = f32::NEG_INFINITY;
     let beta = f32::INFINITY;
 
@@ -273,21 +285,36 @@ pub fn best_move(
             .process_command(player, Box::new(mv.clone()))
             .is_ok()
         {
-            let mut score = minimax(&next_session, depth - 1, alpha, beta, false, player);
+            let search_alpha = if randomness_pct == 0 {
+                alpha
+            } else {
+                f32::NEG_INFINITY
+            };
+            let mut score = minimax(&next_session, depth - 1, search_alpha, beta, false, player);
             if difficulty == AiDifficulty::Expert && (2..=6).contains(&mv.to.0) {
                 score += 0.08;
-            }
-            if score > best_score || best_move.is_none() {
-                best_score = score;
-                best_move = Some(mv);
             }
             if score > alpha {
                 alpha = score;
             }
+            legal_moves.push(mv);
+            scores.push(score);
         }
     }
 
-    best_move
+    let safety_band = match difficulty {
+        AiDifficulty::Easy => 2.2,
+        AiDifficulty::Medium => 0.90,
+        AiDifficulty::Hard => 0.40,
+        AiDifficulty::Expert => 0.20,
+    };
+    let idx = AiDifficulty::select_top_k_with_noise(
+        &scores,
+        randomness_pct,
+        safety_band,
+        seed ^ session.current_tick().0 ^ session.id.0,
+    )?;
+    legal_moves.into_iter().nth(idx)
 }
 
 #[cfg(test)]

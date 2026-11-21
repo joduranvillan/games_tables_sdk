@@ -110,7 +110,7 @@ impl OpeningBook {
             return None;
         }
         let mut sorted = list.clone();
-        sorted.sort_by(|a, b| b.weight.cmp(&a.weight));
+        sorted.sort_by_key(|b| std::cmp::Reverse(b.weight));
         if difficulty == AiDifficulty::Expert && sorted.len() > 1 {
             Some(sorted[1])
         } else {
@@ -124,14 +124,39 @@ impl OpeningBook {
         player: PlayerId,
         difficulty: AiDifficulty,
     ) -> Option<MovePieceCommand> {
+        Self::lookup_session_with_randomness(session, player, difficulty, 0, 0)
+    }
+
+    /// Consulta el libro para la sesión actual con soporte de ruido (`randomness_pct`) para rotar entre líneas teóricas ECO.
+    pub fn lookup_session_with_randomness(
+        session: &Session,
+        player: PlayerId,
+        difficulty: AiDifficulty,
+        randomness_pct: u8,
+        seed: u64,
+    ) -> Option<MovePieceCommand> {
         if !difficulty.use_opening_book() {
             return None;
         }
         let board = session.world().get_resource::<BoardResource>()?;
         let sides = session.world().get_resource::<Sides>()?;
         let zh = compute_zobrist_hash(board, sides, player);
-        let book_mv = Self::lookup_with_difficulty(zh, difficulty)?;
-        Some(book_mv.to_command(player))
+        if randomness_pct == 0 {
+            let book_mv = Self::lookup_with_difficulty(zh, difficulty)?;
+            return Some(book_mv.to_command(player));
+        }
+        let list = Self::global().entries.get(&zh)?;
+        if list.is_empty() {
+            return None;
+        }
+        let scores: Vec<f32> = list.iter().map(|m| f32::from(m.weight)).collect();
+        let idx = AiDifficulty::select_top_k_with_noise(
+            &scores,
+            randomness_pct,
+            20.0,
+            seed ^ zh ^ session.current_tick().0,
+        )?;
+        Some(list[idx].to_command(player))
     }
 
     fn load_default() -> Self {

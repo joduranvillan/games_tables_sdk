@@ -123,8 +123,53 @@ console.log("=== INICIANDO SUITE DE REGRESION FASE 5 (MATCHMAKING ELO & ANALIZAD
       report.accuracyP2 >= 0 && report.accuracyP2 <= 100,
       `Precisión J2 inválida en ${game.id}: ${report.accuracyP2}`
     );
+
+    // 5. Verificar Telemetría IA y Mapa de Calor de Intensidad de Decisión por Zonas (Por Turno y Acumulado)
+    assert(
+      report.cumulativeHeatMap.gameId === game.id &&
+        report.cumulativeHeatMap.cells.length >= 6 &&
+        report.cumulativeHeatMap.totalCandidates >= sampleCommands.length,
+      `Mapa de calor acumulado inválido en ${game.id}`
+    );
+    assert(
+      report.cumulativeHeatMap.peakIntensityPct >= 1 &&
+        report.cumulativeHeatMap.peakIntensityPct <= 100,
+      `peakIntensityPct fuera de rango en ${game.id}: ${report.cumulativeHeatMap.peakIntensityPct}`
+    );
+    for (const entry of report.entries) {
+      assert(
+        entry.zoneHeatMap.cells.length ===
+          entry.zoneHeatMap.rows * entry.zoneHeatMap.cols,
+        `Dimensiones de cuadrícula de mapa de calor inconsistentes en ${game.id} turno #${entry.ply}`
+      );
+      const cellSum = entry.zoneHeatMap.cells.reduce(
+        (acc, c) => acc + c.candidateCount,
+        0
+      );
+      assert(
+        cellSum === entry.zoneHeatMap.totalCandidates &&
+          entry.zoneHeatMap.totalCandidates >= 1,
+        `Suma de candidatos por zona (${cellSum}) debe coincidir con totalCandidates (${entry.zoneHeatMap.totalCandidates}) en ${game.id}`
+      );
+      assert(
+        entry.zoneHeatMap.cells.some((c) => c.hasOptimalMove),
+        `Al menos una zona debe marcar hasOptimalMove (★) en ${game.id} turno #${entry.ply}`
+      );
+      assert(
+        entry.zoneHeatMap.cells.some((c) => c.hasPlayedMove),
+        `Al menos una zona debe marcar hasPlayedMove (●) en ${game.id} turno #${entry.ply}`
+      );
+      assert(
+        entry.aiTelemetry !== null &&
+          entry.aiTelemetry.evaluated_candidates >= 1 &&
+          entry.aiTelemetry.top_k_candidates >= 1,
+        `Telemetría IA en PostMatchAnalyzerPanel debe estar presente en ${game.id} turno #${entry.ply}`
+      );
+    }
   }
-  console.log("  [PASS] Analizador Post-Partida y Curva de Ventaja verificados en los 14/14 juegos.");
+  console.log(
+    "  [PASS] Analizador Post-Partida, Curva de Ventaja y Mapa de Calor de Intensidad de Decisión IA por Zonas verificados en los 14/14 juegos."
+  );
 }
 
 console.log("=== RESULTADO FASE 5: TODAS LAS PRUEBAS PASARON EXITOSAMENTE ===");

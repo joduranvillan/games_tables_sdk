@@ -114,6 +114,17 @@ pub fn best_move(
     ai: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<MonopolyCommand> {
+    best_move_with_randomness(state, ai, difficulty, 0, 0)
+}
+
+/// Selecciona la mejor jugada para `ai` en Monopoly con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    state: &MonopolyState,
+    ai: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<MonopolyCommand> {
     let board = state.world().get_resource::<BoardResource>()?;
     let players = state.world().get_resource::<PlayersResource>()?;
 
@@ -203,12 +214,14 @@ pub fn best_move(
             .map(|b| &b.buildings)
             .unwrap_or(&empty_buildings);
 
+        let mut buildable_spaces = Vec::new();
+        let mut build_scores = Vec::new();
+
         for (space_idx, space) in board.spaces.iter().enumerate() {
-            if let SpaceKind::Property { group, .. } = space {
+            if let SpaceKind::Property { group, price, .. } = space {
                 if players.properties.get(&space_idx) == Some(&ai)
                     && players.owns_full_group(&board.spaces, ai, group)
                 {
-                    // No se puede construir si alguna propiedad del grupo está hipotecada
                     let group_has_mortgaged = board.spaces.iter().enumerate().any(|(idx, s)| {
                         if let SpaceKind::Property { group: g, .. } = s {
                             g == group && players.mortgaged.contains(&idx)
@@ -225,7 +238,6 @@ pub fn best_move(
                         continue;
                     }
 
-                    // Regla de construcción uniforme
                     let group_spaces: Vec<usize> = board
                         .spaces
                         .iter()
@@ -250,14 +262,30 @@ pub fn best_move(
                     if current_level <= min_other {
                         let cost = house_cost_for_space(space_idx);
                         if cash >= cost as i64 {
-                            return Some(MonopolyCommand::BuildHouse(BuildHouseCommand {
-                                player: ai,
-                                space: space_idx,
-                            }));
+                            buildable_spaces.push(space_idx);
+                            build_scores.push(1000.0 - (space_idx as f32) + (*price as f32) * 0.1);
                         }
                     }
                 }
             }
+        }
+
+        if !buildable_spaces.is_empty() {
+            let pick = if randomness_pct == 0 {
+                0
+            } else {
+                AiDifficulty::select_top_k_with_noise(
+                    &build_scores,
+                    randomness_pct,
+                    150.0,
+                    seed ^ state.current_tick().0 ^ state.id.0,
+                )
+                .unwrap_or(0)
+            };
+            return Some(MonopolyCommand::BuildHouse(BuildHouseCommand {
+                player: ai,
+                space: buildable_spaces[pick],
+            }));
         }
     }
 

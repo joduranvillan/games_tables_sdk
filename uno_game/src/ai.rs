@@ -137,6 +137,17 @@ pub fn best_move<S: UnoStateAccess>(
     ai: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<UnoCommand> {
+    best_move_with_randomness(state, ai, difficulty, 0, 0)
+}
+
+/// Selecciona la mejor jugada para `ai` en UNO con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness<S: UnoStateAccess>(
+    state: &S,
+    ai: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<UnoCommand> {
     let uno = state.as_uno_state()?;
     let hand = uno.hands.get(&ai)?;
 
@@ -144,8 +155,6 @@ pub fn best_move<S: UnoStateAccess>(
         return Some(UnoCommand::DrawCard(DrawCardCommand { player: ai }));
     }
 
-    // Cuando el bot queda con 1 carta tras jugar (o si tiene 1 carta y no ha cantado UNO),
-    // emite CallUnoCommand. En Easy tiene 30% de probabilidad de olvidarlo para permitir CatchUnoFailureCommand.
     if hand.len() == 1 && !uno.uno_called.contains(&ai) {
         let forgets = if difficulty == AiDifficulty::Easy {
             (uno.discard_pile.len() * 37 + ai.0 as usize * 17) % 10 < 3
@@ -170,8 +179,7 @@ pub fn best_move<S: UnoStateAccess>(
 
     let dominant_color = most_frequent_color(hand);
 
-    // En Easy: juega la primera carta válida sin considerar estrategia
-    if difficulty == AiDifficulty::Easy {
+    if difficulty == AiDifficulty::Easy && randomness_pct == 0 {
         let (idx, card) = playable[0];
         let fallback_color = if uno.active_color != CardColor::WildColor {
             uno.active_color
@@ -181,46 +189,81 @@ pub fn best_move<S: UnoStateAccess>(
         return Some(make_play_command(ai, idx, &card, fallback_color));
     }
 
-    // 1) Wild Draw Four si <= 2 cartas en mano
-    if hand.len() <= 2 {
-        if let Some(&(idx, card)) = playable
-            .iter()
-            .find(|(_, c)| c.value == CardValue::WildDrawFour)
-        {
-            return Some(make_play_command(ai, idx, &card, dominant_color));
-        }
-    }
-
-    // 2) Carta que cambia color al color propio más frecuente
-    if dominant_color != uno.active_color {
-        if let Some(&(idx, card)) = playable.iter().find(|(_, c)| c.color == dominant_color) {
-            return Some(make_play_command(ai, idx, &card, dominant_color));
-        }
-        if let Some(&(idx, card)) = playable.iter().find(|(_, c)| c.value == CardValue::Wild) {
-            return Some(make_play_command(ai, idx, &card, dominant_color));
-        }
-    }
-
-    // 3) +2 al jugador que va ganando (algún rival tiene menos o igual cartas que la IA, o <= 3 cartas)
     let rival_leading = uno
         .hands
         .iter()
         .any(|(&p, h)| p != ai && (h.len() <= hand.len() || h.len() <= 3));
-    if rival_leading {
-        if let Some(&(idx, card)) = playable.iter().find(|(_, c)| c.value == CardValue::DrawTwo) {
+
+    if randomness_pct == 0 {
+        if hand.len() <= 2 {
+            if let Some(&(idx, card)) = playable
+                .iter()
+                .find(|(_, c)| c.value == CardValue::WildDrawFour)
+            {
+                return Some(make_play_command(ai, idx, &card, dominant_color));
+            }
+        }
+
+        if dominant_color != uno.active_color {
+            if let Some(&(idx, card)) = playable.iter().find(|(_, c)| c.color == dominant_color) {
+                return Some(make_play_command(ai, idx, &card, dominant_color));
+            }
+            if let Some(&(idx, card)) = playable.iter().find(|(_, c)| c.value == CardValue::Wild) {
+                return Some(make_play_command(ai, idx, &card, dominant_color));
+            }
+        }
+
+        if rival_leading {
+            if let Some(&(idx, card)) = playable.iter().find(|(_, c)| c.value == CardValue::DrawTwo)
+            {
+                return Some(make_play_command(ai, idx, &card, dominant_color));
+            }
+        }
+
+        if let Some(&(idx, card)) = playable
+            .iter()
+            .find(|(_, c)| c.color != CardColor::WildColor)
+        {
             return Some(make_play_command(ai, idx, &card, dominant_color));
         }
-    }
 
-    // 4) Carta que coincide con color/número (priorizando cartas normales antes de gastar comodines)
-    if let Some(&(idx, card)) = playable
-        .iter()
-        .find(|(_, c)| c.color != CardColor::WildColor)
-    {
+        let (idx, card) = playable[0];
         return Some(make_play_command(ai, idx, &card, dominant_color));
     }
 
-    let (idx, card) = playable[0];
+    let scores: Vec<f32> = playable
+        .iter()
+        .map(|(_, c)| {
+            if c.value == CardValue::WildDrawFour && hand.len() <= 2 {
+                100.0
+            } else if dominant_color != uno.active_color && c.color == dominant_color {
+                85.0
+            } else if dominant_color != uno.active_color && c.value == CardValue::Wild {
+                80.0
+            } else if rival_leading && c.value == CardValue::DrawTwo {
+                75.0
+            } else if c.color != CardColor::WildColor {
+                50.0
+            } else {
+                25.0
+            }
+        })
+        .collect();
+
+    let safety_band = match difficulty {
+        AiDifficulty::Easy => 60.0,
+        AiDifficulty::Medium => 30.0,
+        AiDifficulty::Hard => 15.0,
+        AiDifficulty::Expert => 8.0,
+    };
+    let pick = AiDifficulty::select_top_k_with_noise(
+        &scores,
+        randomness_pct,
+        safety_band,
+        seed ^ (uno.discard_pile.len() as u64),
+    )
+    .unwrap_or(0);
+    let (idx, card) = playable[pick];
     Some(make_play_command(ai, idx, &card, dominant_color))
 }
 

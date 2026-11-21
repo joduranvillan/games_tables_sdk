@@ -99,6 +99,7 @@ export function runSingleGameSelfTest(gameId: string): GameDiagnosticResult {
 
     const initialTurn = bridge.current_player();
     const initialStateStr = bridge.get_state_json();
+    const initialChecksum = bridge.get_state_checksum_hex();
     const legalMovesRaw = JSON.parse(bridge.get_legal_moves_json(1));
     const legalMovesCount = Array.isArray(legalMovesRaw)
       ? legalMovesRaw.length
@@ -119,11 +120,22 @@ export function runSingleGameSelfTest(gameId: string): GameDiagnosticResult {
         firstCmd = m0;
       }
     } else if (meta.id === "goose") {
-      firstCmd = { command_type: "RollDiceCommand" };
+      firstCmd = { command_type: "RollDiceCommand", d1: 1, d2: 2 };
     }
 
     const humanResp = bridge.send_command_json(1, JSON.stringify(firstCmd));
     const humanMoveDispatched = !humanResp.includes('"ok":false');
+    const afterHumanChecksum = bridge.get_state_checksum_hex();
+
+    // Verify transactional Undo & Redo with exact FNV-1a checksum round-trip
+    const undoOk =
+      bridge.can_undo() &&
+      bridge.undo_step() &&
+      bridge.get_state_checksum_hex() === initialChecksum;
+    const redoOk =
+      bridge.can_redo() &&
+      bridge.redo_step() &&
+      bridge.get_state_checksum_hex() === afterHumanChecksum;
 
     // Step AI if turn advanced or game supports multi-phase AI
     const aiResp = bridge.step_ai_if_needed();
@@ -138,10 +150,9 @@ export function runSingleGameSelfTest(gameId: string): GameDiagnosticResult {
     // Test deterministic Replay / SyncLog round-trip
     const exportedLog = bridge.export_log_json();
     const cloneBridge = new WasmGameBridge();
-    const syncLogVerified = cloneBridge.apply_sync_log_json(
-      meta.id,
-      exportedLog
-    );
+    const syncLogVerified =
+      cloneBridge.apply_sync_log_json(meta.id, exportedLog) &&
+      cloneBridge.get_state_checksum_hex() === bridge.get_state_checksum_hex();
 
     // Verify end-to-end AI difficulty propagation (0=Easy, 1=Medium, 2=Hard, 3=Expert)
     const aiDifficultyVerified = [0, 1, 2, 3].every((lvl) => {
@@ -158,6 +169,8 @@ export function runSingleGameSelfTest(gameId: string): GameDiagnosticResult {
       initialTurn === 1 &&
       legalMovesCount > 0 &&
       humanMoveDispatched &&
+      undoOk &&
+      redoOk &&
       syncLogVerified &&
       aiDifficultyVerified;
 
@@ -174,8 +187,8 @@ export function runSingleGameSelfTest(gameId: string): GameDiagnosticResult {
       durationMs,
       status: passed ? "PASS" : "FAIL",
       detail: passed
-        ? `Motor OK · ${legalMovesCount} jugadas iniciales · IA 4 niveles (0..3) + SyncLog verificados`
-        : "Fallo en validación de contrato de estado, dificultad IA o jugadas legales",
+        ? `Motor OK · ${legalMovesCount} jugadas · Undo/Redo + Checksum FNV-1a (${initialChecksum.slice(0, 10)}) + Telemetría IA verificados`
+        : "Fallo en validación de contrato de estado, Undo/Redo, Checksum o dificultad IA",
     };
   } catch (err) {
     return {

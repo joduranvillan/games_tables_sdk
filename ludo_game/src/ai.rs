@@ -107,7 +107,18 @@ pub fn best_move(
     player: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<MoveTokenCommand> {
-    if difficulty == AiDifficulty::Medium {
+    best_move_with_randomness(session, player, difficulty, 0, 0)
+}
+
+/// Selecciona el mejor movimiento para `player` en Ludo con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<MoveTokenCommand> {
+    if difficulty == AiDifficulty::Medium && randomness_pct == 0 {
         return ludo_ai_pick_move(session, player);
     }
     if session.current_player() != player {
@@ -121,8 +132,7 @@ pub fn best_move(
     let tokens_res = session.world().get_resource::<TokensResource>()?;
     let player_tokens = tokens_res.tokens.get(&player)?;
 
-    if difficulty == AiDifficulty::Easy {
-        // Easy: elige la primera ficha válida sin evaluar capturas ni seguridad
+    if difficulty == AiDifficulty::Easy && randomness_pct == 0 {
         for token_index in 0..player_tokens.len() {
             if tokens_res.is_valid_move_for_token(player, token_index, pending_roll) {
                 return Some(MoveTokenCommand {
@@ -141,8 +151,8 @@ pub fn best_move(
         .min()
         .unwrap_or(0);
 
-    let mut best_token: Option<usize> = None;
-    let mut best_score: i32 = i32::MIN;
+    let mut valid_tokens = Vec::new();
+    let mut scores = Vec::new();
 
     for (token_index, &current_steps) in player_tokens.iter().enumerate() {
         if !tokens_res.is_valid_move_for_token(player, token_index, pending_roll) {
@@ -154,7 +164,7 @@ pub fn best_move(
             current_steps + pending_roll
         };
         let pasos_avanzados = if current_steps == 0 { 1 } else { pending_roll };
-        let mut score: i32 = 3 * i32::from(pasos_avanzados);
+        let mut score: i32 = 3 * (pasos_avanzados as i32);
 
         if current_steps == 0 && target_steps == 1 {
             score += 30;
@@ -166,7 +176,6 @@ pub fn best_move(
             score += 5;
         }
 
-        // Penalizar abandonar una casilla segura si no es para capturar ni coronar
         if let Some(cur_pos) = tokens_res.board_position(player, current_steps) {
             if tokens_res.is_safe_square(cur_pos) && target_steps != WIN_STEPS {
                 score -= 8;
@@ -193,7 +202,6 @@ pub fn best_move(
                 if captures_rival {
                     score += 22;
                 } else if difficulty == AiDifficulty::Expert {
-                    // Evaluar amenaza de captura (ficha rival a 1..=6 casillas por detrás)
                     let under_threat = tokens_res.tokens.iter().any(|(&other, other_tokens)| {
                         other != player
                             && other_tokens.iter().any(|&s| {
@@ -209,18 +217,28 @@ pub fn best_move(
             }
         }
 
-        if score > best_score {
-            best_score = score;
-            best_token = Some(token_index);
-        }
+        valid_tokens.push(token_index);
+        scores.push(score as f32);
     }
 
-    best_token
-        .map(|token_index| MoveTokenCommand {
+    let safety_band = match difficulty {
+        AiDifficulty::Easy => 30.0,
+        AiDifficulty::Medium => 16.0,
+        AiDifficulty::Hard => 8.0,
+        AiDifficulty::Expert => 4.0,
+    };
+    if let Some(idx) = AiDifficulty::select_top_k_with_noise(
+        &scores,
+        randomness_pct,
+        safety_band,
+        seed ^ session.current_tick().0 ^ session.id.0,
+    ) {
+        return Some(MoveTokenCommand {
             player,
-            token_index,
-        })
-        .or_else(|| ludo_ai_pick_move(session, player))
+            token_index: valid_tokens[idx],
+        });
+    }
+    ludo_ai_pick_move(session, player)
 }
 
 #[cfg(test)]

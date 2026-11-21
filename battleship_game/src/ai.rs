@@ -280,6 +280,17 @@ pub fn best_move(
     ai_player: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<BattleshipCommand> {
+    best_move_with_randomness(state, ai_player, difficulty, 0, 0)
+}
+
+/// Selecciona el mejor disparo en Batalla Naval con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    state: &BattleshipState,
+    ai_player: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<BattleshipCommand> {
     let opponent = resolve_opponent(state, ai_player);
     let shots = state.world().get_resource::<ShotsResource>();
     let fleet = state.world().get_resource::<FleetResource>();
@@ -305,8 +316,8 @@ pub fn best_move(
     // Semilla determinista derivada del estado actual para selecciones en Easy/Medium
     let touched_count = (BOARD_SIZE as usize * BOARD_SIZE as usize) - untouched.len();
     let mix = (touched_count as u64).wrapping_mul(0x517cc1b727220a95);
-    let seed = (state.id.0 ^ ((ai_player.0 as u64) << 32) ^ mix).max(1);
-    let mut rng = FastRng::new(seed);
+    let rng_seed = (state.id.0 ^ ((ai_player.0 as u64) << 32) ^ mix ^ seed).max(1);
+    let mut rng = FastRng::new(rng_seed);
 
     let target = match difficulty {
         AiDifficulty::Easy => {
@@ -345,17 +356,23 @@ pub fn best_move(
         }
         AiDifficulty::Hard | AiDifficulty::Expert => {
             let density = compute_probability_density_map(state, ai_player);
-            let mut best_pos = untouched[0];
-            let mut best_score = 0u32;
-
-            for &pos in &untouched {
-                let score = density[pos.row as usize][pos.col as usize];
-                if score > best_score {
-                    best_score = score;
-                    best_pos = pos;
-                }
-            }
-            best_pos
+            let scores: Vec<f32> = untouched
+                .iter()
+                .map(|pos| density[pos.row as usize][pos.col as usize] as f32)
+                .collect();
+            let safety_band = if difficulty == AiDifficulty::Expert {
+                3.0
+            } else {
+                6.0
+            };
+            let idx = AiDifficulty::select_top_k_with_noise(
+                &scores,
+                randomness_pct,
+                safety_band,
+                rng_seed,
+            )
+            .unwrap_or(0);
+            untouched[idx]
         }
     };
 

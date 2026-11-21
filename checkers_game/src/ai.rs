@@ -171,21 +171,90 @@ pub fn evaluate_checkers_board(session: &Session, player: PlayerId) -> f32 {
     score
 }
 
+fn generate_checkers_moves(world: &BevyWorld, player: PlayerId) -> Vec<MovePieceCommand> {
+    let Some(board) = world.get_resource::<BoardResource>() else {
+        return vec![];
+    };
+    let Some(sides) = world.get_resource::<Sides>() else {
+        return vec![];
+    };
+
+    let mut candidates: Vec<MovePieceCommand> = Vec::new();
+    let captures = board.get_all_available_captures(sides, player);
+    let active_jumper = world
+        .get_resource::<MultiCaptureResource>()
+        .and_then(|m| m.active_piece);
+
+    if !captures.is_empty() {
+        for (from, to) in captures {
+            if let Some(req) = active_jumper {
+                if from != req {
+                    continue;
+                }
+            }
+            candidates.push(MovePieceCommand { player, from, to });
+        }
+    } else if active_jumper.is_none() {
+        let forward = sides.forward_direction(player);
+        for r in 0..8u8 {
+            for c in 0..8u8 {
+                let from = Position::new(r, c);
+                if let Some(piece) = board.get(from) {
+                    if piece.owner != player {
+                        continue;
+                    }
+                    let offsets: &[(i8, i8)] = if piece.is_king {
+                        &[(-1, -1), (-1, 1), (1, -1), (1, 1)]
+                    } else if forward == 1 {
+                        &[(1, -1), (1, 1)]
+                    } else {
+                        &[(-1, -1), (-1, 1)]
+                    };
+                    for &(dr, dc) in offsets {
+                        let nr = r as i8 + dr;
+                        let nc = c as i8 + dc;
+                        if (0..8).contains(&nr) && (0..8).contains(&nc) {
+                            let to = Position::new(nr as u8, nc as u8);
+                            if to.is_dark_square() && board.get(to).is_none() {
+                                candidates.push(MovePieceCommand { player, from, to });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    candidates
+}
+
 /// Selecciona la mejor jugada legal en Damas ajustando la evaluación según `AiDifficulty`.
 pub fn best_move(
     session: &Session,
     player: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<MovePieceCommand> {
-    if difficulty == AiDifficulty::Easy {
+    best_move_with_randomness(session, player, difficulty, 0, 0)
+}
+
+/// Selecciona la mejor jugada legal en Damas con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<MovePieceCommand> {
+    if difficulty == AiDifficulty::Easy && randomness_pct == 0 {
         return checkers_ai_pick_move(session, player);
     }
-    let legal = CheckersLegalMoveGenerator::generate_moves(session.world(), player);
+    let legal = generate_checkers_moves(session.world(), player);
     if legal.is_empty() {
         return checkers_ai_pick_move(session, player);
     }
-    let mut best_cmd = None;
-    let mut best_score = f32::NEG_INFINITY;
+    let mut scored_cmds = Vec::with_capacity(legal.len());
+    let mut scores = Vec::with_capacity(legal.len());
+
     for cmd in legal {
         let mut next_session = clone_checkers_session(session);
         if next_session
@@ -196,8 +265,7 @@ pub fn best_move(
             if matches!(difficulty, AiDifficulty::Hard | AiDifficulty::Expert) {
                 let opp = next_session.current_player();
                 if opp != player {
-                    let opp_moves =
-                        CheckersLegalMoveGenerator::generate_moves(next_session.world(), opp);
+                    let opp_moves = generate_checkers_moves(next_session.world(), opp);
                     let mut worst_reply = score;
                     for opp_cmd in opp_moves.into_iter().take(8) {
                         let mut reply_sess = clone_checkers_session(&next_session);
@@ -214,13 +282,26 @@ pub fn best_move(
                     score = worst_reply;
                 }
             }
-            if score > best_score || best_cmd.is_none() {
-                best_score = score;
-                best_cmd = Some(cmd);
-            }
+            scored_cmds.push(cmd);
+            scores.push(score);
         }
     }
-    best_cmd.or_else(|| checkers_ai_pick_move(session, player))
+
+    let safety_band = match difficulty {
+        AiDifficulty::Easy => 1.5,
+        AiDifficulty::Medium => 0.65,
+        AiDifficulty::Hard => 0.30,
+        AiDifficulty::Expert => 0.15,
+    };
+    if let Some(idx) = AiDifficulty::select_top_k_with_noise(
+        &scores,
+        randomness_pct,
+        safety_band,
+        seed ^ session.current_tick().0 ^ session.id.0,
+    ) {
+        return scored_cmds.into_iter().nth(idx);
+    }
+    checkers_ai_pick_move(session, player)
 }
 
 #[cfg(test)]

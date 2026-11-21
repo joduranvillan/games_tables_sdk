@@ -108,6 +108,17 @@ pub fn best_move(
     player: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<PlaceStoneCommand> {
+    best_move_with_randomness(session, player, difficulty, 0, 0)
+}
+
+/// Selecciona el mejor movimiento para `player` en Go aplicando un factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<PlaceStoneCommand> {
     if session
         .world()
         .get_resource::<GameOverResource>()
@@ -131,7 +142,7 @@ pub fn best_move(
     let rollouts_per_candidate = (total_budget / n).max(1);
 
     let mut rng = FastRng::new(
-        (session.id.0 ^ session.current_tick().0)
+        (session.id.0 ^ session.current_tick().0 ^ seed)
             .wrapping_mul(0x9e3779b97f4a7c15)
             .wrapping_add(1),
     );
@@ -145,6 +156,7 @@ pub fn best_move(
     let mut best_move = None;
     let mut best_win_rate = -1.0f32;
     let mut best_net_score = f32::NEG_INFINITY;
+    let mut combined_scores = Vec::with_capacity(candidates.len());
 
     for candidate in &candidates {
         let mut wins = 0.0f32;
@@ -292,6 +304,7 @@ pub fn best_move(
 
         let win_rate = wins / (rollouts_per_candidate as f32);
         let avg_score_diff = total_score_diff / (rollouts_per_candidate as f32);
+        combined_scores.push(win_rate * 100.0 + avg_score_diff);
 
         if win_rate > best_win_rate
             || ((win_rate - best_win_rate).abs() < 1e-4 && avg_score_diff > best_net_score)
@@ -300,6 +313,23 @@ pub fn best_move(
             best_win_rate = win_rate;
             best_net_score = avg_score_diff;
             best_move = Some(candidate.clone());
+        }
+    }
+
+    if randomness_pct > 0 {
+        let safety_band = match difficulty {
+            AiDifficulty::Easy => 35.0,
+            AiDifficulty::Medium => 18.0,
+            AiDifficulty::Hard => 8.0,
+            AiDifficulty::Expert => 4.0,
+        };
+        if let Some(idx) = AiDifficulty::select_top_k_with_noise(
+            &combined_scores,
+            randomness_pct,
+            safety_band,
+            seed ^ session.current_tick().0 ^ session.id.0,
+        ) {
+            return candidates.into_iter().nth(idx);
         }
     }
 

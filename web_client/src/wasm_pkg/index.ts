@@ -114,6 +114,35 @@ export interface BattleshipShip {
   cells: [number, number][];
 }
 
+export interface AiMoveTelemetry {
+  game_type: string;
+  ai_player: number;
+  tick: number;
+  difficulty: number;
+  randomness_pct: number;
+  seed: number;
+  evaluated_candidates: number;
+  top_k_candidates: number;
+  chosen_index: number;
+  chosen_score: number;
+  best_raw_score: number;
+  strategy_profile: string;
+  command_summary: string;
+  elapsed_us: number;
+}
+
+export function computeFnv1a64Hex(input: string): string {
+  const bytes = new TextEncoder().encode(input);
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x0100000001b3n;
+  const mask = 0xffffffffffffffffn;
+  for (let i = 0; i < bytes.length; i++) {
+    hash ^= BigInt(bytes[i]);
+    hash = (hash * prime) & mask;
+  }
+  return "0x" + hash.toString(16).padStart(16, "0");
+}
+
 const GOOSE_SQUARES = new Set([5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59]);
 const LUDO_SAFE_STARS = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
 
@@ -1172,10 +1201,68 @@ export class WasmGameBridge {
   private winner: 0 | 1 | 2 | null = null;
   private aiPlayer: 1 | 2 | null = null;
   private aiDifficulty: number = 1;
+  private aiRandomness: number = 25;
+  private aiSeed: number = 0;
   private commandLog: { player: number; command: string }[] = [];
   private replayFullLog: { player: number; command: string }[] = [];
   private replayCursor: number = 0;
   private rngState: number = 1337;
+  private lastAiTelemetry: AiMoveTelemetry | null = null;
+  private lastEvalMetrics: {
+    evaluated: number;
+    topK: number;
+    chosenIndex: number;
+    chosenScore: number;
+    bestRawScore: number;
+  } = {
+    evaluated: 1,
+    topK: 1,
+    chosenIndex: 0,
+    chosenScore: 100,
+    bestRawScore: 100,
+  };
+
+  public static defaultRandomnessForDifficulty(difficulty: number): number {
+    const d = Math.max(0, Math.min(3, Math.floor(Number(difficulty) || 0)));
+    return d === 0 ? 45 : d === 1 ? 25 : d === 2 ? 12 : 5;
+  }
+
+  public static strategyProfileForGame(gameType: string, difficulty: number): string {
+    const d = Math.max(0, Math.min(3, Math.floor(Number(difficulty) || 0)));
+    const level = d === 0 ? "Easy" : d === 1 ? "Medium" : d === 2 ? "Hard" : "Expert";
+    switch (gameType) {
+      case "chess":
+        return `AlphaBeta+PST+MopUp (${level})`;
+      case "checkers":
+        return `Negamax+KingMobility (${level})`;
+      case "shogi":
+        return `Minimax+HandDrops+Castle (${level})`;
+      case "xiangqi":
+        return `AlphaBeta+PalaceGuard+River (${level})`;
+      case "go":
+        return `LibertyMCTS+EyeGuard (${level})`;
+      case "chinese_checkers":
+        return `HopChain+TargetTriangle (${level})`;
+      case "backgammon":
+        return `PipCount+BlotSafety+Prime (${level})`;
+      case "ludo":
+        return `CaptureStar+SafeGoal (${level})`;
+      case "battleship":
+        return `ParityHunt+DestroyAxis (${level})`;
+      case "mille_bornes":
+        return `CoupFourre+HazardTempo (${level})`;
+      case "monopoly":
+        return `ColorGroupROI+CashReserve (${level})`;
+      case "uno":
+        return `ColorControl+ActionStack (${level})`;
+      case "crisis":
+        return `BorderChokepoint+CardSet (${level})`;
+      case "goose":
+        return `ExpectedAdvance+HazardAvoid (${level})`;
+      default:
+        return `HeuristicTopK (${level})`;
+    }
+  }
 
   // 1. Chess state (FIDE Canonical Rules: Castling O-O / O-O-O, En Passant, Promotion, Check/Pin simulation, 50-move & Threefold)
   private chessGrid: (ChessPiece | null)[][] = createInitialChessGrid();
@@ -1305,6 +1392,7 @@ export class WasmGameBridge {
     this.replayFullLog = [];
     this.replayCursor = 0;
     this.rngState = 1337;
+    this.lastAiTelemetry = null;
 
     if (this.gameType === "chess") {
       this.chessGrid = createInitialChessGrid();
@@ -1448,11 +1536,127 @@ export class WasmGameBridge {
     const ok = this.start_local_match(gameType, humanId, aiId);
     this.aiPlayer = (aiId === 1 ? 1 : 2) as 1 | 2;
     this.aiDifficulty = Math.max(0, Math.min(3, difficulty));
+    this.aiRandomness = WasmGameBridge.defaultRandomnessForDifficulty(this.aiDifficulty);
     return ok;
   }
 
   public get_ai_difficulty(): number {
     return this.aiDifficulty;
+  }
+
+  public get_ai_randomness(): number {
+    return this.aiRandomness;
+  }
+
+  public set_ai_randomness(randomnessPct: number): void {
+    const clamped = Math.max(0, Math.min(100, Math.round(Number(randomnessPct) || 0)));
+    this.aiRandomness = clamped;
+  }
+
+  public get_ai_seed(): number {
+    return this.aiSeed;
+  }
+
+  public set_ai_seed(seed: number): void {
+    this.aiSeed = Math.floor(Number(seed) || 0) >>> 0;
+  }
+
+  private noiseUnitFloat(index: number, salt: number): number {
+    let z =
+      (this.aiSeed ^
+        Math.imul(this.tick + 1, 0x9e3779b9) ^
+        Math.imul(index + 1, 0x85ebca6b) ^
+        Math.imul(salt + 1, 0xc2b2ae35) ^
+        Math.imul(this.aiRandomness + 1, 0x27d4eb2f)) >>>
+      0;
+    z = Math.imul(z ^ (z >>> 16), 0x85ebca6b) >>> 0;
+    z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35) >>> 0;
+    z = (z ^ (z >>> 16)) >>> 0;
+    return (z >>> 8) / 16777216.0;
+  }
+
+  private isNoiseActive(): boolean {
+    if (this.aiRandomness <= 0) return false;
+    const defaultPct = WasmGameBridge.defaultRandomnessForDifficulty(this.aiDifficulty);
+    return this.aiSeed !== 0 || this.aiRandomness !== defaultPct;
+  }
+
+  private selectTopKWithNoise(scores: number[], safetyBand: number): number {
+    if (scores.length === 0) {
+      this.lastEvalMetrics = {
+        evaluated: 1,
+        topK: 1,
+        chosenIndex: 0,
+        chosenScore: 0,
+        bestRawScore: 0,
+      };
+      return 0;
+    }
+    let bestIdx = 0;
+    let maxScore = -Infinity;
+    for (let i = 0; i < scores.length; i++) {
+      if (scores[i] > maxScore) {
+        maxScore = scores[i];
+        bestIdx = i;
+      }
+    }
+    const r = Math.max(0, Math.min(100, this.aiRandomness)) / 100.0;
+    const margin = safetyBand > 0 ? safetyBand * r : 0;
+    let topKCount = 0;
+    for (let i = 0; i < scores.length; i++) {
+      const s = scores[i];
+      if (Number.isFinite(s) && maxScore - s <= margin + 1e-4) {
+        topKCount++;
+      }
+    }
+    topKCount = Math.max(1, topKCount);
+
+    if (!this.isNoiseActive() || safetyBand <= 0) {
+      const cleanBest = Number.isFinite(maxScore) ? Number(maxScore.toFixed(2)) : 0;
+      this.lastEvalMetrics = {
+        evaluated: scores.length,
+        topK: this.aiRandomness === 0 ? 1 : topKCount,
+        chosenIndex: bestIdx,
+        chosenScore: cleanBest,
+        bestRawScore: cleanBest,
+      };
+      return bestIdx;
+    }
+
+    const jitterAmp = safetyBand * r * 1.85 + 1e-3;
+
+    let noisyBestIdx = bestIdx;
+    let noisyBestScore = -Infinity;
+
+    for (let i = 0; i < scores.length; i++) {
+      const s = scores[i];
+      if (maxScore - s <= margin + 1e-4) {
+        const u = this.noiseUnitFloat(i, scores.length);
+        const noisy = s + u * jitterAmp;
+        if (noisy > noisyBestScore) {
+          noisyBestScore = noisy;
+          noisyBestIdx = i;
+        }
+      }
+    }
+
+    const rawChosen = scores[noisyBestIdx] ?? maxScore;
+    this.lastEvalMetrics = {
+      evaluated: scores.length,
+      topK: topKCount,
+      chosenIndex: noisyBestIdx,
+      chosenScore: Number.isFinite(rawChosen) ? Number(rawChosen.toFixed(2)) : 0,
+      bestRawScore: Number.isFinite(maxScore) ? Number(maxScore.toFixed(2)) : 0,
+    };
+    return noisyBestIdx;
+  }
+
+  public get_state_checksum_hex(): string {
+    return computeFnv1a64Hex(this.get_state_json());
+  }
+
+  public get_last_ai_telemetry_json(): string {
+    return this.lastAiTelemetry ? JSON.stringify(this.lastAiTelemetry) : "null";
   }
 
   public current_player(): number {
@@ -3335,6 +3539,69 @@ export class WasmGameBridge {
     if (this.winner !== null || !this.aiPlayer || this.turn !== this.aiPlayer) {
       return "[]";
     }
+    const startPerf = typeof performance !== "undefined" ? performance.now() : Date.now();
+    this.lastEvalMetrics = {
+      evaluated: 1,
+      topK: 1,
+      chosenIndex: 0,
+      chosenScore: 100,
+      bestRawScore: 100,
+    };
+    const logLenBefore = this.commandLog.length;
+    const eventsJson = this.stepAiInternal();
+    const elapsedUs = Math.max(
+      1,
+      Math.round(
+        ((typeof performance !== "undefined" ? performance.now() : Date.now()) - startPerf) * 1000
+      )
+    );
+    if (this.commandLog.length > logLenBefore) {
+      const lastCmdStr = this.commandLog[this.commandLog.length - 1]?.command || "{}";
+      let cmdSummary = "AiMoveCommand";
+      try {
+        const parsedCmd = JSON.parse(lastCmdStr) as Record<string, unknown>;
+        const rawType = String(parsedCmd.command_type || parsedCmd.type || "AiMoveCommand");
+        const shortType = rawType.includes("::") ? rawType.split("::").pop()! : rawType;
+        if (parsedCmd.from !== undefined && parsedCmd.to !== undefined) {
+          cmdSummary = `${shortType}(${JSON.stringify(parsedCmd.from)}->${JSON.stringify(parsedCmd.to)})`;
+        } else if (parsedCmd.fromId !== undefined && parsedCmd.toId !== undefined) {
+          cmdSummary = `${shortType}(${String(parsedCmd.fromId)}->${String(parsedCmd.toId)})`;
+        } else if (parsedCmd.row !== undefined && parsedCmd.col !== undefined) {
+          cmdSummary = `${shortType}(${String(parsedCmd.row)},${String(parsedCmd.col)})`;
+        } else if (parsedCmd.card_index !== undefined) {
+          cmdSummary = `${shortType}(card=${String(parsedCmd.card_index)})`;
+        } else if (parsedCmd.token_index !== undefined) {
+          cmdSummary = `${shortType}(token=${String(parsedCmd.token_index)})`;
+        } else {
+          cmdSummary = shortType;
+        }
+      } catch {
+        cmdSummary = "AiMoveCommand";
+      }
+      this.lastAiTelemetry = {
+        game_type: this.gameType,
+        ai_player: this.aiPlayer,
+        tick: this.tick,
+        difficulty: this.aiDifficulty,
+        randomness_pct: this.aiRandomness,
+        seed: this.aiSeed,
+        evaluated_candidates: Math.max(1, this.lastEvalMetrics.evaluated),
+        top_k_candidates: Math.max(1, this.lastEvalMetrics.topK),
+        chosen_index: this.lastEvalMetrics.chosenIndex,
+        chosen_score: this.lastEvalMetrics.chosenScore,
+        best_raw_score: this.lastEvalMetrics.bestRawScore,
+        strategy_profile: WasmGameBridge.strategyProfileForGame(this.gameType, this.aiDifficulty),
+        command_summary: cmdSummary,
+        elapsed_us: elapsedUs,
+      };
+    }
+    return eventsJson;
+  }
+
+  private stepAiInternal(): string {
+    if (this.winner !== null || !this.aiPlayer || this.turn !== this.aiPlayer) {
+      return "[]";
+    }
     const ai = this.aiPlayer;
     const opp: 1 | 2 = ai === 1 ? 2 : 1;
     const diff = this.aiDifficulty; // 0 = Easy, 1 = Medium, 2 = Hard, 3 = Expert
@@ -3348,16 +3615,30 @@ export class WasmGameBridge {
           (m) => m.from[0] === fr && m.from[1] === fc && m.to[0] === tr && m.to[1] === tc
         );
 
-      // Opening Book for Hard (2) & Expert (3) on turn 1-2
+      // Opening Book for Hard (2) & Expert (3) on turn 1-2 with repertoire variation under noise
       if (this.tick <= 2 && ai === 2 && diff >= 2 && this.chessLastMove) {
         const [lfr, lfc] = this.chessLastMove.from;
         const [ltr, ltc] = this.chessLastMove.to;
         // 1. e4 ([6,4]->[4,4])
         if (lfr === 6 && lfc === 4 && ltr === 4 && ltc === 4) {
-          const book =
+          let book =
             diff === 3
               ? findMove(1, 2, 3, 2) // 1...c5 (Sicilian Defense - Expert)
               : findMove(1, 4, 3, 4); // 1...e5 (Open Game - Hard)
+          if (this.isNoiseActive()) {
+            const repertoire = [
+              findMove(1, 2, 3, 2),
+              findMove(1, 4, 3, 4),
+              findMove(1, 4, 2, 4),
+              findMove(1, 2, 2, 2),
+            ].filter((m): m is ChessMove => Boolean(m));
+            if (repertoire.length > 1) {
+              const repScores = repertoire.map((m) =>
+                m === book ? 100 : 94
+              );
+              book = repertoire[this.selectTopKWithNoise(repScores, 18)];
+            }
+          }
           if (book) {
             return this.send_command_json(
               ai,
@@ -3373,10 +3654,23 @@ export class WasmGameBridge {
         }
         // 1. d4 ([6,3]->[4,3])
         if (lfr === 6 && lfc === 3 && ltr === 4 && ltc === 3) {
-          const book =
+          let book =
             diff === 3
               ? findMove(0, 6, 2, 5) // 1...Nf6 (King's Indian - Expert)
               : findMove(1, 3, 3, 3); // 1...d5 (Queen's Gambit / Closed - Hard)
+          if (this.isNoiseActive()) {
+            const repertoire = [
+              findMove(0, 6, 2, 5),
+              findMove(1, 3, 3, 3),
+              findMove(1, 4, 2, 4),
+            ].filter((m): m is ChessMove => Boolean(m));
+            if (repertoire.length > 1) {
+              const repScores = repertoire.map((m) =>
+                m === book ? 100 : 94
+              );
+              book = repertoire[this.selectTopKWithNoise(repScores, 18)];
+            }
+          }
           if (book) {
             return this.send_command_json(
               ai,
@@ -3401,8 +3695,7 @@ export class WasmGameBridge {
         King: 20000,
       };
 
-      let chosen = legal[0];
-      let bestScore = -Infinity;
+      const scores: number[] = [];
 
       for (let idx = 0; idx < legal.length; idx++) {
         const m = legal[idx];
@@ -3473,11 +3766,11 @@ export class WasmGameBridge {
           }
         }
 
-        if (score > bestScore) {
-          bestScore = score;
-          chosen = m;
-        }
+        scores.push(score);
       }
+
+      const safetyBand = diff === 0 ? 18 : diff === 1 ? 16 : diff === 2 ? 14 : 12;
+      const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
 
       return this.send_command_json(
         ai,
@@ -3495,8 +3788,7 @@ export class WasmGameBridge {
       const legal = this.getCheckersLegalMoves(ai);
       if (legal.length === 0) return "[]";
 
-      let chosen = legal[0];
-      let bestScore = -Infinity;
+      const scores: number[] = [];
       const homeRow = ai === 2 ? 0 : 7;
       const crownRow = ai === 2 ? 7 : 0;
 
@@ -3556,11 +3848,11 @@ export class WasmGameBridge {
           score += tacticalCol - (m.from[0] === homeRow ? 30 : 0) - unsafePenalty;
         }
 
-        if (score > bestScore) {
-          bestScore = score;
-          chosen = m;
-        }
+        scores.push(score);
       }
+
+      const safetyBand = diff === 0 ? 25 : diff === 1 ? 20 : diff === 2 ? 18 : 15;
+      const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
 
       return this.send_command_json(
         ai,
@@ -3587,21 +3879,23 @@ export class WasmGameBridge {
         index: number;
       }[];
       if (playableRaw.length > 0) {
-        let chosenEntry = playableRaw[0];
         const oppCount = this.unoHands[opp]?.length || 7;
-        if (diff >= 1 && playableRaw.length > 1) {
-          const scoreCard = (c: UnoCard): number => {
-            if (diff === 1) {
-              return c.color !== "Wild" ? 20 : 5;
-            }
-            if (c.value === "WildDrawFour") return oppCount <= 3 ? 85 : 15;
-            if (c.value === "DrawTwo") return oppCount <= 3 ? 75 : 50;
-            if (c.value === "Skip" || c.value === "Reverse") return 42;
-            if (c.color === "Wild") return diff === 3 ? 10 : 25;
-            return 20 + (Number(c.value) || 0);
-          };
-          chosenEntry = [...playableRaw].sort((a, b) => scoreCard(b.card) - scoreCard(a.card))[0];
-        }
+        const scoreCard = (c: UnoCard, idx: number): number => {
+          if (diff === 0) {
+            return 20 - idx * 3;
+          }
+          if (diff === 1) {
+            return (c.color !== "Wild" ? 20 : 5) - idx * 0.5;
+          }
+          if (c.value === "WildDrawFour") return oppCount <= 3 ? 85 : 15;
+          if (c.value === "DrawTwo") return oppCount <= 3 ? 75 : 50;
+          if (c.value === "Skip" || c.value === "Reverse") return 42;
+          if (c.color === "Wild") return diff === 3 ? 10 : 25;
+          return 20 + (Number(c.value) || 0);
+        };
+        const unoScores = playableRaw.map((entry, idx) => scoreCard(entry.card, idx));
+        const safetyBand = diff === 0 ? 15 : diff === 1 ? 18 : diff === 2 ? 14 : 10;
+        const chosenEntry = playableRaw[this.selectTopKWithNoise(unoScores, safetyBand)];
 
         // Automatically call UNO when going from 2 cards to 1 card on Medium/Hard/Expert
         if (diff >= 1 && (this.unoHands[ai]?.length || 0) === 2) {
@@ -3646,6 +3940,14 @@ export class WasmGameBridge {
     }
 
     if (this.gameType === "goose") {
+      if (this.isNoiseActive()) {
+        const d1 = 1 + (Math.floor(this.noiseUnitFloat(1, 601) * 6) % 6);
+        const d2 = 1 + (Math.floor(this.noiseUnitFloat(2, 602) * 6) % 6);
+        return this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "RollDiceCommand", player: ai, d1, d2 })
+        );
+      }
       return this.send_command_json(
         ai,
         JSON.stringify({ command_type: "RollDiceCommand", player: ai })
@@ -3659,8 +3961,7 @@ export class WasmGameBridge {
         capturesCount?: number;
       }[];
       if (legal.length > 0) {
-        let chosen = legal[0];
-        let bestScore = -Infinity;
+        const scores: number[] = [];
 
         for (const m of legal) {
           const r = m.row;
@@ -3708,11 +4009,11 @@ export class WasmGameBridge {
             else if (r === 6 && c === 2) score += 42;
           }
 
-          if (score > bestScore) {
-            bestScore = score;
-            chosen = m;
-          }
+          scores.push(score);
         }
+
+        const safetyBand = diff === 0 ? 25 : diff === 1 ? 20 : diff === 2 ? 15 : 12;
+        const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
 
         return this.send_command_json(
           ai,
@@ -3763,12 +4064,14 @@ export class WasmGameBridge {
           Rook: 1000,
           King: 15000,
         };
-        let chosen = legal[0];
-        let bestScore = -Infinity;
+        const scores: number[] = [];
 
         for (let idx = 0; idx < legal.length; idx++) {
           const m = legal[idx];
-          if (!m.from) continue;
+          if (!m.from) {
+            scores.push(-Infinity);
+            continue;
+          }
           const mover = this.shogiGrid[m.from[0]]?.[m.from[1]];
           const target = this.shogiGrid[m.to[0]]?.[m.to[1]];
           let score = 0;
@@ -3829,11 +4132,11 @@ export class WasmGameBridge {
             }
           }
 
-          if (score > bestScore) {
-            bestScore = score;
-            chosen = m;
-          }
+          scores.push(score);
         }
+
+        const safetyBand = diff === 0 ? 20 : diff === 1 ? 22 : diff === 2 ? 18 : 15;
+        const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
 
         return this.send_command_json(
           ai,
@@ -3860,8 +4163,7 @@ export class WasmGameBridge {
           Chariot: 900,
           General: 15000,
         };
-        let chosen = legal[0];
-        let bestScore = -Infinity;
+        const scores: number[] = [];
 
         for (let idx = 0; idx < legal.length; idx++) {
           const m = legal[idx];
@@ -3912,11 +4214,11 @@ export class WasmGameBridge {
             }
           }
 
-          if (score > bestScore) {
-            bestScore = score;
-            chosen = m;
-          }
+          scores.push(score);
         }
+
+        const safetyBand = diff === 0 ? 20 : diff === 1 ? 25 : diff === 2 ? 20 : 18;
+        const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
 
         return this.send_command_json(
           ai,
@@ -3933,47 +4235,47 @@ export class WasmGameBridge {
     if (this.gameType === "chinese_checkers") {
       const legal = this.getChineseCheckersLegalMoves(ai);
       if (legal.length > 0) {
-        let chosen = legal[0];
-        if (diff === 0 && legal.length > 1) {
-          chosen = legal[legal.length - 1];
-        } else if (diff >= 1 && legal.length > 1) {
-          // Find furthest-back straggler row for quadratic straggler penalty on Expert
-          const myCells = this.ccCells.filter((c) => c.owner === ai);
-          const stragglerRow =
-            myCells.length > 0
-              ? ai === 1
-                ? Math.max(...myCells.map((c) => c.r))
-                : Math.min(...myCells.map((c) => c.r))
-              : 0;
+        const myCells = this.ccCells.filter((c) => c.owner === ai);
+        const stragglerRow =
+          myCells.length > 0
+            ? ai === 1
+              ? Math.max(...myCells.map((c) => c.r))
+              : Math.min(...myCells.map((c) => c.r))
+            : 0;
 
-          let bestScore = -Infinity;
-          for (const m of legal) {
-            const [fr, fx2] = m.fromId.split("_").map(Number);
-            const [tr, tx2] = m.toId.split("_").map(Number);
-            const gain = ai === 1 ? fr - tr : tr - fr;
-            const isChainJump = Math.abs(tr - fr) >= 2 || Math.abs(tx2 - fx2) >= 4;
-            const centerBonus = 6 - Math.abs(tx2);
-            const isMovingStraggler = fr === stragglerRow ? 1 : 0;
-            const trailingDist = ai === 1 ? fr : 16 - fr;
-            let score = gain * 22;
-            if (diff === 1) {
-              score += (isChainJump ? 15 : 0) - Math.abs(fx2);
-            } else if (diff === 2) {
-              score += centerBonus * 4 + (isChainJump ? 25 : 0);
-            } else {
-              // Expert: quadratic straggler priority + central bridge jumping
-              score +=
-                centerBonus * 5 +
-                (isChainJump ? 35 : 0) +
-                isMovingStraggler * 45 +
-                trailingDist * trailingDist * 0.4;
-            }
-            if (score > bestScore) {
-              bestScore = score;
-              chosen = m;
-            }
+        const scores: number[] = [];
+        for (let idx = 0; idx < legal.length; idx++) {
+          const m = legal[idx];
+          if (diff === 0) {
+            scores.push(-(legal.length - 1 - idx) * 4);
+            continue;
           }
+          const [fr, fx2] = m.fromId.split("_").map(Number);
+          const [tr, tx2] = m.toId.split("_").map(Number);
+          const gain = ai === 1 ? fr - tr : tr - fr;
+          const isChainJump = Math.abs(tr - fr) >= 2 || Math.abs(tx2 - fx2) >= 4;
+          const centerBonus = 6 - Math.abs(tx2);
+          const isMovingStraggler = fr === stragglerRow ? 1 : 0;
+          const trailingDist = ai === 1 ? fr : 16 - fr;
+          let score = gain * 22;
+          if (diff === 1) {
+            score += (isChainJump ? 15 : 0) - Math.abs(fx2);
+          } else if (diff === 2) {
+            score += centerBonus * 4 + (isChainJump ? 25 : 0);
+          } else {
+            // Expert: quadratic straggler priority + central bridge jumping
+            score +=
+              centerBonus * 5 +
+              (isChainJump ? 35 : 0) +
+              isMovingStraggler * 45 +
+              trailingDist * trailingDist * 0.4;
+          }
+          scores.push(score);
         }
+
+        const safetyBand = diff === 0 ? 18 : diff === 1 ? 18 : diff === 2 ? 15 : 12;
+        const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
+
         return this.send_command_json(
           ai,
           JSON.stringify({
@@ -4022,8 +4324,7 @@ export class WasmGameBridge {
 
       const legal = this.getBackgammonLegalMoves(ai);
       if (legal.length > 0) {
-        let chosen = legal[0];
-        let bestScore = -Infinity;
+        const scores: number[] = [];
 
         for (let idx = 0; idx < legal.length; idx++) {
           const m = legal[idx];
@@ -4031,7 +4332,7 @@ export class WasmGameBridge {
           const srcPt = m.from >= 0 && m.from < 24 ? this.bgPoints[m.from] : null;
           let score = 0;
           if (diff === 0) {
-            score = -idx;
+            score = -idx * 3;
           } else {
             // Bar entry priority
             if (m.from === -1) score += 95;
@@ -4057,16 +4358,18 @@ export class WasmGameBridge {
                 score -= 25; // breaking an existing secure point
               }
             }
-            // Advancing back checkers on Expert
-            if (diff === 3 && m.from >= 0) {
-              score += ai === 2 ? m.from * 2 : (23 - m.from) * 2;
+            // Advancing back checkers and maximizing step distance
+            if (m.from >= 0) {
+              const backDist = ai === 2 ? m.from : 23 - m.from;
+              const stepDist = Math.abs(m.from - m.to);
+              score += backDist * (diff === 3 ? 2.8 : 2.5) + stepDist * 4;
             }
           }
-          if (score > bestScore) {
-            bestScore = score;
-            chosen = m;
-          }
+          scores.push(score);
         }
+
+        const safetyBand = diff === 0 ? 16 : diff === 1 ? 60 : diff === 2 ? 20 : 15;
+        const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
 
         return this.send_command_json(
           ai,
@@ -4085,55 +4388,58 @@ export class WasmGameBridge {
       const oppTokens = this.ludoTokens[opp] || [1, 0, 0, 0];
       const d1 = 6;
       const d2 = 2;
-      let bestToken = 0;
+      const movable: { idx: number; score: number }[] = [];
 
-      if (diff === 0) {
-        bestToken = 0;
-      } else {
-        let bestScore = -Infinity;
-        tokens.forEach((cur, idx) => {
-          if (cur >= 57) return;
-          const step = cur === 0 ? 1 : d1;
-          const nextPos = cur + step > 57 ? 57 - (cur + step - 57) : cur + step;
-          let score = nextPos * 2;
+      tokens.forEach((cur, idx) => {
+        if (cur >= 57) return;
+        if (diff === 0) {
+          movable.push({ idx, score: -idx * 4 });
+          return;
+        }
+        const step = cur === 0 ? 1 : d1;
+        const nextPos = cur + step > 57 ? 57 - (cur + step - 57) : cur + step;
+        let score = nextPos * 2;
 
-          // Base exit on a 6
-          if (cur === 0) {
-            score += diff >= 2 ? 95 : 65;
+        // Base exit on a 6
+        if (cur === 0) {
+          score += diff >= 2 ? 95 : 65;
+        }
+        // Reaching exact goal 57
+        if (nextPos === 57) {
+          score += 120;
+        }
+        // Capturing an opponent token on a non-star square
+        const isNextSafe = LUDO_SAFE_STARS.has(nextPos);
+        if (!isNextSafe && oppTokens.some((op) => op > 0 && op < 52 && op === nextPos)) {
+          score += 110;
+        }
+        // Safe star evaluation & capture threat lookahead on Hard/Expert
+        if (diff >= 2) {
+          if (isNextSafe) {
+            score += 45;
           }
-          // Reaching exact goal 57
-          if (nextPos === 57) {
-            score += 120;
+          if (cur > 0 && LUDO_SAFE_STARS.has(cur) && nextPos !== 57) {
+            score -= 30; // reluctant to abandon a safe star without capturing or scoring
           }
-          // Capturing an opponent token on a non-star square
-          const isNextSafe = LUDO_SAFE_STARS.has(nextPos);
-          if (!isNextSafe && oppTokens.some((op) => op > 0 && op < 52 && op === nextPos)) {
-            score += 110;
-          }
-          // Safe star evaluation & capture threat lookahead on Hard/Expert
-          if (diff >= 2) {
-            if (isNextSafe) {
-              score += 45;
+          if (diff === 3 && !isNextSafe && nextPos < 52) {
+            const threatened = oppTokens.some(
+              (op) => op > 0 && nextPos - op >= 1 && nextPos - op <= 6
+            );
+            if (threatened) {
+              score -= 55;
             }
-            if (cur > 0 && LUDO_SAFE_STARS.has(cur) && nextPos !== 57) {
-              score -= 30; // reluctant to abandon a safe star without capturing or scoring
-            }
-            if (diff === 3 && !isNextSafe && nextPos < 52) {
-              const threatened = oppTokens.some(
-                (op) => op > 0 && nextPos - op >= 1 && nextPos - op <= 6
-              );
-              if (threatened) {
-                score -= 55;
-              }
-            }
           }
+        }
 
-          if (score > bestScore) {
-            bestScore = score;
-            bestToken = idx;
-          }
-        });
-      }
+        movable.push({ idx, score });
+      });
+
+      const safetyBand = diff === 0 ? 16 : diff === 1 ? 25 : diff === 2 ? 18 : 12;
+      const chosenIdx = this.selectTopKWithNoise(
+        movable.map((m) => m.score),
+        safetyBand
+      );
+      const bestToken = movable[chosenIdx]?.idx ?? 0;
 
       return this.send_command_json(
         ai,
@@ -4153,7 +4459,10 @@ export class WasmGameBridge {
         let chosen = legal[0];
         const myShots = this.bsShots[ai] || {};
 
-        if (diff >= 1) {
+        if (diff === 0) {
+          const easyScores = legal.map((_, idx) => -idx * 2);
+          chosen = legal[this.selectTopKWithNoise(easyScores, 20)];
+        } else {
           // Identify active hit cells that belong to ships NOT yet sunk
           const sunkNames = new Set(this.bsSunkShips[ai] || []);
           const sunkCells = new Set<string>();
@@ -4177,29 +4486,37 @@ export class WasmGameBridge {
 
           // 1a. Collinear Line Inference (Hard/Expert): if >=2 active hits share row or col, fire at line endpoints
           if (diff >= 2 && activeHits.length >= 2) {
-            for (let i = 0; i < activeHits.length && !targetCell; i++) {
-              for (let j = i + 1; j < activeHits.length && !targetCell; j++) {
+            const collinearCandidates: { row: number; col: number }[] = [];
+            for (let i = 0; i < activeHits.length; i++) {
+              for (let j = i + 1; j < activeHits.length; j++) {
                 const [r1, c1] = activeHits[i];
                 const [r2, c2] = activeHits[j];
                 if (r1 === r2) {
                   const minC = Math.min(c1, c2);
                   const maxC = Math.max(c1, c2);
-                  const left = legal.find((m) => m.row === r1 && m.col === minC - 1);
                   const right = legal.find((m) => m.row === r1 && m.col === maxC + 1);
-                  targetCell = right || left || null;
+                  const left = legal.find((m) => m.row === r1 && m.col === minC - 1);
+                  if (right) collinearCandidates.push(right);
+                  if (left) collinearCandidates.push(left);
                 } else if (c1 === c2) {
                   const minR = Math.min(r1, r2);
                   const maxR = Math.max(r1, r2);
-                  const up = legal.find((m) => m.row === minR - 1 && m.col === c1);
                   const down = legal.find((m) => m.row === maxR + 1 && m.col === c1);
-                  targetCell = down || up || null;
+                  const up = legal.find((m) => m.row === minR - 1 && m.col === c1);
+                  if (down) collinearCandidates.push(down);
+                  if (up) collinearCandidates.push(up);
                 }
               }
+            }
+            if (collinearCandidates.length > 0) {
+              const colScores = collinearCandidates.map((_, i) => 100 - i * 2);
+              targetCell = collinearCandidates[this.selectTopKWithNoise(colScores, 12)];
             }
           }
 
           // 1b. Orthogonal Target Mode: check orthogonal neighbors of any active hit
           if (!targetCell && activeHits.length > 0) {
+            const orthoCandidates: { row: number; col: number }[] = [];
             for (const [hr, hc] of activeHits) {
               for (const [dr, dc] of [
                 [-1, 0],
@@ -4209,11 +4526,13 @@ export class WasmGameBridge {
               ]) {
                 const cand = legal.find((m) => m.row === hr + dr && m.col === hc + dc);
                 if (cand) {
-                  targetCell = cand;
-                  break;
+                  orthoCandidates.push(cand);
                 }
               }
-              if (targetCell) break;
+            }
+            if (orthoCandidates.length > 0) {
+              const orthoScores = orthoCandidates.map((_, i) => 100 - i * 2);
+              targetCell = orthoCandidates[this.selectTopKWithNoise(orthoScores, 12)];
             }
           }
 
@@ -4265,7 +4584,7 @@ export class WasmGameBridge {
               }
             }
 
-            let bestScore = -Infinity;
+            const scores: number[] = [];
             for (const m of legal) {
               const parity = (m.row + m.col) % 2 === 0 ? 15 : 0;
               const diagBonus =
@@ -4277,23 +4596,19 @@ export class WasmGameBridge {
                     ? 10
                     : 0;
               const score = density[m.row][m.col] * 10 + parity + diagBonus;
-              if (score > bestScore) {
-                bestScore = score;
-                chosen = m;
-              }
+              scores.push(score);
             }
+            chosen = legal[this.selectTopKWithNoise(scores, diff === 2 ? 25 : 20)];
           } else {
             // Medium (diff === 1): checkerboard parity + center bias
-            let bestScore = -Infinity;
+            const scores: number[] = [];
             for (const m of legal) {
               const parity = (m.row + m.col) % 2 === 0 ? 25 : 0;
               const centerDist = Math.abs(4.5 - m.row) + Math.abs(4.5 - m.col);
               const score = parity + (9 - centerDist) * 3;
-              if (score > bestScore) {
-                bestScore = score;
-                chosen = m;
-              }
+              scores.push(score);
             }
+            chosen = legal[this.selectTopKWithNoise(scores, 20)];
           }
         }
 
@@ -4312,8 +4627,7 @@ export class WasmGameBridge {
     if (this.gameType === "mille_bornes") {
       const hand = this.mbHands[ai] || [];
       let bestIdx = 0;
-      if (diff >= 1 && hand.length > 1) {
-        let bestScore = -Infinity;
+      if (hand.length > 1) {
         const myHazard = this.mbHazard[ai];
         const oppHazard = this.mbHazard[opp];
         const shieldMap: Record<string, string> = {
@@ -4327,7 +4641,12 @@ export class WasmGameBridge {
           Accidente: "Reparaciones",
         };
 
+        const scores: number[] = [];
         hand.forEach((card, idx) => {
+          if (diff === 0) {
+            scores.push(-idx * 8);
+            return;
+          }
           let score = 0;
           if (
             card === "As del Volante" ||
@@ -4362,11 +4681,11 @@ export class WasmGameBridge {
               score = -80;
             }
           }
-          if (score > bestScore) {
-            bestScore = score;
-            bestIdx = idx;
-          }
+          scores.push(score);
         });
+
+        const safetyBand = diff === 0 ? 30 : diff === 1 ? 35 : diff === 2 ? 30 : 20;
+        bestIdx = this.selectTopKWithNoise(scores, safetyBand);
       }
       return this.send_command_json(
         ai,
@@ -4390,11 +4709,20 @@ export class WasmGameBridge {
         }
       }
 
-      // 2. Roll dice and advance
-      this.send_command_json(
-        ai,
-        JSON.stringify({ command_type: "monopoly_game::RollDiceCommand", player: ai })
-      );
+      // 2. Roll dice and advance (with bounded noise seed perturbation when noise is active)
+      if (this.isNoiseActive()) {
+        const d1 = 1 + (Math.floor(this.noiseUnitFloat(1, 701) * 6) % 6);
+        const d2 = 1 + (Math.floor(this.noiseUnitFloat(2, 702) * 6) % 6);
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "monopoly_game::RollDiceCommand", player: ai, d1, d2 })
+        );
+      } else {
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "monopoly_game::RollDiceCommand", player: ai })
+        );
+      }
 
       // 3. Evaluate property purchase according to liquidity reserve & color-group monopoly priority
       const curSpace = this.monoSpaces[this.monoPos[ai]];
@@ -4430,8 +4758,15 @@ export class WasmGameBridge {
           const ownedProps = this.monoSpaces
             .filter((s) => s.owner === ai && !s.mortgaged && s.houses < 5 && s.price > 0)
             .sort((a, bProp) => a.houses - bProp.houses || bProp.rent - a.rent);
+          if (ownedProps.length === 0) break;
+          const propScores = ownedProps.map((s) => (5 - s.houses) * 25 + s.rent);
+          const pickIdx = this.selectTopKWithNoise(propScores, diff === 2 ? 25 : 18);
+          const ordered = [
+            ownedProps[pickIdx],
+            ...ownedProps.filter((_, idx) => idx !== pickIdx),
+          ];
           let built = false;
-          for (const candidate of ownedProps) {
+          for (const candidate of ordered) {
             const resp = this.send_command_json(
               ai,
               JSON.stringify({
@@ -4467,27 +4802,31 @@ export class WasmGameBridge {
       // 2. Place reinforcement armies on the frontline territory with highest tactical need/advantage
       const myTerrs = this.crisisTerritories.filter((t) => t.owner === ai);
       if (myTerrs.length > 0 && this.crisisArmiesRemaining > 0) {
-        let targetTerr = myTerrs[0];
-        if (diff >= 1) {
-          let bestTerrScore = -Infinity;
-          for (const t of myTerrs) {
-            const enemyNeighbors = t.neighbors
-              .map((nid) => this.crisisTerritories[nid])
-              .filter((nt) => nt && nt.owner !== ai);
-            if (enemyNeighbors.length === 0) continue;
-            const weakestEnemy = Math.min(...enemyNeighbors.map((nt) => nt.armies));
-            const totalEnemyThreat = enemyNeighbors.reduce((acc, nt) => acc + nt.armies, 0);
-            const score =
-              diff >= 2
-                ? (t.armies + this.crisisArmiesRemaining) / Math.max(1, weakestEnemy) * 20 +
-                  totalEnemyThreat * 2
-                : t.armies * 10 + enemyNeighbors.length * 5;
-            if (score > bestTerrScore) {
-              bestTerrScore = score;
-              targetTerr = t;
-            }
+        const terrScores: number[] = [];
+        for (let idx = 0; idx < myTerrs.length; idx++) {
+          const t = myTerrs[idx];
+          if (diff === 0) {
+            terrScores.push(-idx * 5);
+            continue;
           }
+          const enemyNeighbors = t.neighbors
+            .map((nid) => this.crisisTerritories[nid])
+            .filter((nt) => nt && nt.owner !== ai);
+          if (enemyNeighbors.length === 0) {
+            terrScores.push(-100);
+            continue;
+          }
+          const weakestEnemy = Math.min(...enemyNeighbors.map((nt) => nt.armies));
+          const totalEnemyThreat = enemyNeighbors.reduce((acc, nt) => acc + nt.armies, 0);
+          const score =
+            diff >= 2
+              ? ((t.armies + this.crisisArmiesRemaining) / Math.max(1, weakestEnemy)) * 20 +
+                totalEnemyThreat * 2
+              : t.armies * 10 + enemyNeighbors.length * 5;
+          terrScores.push(score);
         }
+        const safetyBand = diff === 0 ? 20 : diff === 1 ? 25 : diff === 2 ? 18 : 12;
+        const targetTerr = myTerrs[this.selectTopKWithNoise(terrScores, safetyBand)];
         this.send_command_json(
           ai,
           JSON.stringify({
@@ -4504,7 +4843,7 @@ export class WasmGameBridge {
         const ratioThreshold = diff === 1 ? 1.5 : diff === 2 ? 1.3 : 1.15;
         const maxAttackWaves = diff === 1 ? 2 : diff === 2 ? 4 : 6;
         for (let wave = 0; wave < maxAttackWaves && this.winner === null; wave++) {
-          let bestAttack: { from: number; to: number; advantage: number } | null = null;
+          const attackCandidates: { from: number; to: number; advantage: number }[] = [];
           for (const att of this.crisisTerritories) {
             if (att.owner !== ai || att.armies < 2) continue;
             for (const nid of att.neighbors) {
@@ -4513,13 +4852,16 @@ export class WasmGameBridge {
               const ratio = att.armies / Math.max(1, def.armies);
               if (ratio >= ratioThreshold) {
                 const advantage = att.armies - def.armies + (def.armies === 1 ? 3 : 0);
-                if (!bestAttack || advantage > bestAttack.advantage) {
-                  bestAttack = { from: att.id, to: def.id, advantage };
-                }
+                attackCandidates.push({ from: att.id, to: def.id, advantage });
               }
             }
           }
-          if (!bestAttack) break;
+          if (attackCandidates.length === 0) break;
+          const attScores = attackCandidates.map((a) => a.advantage);
+          const bestAttack =
+            attackCandidates[
+              this.selectTopKWithNoise(attScores, diff === 1 ? 4 : diff === 2 ? 3 : 2)
+            ];
           this.send_command_json(
             ai,
             JSON.stringify({
@@ -4586,9 +4928,13 @@ export class WasmGameBridge {
       const targetGame = gameType || parsed.game_type || this.gameType;
       const savedAi = this.aiPlayer;
       const savedDiff = this.aiDifficulty;
+      const savedRand = this.aiRandomness;
+      const savedSeed = this.aiSeed;
       this.start_local_match(targetGame, 1, 2);
       this.aiPlayer = savedAi;
       this.aiDifficulty = savedDiff;
+      this.aiRandomness = savedRand;
+      this.aiSeed = savedSeed;
       if (Array.isArray(parsed.commands)) {
         for (const entry of parsed.commands) {
           this.executeCommandInternal(entry.player, entry.command, true);
@@ -4614,16 +4960,44 @@ export class WasmGameBridge {
     return this.replayCursor >= this.replayFullLog.length;
   }
 
+  public can_undo(): boolean {
+    return this.replayCursor > 0;
+  }
+
+  public can_redo(): boolean {
+    return this.replayCursor < this.replayFullLog.length;
+  }
+
+  public undo_step(): boolean {
+    if (!this.can_undo()) {
+      return false;
+    }
+    return this.seek_replay_step(this.replayCursor - 1);
+  }
+
+  public redo_step(): boolean {
+    if (!this.can_redo()) {
+      return false;
+    }
+    return this.seek_replay_step(this.replayCursor + 1);
+  }
+
   public seek_replay_step(stepIndex: number): boolean {
     const full = [...this.replayFullLog];
     const targetStep = Math.max(0, Math.min(full.length, Math.floor(stepIndex)));
     const currentGame = this.gameType;
     const savedAi = this.aiPlayer;
     const savedDiff = this.aiDifficulty;
+    const savedRand = this.aiRandomness;
+    const savedSeed = this.aiSeed;
+    const savedTelemetry = this.lastAiTelemetry;
 
     this.start_local_match(currentGame, 1, 2);
     this.aiPlayer = savedAi;
     this.aiDifficulty = savedDiff;
+    this.aiRandomness = savedRand;
+    this.aiSeed = savedSeed;
+    this.lastAiTelemetry = targetStep > 0 ? savedTelemetry : null;
 
     for (let i = 0; i < targetStep; i++) {
       const entry = full[i];

@@ -523,6 +523,194 @@ async function runRegression14Games() {
     "  [PASS] Niveles de dificultad de IA (0..3) y mejoras avanzadas (Crisis multifase, Monopoly casas, Batalla Naval densidad/colineal, Damas Chinas, Backgammon, Mil Millas) verificados"
   );
 
+  // F. Verificación E2E de Factor de Aleatoriedad / Ruido Top-K de la IA (0..100%) en los 14 juegos
+  const expectedAutoRandomness: Record<number, number> = {
+    0: 45,
+    1: 25,
+    2: 12,
+    3: 5,
+  };
+
+  for (const item of CATALOG_14_GAMES) {
+    for (const diff of [0, 1, 2, 3]) {
+      const nb = new WasmGameBridge();
+      nb.start_ai_match(item.id, 1, 2, diff);
+      assert(
+        nb.get_ai_randomness() === expectedAutoRandomness[diff],
+        `Auto-escalado de get_ai_randomness() en '${item.id}' (dificultad ${diff}) debe ser ${expectedAutoRandomness[diff]}%, obtenido: ${nb.get_ai_randomness()}%`
+      );
+    }
+
+    const p1Command =
+      item.id === "goose"
+        ? { command_type: "goose_game::RollDiceCommand", player: 1, d1: 1, d2: 2 }
+        : SAMPLE_FIRST_COMMANDS[item.id];
+
+    // Verificar clamping 0..100 y determinismo estricto con 0% de ruido independientemente de ai_seed
+    const detA = new WasmGameBridge();
+    detA.start_ai_match(item.id, 1, 2, 2);
+    detA.set_ai_randomness(0);
+    detA.set_ai_seed(11111);
+    assert(detA.get_ai_randomness() === 0, "set_ai_randomness(0) debe fijar 0%");
+    assert(detA.get_ai_seed() === 11111, "get_ai_seed() debe reflejar set_ai_seed(11111)");
+    detA.send_command_json(1, JSON.stringify(p1Command));
+    detA.step_ai_if_needed();
+
+    const detB = new WasmGameBridge();
+    detB.start_ai_match(item.id, 1, 2, 2);
+    detB.set_ai_randomness(0);
+    detB.set_ai_seed(99999);
+    detB.send_command_json(1, JSON.stringify(p1Command));
+    detB.step_ai_if_needed();
+
+    assert(
+      detA.get_state_json() === detB.get_state_json(),
+      `Con set_ai_randomness(0), '${item.id}' debe ser 100% determinista aunque cambie ai_seed`
+    );
+
+    // Verificar variedad controlada Top-K cuando el ruido está activo a través de distintas semillas
+    const noisyStates = new Set<string>();
+    for (let s = 1; s <= 12; s++) {
+      const vb = new WasmGameBridge();
+      vb.start_ai_match(item.id, 1, 2, 1);
+      vb.set_ai_randomness(75);
+      vb.set_ai_seed(s * 7919);
+      vb.send_command_json(1, JSON.stringify(p1Command));
+      const evs = JSON.parse(vb.step_ai_if_needed());
+      assert(
+        Array.isArray(evs) && evs.length > 0,
+        `Con ruido Top-K activo (seed ${s}), '${item.id}' debe producir una jugada legal`
+      );
+      noisyStates.add(vb.get_state_json());
+    }
+    assert(
+      noisyStates.size >= 2,
+      `Con Factor de Aleatoriedad Top-K activo (75%), '${item.id}' debe variar sus jugadas entre candidatos competitivos (estados distintos: ${noisyStates.size})`
+    );
+  }
+
+  console.log(
+    "  [PASS] Factor de Aleatoriedad / Ruido Top-K de la IA (auto-escalado 45%/25%/12%/5%, determinismo 0% y variedad Top-K en los 14 juegos) verificado"
+  );
+
+  // G. Verificación E2E de Mejoras del Motor: Undo/Redo Transaccional, Checksums FNV-1a 64-bit y Telemetría IA en los 14 juegos
+  for (const item of CATALOG_14_GAMES) {
+    const p1Command =
+      item.id === "goose"
+        ? { command_type: "goose_game::RollDiceCommand", player: 1, d1: 1, d2: 2 }
+        : SAMPLE_FIRST_COMMANDS[item.id];
+
+    const eb = new WasmGameBridge();
+    eb.start_ai_match(item.id, 1, 2, 2);
+    eb.set_ai_randomness(25);
+    eb.set_ai_seed(20261120);
+
+    const initialHash = eb.get_state_checksum_hex();
+    assert(
+      /^0x[0-9a-f]{16}$/.test(initialHash),
+      `Checksum FNV-1a inicial inválido en '${item.id}': ${initialHash}`
+    );
+    assert(!eb.can_undo(), `Al inicio de '${item.id}', can_undo() debe ser false`);
+    assert(!eb.can_redo(), `Al inicio de '${item.id}', can_redo() debe ser false`);
+    assert(
+      eb.get_last_ai_telemetry_json() === "null",
+      `Al inicio de '${item.id}', get_last_ai_telemetry_json() debe ser "null"`
+    );
+
+    // 1. Ejecutar jugada de J1 y verificar transición de checksum + Undo/Redo exacto
+    eb.send_command_json(1, JSON.stringify(p1Command));
+    const afterP1Hash = eb.get_state_checksum_hex();
+    assert(
+      afterP1Hash !== initialHash,
+      `El checksum FNV-1a debe cambiar tras la jugada de J1 en '${item.id}'`
+    );
+    assert(eb.can_undo(), `Tras jugada de J1 en '${item.id}', can_undo() debe ser true`);
+    assert(!eb.can_redo(), `Tras jugada de J1 en '${item.id}', can_redo() debe ser false`);
+
+    assert(eb.undo_step(), `undo_step() debe retornar true en '${item.id}'`);
+    assert(
+      eb.get_state_checksum_hex() === initialHash,
+      `Tras undo_step() en '${item.id}', el checksum FNV-1a debe coincidir exactamente con el inicial (${initialHash})`
+    );
+    assert(eb.can_redo(), `Tras undo_step() en '${item.id}', can_redo() debe ser true`);
+
+    assert(eb.redo_step(), `redo_step() debe retornar true en '${item.id}'`);
+    assert(
+      eb.get_state_checksum_hex() === afterP1Hash,
+      `Tras redo_step() en '${item.id}', el checksum FNV-1a debe restaurar exactamente el estado post-J1 (${afterP1Hash})`
+    );
+
+    // 2. Ejecutar turno de IA y verificar Telemetría IA + Undo/Redo del paso IA
+    const aiEvents = JSON.parse(eb.step_ai_if_needed());
+    assert(
+      Array.isArray(aiEvents) && aiEvents.length > 0,
+      `step_ai_if_needed() debe emitir eventos en '${item.id}'`
+    );
+    const afterAiHash = eb.get_state_checksum_hex();
+    assert(
+      afterAiHash !== afterP1Hash,
+      `El checksum FNV-1a debe cambiar tras el turno de IA en '${item.id}'`
+    );
+
+    const rawTelemetry = eb.get_last_ai_telemetry_json();
+    assert(
+      rawTelemetry !== "null",
+      `get_last_ai_telemetry_json() no debe ser null tras step_ai_if_needed() en '${item.id}'`
+    );
+    const telemetry = JSON.parse(rawTelemetry);
+    assert(
+      telemetry.game_type === item.id,
+      `Telemetría IA game_type debe ser '${item.id}', obtenido '${telemetry.game_type}'`
+    );
+    assert(
+      telemetry.ai_player === 2,
+      `Telemetría IA ai_player debe ser 2 en '${item.id}'`
+    );
+    assert(
+      telemetry.evaluated_candidates >= 1,
+      `Telemetría IA evaluated_candidates debe ser >= 1 en '${item.id}'`
+    );
+    assert(
+      telemetry.top_k_candidates >= 1 &&
+        telemetry.top_k_candidates <= telemetry.evaluated_candidates,
+      `Telemetría IA top_k_candidates (${telemetry.top_k_candidates}) debe estar en 1..=${telemetry.evaluated_candidates} en '${item.id}'`
+    );
+    assert(
+      typeof telemetry.strategy_profile === "string" &&
+        telemetry.strategy_profile.length > 3,
+      `Telemetría IA strategy_profile debe ser no vacío en '${item.id}'`
+    );
+    assert(
+      typeof telemetry.command_summary === "string" &&
+        telemetry.command_summary.length > 2,
+      `Telemetría IA command_summary debe ser no vacío en '${item.id}'`
+    );
+    assert(
+      typeof telemetry.elapsed_us === "number" && telemetry.elapsed_us >= 1,
+      `Telemetría IA elapsed_us debe ser >= 1 en '${item.id}'`
+    );
+
+    // 3. Verificar bifurcación limpia de historial (Undo hasta inicio + nueva jugada trunca Redo)
+    while (eb.can_undo()) {
+      assert(eb.undo_step(), `undo_step() en bucle debe retornar true en '${item.id}'`);
+    }
+    assert(
+      eb.get_state_checksum_hex() === initialHash,
+      `Tras deshacer todos los pasos en '${item.id}', el checksum debe volver al inicial`
+    );
+    assert(eb.can_redo(), `Tras deshacer todo en '${item.id}', can_redo() debe ser true`);
+
+    eb.send_command_json(1, JSON.stringify(p1Command));
+    assert(
+      !eb.can_redo(),
+      `Tras enviar una nueva jugada desde un paso histórico en '${item.id}', la rama futura debe truncarse (can_redo() === false)`
+    );
+  }
+
+  console.log(
+    "  [PASS] Mejoras del motor (Undo/Redo transaccional, bifurcación de historial, Checksums FNV-1a 64-bit y Telemetría IA en los 14 juegos) verificadas"
+  );
+
   console.log("=== SUITE DE REGRESIÓN DE LOS 14 JUEGOS COMPLETADA CON 0 ERRORES ===");
 }
 

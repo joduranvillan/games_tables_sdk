@@ -1040,6 +1040,49 @@ impl Session {
         hasher.finish()
     }
 
+    /// Calcula el checksum determinista FNV-1a de 64 bits del estado de la sesión.
+    /// Excluye timestamps variables de pared (`started_at`, `elapsed`) para garantizar
+    /// reproducibilidad bit-a-bit tras Undo/Redo y sincronización entre nodos.
+    pub fn compute_state_checksum(&self) -> u64 {
+        let winner = self
+            .world
+            .get_resource::<WinnerResource>()
+            .and_then(|w| w.0.map(|pid| pid.0))
+            .unwrap_or(0);
+        let game_over = self.is_game_over();
+        let canonical_cmds: Vec<(u64, serde_json::Value)> = self
+            .command_log
+            .iter()
+            .map(|(tick, _elapsed, cmd)| {
+                (
+                    tick.0,
+                    serde_json::to_value(cmd.as_ref()).unwrap_or(serde_json::Value::Null),
+                )
+            })
+            .collect();
+        let payload = serde_json::json!({
+            "game_name": self.initial_state.metadata.game_name,
+            "seed": self.initial_state.seed,
+            "tick": self.current_tick().0,
+            "turn": self.current_player().0,
+            "game_over": game_over,
+            "winner": winner,
+            "commands": canonical_cmds,
+        });
+        let serialized = serde_json::to_vec(&payload).unwrap_or_default();
+        open_table_core::deterministic_fnv1a_64(&serialized)
+    }
+
+    /// Devuelve el checksum determinista FNV-1a de 64 bits en formato hexadecimal canónico (`0x0123456789abcdef`).
+    pub fn state_checksum_hex(&self) -> String {
+        open_table_core::format_fnv1a_hex(self.compute_state_checksum())
+    }
+
+    /// Verifica si el checksum actual de la sesión coincide con `expected_hex`.
+    pub fn verify_checksum(&self, expected_hex: &str) -> bool {
+        self.state_checksum_hex().eq_ignore_ascii_case(expected_hex.trim())
+    }
+
     /// Exporta el log completo de comandos comprimido con gzip (flate2).
     pub fn export_log_compressed(&self) -> EngineResult<Vec<u8>> {
         let uncompressed = self.export_log()?;

@@ -327,6 +327,17 @@ pub fn best_move(
     player: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<Box<dyn Command>> {
+    best_move_with_randomness(session, player, difficulty, 0, 0)
+}
+
+/// Selecciona la mejor jugada legal en Shogi con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<Box<dyn Command>> {
     if session
         .world()
         .get_resource::<GameOverResource>()
@@ -363,8 +374,7 @@ pub fn best_move(
         AiDifficulty::Hard | AiDifficulty::Expert => 2,
     };
     let mut legal_actions = Vec::new();
-    let mut best_action = None;
-    let mut best_score = f32::NEG_INFINITY;
+    let mut scores = Vec::new();
     let mut alpha = f32::NEG_INFINITY;
     let beta = f32::INFINITY;
 
@@ -374,10 +384,12 @@ pub fn best_move(
             .process_command(player, action.to_command())
             .is_ok()
         {
-            if difficulty == AiDifficulty::Easy {
-                legal_actions.push(action.clone());
-            }
-            let mut score = minimax(&next_session, depth - 1, alpha, beta, false, player);
+            let search_alpha = if randomness_pct == 0 {
+                alpha
+            } else {
+                f32::NEG_INFINITY
+            };
+            let mut score = minimax(&next_session, depth - 1, search_alpha, beta, false, player);
             if difficulty == AiDifficulty::Expert {
                 if let ShogiAction::Move(cmd) = &action {
                     if cmd.promote || (2..=6).contains(&cmd.to.0) {
@@ -385,24 +397,35 @@ pub fn best_move(
                     }
                 }
             }
-            if score > best_score || best_action.is_none() {
-                best_score = score;
-                best_action = Some(action);
-            }
             if score > alpha {
                 alpha = score;
             }
+            legal_actions.push(action);
+            scores.push(score);
         }
     }
 
     if difficulty == AiDifficulty::Easy
+        && randomness_pct == 0
         && legal_actions.len() > 1
         && (session.current_tick().0 & 3) == 0
     {
         return legal_actions.last().map(|a| a.to_command());
     }
 
-    best_action.map(|a| a.to_command())
+    let safety_band = match difficulty {
+        AiDifficulty::Easy => 2.0,
+        AiDifficulty::Medium => 0.85,
+        AiDifficulty::Hard => 0.35,
+        AiDifficulty::Expert => 0.18,
+    };
+    let idx = AiDifficulty::select_top_k_with_noise(
+        &scores,
+        randomness_pct,
+        safety_band,
+        seed ^ session.current_tick().0 ^ session.id.0,
+    )?;
+    legal_actions.get(idx).map(|a| a.to_command())
 }
 
 #[cfg(test)]

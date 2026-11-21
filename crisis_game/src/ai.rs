@@ -279,6 +279,17 @@ pub fn best_move(
     ai: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<CrisisCommand> {
+    best_move_with_randomness(state, ai, difficulty, 0, 0)
+}
+
+/// Selecciona la mejor jugada para `ai` en Crisis/TEG con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    state: &CrisisState,
+    ai: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<CrisisCommand> {
     let map = state.world().get_resource::<TerritoryStateResource>()?;
     let turn_state = state.world().get_resource::<TurnStateResource>()?;
 
@@ -319,6 +330,8 @@ pub fn best_move(
             let mut best_territory = owned_territories[0];
             let mut lowest_ratio = f64::INFINITY;
             let mut best_obj_bonus = false;
+            let mut terr_candidates = Vec::new();
+            let mut terr_scores = Vec::new();
 
             for &t_id in &owned_territories {
                 let ratio = threat_ratio(map, ai, t_id);
@@ -327,6 +340,12 @@ pub fn best_move(
                         map.owners.get(&adj).copied() != Some(ai)
                             && advances_secret_objective(state, map, ai, adj)
                     });
+
+                if ratio.is_finite() {
+                    let score = (10.0 / (ratio + 0.1)) as f32 + if touches_obj { 4.0 } else { 0.0 };
+                    terr_candidates.push(t_id);
+                    terr_scores.push(score);
+                }
 
                 let is_better = if (ratio - lowest_ratio).abs() < 1e-9 {
                     touches_obj && !best_obj_bonus
@@ -338,6 +357,23 @@ pub fn best_move(
                     lowest_ratio = ratio;
                     best_territory = t_id;
                     best_obj_bonus = touches_obj;
+                }
+            }
+
+            if randomness_pct > 0 && !terr_candidates.is_empty() {
+                let safety_band = match difficulty {
+                    AiDifficulty::Easy => 15.0,
+                    AiDifficulty::Medium => 8.0,
+                    AiDifficulty::Hard => 4.0,
+                    AiDifficulty::Expert => 2.0,
+                };
+                if let Some(idx) = AiDifficulty::select_top_k_with_noise(
+                    &terr_scores,
+                    randomness_pct,
+                    safety_band,
+                    seed ^ state.current_tick().0 ^ state.id.0,
+                ) {
+                    best_territory = terr_candidates[idx];
                 }
             }
 
@@ -364,6 +400,8 @@ pub fn best_move(
             let mut best_attack: Option<(TerritoryId, TerritoryId, u8)> = None;
             let mut best_priority_obj = false;
             let mut best_score = f64::NEG_INFINITY;
+            let mut attack_candidates = Vec::new();
+            let mut attack_scores = Vec::new();
 
             for &from in &owned_territories {
                 let att_armies = map.armies.get(&from).copied().unwrap_or(0);
@@ -385,13 +423,21 @@ pub fn best_move(
                     let is_obj_target = difficulty == AiDifficulty::Expert
                         && advances_secret_objective(state, map, ai, to);
 
-                    let seed = state.id.0
+                    let mcts_seed = state.id.0
                         ^ ((from.0 as u64) << 8)
                         ^ ((to.0 as u64) << 16)
-                        ^ ((att_armies as u64) << 24);
-                    let mcts_score = mcts_evaluate_attack(att_armies, def_armies, rollouts, seed);
+                        ^ ((att_armies as u64) << 24)
+                        ^ seed;
+                    let mcts_score =
+                        mcts_evaluate_attack(att_armies, def_armies, rollouts, mcts_seed);
                     let ratio_score = (att_armies as f64) / (def_armies.max(1) as f64);
                     let combined_score = mcts_score * 10.0 + ratio_score;
+                    let dice = std::cmp::min(3, att_armies - 1) as u8;
+
+                    attack_candidates.push((from, to, dice));
+                    attack_scores.push(
+                        (combined_score as f32) + if is_obj_target { 10.0 } else { 0.0 },
+                    );
 
                     let should_pick = match (is_obj_target, best_priority_obj) {
                         (true, false) => true,
@@ -402,9 +448,25 @@ pub fn best_move(
                     if should_pick {
                         best_priority_obj = is_obj_target;
                         best_score = combined_score;
-                        let dice = std::cmp::min(3, att_armies - 1) as u8;
                         best_attack = Some((from, to, dice));
                     }
+                }
+            }
+
+            if randomness_pct > 0 && !attack_candidates.is_empty() {
+                let safety_band = match difficulty {
+                    AiDifficulty::Easy => 12.0,
+                    AiDifficulty::Medium => 6.0,
+                    AiDifficulty::Hard => 3.0,
+                    AiDifficulty::Expert => 1.5,
+                };
+                if let Some(idx) = AiDifficulty::select_top_k_with_noise(
+                    &attack_scores,
+                    randomness_pct,
+                    safety_band,
+                    seed ^ state.current_tick().0 ^ state.id.0,
+                ) {
+                    best_attack = Some(attack_candidates[idx]);
                 }
             }
 

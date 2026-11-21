@@ -128,10 +128,18 @@ fn evaluate_backgammon_move(
 }
 
 /// Selecciona una jugada legal heurística para Backgammon.
-/// Genera todos los movimientos legales mediante prueba-y-error sobre copias temporales
-/// de la sesión, evalúa cada uno con la función heurística y elige el de mayor puntuación.
-/// En caso de empate, elige al azar entre los mejores movimientos.
 pub fn backgammon_ai_pick_move(session: &Session, player: PlayerId) -> Option<MoveCheckerCommand> {
+    backgammon_ai_pick_move_with_randomness(session, player, AiDifficulty::Medium, 0, 0)
+}
+
+/// Selecciona una jugada legal heurística para Backgammon con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn backgammon_ai_pick_move_with_randomness(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<MoveCheckerCommand> {
     if session
         .world()
         .get_resource::<GameOverResource>()
@@ -182,29 +190,49 @@ pub fn backgammon_ai_pick_move(session: &Session, player: PlayerId) -> Option<Mo
         }
     }
 
-    let mut legal_moves_with_score: Vec<(MoveCheckerCommand, f32)> = Vec::new();
+    let mut legal_moves = Vec::new();
+    let mut scores = Vec::new();
 
     for cmd in potential_moves {
         let mut trial = clone_backgammon_session(session);
         if trial.process_command(player, Box::new(cmd.clone())).is_ok() {
             let score = evaluate_backgammon_move(&trial, &cmd, player, sides);
-            legal_moves_with_score.push((cmd, score));
+            legal_moves.push(cmd);
+            scores.push(score);
         }
     }
 
-    if legal_moves_with_score.is_empty() {
+    if legal_moves.is_empty() {
         return None;
     }
 
-    let mut max_score = f32::NEG_INFINITY;
-    for (_, score) in &legal_moves_with_score {
-        if *score > max_score {
-            max_score = *score;
+    if randomness_pct > 0 {
+        let safety_band = match difficulty {
+            AiDifficulty::Easy => 20.0,
+            AiDifficulty::Medium => 10.0,
+            AiDifficulty::Hard => 5.0,
+            AiDifficulty::Expert => 2.5,
+        };
+        if let Some(idx) = AiDifficulty::select_top_k_with_noise(
+            &scores,
+            randomness_pct,
+            safety_band,
+            seed ^ session.current_tick().0 ^ session.id.0,
+        ) {
+            return legal_moves.into_iter().nth(idx);
         }
     }
 
-    let best_moves: Vec<MoveCheckerCommand> = legal_moves_with_score
+    let mut max_score = f32::NEG_INFINITY;
+    for &score in &scores {
+        if score > max_score {
+            max_score = score;
+        }
+    }
+
+    let best_moves: Vec<MoveCheckerCommand> = legal_moves
         .into_iter()
+        .zip(scores)
         .filter(|(_, s)| (*s - max_score).abs() < 1e-4)
         .map(|(cmd, _)| cmd)
         .collect();
@@ -212,12 +240,7 @@ pub fn backgammon_ai_pick_move(session: &Session, player: PlayerId) -> Option<Mo
     if best_moves.len() == 1 {
         Some(best_moves[0].clone())
     } else {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.subsec_nanos() as usize)
-            .unwrap_or(0);
-        let idx = seed % best_moves.len();
+        let idx = ((seed ^ session.current_tick().0) as usize) % best_moves.len();
         Some(best_moves[idx].clone())
     }
 }
@@ -360,6 +383,17 @@ pub fn best_move(
     player: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<BackgammonCommand> {
+    best_move_with_randomness(session, player, difficulty, 0, 0)
+}
+
+/// Selecciona la mejor acción para `player` en Backgammon con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<BackgammonCommand> {
     if session
         .world()
         .get_resource::<GameOverResource>()
@@ -410,7 +444,8 @@ pub fn best_move(
     }
 
     // 3. Mover fichas con los dados pendientes
-    backgammon_ai_pick_move(session, player).map(BackgammonCommand::Move)
+    backgammon_ai_pick_move_with_randomness(session, player, difficulty, randomness_pct, seed)
+        .map(BackgammonCommand::Move)
 }
 
 #[cfg(test)]

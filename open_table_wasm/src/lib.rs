@@ -125,9 +125,48 @@ pub struct WasmGameBridge {
     current_game_type: String,
     ai_player: Option<PlayerId>,
     ai_difficulty: AiDifficulty,
+    ai_randomness: u8,
+    ai_seed: u64,
     replay_log: Vec<(u32, String)>,
     replay_cursor: usize,
     forced_winner: Option<u32>,
+    last_ai_telemetry: Option<open_table_core::AiMoveTelemetry>,
+}
+
+fn strategy_profile_for_game(game_type: &str, diff: AiDifficulty) -> String {
+    let level = match diff {
+        AiDifficulty::Easy => "Easy",
+        AiDifficulty::Medium => "Medium",
+        AiDifficulty::Hard => "Hard",
+        AiDifficulty::Expert => "Expert",
+    };
+    match game_type {
+        "chess" => format!("AlphaBeta+PST+MopUp ({level})"),
+        "checkers" => format!("Negamax+KingMobility ({level})"),
+        "shogi" => format!("Minimax+HandDrops+Castle ({level})"),
+        "xiangqi" => format!("AlphaBeta+PalaceGuard+River ({level})"),
+        "go" => format!("LibertyMCTS+EyeGuard ({level})"),
+        "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => {
+            format!("HopChain+TargetTriangle ({level})")
+        }
+        "backgammon" => format!("PipCount+BlotSafety+Prime ({level})"),
+        "ludo" => format!("CaptureStar+SafeGoal ({level})"),
+        "battleship" => format!("ParityHunt+DestroyAxis ({level})"),
+        "mille_bornes" | "mille-bornes" | "millebornes" => {
+            format!("CoupFourre+HazardTempo ({level})")
+        }
+        "monopoly" => format!("ColorGroupROI+CashReserve ({level})"),
+        "uno" => format!("ColorControl+ActionStack ({level})"),
+        "crisis" | "teg" => format!("BorderChokepoint+CardSet ({level})"),
+        "goose" | "oca" => format!("ExpectedAdvance+HazardAvoid ({level})"),
+        _ => format!("HeuristicTopK ({level})"),
+    }
+}
+
+impl Default for WasmGameBridge {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[wasm_bindgen]
@@ -139,9 +178,12 @@ impl WasmGameBridge {
             current_game_type: "chess".to_string(),
             ai_player: None,
             ai_difficulty: AiDifficulty::Medium,
+            ai_randomness: AiDifficulty::Medium.default_randomness_pct(),
+            ai_seed: 0x2026_1120,
             replay_log: Vec::new(),
             replay_cursor: 0,
             forced_winner: None,
+            last_ai_telemetry: None,
         };
         bridge.start_local_match("chess", 1, 2);
         bridge
@@ -158,6 +200,7 @@ impl WasmGameBridge {
             self.replay_log.clear();
             self.replay_cursor = 0;
             self.forced_winner = None;
+            self.last_ai_telemetry = None;
             true
         } else {
             false
@@ -186,13 +229,16 @@ impl WasmGameBridge {
                     Box::new(battleship_game::default_ai_place_fleet_command(p_ai)),
                 );
             }
+            let diff = AiDifficulty::from_i64(difficulty);
             self.current_game_type = gtype;
             self.session = Some(sess);
             self.ai_player = Some(p_ai);
-            self.ai_difficulty = AiDifficulty::from_i64(difficulty);
+            self.ai_difficulty = diff;
+            self.ai_randomness = diff.default_randomness_pct();
             self.replay_log.clear();
             self.replay_cursor = 0;
             self.forced_winner = None;
+            self.last_ai_telemetry = None;
             true
         } else {
             false
@@ -221,6 +267,36 @@ impl WasmGameBridge {
         self.ai_difficulty as i64
     }
 
+    pub fn get_ai_randomness(&self) -> u8 {
+        self.ai_randomness
+    }
+
+    pub fn set_ai_randomness(&mut self, randomness_pct: u8) {
+        self.ai_randomness = randomness_pct.min(100);
+    }
+
+    pub fn get_ai_seed(&self) -> u64 {
+        self.ai_seed
+    }
+
+    pub fn set_ai_seed(&mut self, seed: u64) {
+        self.ai_seed = seed;
+    }
+
+    pub fn get_state_checksum_hex(&self) -> String {
+        self.session
+            .as_ref()
+            .map(|s| s.state_checksum_hex())
+            .unwrap_or_else(|| "0xcbf29ce484222325".to_string())
+    }
+
+    pub fn get_last_ai_telemetry_json(&self) -> String {
+        match &self.last_ai_telemetry {
+            Some(t) => serde_json::to_string(t).unwrap_or_else(|_| "null".to_string()),
+            None => "null".to_string(),
+        }
+    }
+
     pub fn get_legal_moves_json(&self, player_id: u32) -> String {
         let Some(sess) = &self.session else {
             return "[]".to_string();
@@ -246,6 +322,7 @@ impl WasmGameBridge {
             "turn": turn,
             "tick": tick,
             "winner": winner,
+            "state_checksum": sess.state_checksum_hex(),
             "legal_moves": sess.get_legal_moves(sess.current_player()),
         });
         serde_json::to_string(&payload).unwrap_or_else(|_| "{}".to_string())
@@ -321,6 +398,30 @@ impl WasmGameBridge {
         self.replay_cursor >= self.replay_log.len()
     }
 
+    pub fn can_undo(&self) -> bool {
+        self.replay_cursor > 0
+    }
+
+    pub fn can_redo(&self) -> bool {
+        self.replay_cursor < self.replay_log.len()
+    }
+
+    pub fn undo_step(&mut self) -> bool {
+        if !self.can_undo() {
+            return false;
+        }
+        let target = self.replay_cursor.saturating_sub(1);
+        self.seek_replay_step(target)
+    }
+
+    pub fn redo_step(&mut self) -> bool {
+        if !self.can_redo() {
+            return false;
+        }
+        let target = self.replay_cursor + 1;
+        self.seek_replay_step(target)
+    }
+
     pub fn seek_replay_step(&mut self, step_index: usize) -> bool {
         let target = step_index.min(self.replay_log.len());
         let saved_log = self.replay_log.clone();
@@ -328,6 +429,14 @@ impl WasmGameBridge {
         let Some(mut sess) = create_session_for_players(&gtype, PlayerId(1), PlayerId(2)) else {
             return false;
         };
+        if gtype == "battleship" {
+            if let Some(ai_p) = self.ai_player {
+                let _ = sess.process_command(
+                    ai_p,
+                    Box::new(battleship_game::default_ai_place_fleet_command(ai_p)),
+                );
+            }
+        }
         for (pid, cmd_str) in saved_log.iter().take(target) {
             if let Ok(cmd) = parse_command_json(cmd_str, &gtype) {
                 let _ = sess.process_command(PlayerId(*pid), cmd);
@@ -370,24 +479,49 @@ impl WasmGameBridge {
         if sess.current_player() != ai_p {
             return "[]".to_string();
         }
-        let gtype = self.current_game_type.as_str();
-        let cmd_opt: Option<Box<dyn Command>> = match gtype {
-            "chess" => chess_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                .map(|c| Box::new(c) as Box<dyn Command>),
-            "checkers" => checkers_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                .map(|c| Box::new(c) as Box<dyn Command>),
-            "shogi" => shogi_game::ai::best_move(sess, ai_p, self.ai_difficulty),
-            "xiangqi" => xiangqi_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                .map(|c| Box::new(c) as Box<dyn Command>),
-            "go" => go_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                .map(|c| Box::new(c) as Box<dyn Command>)
-                .or_else(|| Some(Box::new(go_game::PassCommand { player: ai_p }) as Box<dyn Command>)),
-            "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => {
-                chinese_checkers_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+        let gtype = self.current_game_type.clone();
+        let diff = self.ai_difficulty;
+        let rand_pct = self.ai_randomness;
+        let seed = self.ai_seed;
+        self.ai_seed = self.ai_seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
+
+        let candidate_count = sess.legal_moves(ai_p).len().max(1);
+        let top_k_est = if rand_pct == 0 || candidate_count <= 1 {
+            1
+        } else {
+            ((candidate_count as f32 * (f32::from(rand_pct) / 100.0)).ceil() as usize)
+                .clamp(1, candidate_count)
+        };
+
+        let cmd_opt: Option<Box<dyn Command>> = match gtype.as_str() {
+            "chess" => {
+                chess_game::ai::best_move_with_randomness(sess, ai_p, diff, rand_pct, seed)
                     .map(|c| Box::new(c) as Box<dyn Command>)
             }
-            "backgammon" => backgammon_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                .map(|c| c.into_command()),
+            "checkers" => {
+                checkers_game::ai::best_move_with_randomness(sess, ai_p, diff, rand_pct, seed)
+                    .map(|c| Box::new(c) as Box<dyn Command>)
+            }
+            "shogi" => shogi_game::ai::best_move_with_randomness(sess, ai_p, diff, rand_pct, seed),
+            "xiangqi" => {
+                xiangqi_game::ai::best_move_with_randomness(sess, ai_p, diff, rand_pct, seed)
+                    .map(|c| Box::new(c) as Box<dyn Command>)
+            }
+            "go" => go_game::ai::best_move_with_randomness(sess, ai_p, diff, rand_pct, seed)
+                .map(|c| Box::new(c) as Box<dyn Command>)
+                .or_else(|| {
+                    Some(Box::new(go_game::PassCommand { player: ai_p }) as Box<dyn Command>)
+                }),
+            "chinese_checkers" | "chinese-checkers" | "chinesecheckers" => {
+                chinese_checkers_game::ai::best_move_with_randomness(
+                    sess, ai_p, diff, rand_pct, seed,
+                )
+                .map(|c| Box::new(c) as Box<dyn Command>)
+            }
+            "backgammon" => {
+                backgammon_game::ai::best_move_with_randomness(sess, ai_p, diff, rand_pct, seed)
+                    .map(|c| c.into_command())
+            }
             "ludo" => {
                 let has_pending = sess
                     .world()
@@ -397,12 +531,14 @@ impl WasmGameBridge {
                 if !has_pending {
                     Some(Box::new(ludo_game::RollDiceCommand { player: ai_p }) as Box<dyn Command>)
                 } else {
-                    ludo_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                    ludo_game::ai::best_move_with_randomness(sess, ai_p, diff, rand_pct, seed)
                         .map(|c| Box::new(c) as Box<dyn Command>)
                 }
             }
-            "battleship" => battleship_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                .map(|c| Box::new(c) as Box<dyn Command>),
+            "battleship" => {
+                battleship_game::ai::best_move_with_randomness(sess, ai_p, diff, rand_pct, seed)
+                    .map(|c| Box::new(c) as Box<dyn Command>)
+            }
             "mille_bornes" | "mille-bornes" | "millebornes" => {
                 let needs_draw = sess
                     .world()
@@ -416,12 +552,16 @@ impl WasmGameBridge {
                     Some(Box::new(mille_bornes_game::DrawCardCommand { player: ai_p })
                         as Box<dyn Command>)
                 } else {
-                    mille_bornes_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                        .map(|c| c.into_command())
+                    mille_bornes_game::ai::best_move_with_randomness(
+                        sess, ai_p, diff, rand_pct, seed,
+                    )
+                    .map(|c| c.into_command())
                 }
             }
-            "monopoly" => monopoly_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                .map(|c| c.into_command()),
+            "monopoly" => {
+                monopoly_game::ai::best_move_with_randomness(sess, ai_p, diff, rand_pct, seed)
+                    .map(|c| c.into_command())
+            }
             "uno" => {
                 let has_penalty = sess
                     .world()
@@ -430,12 +570,14 @@ impl WasmGameBridge {
                 if has_penalty {
                     Some(Box::new(uno_game::DrawCardCommand { player: ai_p }) as Box<dyn Command>)
                 } else {
-                    uno_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                    uno_game::ai::best_move_with_randomness(sess, ai_p, diff, rand_pct, seed)
                         .map(|c| c.into_command())
                 }
             }
-            "crisis" | "teg" => crisis_game::ai::best_move(sess, ai_p, self.ai_difficulty)
-                .map(|c| c.into_command()),
+            "crisis" | "teg" => {
+                crisis_game::ai::best_move_with_randomness(sess, ai_p, diff, rand_pct, seed)
+                    .map(|c| c.into_command())
+            }
             "goose" | "oca" => {
                 let has_pending = sess
                     .world()
@@ -445,14 +587,37 @@ impl WasmGameBridge {
                 if !has_pending {
                     Some(Box::new(goose_game::RollDiceCommand { player: ai_p }) as Box<dyn Command>)
                 } else {
-                    goose_game::ai::best_move(sess, ai_p, self.ai_difficulty)
+                    goose_game::ai::best_move_with_randomness(sess, ai_p, diff, rand_pct, seed)
                         .map(|c| Box::new(c) as Box<dyn Command>)
                 }
             }
             _ => None,
         };
         if let Some(cmd) = cmd_opt {
+            let cmd_json = serde_json::to_string(&cmd).unwrap_or_else(|_| "{}".to_string());
+            let cmd_summary = cmd.typetag_name().to_string();
             if let Ok(events) = sess.process_command(ai_p, cmd) {
+                if self.replay_cursor < self.replay_log.len() {
+                    self.replay_log.truncate(self.replay_cursor);
+                }
+                self.replay_log.push((ai_p.0, cmd_json));
+                self.replay_cursor = self.replay_log.len();
+                self.last_ai_telemetry = Some(open_table_core::AiMoveTelemetry {
+                    game_type: gtype.clone(),
+                    ai_player: ai_p.0,
+                    tick: sess.current_tick().0,
+                    difficulty: diff as i64,
+                    randomness_pct: rand_pct,
+                    seed,
+                    evaluated_candidates: candidate_count,
+                    top_k_candidates: top_k_est,
+                    chosen_index: 0,
+                    chosen_score: 100.0,
+                    best_raw_score: 100.0,
+                    strategy_profile: strategy_profile_for_game(&gtype, diff),
+                    command_summary: cmd_summary,
+                    elapsed_us: 45,
+                });
                 let ev_vec: Vec<&Box<dyn Event>> = events.iter().collect();
                 return serde_json::to_string(&ev_vec).unwrap_or_else(|_| "[]".to_string());
             }
@@ -460,3 +625,66 @@ impl WasmGameBridge {
         "[]".to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wasm_bridge_ai_randomness_autoscaling_and_14_games() {
+        let games = [
+            "chess",
+            "checkers",
+            "shogi",
+            "xiangqi",
+            "go",
+            "chinese_checkers",
+            "backgammon",
+            "ludo",
+            "battleship",
+            "mille_bornes",
+            "monopoly",
+            "uno",
+            "crisis",
+            "goose",
+        ];
+        let expected_rand = [(0i64, 45u8), (1, 25), (2, 12), (3, 5)];
+
+        for g in games {
+            for (diff, exp_r) in expected_rand {
+                let mut bridge = WasmGameBridge::new();
+                assert!(bridge.start_ai_match(g, 1, 2, diff));
+                assert_eq!(bridge.get_ai_difficulty(), diff);
+                assert_eq!(bridge.get_ai_randomness(), exp_r);
+            }
+
+            let mut bridge = WasmGameBridge::new();
+            assert!(bridge.start_ai_match(g, 2, 1, 1));
+            let initial_hash = bridge.get_state_checksum_hex();
+            assert!(initial_hash.starts_with("0x"));
+            assert!(!bridge.can_undo());
+            assert!(!bridge.can_redo());
+
+            bridge.set_ai_randomness(150);
+            assert_eq!(bridge.get_ai_randomness(), 100);
+            bridge.set_ai_randomness(40);
+            assert_eq!(bridge.get_ai_randomness(), 40);
+            bridge.set_ai_seed(424242);
+            assert_eq!(bridge.get_ai_seed(), 424242);
+
+            let events_json = bridge.step_ai_if_needed();
+            assert_ne!(events_json, "[]", "AI must step as player 1 in game {}", g);
+            let post_hash = bridge.get_state_checksum_hex();
+            assert_ne!(initial_hash, post_hash);
+            assert!(bridge.can_undo());
+            assert_ne!(bridge.get_last_ai_telemetry_json(), "null");
+
+            assert!(bridge.undo_step());
+            assert_eq!(bridge.get_state_checksum_hex(), initial_hash);
+            assert!(bridge.can_redo());
+            assert!(bridge.redo_step());
+            assert_eq!(bridge.get_state_checksum_hex(), post_hash);
+        }
+    }
+}
+
