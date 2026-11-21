@@ -1078,6 +1078,11 @@ impl Session {
         open_table_core::format_fnv1a_hex(self.compute_state_checksum())
     }
 
+    /// Alias ergonómico de `state_checksum_hex()` compatible con los bridges de Godot y WASM.
+    pub fn get_state_checksum_hex(&self) -> String {
+        self.state_checksum_hex()
+    }
+
     /// Verifica si el checksum actual de la sesión coincide con `expected_hex`.
     pub fn verify_checksum(&self, expected_hex: &str) -> bool {
         self.state_checksum_hex().eq_ignore_ascii_case(expected_hex.trim())

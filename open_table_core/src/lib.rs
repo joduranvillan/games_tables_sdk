@@ -42,6 +42,18 @@ pub mod time;
 pub mod transport;
 pub mod visibility;
 
+pub use command::{Command, CommandEnvelope};
+pub use component::Component;
+pub use error::{EngineError, EngineResult};
+pub use event::{Event, EventEnvelope};
+pub use game_variant::GameVariant;
+pub use ids::{EntityId, PlayerId, SessionId, SpectatorId, Tick};
+pub use random::RandomService;
+pub use resource::Resource;
+pub use time::GameClock;
+pub use transport::Transport;
+pub use visibility::{SpectatorVisibility, Visibility};
+
 /// Nivel de dificultad parametrizable para los motores de IA locales.
 ///
 /// # Examples

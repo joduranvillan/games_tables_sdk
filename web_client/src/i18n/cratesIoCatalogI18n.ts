@@ -331,7 +331,7 @@ let checksum = format_fnv1a_hex(deterministic_fnv1a_64(b"board_v1"));`,
     codeExample: `use open_table_engine::prelude::*;
 
 let session = Session::new(SessionId(1), 42, vec![PlayerId(1), PlayerId(2)], RuleEngine::new());
-assert_eq!(session.get_state_checksum_hex(b"init").len(), 16);`,
+assert_eq!(session.get_state_checksum_hex().len(), 18);`,
     summaries: {
       en: "ECS-backed deterministic turn-based session runtime (Session), transactional Undo/Redo stacks, FIDE K=32 ELO engine, and state hashing.",
       es: "Runtime determinista de sesiones por turnos sobre Bevy ECS (Session), pilas Undo/Redo transaccionales, motor ELO FIDE K=32 y firma de estado.",

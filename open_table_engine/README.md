@@ -46,9 +46,10 @@ let session = Session::new(
     RuleEngine::new(),
 );
 
-// Deterministic 64-bit FNV-1a checksum of the session state
-let checksum_hex = session.get_state_checksum_hex(b"initial_board");
-assert_eq!(checksum_hex.len(), 16);
+// Deterministic 64-bit FNV-1a checksum of the session state ("0x" + 16 hex digits = 18 chars)
+let checksum_hex = session.get_state_checksum_hex();
+assert_eq!(checksum_hex.len(), 18);
+assert!(session.verify_checksum(&checksum_hex));
 ```
 
 ## v1.1.0 Engine & AI Telemetry Highlights

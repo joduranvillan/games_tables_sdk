@@ -42,15 +42,16 @@ use open_table_core::{AiDifficulty, PlayerId, RandomService, deterministic_fnv1a
 let mut rng = RandomService::from_seed(42);
 let roll = rng.roll_die(6);
 assert!((1..=6).contains(&roll));
+assert_eq!(PlayerId(1).0, 1);
 
 // Top-K noise selection with 25% randomness factor
 let candidate_scores = vec![120.0, 114.0, 95.0, 40.0];
 let chosen_idx = AiDifficulty::select_top_k_with_noise(&candidate_scores, 25, 15.0, 42).unwrap();
 assert!(chosen_idx <= 1);
 
-// Deterministic 64-bit FNV-1a checksum
+// Deterministic 64-bit FNV-1a checksum ("0x" + 16 hex digits = 18 chars)
 let hash = deterministic_fnv1a_64(b"canonical_board_state_v1");
-assert_eq!(format_fnv1a_hex(hash).len(), 16);
+assert_eq!(format_fnv1a_hex(hash).len(), 18);
 ```
 
 ## v1.1.0 Engine & AI Telemetry Highlights

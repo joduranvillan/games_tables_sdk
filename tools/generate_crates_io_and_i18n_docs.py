@@ -51,15 +51,16 @@ CRATES_METADATA = [
 let mut rng = RandomService::from_seed(42);
 let roll = rng.roll_die(6);
 assert!((1..=6).contains(&roll));
+assert_eq!(PlayerId(1).0, 1);
 
 // Top-K noise selection with 25% randomness factor
 let candidate_scores = vec![120.0, 114.0, 95.0, 40.0];
 let chosen_idx = AiDifficulty::select_top_k_with_noise(&candidate_scores, 25, 15.0, 42).unwrap();
 assert!(chosen_idx <= 1);
 
-// Deterministic 64-bit FNV-1a checksum
+// Deterministic 64-bit FNV-1a checksum ("0x" + 16 hex digits = 18 chars)
 let hash = deterministic_fnv1a_64(b"canonical_board_state_v1");
-assert_eq!(format_fnv1a_hex(hash).len(), 16);''',
+assert_eq!(format_fnv1a_hex(hash).len(), 18);''',
     },
     {
         "name": "open_table_engine",
@@ -83,9 +84,10 @@ let session = Session::new(
     RuleEngine::new(),
 );
 
-// Deterministic 64-bit FNV-1a checksum of the session state
-let checksum_hex = session.get_state_checksum_hex(b"initial_board");
-assert_eq!(checksum_hex.len(), 16);''',
+// Deterministic 64-bit FNV-1a checksum of the session state ("0x" + 16 hex digits = 18 chars)
+let checksum_hex = session.get_state_checksum_hex();
+assert_eq!(checksum_hex.len(), 18);
+assert!(session.verify_checksum(&checksum_hex));''',
     },
     {
         "name": "open_table_macros",
@@ -229,7 +231,7 @@ var checksum: String = bridge.get_state_checksum_hex()''',
 let mut bridge = WasmGameBridge::new();
 bridge.start_ai_match("chess", 1, 2, 2);
 assert_eq!(bridge.get_ai_randomness_pct(), 12);
-assert_eq!(bridge.get_state_checksum_hex().len(), 16);''',
+assert_eq!(bridge.get_state_checksum_hex().len(), 18);''',
     },
     # 14 Canonical Game Crates
     {

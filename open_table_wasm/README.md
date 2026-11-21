@@ -40,7 +40,7 @@ use open_table_wasm::WasmGameBridge;
 let mut bridge = WasmGameBridge::new();
 bridge.start_ai_match("chess", 1, 2, 2);
 assert_eq!(bridge.get_ai_randomness_pct(), 12);
-assert_eq!(bridge.get_state_checksum_hex().len(), 16);
+assert_eq!(bridge.get_state_checksum_hex().len(), 18);
 ```
 
 ## v1.1.0 Engine & AI Telemetry Highlights
