@@ -18,6 +18,16 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Data, DeriveInput, Fields};
 
+fn canonical_crate_name(raw_pkg_name: &str) -> &str {
+    if raw_pkg_name.starts_with("open_table_") && raw_pkg_name.ends_with("_game") {
+        raw_pkg_name
+            .strip_prefix("open_table_")
+            .unwrap_or(raw_pkg_name)
+    } else {
+        raw_pkg_name
+    }
+}
+
 /// `#[derive(GameCommand)]`: genera `impl Command for T` con `as_any()`.
 ///
 /// Si un campo de la struct tiene el atributo `#[issuer]`, ese campo
@@ -28,7 +38,8 @@ pub fn derive_game_command(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = &input.ident;
 
-    let pkg_name = std::env::var("CARGO_PKG_NAME").unwrap_or_default();
+    let raw_pkg_name = std::env::var("CARGO_PKG_NAME").unwrap_or_default();
+    let pkg_name = canonical_crate_name(&raw_pkg_name);
     let tag_name = if pkg_name.is_empty() {
         ident.to_string()
     } else {
@@ -75,7 +86,8 @@ pub fn derive_game_event(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = &input.ident;
 
-    let pkg_name = std::env::var("CARGO_PKG_NAME").unwrap_or_default();
+    let raw_pkg_name = std::env::var("CARGO_PKG_NAME").unwrap_or_default();
+    let pkg_name = canonical_crate_name(&raw_pkg_name);
     let tag_name = if pkg_name.is_empty() {
         ident.to_string()
     } else {
