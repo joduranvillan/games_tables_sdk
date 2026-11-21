@@ -1,5 +1,5 @@
 [package]
-name = "checkers_game"
+name = "open_table_checkers_game"
 version = "1.1.0"
 edition = "2021"
 rust-version = "1.82"
@@ -8,6 +8,11 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/joduranvillan/games_tables_sdk"
 keywords = ["game", "board-game", "checkers", "draughts", "rules"]
 categories = ["game-engines", "games"]
+readme = "README.md"
+
+[lib]
+name = "checkers_game"
+path = "src/lib.rs"
 
 [dependencies]
 open_table_core = { path = "../open_table_core", version = "1.1.0" }

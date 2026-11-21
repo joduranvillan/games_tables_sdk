@@ -8,6 +8,7 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/joduranvillan/games_tables_sdk"
 keywords = ["networking", "websocket", "relay", "board-games", "opentable"]
 categories = ["network-programming", "game-engines"]
+readme = "README.md"
 
 [dependencies]
 # Servicio ELO persistente (./data/ratings.db), API HTTP (8081), TLS/WSS (rustls = "0.23", tokio-rustls = "0.26"),
@@ -15,20 +16,20 @@ categories = ["network-programming", "game-engines"]
 # y Métricas Prometheus (metrics = "0.23", metrics-exporter-prometheus = "0.15")
 open_table_core = { version = "1.1.0", path = "../open_table_core" }
 open_table_engine = { version = "1.1.0", path = "../open_table_engine" }
-chess_game = { path = "../chess_game" }
-checkers_game = { path = "../checkers_game" }
-go_game = { path = "../go_game" }
-shogi_game = { path = "../shogi_game" }
-xiangqi_game = { path = "../xiangqi_game" }
-backgammon_game = { path = "../backgammon_game" }
-battleship_game = { path = "../battleship_game" }
-ludo_game = { path = "../ludo_game" }
-mille_bornes_game = { path = "../mille_bornes_game" }
-monopoly_game = { path = "../monopoly_game" }
-uno_game = { path = "../uno_game" }
-crisis_game = { path = "../crisis_game" }
-chinese_checkers_game = { path = "../chinese_checkers_game" }
-goose_game = { path = "../goose_game" }
+chess_game = { package = "open_table_chess_game", version = "1.1.0", path = "../chess_game" }
+checkers_game = { package = "open_table_checkers_game", version = "1.1.0", path = "../checkers_game" }
+go_game = { package = "open_table_go_game", version = "1.1.0", path = "../go_game" }
+shogi_game = { package = "open_table_shogi_game", version = "1.1.0", path = "../shogi_game" }
+xiangqi_game = { package = "open_table_xiangqi_game", version = "1.1.0", path = "../xiangqi_game" }
+backgammon_game = { package = "open_table_backgammon_game", version = "1.1.0", path = "../backgammon_game" }
+battleship_game = { package = "open_table_battleship_game", version = "1.1.0", path = "../battleship_game" }
+ludo_game = { package = "open_table_ludo_game", version = "1.1.0", path = "../ludo_game" }
+mille_bornes_game = { package = "open_table_mille_bornes_game", version = "1.1.0", path = "../mille_bornes_game" }
+monopoly_game = { package = "open_table_monopoly_game", version = "1.1.0", path = "../monopoly_game" }
+uno_game = { package = "open_table_uno_game", version = "1.1.0", path = "../uno_game" }
+crisis_game = { package = "open_table_crisis_game", version = "1.1.0", path = "../crisis_game" }
+chinese_checkers_game = { package = "open_table_chinese_checkers_game", version = "1.1.0", path = "../chinese_checkers_game" }
+goose_game = { package = "open_table_goose_game", version = "1.1.0", path = "../goose_game" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 getrandom = "0.4"

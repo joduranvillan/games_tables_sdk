@@ -150,6 +150,17 @@ pub fn best_move(
     ai: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<MilleBornesCommand> {
+    best_move_with_randomness(state, ai, difficulty, 0, 0)
+}
+
+/// Selecciona la mejor jugada para `ai` en Mille Bornes con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    state: &MilleBornesState,
+    ai: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<MilleBornesCommand> {
     let deck = state.world().get_resource::<DeckResource>()?;
     let speed_limit = state.world().get_resource::<SpeedLimitResource>();
     let right_of_way = state.world().get_resource::<RightOfWayResource>();
@@ -164,16 +175,12 @@ pub fn best_move(
 
     let opponent = resolve_opponent(state, ai);
 
-    // 1) Safety: priorizar jugar cualquier Card::Safety(_) cuando su peligro correspondiente amenaza,
-    // o para obtener el turno extra (en Medium/Hard/Expert).
     let current_hazard = deck.hazard.get(&ai).copied().flatten();
     let is_speed_limited = speed_limit
         .map(|s| s.limited.contains(&ai))
         .unwrap_or(false)
         || current_hazard == Some(Hazard::SpeedLimit);
 
-    // Si un peligro nos amenaza y tenemos la Safety correspondiente (de las 4 Safeties),
-    // jugarla de inmediato para curar el peligro y obtener turno extra
     let threatening_safety_idx = hand.iter().position(|&card| match (current_hazard, card) {
         (Some(Hazard::FlatTire), Card::Safety(Safety::PunctureProof)) => true,
         (Some(Hazard::OutOfGas), Card::Safety(Safety::ExtraTank)) => true,
@@ -193,8 +200,6 @@ pub fn best_move(
         }));
     }
 
-    // Si no hay peligro amenazante inmediato, pero tenemos cualquier Safety (o RightOfWay),
-    // jugarla para obtener el turno extra y protección permanente
     if difficulty != AiDifficulty::Easy {
         for (idx, card) in hand.iter().enumerate() {
             if matches!(card, Card::Safety(_) | Card::RightOfWay) {
@@ -205,8 +210,6 @@ pub fn best_move(
             }
         }
     }
-
-    // 2) Remedy si bloqueado
 
     if let Some(h) = current_hazard {
         if h != Hazard::SpeedLimit {
@@ -230,7 +233,6 @@ pub fn best_move(
         }
     }
 
-    // 3) Hazard al oponente si tiene buen avance (ignorada en Easy)
     if difficulty != AiDifficulty::Easy {
         let opp_distance = deck.distance.get(&opponent).copied().unwrap_or(0);
         let ai_distance = deck.distance.get(&ai).copied().unwrap_or(0);
@@ -250,29 +252,38 @@ pub fn best_move(
         }
     }
 
-    // 4) Distance máxima posible
-    let mut best_distance_idx: Option<usize> = None;
-    let mut best_distance_val: u32 = 0;
+    let mut distance_indices = Vec::new();
+    let mut distance_scores = Vec::new();
 
     for (idx, card) in hand.iter().enumerate() {
         if let Card::Distance(val) = *card {
-            if can_play_distance_value(deck, speed_limit, right_of_way, ai, val)
-                && val > best_distance_val
-            {
-                best_distance_val = val;
-                best_distance_idx = Some(idx);
+            if can_play_distance_value(deck, speed_limit, right_of_way, ai, val) {
+                distance_indices.push(idx);
+                distance_scores.push(val as f32);
             }
         }
     }
 
-    if let Some(idx) = best_distance_idx {
+    if !distance_indices.is_empty() {
+        let safety_band = match difficulty {
+            AiDifficulty::Easy => 125.0,
+            AiDifficulty::Medium => 75.0,
+            AiDifficulty::Hard => 35.0,
+            AiDifficulty::Expert => 15.0,
+        };
+        let pick_idx = AiDifficulty::select_top_k_with_noise(
+            &distance_scores,
+            randomness_pct,
+            safety_band,
+            seed ^ state.current_tick().0 ^ state.id.0,
+        )
+        .unwrap_or(0);
         return Some(MilleBornesCommand::PlayCard(PlayCardCommand {
             player: ai,
-            card_index: idx,
+            card_index: distance_indices[pick_idx],
         }));
     }
 
-    // Si no puede jugar distancia y no está en Easy, intenta jugar cualquier Hazard válido aunque el rival tenga 0 km
     if difficulty != AiDifficulty::Easy {
         for (idx, card) in hand.iter().enumerate() {
             if let Card::Hazard(hazard) = *card {
@@ -286,7 +297,6 @@ pub fn best_move(
         }
     }
 
-    // Fallback: robar si hay hueco en mano, o descartar una carta no jugable
     if hand.len() < MAX_HAND_SIZE && (!deck.draw_pile.is_empty() || !deck.discard_pile.is_empty()) {
         return Some(MilleBornesCommand::DrawCard(DrawCardCommand { player: ai }));
     }

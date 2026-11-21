@@ -52,7 +52,7 @@ pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
     let mut score = 0.0f32;
     let mut player_moves = 0usize;
 
-    // 1. Material + 2. Movilidad rápida sin clonar el tablero en nodos hoja
+    // 1. Material + 2. Movilidad del jugador evaluado
     for (&pos, piece) in &board.pieces {
         let val = match piece.kind {
             PieceKind::Pawn => 1.0,
@@ -62,6 +62,7 @@ pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
             PieceKind::Queen => 9.0,
             PieceKind::King => 1000.0,
         };
+
         if piece.owner == player {
             score += val;
             player_moves += piece_moves(board, sides, pos, *piece).len();
@@ -304,20 +305,92 @@ pub fn best_move(
     player: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<MovePieceCommand> {
+    best_move_with_randomness(session, player, difficulty, 0, 0)
+}
+
+/// Selecciona la jugada de IA en Ajedrez con factor de aleatoriedad (`randomness_pct`, `0..=100`)
+/// aplicado sobre una banda de seguridad Top-K acotada por dificultad.
+pub fn best_move_with_randomness(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<MovePieceCommand> {
     if difficulty.use_opening_book() {
-        if let Some(book_cmd) =
-            crate::opening_book::OpeningBook::lookup_session(session, player, difficulty)
-        {
+        if let Some(book_cmd) = crate::opening_book::OpeningBook::lookup_session_with_randomness(
+            session,
+            player,
+            difficulty,
+            randomness_pct,
+            seed,
+        ) {
             return Some(book_cmd);
         }
     }
-    if difficulty == AiDifficulty::Easy {
+    if difficulty == AiDifficulty::Easy && randomness_pct == 0 {
         let candidates = generate_candidates(session, player);
         if candidates.len() > 1 && (session.current_tick().0 & 3) == 0 {
             return candidates.last().cloned();
         }
     }
-    chess_ai_pick_move(session, player, difficulty.max_depth())
+    if randomness_pct == 0 {
+        return chess_ai_pick_move(session, player, difficulty.max_depth());
+    }
+
+    if session
+        .world()
+        .get_resource::<GameOverResource>()
+        .is_some_and(|r| r.0)
+        || session.current_player() != player
+    {
+        return None;
+    }
+
+    let mut candidates = generate_candidates(session, player);
+    if candidates.is_empty() {
+        return None;
+    }
+
+    if let Some(board) = session.world().get_resource::<BoardResource>() {
+        candidates.sort_by_key(|cmd| if board.get(cmd.to).is_some() { 0 } else { 1 });
+    }
+
+    let depth = difficulty.max_depth().max(1);
+    let mut scored_moves = Vec::with_capacity(candidates.len());
+    let mut scores = Vec::with_capacity(candidates.len());
+    let alpha = f32::NEG_INFINITY;
+    let beta = f32::INFINITY;
+
+    for candidate in candidates {
+        let mut next_session = clone_chess_session(session);
+        if next_session
+            .process_command(player, Box::new(candidate.clone()))
+            .is_ok()
+        {
+            let score = if depth <= 1 {
+                evaluate_position(&next_session, player)
+            } else {
+                minimax(&next_session, depth - 1, alpha, beta, false, player)
+            };
+            scored_moves.push(candidate);
+            scores.push(score);
+        }
+    }
+
+    let safety_band = match difficulty {
+        AiDifficulty::Easy => 2.5,
+        AiDifficulty::Medium => 1.1,
+        AiDifficulty::Hard => 0.45,
+        AiDifficulty::Expert => 0.25,
+    };
+    let idx = AiDifficulty::select_top_k_with_noise(
+        &scores,
+        randomness_pct,
+        safety_band,
+        seed ^ session.current_tick().0 ^ session.id.0,
+    )?;
+    scored_moves.into_iter().nth(idx)
 }
 
 #[cfg(test)]

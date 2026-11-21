@@ -4041,7 +4041,7 @@ impl OpenTableBridge {
 
                         let cmd_str = String::from_utf8_lossy(&data);
                         if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
-                            let sender = command.issuer().unwrap_or_else(|| {
+                            let sender = command.issuer().unwrap_or({
                                 if from.0 <= 1 {
                                     PlayerId(2)
                                 } else {
@@ -4277,7 +4277,7 @@ impl OpenTableBridge {
 
             let cmd_str = String::from_utf8_lossy(&command_bytes);
             if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
-                let effective_sender = command.issuer().unwrap_or_else(|| {
+                let effective_sender = command.issuer().unwrap_or({
                     if player_id.0 <= 1 {
                         PlayerId(2)
                     } else {
@@ -4474,7 +4474,7 @@ impl OpenTableBridge {
 
             let cmd_str = String::from_utf8_lossy(&command_bytes);
             if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
-                let effective_sender = command.issuer().unwrap_or_else(|| {
+                let effective_sender = command.issuer().unwrap_or({
                     if player_id.0 <= 1 {
                         PlayerId(2)
                     } else {
@@ -4658,7 +4658,7 @@ impl OpenTableBridge {
 
             let cmd_str = String::from_utf8_lossy(&command_bytes);
             if let Ok(command) = parse_command_json(&cmd_str, &self.current_game_type) {
-                let effective_sender = command.issuer().unwrap_or_else(|| {
+                let effective_sender = command.issuer().unwrap_or({
                     if player_id.0 <= 1 {
                         PlayerId(2)
                     } else {

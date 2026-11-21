@@ -4,6 +4,8 @@ import {
   Code2,
   Copy,
   Gamepad2,
+  Globe,
+  Package,
   Search,
   Terminal,
   X,
@@ -13,12 +15,20 @@ import {
   DOC_MODAL_UI_BY_LOCALE,
   getLocalizedDocumentationSections,
 } from "../../i18n/tutorialsAndDocsI18n";
+import {
+  CrateLayerId,
+  CRATES_EXPLORER_UI_BY_LOCALE,
+  CRATES_IO_CATALOG_24,
+  getCrateHighlightsForLocale,
+  NATIVE_DOC_LANGUAGES,
+  TRUSTED_PUBLISHING_OIDC_CONFIG,
+} from "../../i18n/cratesIoCatalogI18n";
 
-export type DocCategory = "usage" | "games" | "developer";
+export type DocCategory = "usage" | "games" | "developer" | "crates";
 
 export interface DocumentationSection {
   id: string;
-  category: DocCategory;
+  category: Exclude<DocCategory, "crates">;
   title: string;
   subtitle: string;
   tags: string[];
@@ -46,7 +56,7 @@ export const DOCUMENTATION_SECTIONS: DocumentationSection[] = [
     ],
     bulletPoints: [
       "Hotseat Local (2 Jugadores): Ambos jugadores comparten el dispositivo alternando turnos en el mismo tablero.",
-      "vs IA Rust (4 Niveles): Juega como Jugador 1 contra el motor de IA determinista con dificultades Fácil (1000 ELO), Media (1200 ELO), Difícil (1450 ELO) y Maestra (1700 ELO).",
+      "vs IA Rust (4 Niveles): Juega como Jugador 1 contra el motor de IA determinista con dificultades Fácil (1000 ELO), Media (1200 ELO), Difícil (1450 ELO) y Maestra (1700 ELO), más factor de aleatoriedad configurable 0-100%.",
       "Online Relay / QR: Crea una sala de 6 caracteres con código QR instantáneo o únete como Jugador 2 desde otro navegador o cliente Godot.",
       "Modo Espectador: Observa partidas en curso en tiempo real con el tablero en modo de solo lectura y acceso al chat de sala."
     ]
@@ -86,17 +96,17 @@ export const DOCUMENTATION_SECTIONS: DocumentationSection[] = [
   {
     id: "usage-analyzer-replay",
     category: "usage",
-    title: "04. Analizador Post-Partida y Visor de Repeticiones",
-    subtitle: "Gráfico SVG de ventaja [-100, +100] y clasificación de jugadas",
-    tags: ["analizador", "post-partida", "ventaja", "replay", "json", "errores"],
+    title: "04. Analizador Post-Partida, Mapa de Calor IA y Visor de Repeticiones",
+    subtitle: "Gráfico SVG de ventaja [-100, +100], Mapa de Calor Top-K y clasificación de jugadas",
+    tags: ["analizador", "post-partida", "ventaja", "replay", "json", "errores", "heatmap"],
     paragraphs: [
-      "La pestaña 'Analizador' reconstruye paso a paso cualquier partida terminada o en curso para los 14 juegos y calcula la curva de ventaja posicional desde la perspectiva del Jugador 1.",
-      "Además, la barra inferior de Replay en el tablero principal permite retroceder o avanzar turno a turno, exportar la partida a un archivo JSON o importar un registro previo."
+      "La pestaña 'Analizador' reconstruye paso a paso cualquier partida terminada o en curso para los 14 juegos, calcula la curva de ventaja posicional y renderiza el Mapa de Calor de Intensidad de Decisión IA (conmutable entre Turno Seleccionado y Partida Acumulada).",
+      "Además, la barra inferior de Replay en el tablero principal permite usar Undo/Redo transaccional, verificar el checksum determinista FNV-1a de 64 bits y exportar o importar registros JSON."
     ],
     bulletPoints: [
       "★ Óptima (ganancia neta >= +5 puntos) y ✓ Buena (pérdida <= 4 puntos).",
       "? Imprecisión (caída de 4 a 14 puntos) y ?? Error Crítico / Blunder (caída >= 15 puntos).",
-      "Haz clic en cualquier punto de la curva SVG o fila de la tabla para inspeccionar el estado exacto y cargarlo en el tablero principal."
+      "Haz clic en cualquier punto de la curva SVG o fila de la tabla para inspeccionar el estado exacto y el Mapa de Calor Top-K."
     ]
   },
   {
@@ -169,7 +179,7 @@ export const DOCUMENTATION_SECTIONS: DocumentationSection[] = [
     tags: ["verificacion", "tests", "vitest", "diagnostico", "ci", "funcional", "e2e"],
     paragraphs: [
       "Para garantizar en cualquier momento que el cliente Web React + WASM funciona al 100%, dispones de dos mecanismos complementarios: el Panel de Diagnóstico en la propia interfaz (pestaña 'Diagnóstico') y el script automatizado de terminal.",
-      "El script de verificación ejecuta el chequeo estático de TypeScript, las 6 suites de pruebas en Vitest (cubriendo los 14 juegos y las Fases 1 a 5), el build de producción de Vite y la auditoría de documentación."
+      "El script de verificación ejecuta el chequeo estático de TypeScript, las suites de pruebas en Vitest (cubriendo los 14 juegos, los 24 crates documentados y la internacionalización), el build de producción de Vite y la auditoría de documentación."
     ],
     bulletPoints: [
       "Verificación en un solo comando desde la raíz del SDK: bash tools/verify_web_client.sh",
@@ -200,10 +210,10 @@ bash games_tables_sdk/tools/build_wasm.sh`
     ],
     bulletPoints: [
       "start_local_match(game_type, p1, p2) / start_ai_match(game_type, human_id, ai_id, difficulty): Inicializa la sesión limpia.",
-      "get_state_json(): Devuelve el snapshot JSON canónico del tablero actual.",
+      "get_state_json() y get_state_checksum_hex(): Devuelve el snapshot JSON canónico y la firma FNV-1a de 64 bits.",
       "get_legal_moves_json(player_id): Devuelve el array JSON de comandos legales para iluminar destinos en la UI.",
-      "send_command_json(player_id, cmd_json): Valida y aplica el comando, grabándolo en el historial determinista de replay.",
-      "step_ai_if_needed(): Ejecuta el turno de la IA (incluyendo fases automáticas de tirada de dados o robo de cartas).",
+      "send_command_json(player_id, cmd_json), undo_step() y redo_step(): Ejecuta comandos con historial transaccional.",
+      "set_ai_randomness_pct(pct) y get_last_ai_telemetry_json(): Controla el ruido Top-K (0-100%) e inspecciona los candidatos evaluados por la IA.",
       "export_log_json() / apply_sync_log_json(game_type, log_json): Serializa y reconstruye partidas completas para Replay, Analizador y sincronización Relay."
     ],
     codeSnippet: {
@@ -211,10 +221,11 @@ bash games_tables_sdk/tools/build_wasm.sh`
       code: `import { WasmGameBridge } from "./wasm_pkg";
 
 const bridge = new WasmGameBridge();
-bridge.start_ai_match("chess", 1, 2, 1); // Humano J1 vs IA Media J2
+bridge.start_ai_match("chess", 1, 2, 1); // Humano J1 vs IA Media J2 (25% ruido por defecto)
 
-// 1. Obtener estado y jugadas legales para renderizar el tablero SVG
+// 1. Obtener estado, checksum FNV-1a y jugadas legales
 const state = JSON.parse(bridge.get_state_json());
+const checksum = bridge.get_state_checksum_hex();
 const legalMoves = JSON.parse(bridge.get_legal_moves_json(1));
 
 // 2. Despachar una jugada legal del Jugador 1
@@ -311,10 +322,14 @@ interface DocumentationCenterModalProps {
 export const DocumentationCenterModal: React.FC<
   DocumentationCenterModalProps
 > = ({ isOpen, onClose, initialCategory = "usage" }) => {
-  const { locale } = useI18n();
+  const { locale, setLocale } = useI18n();
   const ui = DOC_MODAL_UI_BY_LOCALE[locale];
+  const cratesUi = CRATES_EXPLORER_UI_BY_LOCALE[locale];
+
   const [activeCategory, setActiveCategory] =
     useState<DocCategory>(initialCategory);
+  const [activeCrateLayer, setActiveCrateLayer] =
+    useState<CrateLayerId>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -342,6 +357,30 @@ export const DocumentationCenterModal: React.FC<
     });
   }, [activeCategory, searchQuery, localizedSections]);
 
+  const filteredCrates = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return CRATES_IO_CATALOG_24.filter((crate) => {
+      if (activeCrateLayer !== "all" && crate.layer !== activeCrateLayer) {
+        return false;
+      }
+      if (!q) return true;
+      const localizedSummary =
+        crate.summaryByLocale[locale] || crate.summaryByLocale.en;
+      const highlights = getCrateHighlightsForLocale(crate, locale);
+      const haystack = [
+        crate.name,
+        crate.layer,
+        localizedSummary,
+        ...highlights,
+        ...crate.exports,
+        crate.codeExample,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [activeCrateLayer, searchQuery, locale]);
+
   if (!isOpen) return null;
 
   const handleCopySnippet = (id: string, code: string) => {
@@ -352,6 +391,10 @@ export const DocumentationCenterModal: React.FC<
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const activeNativeDocMeta =
+    NATIVE_DOC_LANGUAGES.find((l) => l.locale === locale) ||
+    NATIVE_DOC_LANGUAGES[0];
+
   return (
     <div
       role="dialog"
@@ -359,12 +402,12 @@ export const DocumentationCenterModal: React.FC<
       aria-label={ui.dialogAriaLabel}
       className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
     >
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-6xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
         {/* Top Modal Header */}
         <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-4">
           <div>
             <div className="text-xs text-slate-400">
-              {ui.headerKicker}
+              {ui.headerKicker} · {activeNativeDocMeta.hubPath}
             </div>
             <h2 className="text-lg font-bold text-white font-display">
               {ui.headerTitle}
@@ -381,11 +424,46 @@ export const DocumentationCenterModal: React.FC<
           </button>
         </div>
 
+        {/* 7-Language Native Documentation Switcher Bar */}
+        <div
+          data-testid="doc-modal-language-bar"
+          className="px-6 py-2.5 bg-slate-950/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <Globe className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="font-medium text-slate-300">
+              {cratesUi.languageBarLabel}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-lg">
+            {NATIVE_DOC_LANGUAGES.map((lang) => {
+              const isSelected = locale === lang.locale;
+              return (
+                <button
+                  key={lang.locale}
+                  type="button"
+                  data-testid={`doc-lang-btn-${lang.locale}`}
+                  onClick={() => setLocale(lang.locale)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    isSelected
+                      ? "bg-emerald-600 text-white"
+                      : "text-slate-300 hover:text-white hover:bg-slate-800"
+                  }`}
+                >
+                  {lang.codeLabel} · {lang.nativeLabel}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Category Tabs + Search Input */}
-        <div className="px-6 py-3.5 bg-slate-950/60 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-lg">
+        <div className="px-6 py-3.5 bg-slate-950/60 border-b border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-lg">
             <button
               type="button"
+              data-testid="doc-tab-usage"
               onClick={() => {
                 setActiveCategory("usage");
                 setSearchQuery("");
@@ -402,6 +480,7 @@ export const DocumentationCenterModal: React.FC<
 
             <button
               type="button"
+              data-testid="doc-tab-games"
               onClick={() => {
                 setActiveCategory("games");
                 setSearchQuery("");
@@ -418,6 +497,7 @@ export const DocumentationCenterModal: React.FC<
 
             <button
               type="button"
+              data-testid="doc-tab-developer"
               onClick={() => {
                 setActiveCategory("developer");
                 setSearchQuery("");
@@ -431,12 +511,30 @@ export const DocumentationCenterModal: React.FC<
               <Code2 className="w-3.5 h-3.5" />
               <span>{ui.tabDeveloper}</span>
             </button>
+
+            <button
+              type="button"
+              data-testid="doc-tab-crates"
+              onClick={() => {
+                setActiveCategory("crates");
+                setSearchQuery("");
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                activeCategory === "crates"
+                  ? "bg-emerald-600 text-white"
+                  : "text-slate-300 hover:text-white"
+              }`}
+            >
+              <Package className="w-3.5 h-3.5" />
+              <span>{cratesUi.tabCratesIo}</span>
+            </button>
           </div>
 
           <div className="relative flex-1 max-w-xs">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
+              data-testid="doc-modal-search-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={ui.searchPlaceholder}
@@ -447,7 +545,268 @@ export const DocumentationCenterModal: React.FC<
 
         {/* Scrollable Content Body */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
-          {filteredSections.length === 0 ? (
+          {activeCategory === "crates" ? (
+            <>
+              {/* Crates.io & 7-Language Hub Header Banner */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs text-slate-400">
+                      {cratesUi.categoryBadgeCrates} · 24/24 Crates · v1.1.0
+                    </div>
+                    <h3 className="text-base font-bold text-white font-display mt-0.5">
+                      {cratesUi.i18nHubBannerTitle}
+                    </h3>
+                  </div>
+                  <div className="text-xs font-mono tabular-nums text-slate-400">
+                    {filteredCrates.length} / 24 crates
+                  </div>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed max-w-4xl">
+                  {cratesUi.i18nHubBannerDesc}
+                </p>
+
+                {/* Architectural Layer Segmented Filter */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {(
+                    [
+                      { id: "all", label: cratesUi.filterAll },
+                      { id: "core-engine", label: cratesUi.filterCore },
+                      { id: "transports-relay", label: cratesUi.filterTransports },
+                      { id: "runtime-bridges", label: cratesUi.filterBridges },
+                      { id: "canonical-games", label: cratesUi.filterGames },
+                    ] as Array<{ id: CrateLayerId; label: string }>
+                  ).map((layerFilter) => (
+                    <button
+                      key={layerFilter.id}
+                      type="button"
+                      data-testid={`crate-layer-filter-${layerFilter.id}`}
+                      onClick={() => setActiveCrateLayer(layerFilter.id)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        activeCrateLayer === layerFilter.id
+                          ? "bg-emerald-600 text-white"
+                          : "bg-slate-900 border border-slate-800 text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      {layerFilter.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Crates.io Trusted Publishing (OIDC) & 4-Tier Topological Pipeline Card */}
+              <div
+                data-testid="trusted-publishing-oidc-card"
+                className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-3"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs text-slate-400 font-mono">
+                      OIDC Trusted Publishing · {TRUSTED_PUBLISHING_OIDC_CONFIG.authAction} · TTL {TRUSTED_PUBLISHING_OIDC_CONFIG.tokenTtlMinutes}m
+                    </div>
+                    <h4 className="text-sm font-bold text-white font-display mt-0.5">
+                      Crates.io Trusted Publishing ({TRUSTED_PUBLISHING_OIDC_CONFIG.publishableCratesCount} Crates · {TRUSTED_PUBLISHING_OIDC_CONFIG.workflowFilename} · Environment: {TRUSTED_PUBLISHING_OIDC_CONFIG.environment})
+                    </h4>
+                  </div>
+
+                  <button
+                    type="button"
+                    data-testid="copy-oidc-workflow-btn"
+                    onClick={() =>
+                      handleCopySnippet(
+                        "oidc-workflow-yaml",
+                        TRUSTED_PUBLISHING_OIDC_CONFIG.workflowYamlSnippet
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 hover:bg-slate-800 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer self-start sm:self-auto"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>
+                      {copiedId === "oidc-workflow-yaml"
+                        ? cratesUi.copiedLabel
+                        : cratesUi.copyRustBtn}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="text-xs text-slate-300 font-mono tabular-nums">
+                  <span>Owner: {TRUSTED_PUBLISHING_OIDC_CONFIG.repositoryOwner}</span>
+                  <span aria-hidden="true"> · </span>
+                  <span>Repo: {TRUSTED_PUBLISHING_OIDC_CONFIG.repositoryName}</span>
+                  <span aria-hidden="true"> · </span>
+                  <span>Workflow: .github/workflows/{TRUSTED_PUBLISHING_OIDC_CONFIG.workflowFilename}</span>
+                  <span aria-hidden="true"> · </span>
+                  <span>Environment: {TRUSTED_PUBLISHING_OIDC_CONFIG.environment}</span>
+                  <span aria-hidden="true"> · </span>
+                  <span>Script: {TRUSTED_PUBLISHING_OIDC_CONFIG.scriptPath}</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {TRUSTED_PUBLISHING_OIDC_CONFIG.topologicalTiers.map((t) => (
+                    <div
+                      key={t.tier}
+                      className="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex flex-col gap-1"
+                    >
+                      <div className="text-xs font-semibold text-emerald-400">
+                        {t.label}
+                      </div>
+                      <div className="text-[11px] text-slate-300 font-mono leading-relaxed">
+                        {t.crates.join(", ")}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Crates List */}
+              {filteredCrates.length === 0 ? (
+                <div className="p-8 rounded-xl bg-slate-950 border border-slate-800 text-center flex flex-col items-center gap-3">
+                  <p className="text-xs text-slate-400">
+                    {ui.emptySearchPrefix} "{searchQuery}".
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveCrateLayer("all");
+                      setSearchQuery("");
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-white font-medium cursor-pointer"
+                  >
+                    {cratesUi.resetFilterBtn}
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredCrates.map((crate) => {
+                    const summary =
+                      crate.summaryByLocale[locale] || crate.summaryByLocale.en;
+                    const highlights = getCrateHighlightsForLocale(
+                      crate,
+                      locale
+                    );
+                    const cargoCopyId = `cargo-${crate.name}`;
+                    const rustCopyId = `rust-${crate.name}`;
+
+                    return (
+                      <article
+                        key={crate.name}
+                        data-testid={`crate-doc-card-${crate.name}`}
+                        className="p-5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-3"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+                          <div>
+                            {/* Zero-Pill Unboxed Metadata Line */}
+                            <div className="text-xs text-slate-400 font-mono tabular-nums">
+                              <span>v{crate.version}</span>
+                              <span aria-hidden="true"> · </span>
+                              <span>{crate.license}</span>
+                              <span aria-hidden="true"> · </span>
+                              <span>Edition {crate.edition}</span>
+                              <span aria-hidden="true"> · </span>
+                              <span>rustc {crate.rustVersion}</span>
+                              <span aria-hidden="true"> · </span>
+                              <span>{crate.readmePath}</span>
+                            </div>
+                            <h4 className="text-base font-bold text-white font-mono mt-0.5">
+                              {crate.name}
+                            </h4>
+                          </div>
+
+                          <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
+                            <span>crates.io/crates/{crate.name}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>docs.rs/{crate.name}</span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-300 leading-relaxed max-w-4xl">
+                          {summary}
+                        </p>
+
+                        <ul className="list-disc list-inside flex flex-col gap-1 text-xs text-slate-300 pl-1">
+                          {highlights.map((hl, idx) => (
+                            <li key={idx} className="leading-relaxed">
+                              {hl}
+                            </li>
+                          ))}
+                        </ul>
+
+                        {/* Unboxed Exported Public Rust API Symbols */}
+                        <div className="text-xs text-slate-400">
+                          <span className="font-semibold text-slate-300">
+                            {cratesUi.exportsLabel}{" "}
+                          </span>
+                          <span className="font-mono text-emerald-300">
+                            {crate.exports.join(" · ")}
+                          </span>
+                        </div>
+
+                        {/* Cargo.toml + Rust Code Blocks */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 pt-1">
+                          <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-900 flex flex-col">
+                            <div className="px-3 py-1.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-xs text-slate-300">
+                              <span className="font-medium">
+                                {cratesUi.cargoTomlLabel}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCopySnippet(
+                                    cargoCopyId,
+                                    crate.cargoToml
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs cursor-pointer"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>
+                                  {copiedId === cargoCopyId
+                                    ? cratesUi.copiedLabel
+                                    : cratesUi.copyCargoBtn}
+                                </span>
+                              </button>
+                            </div>
+                            <pre className="p-3 text-xs font-mono text-emerald-300 overflow-x-auto leading-relaxed">
+                              <code>{crate.cargoToml}</code>
+                            </pre>
+                          </div>
+
+                          <div className="lg:col-span-2 rounded-xl overflow-hidden border border-slate-800 bg-slate-900 flex flex-col">
+                            <div className="px-3 py-1.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-xs text-slate-300">
+                              <span className="inline-flex items-center gap-1.5 font-medium">
+                                <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>{cratesUi.rustExampleLabel}</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCopySnippet(
+                                    rustCopyId,
+                                    crate.codeExample
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs cursor-pointer"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>
+                                  {copiedId === rustCopyId
+                                    ? cratesUi.copiedLabel
+                                    : cratesUi.copyRustBtn}
+                                </span>
+                              </button>
+                            </div>
+                            <pre className="p-3 text-xs font-mono text-emerald-300 overflow-x-auto leading-relaxed">
+                              <code>{crate.codeExample}</code>
+                            </pre>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          ) : filteredSections.length === 0 ? (
             <div className="p-8 rounded-xl bg-slate-950 border border-slate-800 text-center text-xs text-slate-400">
               {ui.emptySearchPrefix} "{searchQuery}". {ui.emptySearchSuffix}
             </div>
@@ -522,7 +881,9 @@ export const DocumentationCenterModal: React.FC<
 
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between text-xs text-slate-400">
-          <span>{ui.footerSyncText}</span>
+          <span>
+            {ui.footerSyncText} · {activeNativeDocMeta.hubPath}
+          </span>
           <button
             type="button"
             onClick={onClose}

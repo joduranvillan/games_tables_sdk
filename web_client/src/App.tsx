@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { WasmGameBridge } from "./wasm_pkg";
+import { AiMoveTelemetry, WasmGameBridge } from "./wasm_pkg";
 import {
   getSavedRelayUrl,
   MatchmakingQueueTicket,
@@ -86,11 +86,13 @@ import {
   Menu,
   Palette,
   QrCode,
+  Redo2,
   RefreshCw,
   RotateCcw,
   Search,
   Settings,
   Trophy,
+  Undo2,
   Users,
   Wifi,
   X,
@@ -287,6 +289,9 @@ const AppShell: React.FC = () => {
   const [selectedGameId, setSelectedGameId] = useState<string>("chess");
   const [matchMode, setMatchMode] = useState<MatchMode>("hotseat");
   const [aiDifficulty, setAiDifficulty] = useState<number>(1);
+  const [aiRandomness, setAiRandomness] = useState<number>(() =>
+    WasmGameBridge.defaultRandomnessForDifficulty(1)
+  );
 
   const [stateJson, setStateJson] = useState<string>(() =>
     bridgeRef.current.get_state_json()
@@ -297,9 +302,16 @@ const AppShell: React.FC = () => {
   const [currentTurn, setCurrentTurn] = useState<number>(1);
   const [localNetworkPlayerId, setLocalNetworkPlayerId] = useState<1 | 2>(1);
 
-  // Replay timeline state
+  // Replay timeline & transactional Undo/Redo + Checksum + AI Telemetry state
   const [replayCurrentStep, setReplayCurrentStep] = useState<number>(0);
   const [replayTotalSteps, setReplayTotalSteps] = useState<number>(0);
+  const [canUndo, setCanUndo] = useState<boolean>(false);
+  const [canRedo, setCanRedo] = useState<boolean>(false);
+  const [stateChecksumHex, setStateChecksumHex] = useState<string>(() =>
+    bridgeRef.current.get_state_checksum_hex()
+  );
+  const [lastAiTelemetry, setLastAiTelemetry] =
+    useState<AiMoveTelemetry | null>(null);
 
   // Tournament Clock state
   const [clockState, setClockState] = useState<TournamentClockState>(() =>
@@ -425,6 +437,15 @@ const AppShell: React.FC = () => {
     setLegalMovesJson(bridgeRef.current.get_legal_moves_json(turn));
     setReplayCurrentStep(bridgeRef.current.get_current_replay_step());
     setReplayTotalSteps(bridgeRef.current.get_replay_step_count());
+    setCanUndo(bridgeRef.current.can_undo());
+    setCanRedo(bridgeRef.current.can_redo());
+    setStateChecksumHex(bridgeRef.current.get_state_checksum_hex());
+    try {
+      const rawTel = bridgeRef.current.get_last_ai_telemetry_json();
+      setLastAiTelemetry(rawTel && rawTel !== "null" ? JSON.parse(rawTel) : null);
+    } catch {
+      setLastAiTelemetry(null);
+    }
     checkAndRecordWinnerIfAny(
       nextStateStr,
       bridgeRef.current.get_current_game_type(),
@@ -504,7 +525,8 @@ const AppShell: React.FC = () => {
   const startGameSession = (
     gameId: string,
     mode: MatchMode,
-    diff: number = aiDifficulty
+    diff: number = aiDifficulty,
+    customRandomness?: number
   ) => {
     matchOutcomeRecordedRef.current = false;
     setSelectedGameId(gameId);
@@ -512,6 +534,11 @@ const AppShell: React.FC = () => {
     setClockState((prev) => createInitialClockState(prev.preset));
     if (mode === "ai") {
       bridgeRef.current.start_ai_match(gameId, 1, 2, diff);
+      const nextRandomness =
+        customRandomness ?? WasmGameBridge.defaultRandomnessForDifficulty(diff);
+      setAiRandomness(nextRandomness);
+      bridgeRef.current.set_ai_randomness(nextRandomness);
+      bridgeRef.current.set_ai_seed((Date.now() & 0x7fffffff) || 1);
       setLocalNetworkPlayerId(1);
     } else {
       bridgeRef.current.start_local_match(gameId, 1, 2);
@@ -582,6 +609,39 @@ const AppShell: React.FC = () => {
 
   const handleSeekReplayStep = (step: number) => {
     bridgeRef.current.seek_replay_step(step);
+    syncFromBridge();
+  };
+
+  const handleUndoMove = () => {
+    if (!bridgeRef.current.can_undo()) return;
+    if (
+      matchMode === "ai" &&
+      bridgeRef.current.current_player() === 1 &&
+      bridgeRef.current.get_current_replay_step() >= 2
+    ) {
+      bridgeRef.current.undo_step();
+      bridgeRef.current.undo_step();
+    } else {
+      bridgeRef.current.undo_step();
+    }
+    playProceduralSound("move", themeConfig);
+    syncFromBridge();
+  };
+
+  const handleRedoMove = () => {
+    if (!bridgeRef.current.can_redo()) return;
+    if (
+      matchMode === "ai" &&
+      bridgeRef.current.get_replay_step_count() -
+        bridgeRef.current.get_current_replay_step() >=
+        2
+    ) {
+      bridgeRef.current.redo_step();
+      bridgeRef.current.redo_step();
+    } else {
+      bridgeRef.current.redo_step();
+    }
+    playProceduralSound("move", themeConfig);
     syncFromBridge();
   };
 
@@ -1299,23 +1359,124 @@ const AppShell: React.FC = () => {
                     </div>
 
                     {matchMode === "ai" && (
-                      <select
-                        aria-label="AI Difficulty"
-                        value={aiDifficulty}
-                        onChange={(e) => {
-                          const nextDiff = Number(e.target.value);
-                          setAiDifficulty(nextDiff);
-                          startGameSession(selectedGameId, "ai", nextDiff);
-                        }}
-                        className="min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-950 border border-slate-800 text-slate-200"
-                      >
-                        <option value={0}>{t("ai.easy")}</option>
-                        <option value={1}>{t("ai.medium")}</option>
-                        <option value={2}>{t("ai.hard")}</option>
-                        <option value={3}>{t("ai.master")}</option>
-                      </select>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          aria-label="AI Difficulty"
+                          value={aiDifficulty}
+                          onChange={(e) => {
+                            const nextDiff = Number(e.target.value);
+                            const autoRand =
+                              WasmGameBridge.defaultRandomnessForDifficulty(
+                                nextDiff
+                              );
+                            setAiDifficulty(nextDiff);
+                            setAiRandomness(autoRand);
+                            startGameSession(
+                              selectedGameId,
+                              "ai",
+                              nextDiff,
+                              autoRand
+                            );
+                          }}
+                          className="min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-950 border border-slate-800 text-slate-200"
+                        >
+                          <option value={0}>{t("ai.easy")}</option>
+                          <option value={1}>{t("ai.medium")}</option>
+                          <option value={2}>{t("ai.hard")}</option>
+                          <option value={3}>{t("ai.master")}</option>
+                        </select>
+                        <div
+                          className="min-h-[38px] inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-950 border border-slate-800 text-slate-200"
+                          title="Factor de Aleatoriedad / Ruido Top-K de la IA (0% determinista - 100% máxima variedad dentro de banda segura)"
+                        >
+                          <span className="text-slate-400 whitespace-nowrap">
+                            Ruido IA
+                          </span>
+                          <input
+                            type="range"
+                            aria-label="AI Randomness Factor"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={aiRandomness}
+                            onChange={(e) => {
+                              const nextRand = Number(e.target.value);
+                              setAiRandomness(nextRand);
+                              bridgeRef.current.set_ai_randomness(nextRand);
+                            }}
+                            className="w-20 accent-emerald-500 cursor-pointer"
+                          />
+                          <span className="font-mono text-emerald-400 w-9 text-right">
+                            {aiRandomness}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {(matchMode === "hotseat" || matchMode === "ai") && (
+                      <div className="inline-flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={handleUndoMove}
+                          disabled={!canUndo}
+                          aria-label="Deshacer jugada"
+                          title="Deshacer jugada (Undo transaccional con restauración exacta de estado)"
+                          className="min-h-[38px] inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none border border-slate-800 text-xs font-medium text-slate-200 whitespace-nowrap shrink-0 cursor-pointer"
+                        >
+                          <Undo2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span>Deshacer</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleRedoMove}
+                          disabled={!canRedo}
+                          aria-label="Rehacer jugada"
+                          title="Rehacer jugada (Redo transaccional en línea de tiempo)"
+                          className="min-h-[38px] inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none border border-slate-800 text-xs font-medium text-slate-200 whitespace-nowrap shrink-0 cursor-pointer"
+                        >
+                          <Redo2 className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                          <span>Rehacer</span>
+                        </button>
+                      </div>
                     )}
                   </div>
+                </div>
+
+                {/* Unboxed Deterministic Checksum & AI Telemetry Line */}
+                <div className="pt-2 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 font-mono tabular-nums">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>
+                      Checksum FNV-1a:{" "}
+                      <strong className="text-emerald-400">
+                        {stateChecksumHex}
+                      </strong>
+                    </span>
+                    <span aria-hidden="true" className="text-slate-600">
+                      ·
+                    </span>
+                    <span>
+                      Historial: {replayCurrentStep}/{replayTotalSteps}
+                    </span>
+                  </div>
+                  {lastAiTelemetry && (
+                    <div className="flex flex-wrap items-center gap-2 text-slate-300">
+                      <span>
+                        IA {lastAiTelemetry.strategy_profile}:{" "}
+                        <strong className="text-sky-400">
+                          {lastAiTelemetry.command_summary}
+                        </strong>
+                      </span>
+                      <span aria-hidden="true" className="text-slate-600">
+                        ·
+                      </span>
+                      <span>
+                        Top-K {lastAiTelemetry.top_k_candidates}/
+                        {lastAiTelemetry.evaluated_candidates} · Score{" "}
+                        {lastAiTelemetry.chosen_score} ·{" "}
+                        {lastAiTelemetry.elapsed_us} µs
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Online Relay Role Switcher when in Online or Spectator Mode */}

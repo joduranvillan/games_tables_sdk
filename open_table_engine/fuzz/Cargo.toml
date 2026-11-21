@@ -1,6 +1,6 @@
 [package]
 name = "open_table_engine-fuzz"
-version = "0.1.0"
+version = "1.1.0"
 publish = false
 edition = "2021"
 rust-version = "1.82"
@@ -15,7 +15,7 @@ serde_json = "1"
 typetag = "0.2"
 open_table_engine = { path = "..", version = "0.1.0" }
 
-open_table_core = { path = "../../open_table_core", version = "0.1.0" }
+open_table_core = { path = "../../open_table_core", version = "1.1.0" }
 
 [[bin]]
 name = "fuzz_session"

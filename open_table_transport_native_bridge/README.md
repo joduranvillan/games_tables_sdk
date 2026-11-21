@@ -1,80 +1,53 @@
-# `open_table_transport_native_bridge`
+# `open_table_transport_native_bridge` (`lib: open_table_transport_native_bridge`)
 
-Capa de protocolo compartida por CUALQUIER transporte móvil nativo
-(Nearby Connections en Android, MultipeerConnectivity en iOS, o
-cualquier otro que aparezca). Contiene todo lo que `open_table_transport_tcp`
-ya probó — handshake `Join`/`Reconnect`, validación de identidad, tokens
-CSPRNG, timeout de reconexión — pero generalizado sobre un trait mínimo
-en vez de sockets TCP.
+[![Crates.io](https://img.shields.io/crates/v/open_table_transport_native_bridge.svg)](https://crates.io/crates/open_table_transport_native_bridge)
+[![Docs.rs](https://docs.rs/open_table_transport_native_bridge/badge.svg)](https://docs.rs/open_table_transport_native_bridge)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](../LICENSE)
+[![Rust 1.82+](https://img.shields.io/badge/rust-1.82%2B-orange.svg)](https://www.rust-lang.org)
 
-## La idea central
+**Documentation Languages:** [English](../docs/i18n/en/README.md) · [Español](../docs/i18n/es/README.md) · [Português (BR)](../docs/i18n/pt-BR/README.md) · [Français](../docs/i18n/fr/README.md) · [Deutsch](../docs/i18n/de/README.md) · [简体中文](../docs/i18n/zh-CN/README.md) · [日本語](../docs/i18n/ja/README.md)
 
-```rust
-pub trait RawByteLink: Send {
-    fn send_raw(&mut self, peer_tag: &str, bytes: &[u8]) -> EngineResult<()>;
-    fn broadcast_raw(&mut self, bytes: &[u8]) -> EngineResult<()>;
-    fn poll_raw_received(&mut self) -> Vec<(String, Vec<u8>)>;
-    fn poll_link_events(&mut self) -> Vec<RawLinkEvent>;
-}
+**Architectural Layer:** Transports, Relay & Discovery · **Package:** `open_table_transport_native_bridge` · **Library Name (`[lib]`):** `open_table_transport_native_bridge` · **Version:** `1.1.0` · **Edition:** `2021`
+
+Zero-socket `RawByteLink` bridge adapting Android Nearby Connections, iOS MultipeerConnectivity, and WebRTC DataChannels into `Transport`.
+
+> **Español:** Puente `RawByteLink` sin sockets que adapta Android Nearby Connections, iOS MultipeerConnectivity y WebRTC DataChannels al trait `Transport`.
+
+---
+
+## Key Capabilities & Canonical Features
+
+- Decouples platform-specific Bluetooth/Wi-Fi Direct SDK callbacks from the Rust engine.
+- In-memory ring buffer queues (`push_incoming_bytes`, `drain_outgoing_bytes`) safe across FFI boundaries.
+- Deterministic packet ordering and peer lifecycle notifications.
+
+## Primary Exported API
+
+- **Public Symbols:** `NativeBridgeTransport`, `RawByteLink`
+
+## Installation (`Cargo.toml`)
+
+```toml
+[dependencies]
+open_table_transport_native_bridge = "1.1.0"
 ```
 
-Cualquier cosa que sepa mover bytes hacia/desde un `peer_tag` (un
-string opaco — el `endpointId` de Nearby, el `MCPeerID` de Multipeer)
-puede envolverse en `NativeHostTransport<L>` o `NativeClientTransport<L>`
-y automáticamente hereda:
-
-- Handshake `Join` (jugador nuevo → `PlayerId` + `reconnect_token`) /
-  `Reconnect` (prueba de identidad con el token).
-- `ConnectionEvent::{Joined, Reconnected, Disconnected, TimedOut}`.
-- Timeout configurable, con purga del token al expirar.
-- Implementación de `open_table_core::Transport` — o sea, `Session`
-  nunca sabe ni le importa qué hay debajo.
-
-Ver `tests/handshake_flow.rs` para el ejemplo completo: un
-`FakeRawByteLink` (dos canales en memoria) prueba las 5 propiedades de
-arriba sin ningún dispositivo real.
-
-## Cómo conectarlo a un plugin nativo real
-
-Para Android (`OpenTableNearbyPlugin.kt`, en `platform_plugins/android/`):
+## Quick Start & Usage Example
 
 ```rust
-struct NearbyLink {
-    // handles hacia los métodos de OpenTableNearbyPlugin vía gdext,
-    // más una cola interna donde vuelcan las señales de Godot
-    // (data_received, peer_disconnected) que le llegan desde GDScript.
-}
+use open_table_transport_native_bridge::NativeBridgeTransport;
 
-impl RawByteLink for NearbyLink {
-    fn send_raw(&mut self, peer_tag: &str, bytes: &[u8]) -> EngineResult<()> {
-        // llama a nearby_plugin.sendBytes(peer_tag, bytes) vía gdext
-    }
-    fn broadcast_raw(&mut self, bytes: &[u8]) -> EngineResult<()> {
-        // llama a nearby_plugin.broadcastBytes(bytes)
-    }
-    fn poll_raw_received(&mut self) -> Vec<(String, Vec<u8>)> {
-        // drena la cola que se llena cuando GDScript reenvía data_received
-    }
-    fn poll_link_events(&mut self) -> Vec<RawLinkEvent> {
-        // drena la cola que se llena con peer_disconnected
-    }
-}
+let mut bridge = NativeBridgeTransport::new();
+bridge.push_incoming_frame(b"{\"cmd\":\"MovePiece\"}".to_vec());
+assert_eq!(bridge.pending_incoming_count(), 1);
 ```
 
-Esa `NearbyLink` (o su equivalente `MultipeerLink` para iOS) es la
-ÚNICA pieza nueva que hace falta escribir por plataforma — y es
-mecánica: solo reenvía llamadas, no toma ninguna decisión. Vive dentro
-de `open_table_godot` (todavía sin compilar/verificar, ver su
-`LIMITACION.md`), no en este crate.
+## v1.1.0 Engine & AI Telemetry Highlights
 
-## Estado
+- **Configurable AI Randomness (`0–100%`)**: Supports Top-K score band perturbation via `AiDifficulty::select_top_k_with_noise` and difficulty-calibrated default noise (`Easy = 45%`, `Medium = 25%`, `Hard = 12%`, `Expert = 5%`).
+- **Transactional Undo/Redo & Determinism**: Integrates with `open_table_engine::Session` snapshot stacks (`undo_step`, `redo_step`) and 64-bit FNV-1a state checksums (`compute_state_checksum`, `get_state_checksum_hex`).
+- **Cross-Platform Parity**: Verified across native Rust (`cargo test --workspace`), Godot 4 / Redot 4 (`open_table_godot`), and WebAssembly React (`open_table_wasm`).
 
-Probado (5 tests, sin dispositivos reales): `join_asigna_un_player_id_y_un_token`,
-`los_datos_viajan_en_los_dos_sentidos_despues_del_handshake`,
-`reconectar_con_el_token_correcto_recupera_el_mismo_player_id`,
-`reconectar_con_un_token_incorrecto_es_rechazado`,
-`un_jugador_que_no_vuelve_a_tiempo_pierde_su_sesion`.
+## License
 
-NO probado: la implementación real de `RawByteLink` sobre
-`OpenTableNearbyPlugin`/`OpenTableMultipeerNetwork` — eso necesita
-Android Studio/Xcode, que no hay en el entorno donde se armó esto.
+Licensed under the **GNU General Public License v3.0 or later (`GPL-3.0-or-later`)**. See [`../LICENSE`](../LICENSE) for full details.

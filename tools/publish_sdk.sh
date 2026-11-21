@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 OpenTable Contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 set -euo pipefail
-cargo publish -p open_table_core
-sleep 30  # esperar propagación a crates.io
-cargo publish -p open_table_macros
-sleep 30
-cargo publish -p open_table_engine
-echo "SDK published successfully"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/publish_crates_io.sh" "${@:---publish}"

@@ -9,6 +9,7 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/joduranvillan/games_tables_sdk"
 keywords = ["board-game", "game-engine", "ecs", "sdk", "rules"]
 categories = ["game-engines", "game-development"]
+readme = "README.md"
 
 [dependencies]
 open_table_core = { version = "1.1.0", path = "../open_table_core" }
@@ -24,18 +25,18 @@ sha2 = "0.11.0"
 [dev-dependencies]
 criterion = "0.8"
 bincode = { version = "2.0.1" , features = ["serde"] }
-backgammon_game = { path = "../backgammon_game" }
-checkers_game = { path = "../checkers_game" }
-chess_game = { path = "../chess_game" }
-chinese_checkers_game = { path = "../chinese_checkers_game" }
-crisis_game = { path = "../crisis_game" }
-go_game = { path = "../go_game" }
-ludo_game = { path = "../ludo_game" }
-mille_bornes_game = { path = "../mille_bornes_game" }
-monopoly_game = { path = "../monopoly_game" }
-shogi_game = { path = "../shogi_game" }
-uno_game = { path = "../uno_game" }
-xiangqi_game = { path = "../xiangqi_game" }
+backgammon_game = { package = "open_table_backgammon_game", path = "../backgammon_game" }
+checkers_game = { package = "open_table_checkers_game", path = "../checkers_game" }
+chess_game = { package = "open_table_chess_game", path = "../chess_game" }
+chinese_checkers_game = { package = "open_table_chinese_checkers_game", path = "../chinese_checkers_game" }
+crisis_game = { package = "open_table_crisis_game", path = "../crisis_game" }
+go_game = { package = "open_table_go_game", path = "../go_game" }
+ludo_game = { package = "open_table_ludo_game", path = "../ludo_game" }
+mille_bornes_game = { package = "open_table_mille_bornes_game", path = "../mille_bornes_game" }
+monopoly_game = { package = "open_table_monopoly_game", path = "../monopoly_game" }
+shogi_game = { package = "open_table_shogi_game", path = "../shogi_game" }
+uno_game = { package = "open_table_uno_game", path = "../uno_game" }
+xiangqi_game = { package = "open_table_xiangqi_game", path = "../xiangqi_game" }
 
 [[bench]]
 name = "session_throughput"

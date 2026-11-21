@@ -114,6 +114,35 @@ export interface BattleshipShip {
   cells: [number, number][];
 }
 
+export interface AiMoveTelemetry {
+  game_type: string;
+  ai_player: number;
+  tick: number;
+  difficulty: number;
+  randomness_pct: number;
+  seed: number;
+  evaluated_candidates: number;
+  top_k_candidates: number;
+  chosen_index: number;
+  chosen_score: number;
+  best_raw_score: number;
+  strategy_profile: string;
+  command_summary: string;
+  elapsed_us: number;
+}
+
+export function computeFnv1a64Hex(input: string): string {
+  const bytes = new TextEncoder().encode(input);
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x0100000001b3n;
+  const mask = 0xffffffffffffffffn;
+  for (let i = 0; i < bytes.length; i++) {
+    hash ^= BigInt(bytes[i]);
+    hash = (hash * prime) & mask;
+  }
+  return "0x" + hash.toString(16).padStart(16, "0");
+}
+
 const GOOSE_SQUARES = new Set([5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59]);
 const LUDO_SAFE_STARS = new Set([1, 9, 14, 22, 27, 35, 40, 48]);
 
@@ -1172,10 +1201,68 @@ export class WasmGameBridge {
   private winner: 0 | 1 | 2 | null = null;
   private aiPlayer: 1 | 2 | null = null;
   private aiDifficulty: number = 1;
+  private aiRandomness: number = 25;
+  private aiSeed: number = 0;
   private commandLog: { player: number; command: string }[] = [];
   private replayFullLog: { player: number; command: string }[] = [];
   private replayCursor: number = 0;
   private rngState: number = 1337;
+  private lastAiTelemetry: AiMoveTelemetry | null = null;
+  private lastEvalMetrics: {
+    evaluated: number;
+    topK: number;
+    chosenIndex: number;
+    chosenScore: number;
+    bestRawScore: number;
+  } = {
+    evaluated: 1,
+    topK: 1,
+    chosenIndex: 0,
+    chosenScore: 100,
+    bestRawScore: 100,
+  };
+
+  public static defaultRandomnessForDifficulty(difficulty: number): number {
+    const d = Math.max(0, Math.min(3, Math.floor(Number(difficulty) || 0)));
+    return d === 0 ? 45 : d === 1 ? 25 : d === 2 ? 12 : 5;
+  }
+
+  public static strategyProfileForGame(gameType: string, difficulty: number): string {
+    const d = Math.max(0, Math.min(3, Math.floor(Number(difficulty) || 0)));
+    const level = d === 0 ? "Easy" : d === 1 ? "Medium" : d === 2 ? "Hard" : "Expert";
+    switch (gameType) {
+      case "chess":
+        return `AlphaBeta+PST+MopUp (${level})`;
+      case "checkers":
+        return `Negamax+KingMobility (${level})`;
+      case "shogi":
+        return `Minimax+HandDrops+Castle (${level})`;
+      case "xiangqi":
+        return `AlphaBeta+PalaceGuard+River (${level})`;
+      case "go":
+        return `LibertyMCTS+EyeGuard (${level})`;
+      case "chinese_checkers":
+        return `HopChain+TargetTriangle (${level})`;
+      case "backgammon":
+        return `PipCount+BlotSafety+Prime (${level})`;
+      case "ludo":
+        return `CaptureStar+SafeGoal (${level})`;
+      case "battleship":
+        return `ParityHunt+DestroyAxis (${level})`;
+      case "mille_bornes":
+        return `CoupFourre+HazardTempo (${level})`;
+      case "monopoly":
+        return `ColorGroupROI+CashReserve (${level})`;
+      case "uno":
+        return `ColorControl+ActionStack (${level})`;
+      case "crisis":
+        return `BorderChokepoint+CardSet (${level})`;
+      case "goose":
+        return `ExpectedAdvance+HazardAvoid (${level})`;
+      default:
+        return `HeuristicTopK (${level})`;
+    }
+  }
 
   // 1. Chess state (FIDE Canonical Rules: Castling O-O / O-O-O, En Passant, Promotion, Check/Pin simulation, 50-move & Threefold)
   private chessGrid: (ChessPiece | null)[][] = createInitialChessGrid();
@@ -1305,6 +1392,7 @@ export class WasmGameBridge {
     this.replayFullLog = [];
     this.replayCursor = 0;
     this.rngState = 1337;
+    this.lastAiTelemetry = null;
 
     if (this.gameType === "chess") {
       this.chessGrid = createInitialChessGrid();
@@ -1448,7 +1536,127 @@ export class WasmGameBridge {
     const ok = this.start_local_match(gameType, humanId, aiId);
     this.aiPlayer = (aiId === 1 ? 1 : 2) as 1 | 2;
     this.aiDifficulty = Math.max(0, Math.min(3, difficulty));
+    this.aiRandomness = WasmGameBridge.defaultRandomnessForDifficulty(this.aiDifficulty);
     return ok;
+  }
+
+  public get_ai_difficulty(): number {
+    return this.aiDifficulty;
+  }
+
+  public get_ai_randomness(): number {
+    return this.aiRandomness;
+  }
+
+  public set_ai_randomness(randomnessPct: number): void {
+    const clamped = Math.max(0, Math.min(100, Math.round(Number(randomnessPct) || 0)));
+    this.aiRandomness = clamped;
+  }
+
+  public get_ai_seed(): number {
+    return this.aiSeed;
+  }
+
+  public set_ai_seed(seed: number): void {
+    this.aiSeed = Math.floor(Number(seed) || 0) >>> 0;
+  }
+
+  private noiseUnitFloat(index: number, salt: number): number {
+    let z =
+      (this.aiSeed ^
+        Math.imul(this.tick + 1, 0x9e3779b9) ^
+        Math.imul(index + 1, 0x85ebca6b) ^
+        Math.imul(salt + 1, 0xc2b2ae35) ^
+        Math.imul(this.aiRandomness + 1, 0x27d4eb2f)) >>>
+      0;
+    z = Math.imul(z ^ (z >>> 16), 0x85ebca6b) >>> 0;
+    z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35) >>> 0;
+    z = (z ^ (z >>> 16)) >>> 0;
+    return (z >>> 8) / 16777216.0;
+  }
+
+  private isNoiseActive(): boolean {
+    if (this.aiRandomness <= 0) return false;
+    const defaultPct = WasmGameBridge.defaultRandomnessForDifficulty(this.aiDifficulty);
+    return this.aiSeed !== 0 || this.aiRandomness !== defaultPct;
+  }
+
+  private selectTopKWithNoise(scores: number[], safetyBand: number): number {
+    if (scores.length === 0) {
+      this.lastEvalMetrics = {
+        evaluated: 1,
+        topK: 1,
+        chosenIndex: 0,
+        chosenScore: 0,
+        bestRawScore: 0,
+      };
+      return 0;
+    }
+    let bestIdx = 0;
+    let maxScore = -Infinity;
+    for (let i = 0; i < scores.length; i++) {
+      if (scores[i] > maxScore) {
+        maxScore = scores[i];
+        bestIdx = i;
+      }
+    }
+    const r = Math.max(0, Math.min(100, this.aiRandomness)) / 100.0;
+    const margin = safetyBand > 0 ? safetyBand * r : 0;
+    let topKCount = 0;
+    for (let i = 0; i < scores.length; i++) {
+      const s = scores[i];
+      if (Number.isFinite(s) && maxScore - s <= margin + 1e-4) {
+        topKCount++;
+      }
+    }
+    topKCount = Math.max(1, topKCount);
+
+    if (!this.isNoiseActive() || safetyBand <= 0) {
+      const cleanBest = Number.isFinite(maxScore) ? Number(maxScore.toFixed(2)) : 0;
+      this.lastEvalMetrics = {
+        evaluated: scores.length,
+        topK: this.aiRandomness === 0 ? 1 : topKCount,
+        chosenIndex: bestIdx,
+        chosenScore: cleanBest,
+        bestRawScore: cleanBest,
+      };
+      return bestIdx;
+    }
+
+    const jitterAmp = safetyBand * r * 1.85 + 1e-3;
+
+    let noisyBestIdx = bestIdx;
+    let noisyBestScore = -Infinity;
+
+    for (let i = 0; i < scores.length; i++) {
+      const s = scores[i];
+      if (maxScore - s <= margin + 1e-4) {
+        const u = this.noiseUnitFloat(i, scores.length);
+        const noisy = s + u * jitterAmp;
+        if (noisy > noisyBestScore) {
+          noisyBestScore = noisy;
+          noisyBestIdx = i;
+        }
+      }
+    }
+
+    const rawChosen = scores[noisyBestIdx] ?? maxScore;
+    this.lastEvalMetrics = {
+      evaluated: scores.length,
+      topK: topKCount,
+      chosenIndex: noisyBestIdx,
+      chosenScore: Number.isFinite(rawChosen) ? Number(rawChosen.toFixed(2)) : 0,
+      bestRawScore: Number.isFinite(maxScore) ? Number(maxScore.toFixed(2)) : 0,
+    };
+    return noisyBestIdx;
+  }
+
+  public get_state_checksum_hex(): string {
+    return computeFnv1a64Hex(this.get_state_json());
+  }
+
+  public get_last_ai_telemetry_json(): string {
+    return this.lastAiTelemetry ? JSON.stringify(this.lastAiTelemetry) : "null";
   }
 
   public current_player(): number {
@@ -3331,12 +3539,239 @@ export class WasmGameBridge {
     if (this.winner !== null || !this.aiPlayer || this.turn !== this.aiPlayer) {
       return "[]";
     }
+    const startPerf = typeof performance !== "undefined" ? performance.now() : Date.now();
+    this.lastEvalMetrics = {
+      evaluated: 1,
+      topK: 1,
+      chosenIndex: 0,
+      chosenScore: 100,
+      bestRawScore: 100,
+    };
+    const logLenBefore = this.commandLog.length;
+    const eventsJson = this.stepAiInternal();
+    const elapsedUs = Math.max(
+      1,
+      Math.round(
+        ((typeof performance !== "undefined" ? performance.now() : Date.now()) - startPerf) * 1000
+      )
+    );
+    if (this.commandLog.length > logLenBefore) {
+      const lastCmdStr = this.commandLog[this.commandLog.length - 1]?.command || "{}";
+      let cmdSummary = "AiMoveCommand";
+      try {
+        const parsedCmd = JSON.parse(lastCmdStr) as Record<string, unknown>;
+        const rawType = String(parsedCmd.command_type || parsedCmd.type || "AiMoveCommand");
+        const shortType = rawType.includes("::") ? rawType.split("::").pop()! : rawType;
+        if (parsedCmd.from !== undefined && parsedCmd.to !== undefined) {
+          cmdSummary = `${shortType}(${JSON.stringify(parsedCmd.from)}->${JSON.stringify(parsedCmd.to)})`;
+        } else if (parsedCmd.fromId !== undefined && parsedCmd.toId !== undefined) {
+          cmdSummary = `${shortType}(${String(parsedCmd.fromId)}->${String(parsedCmd.toId)})`;
+        } else if (parsedCmd.row !== undefined && parsedCmd.col !== undefined) {
+          cmdSummary = `${shortType}(${String(parsedCmd.row)},${String(parsedCmd.col)})`;
+        } else if (parsedCmd.card_index !== undefined) {
+          cmdSummary = `${shortType}(card=${String(parsedCmd.card_index)})`;
+        } else if (parsedCmd.token_index !== undefined) {
+          cmdSummary = `${shortType}(token=${String(parsedCmd.token_index)})`;
+        } else {
+          cmdSummary = shortType;
+        }
+      } catch {
+        cmdSummary = "AiMoveCommand";
+      }
+      this.lastAiTelemetry = {
+        game_type: this.gameType,
+        ai_player: this.aiPlayer,
+        tick: this.tick,
+        difficulty: this.aiDifficulty,
+        randomness_pct: this.aiRandomness,
+        seed: this.aiSeed,
+        evaluated_candidates: Math.max(1, this.lastEvalMetrics.evaluated),
+        top_k_candidates: Math.max(1, this.lastEvalMetrics.topK),
+        chosen_index: this.lastEvalMetrics.chosenIndex,
+        chosen_score: this.lastEvalMetrics.chosenScore,
+        best_raw_score: this.lastEvalMetrics.bestRawScore,
+        strategy_profile: WasmGameBridge.strategyProfileForGame(this.gameType, this.aiDifficulty),
+        command_summary: cmdSummary,
+        elapsed_us: elapsedUs,
+      };
+    }
+    return eventsJson;
+  }
+
+  private stepAiInternal(): string {
+    if (this.winner !== null || !this.aiPlayer || this.turn !== this.aiPlayer) {
+      return "[]";
+    }
     const ai = this.aiPlayer;
+    const opp: 1 | 2 = ai === 1 ? 2 : 1;
+    const diff = this.aiDifficulty; // 0 = Easy, 1 = Medium, 2 = Hard, 3 = Expert
 
     if (this.gameType === "chess") {
       const legal = this.getChessLegalMoves(ai);
       if (legal.length === 0) return "[]";
-      const chosen = legal[0];
+
+      const findMove = (fr: number, fc: number, tr: number, tc: number) =>
+        legal.find(
+          (m) => m.from[0] === fr && m.from[1] === fc && m.to[0] === tr && m.to[1] === tc
+        );
+
+      // Opening Book for Hard (2) & Expert (3) on turn 1-2 with repertoire variation under noise
+      if (this.tick <= 2 && ai === 2 && diff >= 2 && this.chessLastMove) {
+        const [lfr, lfc] = this.chessLastMove.from;
+        const [ltr, ltc] = this.chessLastMove.to;
+        // 1. e4 ([6,4]->[4,4])
+        if (lfr === 6 && lfc === 4 && ltr === 4 && ltc === 4) {
+          let book =
+            diff === 3
+              ? findMove(1, 2, 3, 2) // 1...c5 (Sicilian Defense - Expert)
+              : findMove(1, 4, 3, 4); // 1...e5 (Open Game - Hard)
+          if (this.isNoiseActive()) {
+            const repertoire = [
+              findMove(1, 2, 3, 2),
+              findMove(1, 4, 3, 4),
+              findMove(1, 4, 2, 4),
+              findMove(1, 2, 2, 2),
+            ].filter((m): m is ChessMove => Boolean(m));
+            if (repertoire.length > 1) {
+              const repScores = repertoire.map((m) =>
+                m === book ? 100 : 94
+              );
+              book = repertoire[this.selectTopKWithNoise(repScores, 18)];
+            }
+          }
+          if (book) {
+            return this.send_command_json(
+              ai,
+              JSON.stringify({
+                command_type: "chess_game::MovePieceCommand",
+                player: ai,
+                from: book.from,
+                to: book.to,
+                promotion: book.promotion,
+              })
+            );
+          }
+        }
+        // 1. d4 ([6,3]->[4,3])
+        if (lfr === 6 && lfc === 3 && ltr === 4 && ltc === 3) {
+          let book =
+            diff === 3
+              ? findMove(0, 6, 2, 5) // 1...Nf6 (King's Indian - Expert)
+              : findMove(1, 3, 3, 3); // 1...d5 (Queen's Gambit / Closed - Hard)
+          if (this.isNoiseActive()) {
+            const repertoire = [
+              findMove(0, 6, 2, 5),
+              findMove(1, 3, 3, 3),
+              findMove(1, 4, 2, 4),
+            ].filter((m): m is ChessMove => Boolean(m));
+            if (repertoire.length > 1) {
+              const repScores = repertoire.map((m) =>
+                m === book ? 100 : 94
+              );
+              book = repertoire[this.selectTopKWithNoise(repScores, 18)];
+            }
+          }
+          if (book) {
+            return this.send_command_json(
+              ai,
+              JSON.stringify({
+                command_type: "chess_game::MovePieceCommand",
+                player: ai,
+                from: book.from,
+                to: book.to,
+                promotion: book.promotion,
+              })
+            );
+          }
+        }
+      }
+
+      const pieceVal: Record<ChessPiece["kind"], number> = {
+        Pawn: 100,
+        Knight: 320,
+        Bishop: 330,
+        Rook: 500,
+        Queen: 900,
+        King: 20000,
+      };
+
+      const scores: number[] = [];
+
+      for (let idx = 0; idx < legal.length; idx++) {
+        const m = legal[idx];
+        const mover = this.chessGrid[m.from[0]]?.[m.from[1]];
+        const target = this.chessGrid[m.to[0]]?.[m.to[1]];
+        let score = 0;
+
+        if (target) {
+          score += pieceVal[target.kind] * 1.15 - (mover ? pieceVal[mover.kind] * 0.08 : 0);
+        } else if (m.isEnPassant) {
+          score += 105;
+        }
+        if (m.promotion) {
+          score += pieceVal[m.promotion] || 800;
+        }
+        if (m.isCastling) {
+          score += 65;
+        }
+
+        const centerDist = Math.abs(3.5 - m.to[0]) + Math.abs(3.5 - m.to[1]);
+        const adv = ai === 2 ? m.to[0] - m.from[0] : m.from[0] - m.to[0];
+
+        if (diff === 0) {
+          // Easy: prefers simple flank or single-step moves, low depth
+          score += (4 - Math.abs(adv)) * 4 - centerDist * 1.5 - idx * 0.25;
+        } else if (diff === 1) {
+          // Medium: classic knight/bishop development & center control
+          if (mover?.kind === "Knight" || mover?.kind === "Bishop") {
+            score += 48 + (7 - centerDist) * 8;
+          } else if (mover?.kind === "Pawn" && (m.from[1] === 3 || m.from[1] === 4)) {
+            score += 36 + Math.abs(adv) * 10;
+          } else {
+            score += (7 - centerDist) * 4;
+          }
+        } else {
+          // Hard (2) & Expert (3): central pawn break + tactical safety check on simGrid
+          const simGrid = simulateChessMoveOnGrid(
+            this.chessGrid,
+            m.from,
+            m.to,
+            this.chessEnPassantTarget,
+            m.promotion
+          );
+          if (isChessKingInCheck(simGrid, opp)) {
+            score += 45;
+          }
+          const landedAttacked = isChessSquareAttacked(simGrid, m.to, opp);
+          if (landedAttacked && mover) {
+            score -= pieceVal[mover.kind] * (diff === 3 ? 0.95 : 0.75);
+          }
+
+          if (diff === 2) {
+            // Hard: prefers central E/D file control and solid development
+            if (mover?.kind === "Pawn" && (m.from[1] === 4 || m.from[1] === 3)) {
+              score += 62 + Math.abs(adv) * 14;
+            } else if (mover?.kind === "Knight" || mover?.kind === "Bishop") {
+              score += 50 + (7 - centerDist) * 9;
+            }
+          } else {
+            // Expert: prefers asymmetrical counter-play (C-file / Knight pressure / active piece play)
+            if (mover?.kind === "Pawn" && m.from[1] === 2 && Math.abs(adv) === 2) {
+              score += 75;
+            } else if (mover?.kind === "Knight" && (m.to[1] === 5 || m.to[1] === 2)) {
+              score += 70 + (7 - centerDist) * 10;
+            } else if (mover?.kind === "Bishop" || mover?.kind === "Pawn") {
+              score += 48 + (7 - centerDist) * 9;
+            }
+          }
+        }
+
+        scores.push(score);
+      }
+
+      const safetyBand = diff === 0 ? 18 : diff === 1 ? 16 : diff === 2 ? 14 : 12;
+      const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
+
       return this.send_command_json(
         ai,
         JSON.stringify({
@@ -3348,10 +3783,77 @@ export class WasmGameBridge {
         })
       );
     }
+
     if (this.gameType === "checkers") {
       const legal = this.getCheckersLegalMoves(ai);
       if (legal.length === 0) return "[]";
-      const chosen = legal[0];
+
+      const scores: number[] = [];
+      const homeRow = ai === 2 ? 0 : 7;
+      const crownRow = ai === 2 ? 7 : 0;
+
+      for (let idx = 0; idx < legal.length; idx++) {
+        const m = legal[idx];
+        const mover = this.checkersGrid[m.from[0]]?.[m.from[1]];
+        let score = 0;
+        if (m.captured) {
+          score += 200;
+        }
+        if (!mover?.isKing && m.to[0] === crownRow) {
+          score += 140;
+        }
+
+        const centerColBonus = 3.5 - Math.abs(3.5 - m.to[1]);
+        const isSafeEdge = m.to[1] === 0 || m.to[1] === 7;
+
+        if (diff === 0) {
+          // Easy: leftmost legal move
+          score += -idx * 5;
+        } else if (diff === 1) {
+          // Medium: right-flank development (col 6 or safe edge)
+          score += (m.to[1] === 6 || m.to[1] === 1 ? 42 : isSafeEdge ? 20 : 0) + idx * 2;
+        } else if (diff === 2) {
+          // Hard: Old Faithful central column control (from col 3 -> col 4) and preserving back row
+          score +=
+            centerColBonus * 18 +
+            (m.from[1] === 3 && m.to[1] === 4 ? 25 : 0) -
+            (m.from[0] === homeRow ? 25 : 0);
+        } else {
+          // Expert: Single/Double Corner tactical diagonal (col 2 or 5->4) + lookahead safety against immediate jump
+          let unsafePenalty = 0;
+          const r = m.to[0];
+          const c = m.to[1];
+          for (const [dr, dc] of [
+            [-1, -1],
+            [-1, 1],
+            [1, -1],
+            [1, 1],
+          ]) {
+            const adj = this.checkersGrid[r + dr]?.[c + dc];
+            const land = this.checkersGrid[r - dr]?.[c - dc];
+            if (
+              adj &&
+              adj.owner === opp &&
+              land === null &&
+              r - dr >= 0 &&
+              r - dr < 8 &&
+              c - dc >= 0 &&
+              c - dc < 8
+            ) {
+              unsafePenalty += 120;
+            }
+          }
+          const tacticalCol =
+            m.to[1] === 2 || (m.from[1] === 5 && m.to[1] === 4) ? 45 : centerColBonus * 10;
+          score += tacticalCol - (m.from[0] === homeRow ? 30 : 0) - unsafePenalty;
+        }
+
+        scores.push(score);
+      }
+
+      const safetyBand = diff === 0 ? 25 : diff === 1 ? 20 : diff === 2 ? 18 : 15;
+      const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
+
       return this.send_command_json(
         ai,
         JSON.stringify({
@@ -3362,19 +3864,72 @@ export class WasmGameBridge {
         })
       );
     }
+
     if (this.gameType === "uno") {
+      // On Hard/Expert, catch opponent if they have 1 card and forgot to call UNO
+      if (diff >= 2 && (this.unoHands[opp]?.length || 0) === 1 && !this.unoCalled[opp]) {
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "CatchUnoCommand", player: ai })
+        );
+      }
+
       const playableRaw = JSON.parse(this.get_legal_moves_json(ai)) as {
         card: UnoCard;
         index: number;
       }[];
       if (playableRaw.length > 0) {
+        const oppCount = this.unoHands[opp]?.length || 7;
+        const scoreCard = (c: UnoCard, idx: number): number => {
+          if (diff === 0) {
+            return 20 - idx * 3;
+          }
+          if (diff === 1) {
+            return (c.color !== "Wild" ? 20 : 5) - idx * 0.5;
+          }
+          if (c.value === "WildDrawFour") return oppCount <= 3 ? 85 : 15;
+          if (c.value === "DrawTwo") return oppCount <= 3 ? 75 : 50;
+          if (c.value === "Skip" || c.value === "Reverse") return 42;
+          if (c.color === "Wild") return diff === 3 ? 10 : 25;
+          return 20 + (Number(c.value) || 0);
+        };
+        const unoScores = playableRaw.map((entry, idx) => scoreCard(entry.card, idx));
+        const safetyBand = diff === 0 ? 15 : diff === 1 ? 18 : diff === 2 ? 14 : 10;
+        const chosenEntry = playableRaw[this.selectTopKWithNoise(unoScores, safetyBand)];
+
+        // Automatically call UNO when going from 2 cards to 1 card on Medium/Hard/Expert
+        if (diff >= 1 && (this.unoHands[ai]?.length || 0) === 2) {
+          this.send_command_json(
+            ai,
+            JSON.stringify({ command_type: "CallUnoCommand", player: ai })
+          );
+        }
+
+        // Choose most frequent color in AI's hand on Medium/Hard/Expert
+        const colors: ("Red" | "Yellow" | "Green" | "Blue")[] = ["Red", "Yellow", "Green", "Blue"];
+        let bestColor: "Red" | "Yellow" | "Green" | "Blue" = colors[diff % 4];
+        if (diff >= 1) {
+          const counts: Record<"Red" | "Yellow" | "Green" | "Blue", number> = {
+            Red: 0,
+            Yellow: 0,
+            Green: 0,
+            Blue: 0,
+          };
+          for (const c of this.unoHands[ai] || []) {
+            if (c.color !== "Wild") {
+              counts[c.color as "Red" | "Yellow" | "Green" | "Blue"] += 1;
+            }
+          }
+          bestColor = colors.reduce((a, b) => (counts[b] > counts[a] ? b : a), colors[0]);
+        }
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "PlayCardCommand",
             player: ai,
-            card_index: playableRaw[0].index,
-            chosen_color: "Red",
+            card_index: chosenEntry.index,
+            chosen_color: bestColor,
           })
         );
       }
@@ -3383,22 +3938,90 @@ export class WasmGameBridge {
         JSON.stringify({ command_type: "DrawCardCommand", player: ai })
       );
     }
+
     if (this.gameType === "goose") {
+      if (this.isNoiseActive()) {
+        const d1 = 1 + (Math.floor(this.noiseUnitFloat(1, 601) * 6) % 6);
+        const d2 = 1 + (Math.floor(this.noiseUnitFloat(2, 602) * 6) % 6);
+        return this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "RollDiceCommand", player: ai, d1, d2 })
+        );
+      }
       return this.send_command_json(
         ai,
         JSON.stringify({ command_type: "RollDiceCommand", player: ai })
       );
     }
+
     if (this.gameType === "go") {
-      const legal = JSON.parse(this.get_legal_moves_json(ai)) as { row: number; col: number }[];
+      const legal = JSON.parse(this.get_legal_moves_json(ai)) as {
+        row: number;
+        col: number;
+        capturesCount?: number;
+      }[];
       if (legal.length > 0) {
+        const scores: number[] = [];
+
+        for (const m of legal) {
+          const r = m.row;
+          const c = m.col;
+          const caps = m.capturesCount || 0;
+          const minEdge = Math.min(r, c, this.goSize - 1 - r, this.goSize - 1 - c);
+          let score = caps * (45 + diff * 15);
+
+          // Avoid 1st-line edge plays on open board
+          if (minEdge === 0 && caps === 0) {
+            score -= 40;
+          } else if (minEdge === 1) {
+            score += diff === 0 ? 18 : 2;
+          } else if (minEdge === 2) {
+            // 3rd line (Hoshi / Komoku territory line on 9x9)
+            score += 24;
+          } else if (minEdge >= 3) {
+            // 4th line / Tengen influence
+            score += 20;
+          }
+
+          // Adjacent stone tactical pressure
+          for (const [dr, dc] of [
+            [-1, 0],
+            [1, 0],
+            [0, -1],
+            [0, 1],
+          ]) {
+            const adj = this.goGrid[r + dr]?.[c + dc];
+            if (adj === opp) score += 6 * (diff + 1);
+            if (adj === ai) score += 3 * diff;
+          }
+
+          // Distinct strategic opening points across difficulty levels 0..3
+          if (diff === 0 && r === 1 && c === 2) score += 35;
+          if (diff === 1 && (r === 2 || r === 6) && (c === 2 || c === 6)) {
+            score += r === 2 && c === 2 ? 40 : 30;
+          }
+          if (diff === 2) {
+            if (r === 4 && c === 4) score += 45;
+            else if (r === 2 && c === 6) score += 38;
+          }
+          if (diff === 3) {
+            if (r === 6 && c === 6) score += 48;
+            else if (r === 6 && c === 2) score += 42;
+          }
+
+          scores.push(score);
+        }
+
+        const safetyBand = diff === 0 ? 25 : diff === 1 ? 20 : diff === 2 ? 15 : 12;
+        const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "go_game::PlaceStoneCommand",
             player: ai,
-            row: legal[0].row,
-            col: legal[0].col,
+            row: chosen.row,
+            col: chosen.col,
           })
         );
       }
@@ -3407,126 +4030,881 @@ export class WasmGameBridge {
         JSON.stringify({ command_type: "PassCommand", player: ai })
       );
     }
+
     if (this.gameType === "shogi") {
+      // On Hard/Expert, consider dropping a captured piece from Komadai onto an active central square
+      if (diff >= 2 && (this.shogiHands[ai]?.length || 0) > 0) {
+        const dropKind = this.shogiHands[ai][0];
+        const targetRow = ai === 2 ? 5 : 3;
+        for (const targetCol of [4, 3, 5, 2, 6]) {
+          const check = isShogiDropLegal(this.shogiGrid, dropKind, [targetRow, targetCol], ai);
+          if (check.ok) {
+            return this.send_command_json(
+              ai,
+              JSON.stringify({
+                command_type: "shogi_game::DropPieceCommand",
+                player: ai,
+                kind: dropKind,
+                to: [targetRow, targetCol],
+              })
+            );
+          }
+        }
+      }
+
       const legal = this.getShogiLegalMoves(ai);
       if (legal.length > 0 && legal[0].from) {
+        const pieceVal: Record<ShogiPiece["kind"], number> = {
+          Pawn: 100,
+          Lance: 300,
+          Knight: 350,
+          Silver: 500,
+          Gold: 600,
+          Bishop: 850,
+          Rook: 1000,
+          King: 15000,
+        };
+        const scores: number[] = [];
+
+        for (let idx = 0; idx < legal.length; idx++) {
+          const m = legal[idx];
+          if (!m.from) {
+            scores.push(-Infinity);
+            continue;
+          }
+          const mover = this.shogiGrid[m.from[0]]?.[m.from[1]];
+          const target = this.shogiGrid[m.to[0]]?.[m.to[1]];
+          let score = 0;
+
+          if (target) {
+            score += (pieceVal[target.kind] || 100) * 1.25;
+          }
+          if (m.canPromote || m.mustPromote) {
+            score += diff >= 1 ? 180 : 60;
+          }
+
+          // 1-ply Quiescence Recapture Check on Hard/Expert
+          if (diff >= 2 && mover) {
+            let recaptured = false;
+            for (let or = 0; or < 9 && !recaptured; or++) {
+              for (let oc = 0; oc < 9; oc++) {
+                const opc = this.shogiGrid[or]?.[oc];
+                if (
+                  opc &&
+                  opc.owner === opp &&
+                  (or !== m.to[0] || oc !== m.to[1]) &&
+                  isShogiMovePseudoLegal(this.shogiGrid, [or, oc], m.to, opp)
+                ) {
+                  recaptured = true;
+                  break;
+                }
+              }
+            }
+            if (recaptured) {
+              score -= (pieceVal[mover.kind] || 100) * (diff === 3 ? 1.05 : 0.8);
+            }
+          }
+
+          const centerCol = 4 - Math.abs(4 - m.to[1]);
+
+          if (diff === 0) {
+            score += -idx * 3;
+          } else if (diff === 1) {
+            // Medium: central vanguard pawn / gold / silver advance
+            score += centerCol * 16 + (mover?.kind === "Pawn" ? 25 : 10);
+          } else if (diff === 2) {
+            // Hard: Silver / Gold / Bishop line activation (col 2 or 6)
+            if (mover?.kind === "Silver" || mover?.kind === "Gold") {
+              score += 75 + centerCol * 8;
+            } else if (mover?.kind === "Pawn" && (m.to[1] === 2 || m.to[1] === 6)) {
+              score += 65;
+            } else {
+              score += centerCol * 10;
+            }
+          } else {
+            // Expert: Rook file pawn push (col 7/1) or Rook/King safety + tactical pressure
+            if (mover?.kind === "Pawn" && (m.to[1] === 7 || m.to[1] === 1)) {
+              score += 85;
+            } else if (mover?.kind === "Rook" || mover?.kind === "Bishop") {
+              score += 70 + centerCol * 10;
+            } else if (mover?.kind === "Gold" || mover?.kind === "Silver") {
+              score += 65;
+            }
+          }
+
+          scores.push(score);
+        }
+
+        const safetyBand = diff === 0 ? 20 : diff === 1 ? 22 : diff === 2 ? 18 : 15;
+        const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "shogi_game::MovePieceCommand",
             player: ai,
-            from: legal[0].from,
-            to: legal[0].to,
-            promote: Boolean(legal[0].mustPromote),
+            from: chosen.from,
+            to: chosen.to,
+            promote: Boolean(chosen.mustPromote || (diff >= 1 && chosen.canPromote)),
           })
         );
       }
     }
+
     if (this.gameType === "xiangqi") {
       const legal = this.getXiangqiLegalMoves(ai);
       if (legal.length > 0) {
+        const pieceVal: Record<XiangqiPiece["kind"], number> = {
+          Soldier: 100,
+          Advisor: 200,
+          Elephant: 200,
+          Horse: 450,
+          Cannon: 500,
+          Chariot: 900,
+          General: 15000,
+        };
+        const scores: number[] = [];
+
+        for (let idx = 0; idx < legal.length; idx++) {
+          const m = legal[idx];
+          const mover = this.xiangqiGrid[m.from[0]]?.[m.from[1]];
+          const target = this.xiangqiGrid[m.to[0]]?.[m.to[1]];
+          let score = 0;
+
+          if (diff === 0) {
+            // Easy: prefers simple non-capturing first move on left flank
+            score = (target ? -50 : 20) - idx * 3;
+          } else if (diff === 1) {
+            // Medium: greedy capture or Central Cannon
+            if (target) {
+              score += (pieceVal[target.kind] || 100) * 1.25;
+            }
+            if (mover?.kind === "Cannon" && m.to[1] === 4) {
+              score += 120;
+            }
+          } else {
+            // Hard (2) & Expert (3): 1-ply Quiescence Exchange Evaluation
+            if (mover) {
+              const gain = target ? pieceVal[target.kind] || 100 : 0;
+              const risk = pieceVal[mover.kind] || 100;
+              const isDefendedBackRank =
+                target !== null && ((ai === 2 && m.to[0] >= 7) || (ai === 1 && m.to[0] <= 2));
+              if (target) {
+                score += isDefendedBackRank ? gain - risk * 1.15 : gain * 1.2;
+              }
+            }
+
+            const centerCol = 4 - Math.abs(4 - m.to[1]);
+            if (diff === 2) {
+              // Hard: Screen Horse defense ([0,1]->[2,2] or [0,7]->[2,6])
+              if (mover?.kind === "Horse" && (m.to[1] === 2 || m.to[1] === 6)) {
+                score += 145;
+              } else {
+                score += centerCol * 12;
+              }
+            } else {
+              // Expert: Central Cannon ([2,7]->[2,4] or [2,1]->[2,4])
+              if (mover?.kind === "Cannon" && m.to[1] === 4 && m.from[1] === 7) {
+                score += 170;
+              } else if (mover?.kind === "Cannon" && m.to[1] === 4) {
+                score += 155;
+              } else if (mover?.kind === "Soldier" && m.from[1] === 4) {
+                score += 130;
+              }
+            }
+          }
+
+          scores.push(score);
+        }
+
+        const safetyBand = diff === 0 ? 20 : diff === 1 ? 25 : diff === 2 ? 20 : 18;
+        const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "xiangqi_game::MovePieceCommand",
             player: ai,
-            from: legal[0].from,
-            to: legal[0].to,
+            from: chosen.from,
+            to: chosen.to,
           })
         );
       }
     }
+
     if (this.gameType === "chinese_checkers") {
       const legal = this.getChineseCheckersLegalMoves(ai);
       if (legal.length > 0) {
+        const myCells = this.ccCells.filter((c) => c.owner === ai);
+        const stragglerRow =
+          myCells.length > 0
+            ? ai === 1
+              ? Math.max(...myCells.map((c) => c.r))
+              : Math.min(...myCells.map((c) => c.r))
+            : 0;
+
+        const scores: number[] = [];
+        for (let idx = 0; idx < legal.length; idx++) {
+          const m = legal[idx];
+          if (diff === 0) {
+            scores.push(-(legal.length - 1 - idx) * 4);
+            continue;
+          }
+          const [fr, fx2] = m.fromId.split("_").map(Number);
+          const [tr, tx2] = m.toId.split("_").map(Number);
+          const gain = ai === 1 ? fr - tr : tr - fr;
+          const isChainJump = Math.abs(tr - fr) >= 2 || Math.abs(tx2 - fx2) >= 4;
+          const centerBonus = 6 - Math.abs(tx2);
+          const isMovingStraggler = fr === stragglerRow ? 1 : 0;
+          const trailingDist = ai === 1 ? fr : 16 - fr;
+          let score = gain * 22;
+          if (diff === 1) {
+            score += (isChainJump ? 15 : 0) - Math.abs(fx2);
+          } else if (diff === 2) {
+            score += centerBonus * 4 + (isChainJump ? 25 : 0);
+          } else {
+            // Expert: quadratic straggler priority + central bridge jumping
+            score +=
+              centerBonus * 5 +
+              (isChainJump ? 35 : 0) +
+              isMovingStraggler * 45 +
+              trailingDist * trailingDist * 0.4;
+          }
+          scores.push(score);
+        }
+
+        const safetyBand = diff === 0 ? 18 : diff === 1 ? 18 : diff === 2 ? 15 : 12;
+        const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "chinese_checkers_game::MoveMarbleCommand",
             player: ai,
-            fromId: legal[0].fromId,
-            toId: legal[0].toId,
+            fromId: chosen.fromId,
+            toId: chosen.toId,
           })
         );
       }
     }
+
     if (this.gameType === "backgammon") {
+      // Calculate Pip Count for Doubling Cube and racing decisions
+      const calcPips = (p: 1 | 2): number => {
+        let pips = (this.bgBar[p] || 0) * 25;
+        for (let i = 0; i < 24; i++) {
+          const pt = this.bgPoints[i];
+          if (pt && pt.owner === p && pt.count > 0) {
+            pips += pt.count * (p === 1 ? 24 - i : i + 1);
+          }
+        }
+        return pips;
+      };
+      const myPips = calcPips(ai);
+      const oppPips = calcPips(opp);
+
+      // Respond if opponent offered the Doubling Cube
+      if (this.bgCubeOfferedBy && this.bgCubeOfferedBy !== ai) {
+        if (diff >= 2 && myPips > oppPips + 45) {
+          return this.send_command_json(
+            ai,
+            JSON.stringify({ command_type: "backgammon_game::RejectDoubleCommand", player: ai })
+          );
+        }
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "backgammon_game::AcceptDoubleCommand", player: ai })
+        );
+      } else if (diff >= 2 && !this.bgCubeOfferedBy && this.bgCubeValue < 4 && myPips + 18 <= oppPips) {
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "backgammon_game::OfferDoubleCommand", player: ai })
+        );
+      }
+
       const legal = this.getBackgammonLegalMoves(ai);
       if (legal.length > 0) {
+        const scores: number[] = [];
+
+        for (let idx = 0; idx < legal.length; idx++) {
+          const m = legal[idx];
+          const destPt = m.to >= 0 && m.to < 24 ? this.bgPoints[m.to] : null;
+          const srcPt = m.from >= 0 && m.from < 24 ? this.bgPoints[m.from] : null;
+          let score = 0;
+          if (diff === 0) {
+            score = -idx * 3;
+          } else {
+            // Bar entry priority
+            if (m.from === -1) score += 95;
+            // Hitting opponent blot
+            if (destPt && destPt.owner === opp && destPt.count === 1) {
+              score += 80 * diff;
+            }
+            // Making a secure point (covering own blot)
+            if (destPt && destPt.owner === ai && destPt.count === 1) {
+              score += 70 * diff;
+            }
+            // Bearing off
+            if (m.to === 24 || m.to === -1) {
+              score += 110;
+            }
+            // Penalize leaving an exposed single blot in opponent's inner board on Hard/Expert
+            if (diff >= 2) {
+              const inOppHome = ai === 2 ? m.to >= 12 : m.to < 12;
+              if (inOppHome && (!destPt || destPt.count === 0)) {
+                score -= 35;
+              }
+              if (srcPt && srcPt.owner === ai && srcPt.count === 2) {
+                score -= 25; // breaking an existing secure point
+              }
+            }
+            // Advancing back checkers and maximizing step distance
+            if (m.from >= 0) {
+              const backDist = ai === 2 ? m.from : 23 - m.from;
+              const stepDist = Math.abs(m.from - m.to);
+              score += backDist * (diff === 3 ? 2.8 : 2.5) + stepDist * 4;
+            }
+          }
+          scores.push(score);
+        }
+
+        const safetyBand = diff === 0 ? 16 : diff === 1 ? 60 : diff === 2 ? 20 : 15;
+        const chosen = legal[this.selectTopKWithNoise(scores, safetyBand)];
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "backgammon_game::MoveCheckerCommand",
             player: ai,
-            from: legal[0].from,
-            to: legal[0].to,
+            from: chosen.from,
+            to: chosen.to,
           })
         );
       }
     }
+
     if (this.gameType === "ludo") {
+      const tokens = this.ludoTokens[ai] || [1, 0, 0, 0];
+      const oppTokens = this.ludoTokens[opp] || [1, 0, 0, 0];
+      const d1 = 6;
+      const d2 = 2;
+      const movable: { idx: number; score: number }[] = [];
+
+      tokens.forEach((cur, idx) => {
+        if (cur >= 57) return;
+        if (diff === 0) {
+          movable.push({ idx, score: -idx * 4 });
+          return;
+        }
+        const step = cur === 0 ? 1 : d1;
+        const nextPos = cur + step > 57 ? 57 - (cur + step - 57) : cur + step;
+        let score = nextPos * 2;
+
+        // Base exit on a 6
+        if (cur === 0) {
+          score += diff >= 2 ? 95 : 65;
+        }
+        // Reaching exact goal 57
+        if (nextPos === 57) {
+          score += 120;
+        }
+        // Capturing an opponent token on a non-star square
+        const isNextSafe = LUDO_SAFE_STARS.has(nextPos);
+        if (!isNextSafe && oppTokens.some((op) => op > 0 && op < 52 && op === nextPos)) {
+          score += 110;
+        }
+        // Safe star evaluation & capture threat lookahead on Hard/Expert
+        if (diff >= 2) {
+          if (isNextSafe) {
+            score += 45;
+          }
+          if (cur > 0 && LUDO_SAFE_STARS.has(cur) && nextPos !== 57) {
+            score -= 30; // reluctant to abandon a safe star without capturing or scoring
+          }
+          if (diff === 3 && !isNextSafe && nextPos < 52) {
+            const threatened = oppTokens.some(
+              (op) => op > 0 && nextPos - op >= 1 && nextPos - op <= 6
+            );
+            if (threatened) {
+              score -= 55;
+            }
+          }
+        }
+
+        movable.push({ idx, score });
+      });
+
+      const safetyBand = diff === 0 ? 16 : diff === 1 ? 25 : diff === 2 ? 18 : 12;
+      const chosenIdx = this.selectTopKWithNoise(
+        movable.map((m) => m.score),
+        safetyBand
+      );
+      const bestToken = movable[chosenIdx]?.idx ?? 0;
+
       return this.send_command_json(
         ai,
         JSON.stringify({
           command_type: "ludo_game::MoveTokenCommand",
           player: ai,
-          token_index: 0,
-          d1: 6,
-          d2: 2,
+          token_index: bestToken,
+          d1,
+          d2,
         })
       );
     }
+
     if (this.gameType === "battleship") {
       const legal = JSON.parse(this.get_legal_moves_json(ai)) as { row: number; col: number }[];
       if (legal.length > 0) {
+        let chosen = legal[0];
+        const myShots = this.bsShots[ai] || {};
+
+        if (diff === 0) {
+          const easyScores = legal.map((_, idx) => -idx * 2);
+          chosen = legal[this.selectTopKWithNoise(easyScores, 20)];
+        } else {
+          // Identify active hit cells that belong to ships NOT yet sunk
+          const sunkNames = new Set(this.bsSunkShips[ai] || []);
+          const sunkCells = new Set<string>();
+          for (const ship of this.bsFleets[opp] || []) {
+            if (sunkNames.has(ship.name)) {
+              for (const [sr, sc] of ship.cells) {
+                sunkCells.add(`${sr}_${sc}`);
+              }
+            }
+          }
+
+          const activeHits: [number, number][] = [];
+          for (const key of Object.keys(myShots)) {
+            if (myShots[key] === "hit" && !sunkCells.has(key)) {
+              const [hr, hc] = key.split("_").map(Number);
+              activeHits.push([hr, hc]);
+            }
+          }
+
+          let targetCell: { row: number; col: number } | null = null;
+
+          // 1a. Collinear Line Inference (Hard/Expert): if >=2 active hits share row or col, fire at line endpoints
+          if (diff >= 2 && activeHits.length >= 2) {
+            const collinearCandidates: { row: number; col: number }[] = [];
+            for (let i = 0; i < activeHits.length; i++) {
+              for (let j = i + 1; j < activeHits.length; j++) {
+                const [r1, c1] = activeHits[i];
+                const [r2, c2] = activeHits[j];
+                if (r1 === r2) {
+                  const minC = Math.min(c1, c2);
+                  const maxC = Math.max(c1, c2);
+                  const right = legal.find((m) => m.row === r1 && m.col === maxC + 1);
+                  const left = legal.find((m) => m.row === r1 && m.col === minC - 1);
+                  if (right) collinearCandidates.push(right);
+                  if (left) collinearCandidates.push(left);
+                } else if (c1 === c2) {
+                  const minR = Math.min(r1, r2);
+                  const maxR = Math.max(r1, r2);
+                  const down = legal.find((m) => m.row === maxR + 1 && m.col === c1);
+                  const up = legal.find((m) => m.row === minR - 1 && m.col === c1);
+                  if (down) collinearCandidates.push(down);
+                  if (up) collinearCandidates.push(up);
+                }
+              }
+            }
+            if (collinearCandidates.length > 0) {
+              const colScores = collinearCandidates.map((_, i) => 100 - i * 2);
+              targetCell = collinearCandidates[this.selectTopKWithNoise(colScores, 12)];
+            }
+          }
+
+          // 1b. Orthogonal Target Mode: check orthogonal neighbors of any active hit
+          if (!targetCell && activeHits.length > 0) {
+            const orthoCandidates: { row: number; col: number }[] = [];
+            for (const [hr, hc] of activeHits) {
+              for (const [dr, dc] of [
+                [-1, 0],
+                [1, 0],
+                [0, -1],
+                [0, 1],
+              ]) {
+                const cand = legal.find((m) => m.row === hr + dr && m.col === hc + dc);
+                if (cand) {
+                  orthoCandidates.push(cand);
+                }
+              }
+            }
+            if (orthoCandidates.length > 0) {
+              const orthoScores = orthoCandidates.map((_, i) => 100 - i * 2);
+              targetCell = orthoCandidates[this.selectTopKWithNoise(orthoScores, 12)];
+            }
+          }
+
+          if (targetCell) {
+            chosen = targetCell;
+          } else if (diff >= 2) {
+            // 2. Probability Density Map (Hard/Expert): count valid placements of remaining unsunk ship sizes
+            const remainingSizes = (this.bsFleets[opp] || [])
+              .filter((s) => !sunkNames.has(s.name))
+              .map((s) => s.size);
+            const shipSizes = remainingSizes.length > 0 ? remainingSizes : [5, 4, 3, 3, 2];
+            const density: number[][] = Array.from({ length: 10 }, () =>
+              Array.from({ length: 10 }, () => 0)
+            );
+
+            const isBlocked = (r: number, c: number) =>
+              myShots[`${r}_${c}`] === "miss" || sunkCells.has(`${r}_${c}`);
+
+            for (const size of shipSizes) {
+              // Horizontal placements
+              for (let r = 0; r < 10; r++) {
+                for (let c = 0; c <= 10 - size; c++) {
+                  let ok = true;
+                  for (let k = 0; k < size; k++) {
+                    if (isBlocked(r, c + k)) {
+                      ok = false;
+                      break;
+                    }
+                  }
+                  if (ok) {
+                    for (let k = 0; k < size; k++) density[r][c + k] += 1;
+                  }
+                }
+              }
+              // Vertical placements
+              for (let r = 0; r <= 10 - size; r++) {
+                for (let c = 0; c < 10; c++) {
+                  let ok = true;
+                  for (let k = 0; k < size; k++) {
+                    if (isBlocked(r + k, c)) {
+                      ok = false;
+                      break;
+                    }
+                  }
+                  if (ok) {
+                    for (let k = 0; k < size; k++) density[r + k][c] += 1;
+                  }
+                }
+              }
+            }
+
+            const scores: number[] = [];
+            for (const m of legal) {
+              const parity = (m.row + m.col) % 2 === 0 ? 15 : 0;
+              const diagBonus =
+                diff === 3
+                  ? m.row + m.col === 9
+                    ? 12
+                    : 0
+                  : m.row === m.col
+                    ? 10
+                    : 0;
+              const score = density[m.row][m.col] * 10 + parity + diagBonus;
+              scores.push(score);
+            }
+            chosen = legal[this.selectTopKWithNoise(scores, diff === 2 ? 25 : 20)];
+          } else {
+            // Medium (diff === 1): checkerboard parity + center bias
+            const scores: number[] = [];
+            for (const m of legal) {
+              const parity = (m.row + m.col) % 2 === 0 ? 25 : 0;
+              const centerDist = Math.abs(4.5 - m.row) + Math.abs(4.5 - m.col);
+              const score = parity + (9 - centerDist) * 3;
+              scores.push(score);
+            }
+            chosen = legal[this.selectTopKWithNoise(scores, 20)];
+          }
+        }
+
         return this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "battleship_game::FireShotCommand",
             player: ai,
-            row: legal[0].row,
-            col: legal[0].col,
+            row: chosen.row,
+            col: chosen.col,
           })
         );
       }
     }
+
     if (this.gameType === "mille_bornes") {
+      const hand = this.mbHands[ai] || [];
+      let bestIdx = 0;
+      if (hand.length > 1) {
+        const myHazard = this.mbHazard[ai];
+        const oppHazard = this.mbHazard[opp];
+        const shieldMap: Record<string, string> = {
+          Pinchazo: "Impinchable",
+          "Sin Gasolina": "Cisterna",
+          Accidente: "As del Volante",
+        };
+        const remedyMap: Record<string, string> = {
+          Pinchazo: "Rueda de Auxilio",
+          "Sin Gasolina": "Gasolina",
+          Accidente: "Reparaciones",
+        };
+
+        const scores: number[] = [];
+        hand.forEach((card, idx) => {
+          if (diff === 0) {
+            scores.push(-idx * 8);
+            return;
+          }
+          let score = 0;
+          if (
+            card === "As del Volante" ||
+            card === "Cisterna" ||
+            card === "Impinchable" ||
+            card === "Incorruptible" ||
+            card === "Prioridad"
+          ) {
+            score = diff >= 2 ? 220 : 110;
+          } else if (
+            myHazard &&
+            (card === remedyMap[myHazard] ||
+              card === "Reparaciones" ||
+              card === "Gasolina" ||
+              card === "Rueda de Auxilio" ||
+              card === "Luz Verde")
+          ) {
+            score = 210;
+          } else if (card.startsWith("Distance ")) {
+            const km = Number(card.replace("Distance ", "")) || 50;
+            const within200Limit = km !== 200 || this.mbPlayed200Count[ai] < 2;
+            if (!myHazard && within200Limit && this.mbDistance[ai] + km <= 1000) {
+              score = km + (this.mbDistance[ai] + km === 1000 ? 150 : 0);
+            } else {
+              score = -50;
+            }
+          } else if (card === "Pinchazo" || card === "Sin Gasolina" || card === "Accidente") {
+            const blocked = this.mbSafeties[opp]?.includes(shieldMap[card]);
+            if (!blocked && !oppHazard) {
+              score = diff === 3 ? 195 : diff === 2 ? 140 : 75;
+            } else {
+              score = -80;
+            }
+          }
+          scores.push(score);
+        });
+
+        const safetyBand = diff === 0 ? 30 : diff === 1 ? 35 : diff === 2 ? 30 : 20;
+        bestIdx = this.selectTopKWithNoise(scores, safetyBand);
+      }
       return this.send_command_json(
         ai,
         JSON.stringify({
           command_type: "mille_bornes_game::PlayCardCommand",
           player: ai,
-          card_index: 0,
+          card_index: bestIdx,
         })
       );
     }
+
     if (this.gameType === "monopoly") {
-      this.send_command_json(
-        ai,
-        JSON.stringify({ command_type: "monopoly_game::RollDiceCommand", player: ai })
-      );
-      this.send_command_json(
-        ai,
-        JSON.stringify({ command_type: "monopoly_game::BuyPropertyCommand", player: ai })
-      );
+      // 1. Strategic Jail release: pay $50 fine on Medium/Hard/Expert when unowned properties remain
+      if (this.monoInJail[ai] && diff >= 1 && this.monoCash[ai] >= 250) {
+        const unownedCount = this.monoSpaces.filter((s) => s.price > 0 && s.owner === null).length;
+        if (unownedCount >= 4 || diff === 1) {
+          this.send_command_json(
+            ai,
+            JSON.stringify({ command_type: "monopoly_game::PayJailFineCommand", player: ai })
+          );
+        }
+      }
+
+      // 2. Roll dice and advance (with bounded noise seed perturbation when noise is active)
+      if (this.isNoiseActive()) {
+        const d1 = 1 + (Math.floor(this.noiseUnitFloat(1, 701) * 6) % 6);
+        const d2 = 1 + (Math.floor(this.noiseUnitFloat(2, 702) * 6) % 6);
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "monopoly_game::RollDiceCommand", player: ai, d1, d2 })
+        );
+      } else {
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "monopoly_game::RollDiceCommand", player: ai })
+        );
+      }
+
+      // 3. Evaluate property purchase according to liquidity reserve & color-group monopoly priority
+      const curSpace = this.monoSpaces[this.monoPos[ai]];
+      if (curSpace && curSpace.price > 0 && curSpace.owner === null && this.monoCash[ai] >= curSpace.price) {
+        const groupSpaces = this.monoSpaces.filter(
+          (s) => s.group === curSpace.group && s.price > 0
+        );
+        const completesMyGroup =
+          groupSpaces.length > 1 &&
+          groupSpaces.every((s) => s.index === curSpace.index || s.owner === ai);
+        const blocksOpponentGroup =
+          groupSpaces.length > 1 &&
+          groupSpaces.filter((s) => s.owner === opp).length === groupSpaces.length - 1;
+        const cashReserve = diff === 0 ? 0 : diff === 1 ? 100 : 150;
+
+        if (
+          diff === 0 ||
+          completesMyGroup ||
+          (diff >= 2 && blocksOpponentGroup) ||
+          this.monoCash[ai] - curSpace.price >= cashReserve
+        ) {
+          this.send_command_json(
+            ai,
+            JSON.stringify({ command_type: "monopoly_game::BuyPropertyCommand", player: ai })
+          );
+        }
+      }
+
+      // 4. Build houses on Hard (2) & Expert (3) when holding developable properties and cash buffer
+      if (diff >= 2 && this.monoCash[ai] >= 250) {
+        const maxBuilds = diff === 3 ? 2 : 1;
+        for (let b = 0; b < maxBuilds && this.monoCash[ai] >= 200; b++) {
+          const ownedProps = this.monoSpaces
+            .filter((s) => s.owner === ai && !s.mortgaged && s.houses < 5 && s.price > 0)
+            .sort((a, bProp) => a.houses - bProp.houses || bProp.rent - a.rent);
+          if (ownedProps.length === 0) break;
+          const propScores = ownedProps.map((s) => (5 - s.houses) * 25 + s.rent);
+          const pickIdx = this.selectTopKWithNoise(propScores, diff === 2 ? 25 : 18);
+          const ordered = [
+            ownedProps[pickIdx],
+            ...ownedProps.filter((_, idx) => idx !== pickIdx),
+          ];
+          let built = false;
+          for (const candidate of ordered) {
+            const resp = this.send_command_json(
+              ai,
+              JSON.stringify({
+                command_type: "monopoly_game::BuildHouseCommand",
+                player: ai,
+                space: candidate.index,
+              })
+            );
+            if (!resp.includes('"ok":false')) {
+              built = true;
+              break;
+            }
+          }
+          if (!built) break;
+        }
+      }
+
       return this.send_command_json(
         ai,
         JSON.stringify({ command_type: "monopoly_game::EndTurnCommand", player: ai })
       );
     }
+
     if (this.gameType === "crisis") {
-      const myTerr = this.crisisTerritories.find((t) => t.owner === ai);
-      if (myTerr && this.crisisArmiesRemaining > 0) {
+      // 1. Exchange 3 cards for +6 reinforcement armies on Medium/Hard/Expert
+      if (diff >= 1 && (this.crisisCards[ai] || 0) >= 3) {
+        this.send_command_json(
+          ai,
+          JSON.stringify({ command_type: "crisis_game::ExchangeCardsCommand", player: ai })
+        );
+      }
+
+      // 2. Place reinforcement armies on the frontline territory with highest tactical need/advantage
+      const myTerrs = this.crisisTerritories.filter((t) => t.owner === ai);
+      if (myTerrs.length > 0 && this.crisisArmiesRemaining > 0) {
+        const terrScores: number[] = [];
+        for (let idx = 0; idx < myTerrs.length; idx++) {
+          const t = myTerrs[idx];
+          if (diff === 0) {
+            terrScores.push(-idx * 5);
+            continue;
+          }
+          const enemyNeighbors = t.neighbors
+            .map((nid) => this.crisisTerritories[nid])
+            .filter((nt) => nt && nt.owner !== ai);
+          if (enemyNeighbors.length === 0) {
+            terrScores.push(-100);
+            continue;
+          }
+          const weakestEnemy = Math.min(...enemyNeighbors.map((nt) => nt.armies));
+          const totalEnemyThreat = enemyNeighbors.reduce((acc, nt) => acc + nt.armies, 0);
+          const score =
+            diff >= 2
+              ? ((t.armies + this.crisisArmiesRemaining) / Math.max(1, weakestEnemy)) * 20 +
+                totalEnemyThreat * 2
+              : t.armies * 10 + enemyNeighbors.length * 5;
+          terrScores.push(score);
+        }
+        const safetyBand = diff === 0 ? 20 : diff === 1 ? 25 : diff === 2 ? 18 : 12;
+        const targetTerr = myTerrs[this.selectTopKWithNoise(terrScores, safetyBand)];
         this.send_command_json(
           ai,
           JSON.stringify({
             command_type: "crisis_game::PlaceArmiesCommand",
             player: ai,
-            territory: myTerr.id,
+            territory: targetTerr.id,
             count: this.crisisArmiesRemaining,
           })
         );
       }
+
+      // 3. Multi-phase Attack execution based on difficulty superiority threshold
+      if (diff >= 1 && this.winner === null) {
+        const ratioThreshold = diff === 1 ? 1.5 : diff === 2 ? 1.3 : 1.15;
+        const maxAttackWaves = diff === 1 ? 2 : diff === 2 ? 4 : 6;
+        for (let wave = 0; wave < maxAttackWaves && this.winner === null; wave++) {
+          const attackCandidates: { from: number; to: number; advantage: number }[] = [];
+          for (const att of this.crisisTerritories) {
+            if (att.owner !== ai || att.armies < 2) continue;
+            for (const nid of att.neighbors) {
+              const def = this.crisisTerritories[nid];
+              if (!def || def.owner === ai) continue;
+              const ratio = att.armies / Math.max(1, def.armies);
+              if (ratio >= ratioThreshold) {
+                const advantage = att.armies - def.armies + (def.armies === 1 ? 3 : 0);
+                attackCandidates.push({ from: att.id, to: def.id, advantage });
+              }
+            }
+          }
+          if (attackCandidates.length === 0) break;
+          const attScores = attackCandidates.map((a) => a.advantage);
+          const bestAttack =
+            attackCandidates[
+              this.selectTopKWithNoise(attScores, diff === 1 ? 4 : diff === 2 ? 3 : 2)
+            ];
+          this.send_command_json(
+            ai,
+            JSON.stringify({
+              command_type: "crisis_game::AttackCommand",
+              player: ai,
+              from: bestAttack.from,
+              to: bestAttack.to,
+            })
+          );
+        }
+      }
+
+      // 4. Fortify phase on Hard (2) & Expert (3): transfer surplus armies from rear territory to frontline border
+      if (diff >= 2 && this.winner === null) {
+        const hasEnemyNeighbor = (t: CrisisTerritory) =>
+          t.neighbors.some((nid) => this.crisisTerritories[nid]?.owner !== ai);
+
+        for (const src of this.crisisTerritories) {
+          if (src.owner !== ai || src.armies <= 2 || hasEnemyNeighbor(src)) continue;
+          const borderNeighborId = src.neighbors.find((nid) => {
+            const dst = this.crisisTerritories[nid];
+            return dst && dst.owner === ai && hasEnemyNeighbor(dst);
+          });
+          if (borderNeighborId !== undefined) {
+            this.send_command_json(
+              ai,
+              JSON.stringify({
+                command_type: "crisis_game::FortifyCommand",
+                player: ai,
+                from: src.id,
+                to: borderNeighborId,
+                count: src.armies - 1,
+              })
+            );
+            break;
+          }
+        }
+      }
+
+      if (this.winner !== null) {
+        return JSON.stringify([{ event: "GameOverEvent", winner: this.winner }]);
+      }
+
       return this.send_command_json(
         ai,
         JSON.stringify({ command_type: "crisis_game::EndTurnCommand", player: ai })
@@ -3550,9 +4928,13 @@ export class WasmGameBridge {
       const targetGame = gameType || parsed.game_type || this.gameType;
       const savedAi = this.aiPlayer;
       const savedDiff = this.aiDifficulty;
+      const savedRand = this.aiRandomness;
+      const savedSeed = this.aiSeed;
       this.start_local_match(targetGame, 1, 2);
       this.aiPlayer = savedAi;
       this.aiDifficulty = savedDiff;
+      this.aiRandomness = savedRand;
+      this.aiSeed = savedSeed;
       if (Array.isArray(parsed.commands)) {
         for (const entry of parsed.commands) {
           this.executeCommandInternal(entry.player, entry.command, true);
@@ -3578,16 +4960,44 @@ export class WasmGameBridge {
     return this.replayCursor >= this.replayFullLog.length;
   }
 
+  public can_undo(): boolean {
+    return this.replayCursor > 0;
+  }
+
+  public can_redo(): boolean {
+    return this.replayCursor < this.replayFullLog.length;
+  }
+
+  public undo_step(): boolean {
+    if (!this.can_undo()) {
+      return false;
+    }
+    return this.seek_replay_step(this.replayCursor - 1);
+  }
+
+  public redo_step(): boolean {
+    if (!this.can_redo()) {
+      return false;
+    }
+    return this.seek_replay_step(this.replayCursor + 1);
+  }
+
   public seek_replay_step(stepIndex: number): boolean {
     const full = [...this.replayFullLog];
     const targetStep = Math.max(0, Math.min(full.length, Math.floor(stepIndex)));
     const currentGame = this.gameType;
     const savedAi = this.aiPlayer;
     const savedDiff = this.aiDifficulty;
+    const savedRand = this.aiRandomness;
+    const savedSeed = this.aiSeed;
+    const savedTelemetry = this.lastAiTelemetry;
 
     this.start_local_match(currentGame, 1, 2);
     this.aiPlayer = savedAi;
     this.aiDifficulty = savedDiff;
+    this.aiRandomness = savedRand;
+    this.aiSeed = savedSeed;
+    this.lastAiTelemetry = targetStep > 0 ? savedTelemetry : null;
 
     for (let i = 0; i < targetStep; i++) {
       const entry = full[i];

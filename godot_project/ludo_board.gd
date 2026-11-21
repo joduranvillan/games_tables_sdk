@@ -427,8 +427,11 @@ func _spawn_particle_burst(global_pos: Vector2, color: Color) -> void:
 	particles.scale_amount_max = 7.0
 	particles.color = color
 	add_child(particles)
-	var timer = get_tree().create_timer(1.0)
-	timer.timeout.connect(particles.queue_free)
+	if is_inside_tree() and get_tree() != null:
+		var timer = get_tree().create_timer(1.0)
+		timer.timeout.connect(particles.queue_free)
+	else:
+		particles.queue_free()
 
 func get_cell_position(step: int, player: int = 1) -> Vector2:
 	# 0 = Base

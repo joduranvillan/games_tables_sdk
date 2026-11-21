@@ -9,6 +9,7 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/joduranvillan/games_tables_sdk"
 keywords = ["board-game", "game-engine", "sdk", "macros", "proc-macro"]
 categories = ["game-engines", "game-development"]
+readme = "README.md"
 
 [lib]
 proc-macro = true
@@ -18,7 +19,7 @@ syn = { version = "3", features = ["full"] }
 quote = "1"
 
 [dev-dependencies]
-open_table_core = { version = "1.1.0", path = "../open_table_core" }
+open_table_core = { path = "../open_table_core" }
 open_table_engine = { path = "../open_table_engine" }
 bevy_ecs = "0.20"
 serde = { version = "1", features = ["derive"] }

@@ -153,6 +153,17 @@ pub fn best_move(
     ai: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<ChineseCheckersCommand> {
+    best_move_with_randomness(state, ai, difficulty, 0, 0)
+}
+
+/// Selecciona el mejor movimiento en Damas Chinas con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    state: &ChineseCheckersState,
+    ai: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<ChineseCheckersCommand> {
     let board = state.world().get_resource::<BoardResource>()?;
     let candidates = generate_legal_moves(board, ai);
     if candidates.is_empty() {
@@ -176,7 +187,8 @@ pub fn best_move(
     };
 
     let rollouts = difficulty.rollouts().max(1);
-    let mut rng = FastRng::new((state.id.0 ^ ((ai.0 as u64) << 16) ^ (rollouts as u64)).max(1));
+    let mut rng =
+        FastRng::new((state.id.0 ^ ((ai.0 as u64) << 16) ^ (rollouts as u64) ^ seed).max(1));
 
     let mut visit_counts = vec![0u32; pool.len()];
     let mut total_scores = vec![0.0f64; pool.len()];
@@ -225,20 +237,29 @@ pub fn best_move(
         total_scores[idx] += immediate_gain * 10.0 + rollout_gain;
     }
 
-    let mut best_idx = 0;
-    let mut best_avg = f64::NEG_INFINITY;
-
+    let mut avg_scores = Vec::with_capacity(pool.len());
     for (i, cmd) in pool.iter().enumerate() {
         let avg = if visit_counts[i] > 0 {
             total_scores[i] / (visit_counts[i] as f64)
         } else {
             (hex_distance(cmd.from, apex) - hex_distance(cmd.to, apex)) as f64 * 10.0
         };
-        if avg > best_avg {
-            best_avg = avg;
-            best_idx = i;
-        }
+        avg_scores.push(avg as f32);
     }
+
+    let safety_band = match difficulty {
+        AiDifficulty::Easy => 18.0,
+        AiDifficulty::Medium => 10.0,
+        AiDifficulty::Hard => 5.0,
+        AiDifficulty::Expert => 2.5,
+    };
+    let best_idx = AiDifficulty::select_top_k_with_noise(
+        &avg_scores,
+        randomness_pct,
+        safety_band,
+        seed ^ state.current_tick().0 ^ state.id.0,
+    )
+    .unwrap_or(0);
 
     Some(pool[best_idx].clone())
 }

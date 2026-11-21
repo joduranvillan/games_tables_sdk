@@ -70,7 +70,17 @@ pub fn goose_ai_pick_move(session: &Session, player: PlayerId) -> Option<MoveTok
 pub fn best_move(
     session: &Session,
     player: PlayerId,
+    difficulty: AiDifficulty,
+) -> Option<MoveTokenCommand> {
+    best_move_with_randomness(session, player, difficulty, 0, 0)
+}
+
+pub fn best_move_with_randomness(
+    session: &Session,
+    player: PlayerId,
     _difficulty: AiDifficulty,
+    _randomness_pct: u8,
+    _seed: u64,
 ) -> Option<MoveTokenCommand> {
     goose_ai_pick_move(session, player)
 }

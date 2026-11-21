@@ -30,12 +30,12 @@ fi
 
 echo "=== 3. IA extendida (6 nuevos juegos) ==="
 if command -v cargo &>/dev/null; then
-    cargo test -p battleship_game -- ai
-    cargo test -p mille_bornes_game -- ai
-    cargo test -p uno_game -- ai
-    cargo test -p monopoly_game -- ai
-    cargo test -p chinese_checkers_game -- ai
-    cargo test -p crisis_game -- ai
+    cargo test -p open_table_battleship_game -- ai
+    cargo test -p open_table_mille_bornes_game -- ai
+    cargo test -p open_table_uno_game -- ai
+    cargo test -p open_table_monopoly_game -- ai
+    cargo test -p open_table_chinese_checkers_game -- ai
+    cargo test -p open_table_crisis_game -- ai
 else
     test -f battleship_game/src/ai.rs
     test -f mille_bornes_game/src/ai.rs

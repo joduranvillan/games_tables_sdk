@@ -136,25 +136,31 @@ pub fn evaluate_position(session: &Session, player: PlayerId) -> f32 {
 
     let mut score = 0.0f32;
 
-    // Piezas en el tablero
-    for piece in board.squares.values() {
+    // Piezas en el tablero (material + avance hacia zona de promoción + control central)
+    for (&(x, y), piece) in &board.squares {
         let val = piece_value(piece.kind);
+        let adv = if piece.owner == board.sente {
+            (8usize.saturating_sub(y)) as f32 * 0.04
+        } else {
+            (y as f32) * 0.04
+        };
+        let center_bonus = (4.0 - (x as f32 - 4.0).abs()).max(0.0) * 0.02;
         if piece.owner == player {
-            score += val;
+            score += val + adv + center_bonus;
         } else if piece.owner == opponent {
-            score -= val;
+            score -= val + adv + center_bonus;
         }
     }
 
     // Piezas en mano
     if let Some(hand) = board.hands.get(&player) {
         for &k in hand {
-            score += piece_value(k);
+            score += piece_value(k) * 1.05;
         }
     }
     if let Some(hand) = board.hands.get(&opponent) {
         for &k in hand {
-            score -= piece_value(k);
+            score -= piece_value(k) * 1.05;
         }
     }
 
@@ -321,6 +327,17 @@ pub fn best_move(
     player: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<Box<dyn Command>> {
+    best_move_with_randomness(session, player, difficulty, 0, 0)
+}
+
+/// Selecciona la mejor jugada legal en Shogi con factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<Box<dyn Command>> {
     if session
         .world()
         .get_resource::<GameOverResource>()
@@ -352,9 +369,12 @@ pub fn best_move(
         ShogiAction::Drop(_) => 2,
     });
 
-    let depth = difficulty.max_depth().clamp(1, 2);
-    let mut best_action = None;
-    let mut best_score = f32::NEG_INFINITY;
+    let depth: u8 = match difficulty {
+        AiDifficulty::Easy | AiDifficulty::Medium => 1,
+        AiDifficulty::Hard | AiDifficulty::Expert => 2,
+    };
+    let mut legal_actions = Vec::new();
+    let mut scores = Vec::new();
     let mut alpha = f32::NEG_INFINITY;
     let beta = f32::INFINITY;
 
@@ -364,18 +384,48 @@ pub fn best_move(
             .process_command(player, action.to_command())
             .is_ok()
         {
-            let score = minimax(&next_session, depth - 1, alpha, beta, false, player);
-            if score > best_score || best_action.is_none() {
-                best_score = score;
-                best_action = Some(action);
+            let search_alpha = if randomness_pct == 0 {
+                alpha
+            } else {
+                f32::NEG_INFINITY
+            };
+            let mut score = minimax(&next_session, depth - 1, search_alpha, beta, false, player);
+            if difficulty == AiDifficulty::Expert {
+                if let ShogiAction::Move(cmd) = &action {
+                    if cmd.promote || (2..=6).contains(&cmd.to.0) {
+                        score += 0.08;
+                    }
+                }
             }
             if score > alpha {
                 alpha = score;
             }
+            legal_actions.push(action);
+            scores.push(score);
         }
     }
 
-    best_action.map(|a| a.to_command())
+    if difficulty == AiDifficulty::Easy
+        && randomness_pct == 0
+        && legal_actions.len() > 1
+        && (session.current_tick().0 & 3) == 0
+    {
+        return legal_actions.last().map(|a| a.to_command());
+    }
+
+    let safety_band = match difficulty {
+        AiDifficulty::Easy => 2.0,
+        AiDifficulty::Medium => 0.85,
+        AiDifficulty::Hard => 0.35,
+        AiDifficulty::Expert => 0.18,
+    };
+    let idx = AiDifficulty::select_top_k_with_noise(
+        &scores,
+        randomness_pct,
+        safety_band,
+        seed ^ session.current_tick().0 ^ session.id.0,
+    )?;
+    legal_actions.get(idx).map(|a| a.to_command())
 }
 
 #[cfg(test)]

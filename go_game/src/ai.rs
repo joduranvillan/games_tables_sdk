@@ -108,6 +108,17 @@ pub fn best_move(
     player: PlayerId,
     difficulty: AiDifficulty,
 ) -> Option<PlaceStoneCommand> {
+    best_move_with_randomness(session, player, difficulty, 0, 0)
+}
+
+/// Selecciona el mejor movimiento para `player` en Go aplicando un factor de aleatoriedad (`randomness_pct`, `0..=100`).
+pub fn best_move_with_randomness(
+    session: &Session,
+    player: PlayerId,
+    difficulty: AiDifficulty,
+    randomness_pct: u8,
+    seed: u64,
+) -> Option<PlaceStoneCommand> {
     if session
         .world()
         .get_resource::<GameOverResource>()
@@ -131,18 +142,75 @@ pub fn best_move(
     let rollouts_per_candidate = (total_budget / n).max(1);
 
     let mut rng = FastRng::new(
-        (session.id.0 ^ session.current_tick().0)
+        (session.id.0 ^ session.current_tick().0 ^ seed)
             .wrapping_mul(0x9e3779b97f4a7c15)
             .wrapping_add(1),
     );
 
+    let board_size = session
+        .world()
+        .get_resource::<BoardResource>()
+        .map(|b| b.size)
+        .unwrap_or(9);
+
     let mut best_move = None;
     let mut best_win_rate = -1.0f32;
     let mut best_net_score = f32::NEG_INFINITY;
+    let mut combined_scores = Vec::with_capacity(candidates.len());
 
     for candidate in &candidates {
         let mut wins = 0.0f32;
         let mut total_score_diff = 0.0f32;
+
+        // Prioridad posicional (evitar primera línea (0,0) y favorecer 3ª/4ª línea y puntos Hoshi)
+        let edge_dist_x = candidate.x.min(board_size.saturating_sub(1 + candidate.x));
+        let edge_dist_y = candidate.y.min(board_size.saturating_sub(1 + candidate.y));
+        let min_edge = edge_dist_x.min(edge_dist_y);
+        let center = (board_size as f32 - 1.0) * 0.5;
+        let center_dist = (candidate.x as f32 - center).abs() + (candidate.y as f32 - center).abs();
+        let positional_prior = match difficulty {
+            AiDifficulty::Easy => {
+                if min_edge == 0 {
+                    -0.15
+                } else {
+                    0.05 * (min_edge as f32)
+                }
+            }
+            AiDifficulty::Medium => {
+                let line_bonus = if min_edge == 2 {
+                    0.35
+                } else if min_edge == 1 {
+                    0.1
+                } else {
+                    -0.25
+                };
+                line_bonus - center_dist * 0.01
+            }
+            AiDifficulty::Hard => {
+                let is_hoshi = (edge_dist_x == 2 && edge_dist_y == 2)
+                    || (candidate.x * 2 + 1 == board_size && candidate.y * 2 + 1 == board_size);
+                let line_bonus = if is_hoshi {
+                    0.65
+                } else if min_edge >= 2 {
+                    0.3
+                } else {
+                    -0.4
+                };
+                line_bonus - center_dist * 0.015
+            }
+            AiDifficulty::Expert => {
+                let is_komoku_or_hoshi = (edge_dist_x == 2 && edge_dist_y == 3)
+                    || (edge_dist_x == 3 && edge_dist_y == 2);
+                let line_bonus = if is_komoku_or_hoshi {
+                    0.75
+                } else if min_edge >= 2 {
+                    0.4
+                } else {
+                    -0.5
+                };
+                line_bonus - center_dist * 0.012
+            }
+        };
 
         for _ in 0..rollouts_per_candidate {
             let mut sim_session = clone_go_session(session);
@@ -224,7 +292,7 @@ pub fn best_move(
                     (white_t as f32, black_t as f32)
                 };
 
-                total_score_diff += my_score - opp_score;
+                total_score_diff += (my_score - opp_score) + positional_prior;
                 if my_score > opp_score {
                     wins += 1.0;
                 } else if (my_score - opp_score).abs() < 1e-3 {
@@ -235,6 +303,7 @@ pub fn best_move(
 
         let win_rate = wins / (rollouts_per_candidate as f32);
         let avg_score_diff = total_score_diff / (rollouts_per_candidate as f32);
+        combined_scores.push(win_rate * 100.0 + avg_score_diff);
 
         if win_rate > best_win_rate
             || ((win_rate - best_win_rate).abs() < 1e-4 && avg_score_diff > best_net_score)
@@ -243,6 +312,23 @@ pub fn best_move(
             best_win_rate = win_rate;
             best_net_score = avg_score_diff;
             best_move = Some(candidate.clone());
+        }
+    }
+
+    if randomness_pct > 0 {
+        let safety_band = match difficulty {
+            AiDifficulty::Easy => 35.0,
+            AiDifficulty::Medium => 18.0,
+            AiDifficulty::Hard => 8.0,
+            AiDifficulty::Expert => 4.0,
+        };
+        if let Some(idx) = AiDifficulty::select_top_k_with_noise(
+            &combined_scores,
+            randomness_pct,
+            safety_band,
+            seed ^ session.current_tick().0 ^ session.id.0,
+        ) {
+            return candidates.into_iter().nth(idx);
         }
     }
 

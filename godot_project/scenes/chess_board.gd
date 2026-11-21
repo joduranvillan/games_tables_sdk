@@ -532,6 +532,8 @@ func _reset_all_piece_scales() -> void:
 func _bounce_piece(r: int, c: int) -> void:
 	if r < 0 or r >= BOARD_SIZE or c < 0 or c >= BOARD_SIZE:
 		return
+	if not is_inside_tree() or OS.has_feature("headless"):
+		return
 	var sprite = piece_sprites[r][c]
 	if sprite != null and is_instance_valid(sprite):
 		sprite.scale = Vector2(1.0, 1.0)
@@ -1219,11 +1221,14 @@ func _on_move_rejected(reason: String) -> void:
 		rejected_cell = selected_pos
 	
 	queue_redraw()
-	var timer = get_tree().create_timer(0.3)
-	timer.timeout.connect(func():
+	if is_inside_tree() and not OS.has_feature("headless") and get_tree() != null:
+		var timer = get_tree().create_timer(0.3)
+		timer.timeout.connect(func():
+			rejected_cell = null
+			queue_redraw()
+		)
+	else:
 		rejected_cell = null
-		queue_redraw()
-	)
 
 func _draw_board_overlay() -> void:
 	if board_overlay == null or not is_instance_valid(board_overlay):
