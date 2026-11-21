@@ -100,6 +100,13 @@ verify_crates_metadata() {
       continue
     fi
 
+    if command -v python3 >/dev/null 2>&1; then
+      if ! python3 -c 'import sys, tomllib; tomllib.load(open(sys.argv[1], "rb"))' "$manifest" 2>/dev/null; then
+        echo "ERROR: Invalid TOML syntax in $crate/Cargo.toml" >&2
+        failed=1
+      fi
+    fi
+
     if [ ! -s "$readme" ]; then
       echo "ERROR: Missing or empty README.md for $crate" >&2
       failed=1

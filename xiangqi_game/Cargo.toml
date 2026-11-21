@@ -8,7 +8,7 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/joduranvillan/games_tables_sdk"
 keywords = ["game", "board-game", "xiangqi", "chinese-chess", "rules"]
 categories = ["game-engines", "games"]
-readme = \"README.md\"
+readme = "README.md"
 
 [dependencies]
 open_table_core = { path = "../open_table_core", version = "1.1.0" }

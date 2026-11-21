@@ -8,7 +8,7 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/joduranvillan/games_tables_sdk"
 keywords = ["networking", "mobile", "bridge", "board-games", "opentable"]
 categories = ["network-programming", "game-engines"]
-readme = \"README.md\"
+readme = "README.md"
 
 [dependencies]
 open_table_core = { path = "../open_table_core", version = "1.1.0" }

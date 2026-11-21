@@ -9,7 +9,7 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/joduranvillan/games_tables_sdk"
 keywords = ["board-game", "game-engine", "ecs", "sdk", "rules"]
 categories = ["game-engines", "game-development"]
-readme = \"README.md\"
+readme = "README.md"
 
 [dependencies]
 open_table_core = { version = "1.1.0", path = "../open_table_core" }
