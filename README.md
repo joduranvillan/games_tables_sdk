@@ -1,3 +1,70 @@
+# OpenTable SDK v1.1.0 — Deterministic Board Game Engine Suite (Rust, Godot 4 & WebAssembly)
+
+[![CI](https://github.com/joduranvillan/games_tables_sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/joduranvillan/games_tables_sdk/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/joduranvillan/games_tables_sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/joduranvillan/games_tables_sdk)
+[![Crates.io](https://img.shields.io/crates/v/open_table_core.svg)](https://crates.io/crates/open_table_core)
+[![Docs.rs](https://docs.rs/open_table_core/badge.svg)](https://docs.rs/open_table_core)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3_or_later-blue.svg)](./LICENSE)
+[![Games Implemented](https://img.shields.io/badge/games-14%2F14-brightgreen.svg)](#14-canonical-board-games-suite)
+
+**Languages / Idiomas:** [English](./docs/i18n/en/README.md) · [Español](./docs/i18n/es/README.md) · [Português (BR)](./docs/i18n/pt-BR/README.md) · [Français](./docs/i18n/fr/README.md) · [Deutsch](./docs/i18n/de/README.md) · [简体中文](./docs/i18n/zh-CN/README.md) · [日本語](./docs/i18n/ja/README.md)
+
+---
+
+OpenTable SDK is a deterministic, modular turn-based board game workspace written in Rust (24 crates) with native runtimes for **Godot 4 / Redot 4** (`open_table_godot`) and **React + TypeScript + WebAssembly** (`open_table_wasm`). Every one of the **14 canonical board games** implements official tournament rules, a legal move generator (`LegalMoveGenerator`), a 4-level local AI opponent with configurable **0–100% Top-K decision randomness**, transactional **Undo/Redo**, **64-bit FNV-1a state checksums**, and a **Post-Match Tactical Analyzer** with an interactive **Decision Intensity Heat-Map**.
+
+## Highlights & What's New in `v1.1.0`
+
+- **AI Randomness / Decision Noise (`0–100%`)**: Auto-scaled by difficulty (`Easy = 45%`, `Medium = 25%`, `Hard = 12%`, `Expert = 5%`) with live UI slider control and Top-K score band perturbation (`AiDifficulty::select_top_k_with_noise`) across all 14 games.
+- **Transactional Undo/Redo & 64-Bit FNV-1a Checksums**: Snapshot rollback/re-apply (`undo_step`, `redo_step`) and deterministic 64-bit FNV-1a state signatures (`get_state_checksum_hex`) across Rust, Godot, and WebAssembly.
+- **AI Decision Intensity Heat-Map Overlay**: Integrated into the Post-Match Tactical Analyzer (`PostMatchAnalyzerPanel.tsx`) with a live toggle between **Selected Turn (`#ply`)** and **Cumulative Match (`N turns`)**, adapted to the board topology of all 14 games.
+- **Multilingual Native Documentation (7 Languages) & Crates.io Ready**: Every one of the 24 crates includes an English `README.md` for `crates.io` / `docs.rs`, paired with full native guides in **English, Español, Português (BR), Français, Deutsch, 简体中文, and 日本語** under [`docs/i18n/`](./docs/i18n/).
+
+## Complete Workspace Directory — 24 Crates (`crates.io` & `docs.rs`)
+
+| Crate | Layer | Version | Description |
+|---|---|:---:|---|
+| [`open_table_core`](./open_table_core/README.md) | Core & Engine Foundation | `1.1.0` | Foundational deterministic traits, serializable Commands/Events, seeded ChaCha8 RNG, and transport contracts for turn-based board game engines. |
+| [`open_table_engine`](./open_table_engine/README.md) | Core & Engine Foundation | `1.1.0` | ECS-backed deterministic turn-based session runtime (`Session`), transactional command pipeline, Undo/Redo stacks, FIDE ELO calculator, and state hashing. |
+| [`open_table_macros`](./open_table_macros/README.md) | Core & Engine Foundation | `1.1.0` | Procedural derive macros (`#[derive(Component)]`, `#[derive(Resource)]`, `#[game_command]`, `#[game_event]`) reducing boilerplate for OpenTable game crates. |
+| [`open_table_qr`](./open_table_qr/README.md) | Transports, Relay & Discovery | `1.1.0` | Compact session invitation payloads and SVG/terminal QR code generation for LAN, Relay room codes, and mobile P2P pairing. |
+| [`open_table_transport_tcp`](./open_table_transport_tcp/README.md) | Transports, Relay & Discovery | `1.1.0` | Length-prefixed TCP host/client transport implementation of `open_table_core::Transport` for low-latency LAN multiplayer. |
+| [`open_table_transport_websocket`](./open_table_transport_websocket/README.md) | Transports, Relay & Discovery | `1.1.0` | WebSocket client transport connecting desktop, mobile, and WebAssembly peers through `open_table_relay` rooms. |
+| [`open_table_transport_native_bridge`](./open_table_transport_native_bridge/README.md) | Transports, Relay & Discovery | `1.1.0` | Zero-socket `RawByteLink` bridge adapting Android Nearby Connections, iOS MultipeerConnectivity, and WebRTC DataChannels into `Transport`. |
+| [`open_table_relay`](./open_table_relay/README.md) | Transports, Relay & Discovery | `1.1.0` | Asynchronous WebSocket Relay server with 6-character room codes, spectator broadcasting, and automated ELO-window matchmaking queues. |
+| [`open_table_godot`](./open_table_godot/README.md) | Runtime Bridges (Godot & WebAssembly) | `1.1.0` | GDExtension C-ABI bridge exposing all 14 canonical board games, 4-level AI with 0-100% randomness, ELO rating, and networking to Godot 4 / Redot 4. |
+| [`open_table_wasm`](./open_table_wasm/README.md) | Runtime Bridges (Godot & WebAssembly) | `1.1.0` | WebAssembly (`wasm-bindgen`) bridge compiling all 14 canonical Rust board game engines, AI levels, Undo/Redo, FNV-1a checksums, and telemetry for the React Web client. |
+| [`chess_game`](./chess_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical FIDE Chess engine with castling, en passant, 4-piece promotion, 50-move/threefold repetition draws, Zobrist hashing, ECO opening book, and alpha-beta AI. |
+| [`checkers_game`](./checkers_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical 8x8 Draughts / Checkers engine with mandatory capture priority, chained multi-jump continuations, King crowning, 40-move draw clock, and minimax AI. |
+| [`go_game`](./go_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical Go (Weiqi / Baduk) engine supporting 9x9, 13x13, and 19x19 boards, BFS liberty & chain capture, positional Superko, Hoshi handicap, and 6.5 Komi scoring. |
+| [`shogi_game`](./shogi_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical 9x9 Japanese Shogi engine with Komadai capture trays, piece drops, Nifu (double pawn) and Uchifuzume bans, FESA promotion zones, and Sennichite x4 detection. |
+| [`xiangqi_game`](./xiangqi_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical 9x10 Chinese Chess (Xiangqi) engine with 3x3 Palaces, River boundary, Horse/Elephant leg blocking, Cannon screen jumping, and Flying General prohibition. |
+| [`chinese_checkers_game`](./chinese_checkers_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical 121-node hexagram Chinese Checkers engine supporting 2, 3, 4, and 6 players, BFS chained multi-hop paths, anti-camping rules, and axial distance heuristics. |
+| [`backgammon_game`](./backgammon_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical 24-point Backgammon engine with doubles (4 moves), mandatory bar re-entry, exact/highest bear-off, Doubling Cube (2..64), and Crawford rule. |
+| [`battleship_game`](./battleship_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical 10x10 Naval Combat (Battleship) engine with 5-ship fleet deployment (`[5,4,3,3,2]`), optional `extra_turn_on_hit` salvo rule, rematch command, and Hunt/Target parity AI. |
+| [`ludo_game`](./ludo_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical 52-track + 5-goal Ludo (Parcheesi) engine with 8 safe star squares, triple-six penalty, capture/goal bonus rolls, and threat-aware tactical AI. |
+| [`mille_bornes_game`](./mille_bornes_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical 1000-km Mille Bornes card racing engine with Hazards, Remedies, Speed Limits, max two 200-km cards, 4 Safety shields, and Coup Fourré instant counter-play. |
+| [`monopoly_game`](./monopoly_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical 40-square Monopoly economic engine with property auctions, Chance/Community Chest decks, even house/hotel building, mortgages, jail, P2P trades, and ROI AI. |
+| [`uno_game`](./uno_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical 108-card UNO engine with Skip, Reverse, Draw Two, Wild, Wild Draw Four challenge verification, mandatory UNO! call/penalty, and Jump-In interception. |
+| [`crisis_game`](./crisis_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical 30-territory, 6-continent global strategy engine (TEG / Risk) with secret objectives, continent bonuses, 3v3 sorted dice combat, 3-card trades, and multi-phase AI. |
+| [`goose_game`](./goose_game/README.md) | 14 Canonical Board Game Engines | `1.1.0` | Canonical 63-square spiral Game of the Goose (Juego de la Oca) engine with 13 Geese ('De oca a oca'), Bridges, Inn, Dice, Well, Labyrinth, Prison, Death Skull (58), and exact bounce. |
+
+## Quick Verification Commands
+
+```bash
+# 1. Run all 458+ Rust workspace tests and canonical rule suites
+cargo test --workspace
+
+# 2. Verify workspace structure, Godot smoke suites, and generate TEST_SUMMARY.md
+bash tools/verify_workspace.sh && bash tools/generate_test_summary.sh
+
+# 3. Verify React + TypeScript + WebAssembly Web Client (Vitest + PWA build)
+bash tools/verify_web_client.sh
+```
+
+---
+
+<!-- SPANISH_CANONICAL_REFERENCE_START -->
 # OpenTable SDK — estado actual
 
 [![CI](https://github.com/joduranvillan/games_tables_sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/joduranvillan/games_tables_sdk/actions/workflows/ci.yml)
