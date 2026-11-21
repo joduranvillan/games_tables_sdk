@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["best_move","ludo_ai_pick_move"]};
+window.SIDEBAR_ITEMS = {"fn":["best_move","best_move_with_randomness","ludo_ai_pick_move"]};

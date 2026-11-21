@@ -70,43 +70,53 @@
 <a href=#70 id=70 data-nosnippet>70</a><span class="kw">pub fn </span>best_move(
 <a href=#71 id=71 data-nosnippet>71</a>    session: <span class="kw-2">&amp;</span>Session,
 <a href=#72 id=72 data-nosnippet>72</a>    player: PlayerId,
-<a href=#73 id=73 data-nosnippet>73</a>    _difficulty: AiDifficulty,
+<a href=#73 id=73 data-nosnippet>73</a>    difficulty: AiDifficulty,
 <a href=#74 id=74 data-nosnippet>74</a>) -&gt; <span class="prelude-ty">Option</span>&lt;MoveTokenCommand&gt; {
-<a href=#75 id=75 data-nosnippet>75</a>    goose_ai_pick_move(session, player)
+<a href=#75 id=75 data-nosnippet>75</a>    best_move_with_randomness(session, player, difficulty, <span class="number">0</span>, <span class="number">0</span>)
 <a href=#76 id=76 data-nosnippet>76</a>}
 <a href=#77 id=77 data-nosnippet>77</a>
-<a href=#78 id=78 data-nosnippet>78</a><span class="kw">pub fn </span>select_ai_move(
+<a href=#78 id=78 data-nosnippet>78</a><span class="kw">pub fn </span>best_move_with_randomness(
 <a href=#79 id=79 data-nosnippet>79</a>    session: <span class="kw-2">&amp;</span>Session,
 <a href=#80 id=80 data-nosnippet>80</a>    player: PlayerId,
-<a href=#81 id=81 data-nosnippet>81</a>    _difficulty: GooseAiDifficulty,
-<a href=#82 id=82 data-nosnippet>82</a>) -&gt; <span class="prelude-ty">Option</span>&lt;Box&lt;<span class="kw">dyn </span>Command&gt;&gt; {
-<a href=#83 id=83 data-nosnippet>83</a>    GooseMoveGenerator
-<a href=#84 id=84 data-nosnippet>84</a>        .legal_moves(session, player)
-<a href=#85 id=85 data-nosnippet>85</a>        .into_iter()
-<a href=#86 id=86 data-nosnippet>86</a>        .next()
-<a href=#87 id=87 data-nosnippet>87</a>}
-<a href=#88 id=88 data-nosnippet>88</a>
-<a href=#89 id=89 data-nosnippet>89</a><span class="attr">#[cfg(test)]
-<a href=#90 id=90 data-nosnippet>90</a></span><span class="kw">mod </span>tests {
-<a href=#91 id=91 data-nosnippet>91</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#92 id=92 data-nosnippet>92</a>    <span class="kw">use </span><span class="kw">crate</span>::new_goose_session;
-<a href=#93 id=93 data-nosnippet>93</a>
-<a href=#94 id=94 data-nosnippet>94</a>    <span class="kw">const </span>P1: PlayerId = PlayerId(<span class="number">1</span>);
-<a href=#95 id=95 data-nosnippet>95</a>    <span class="kw">const </span>P2: PlayerId = PlayerId(<span class="number">2</span>);
-<a href=#96 id=96 data-nosnippet>96</a>
-<a href=#97 id=97 data-nosnippet>97</a>    <span class="attr">#[test]
-<a href=#98 id=98 data-nosnippet>98</a>    </span><span class="kw">fn </span>test_goose_ai_pick_move_with_pending_roll() {
-<a href=#99 id=99 data-nosnippet>99</a>        <span class="kw">let </span><span class="kw-2">mut </span>session = new_goose_session(SessionId(<span class="number">1</span>), <span class="number">42</span>, <span class="macro">vec!</span>[P1, P2]);
-<a href=#100 id=100 data-nosnippet>100</a>        <span class="macro">assert!</span>(goose_ai_pick_move(<span class="kw-2">&amp;</span>session, P1).is_none());
-<a href=#101 id=101 data-nosnippet>101</a>
-<a href=#102 id=102 data-nosnippet>102</a>        session
-<a href=#103 id=103 data-nosnippet>103</a>            .world_mut()
-<a href=#104 id=104 data-nosnippet>104</a>            .resource_mut::&lt;PendingRollResource&gt;()
-<a href=#105 id=105 data-nosnippet>105</a>            .pending
-<a href=#106 id=106 data-nosnippet>106</a>            .insert(P1, <span class="number">4</span>);
-<a href=#107 id=107 data-nosnippet>107</a>
-<a href=#108 id=108 data-nosnippet>108</a>        <span class="kw">let </span>mv = goose_ai_pick_move(<span class="kw-2">&amp;</span>session, P1);
-<a href=#109 id=109 data-nosnippet>109</a>        <span class="macro">assert_eq!</span>(mv, <span class="prelude-val">Some</span>(MoveTokenCommand { player: P1 }));
-<a href=#110 id=110 data-nosnippet>110</a>    }
-<a href=#111 id=111 data-nosnippet>111</a>}
+<a href=#81 id=81 data-nosnippet>81</a>    _difficulty: AiDifficulty,
+<a href=#82 id=82 data-nosnippet>82</a>    _randomness_pct: u8,
+<a href=#83 id=83 data-nosnippet>83</a>    _seed: u64,
+<a href=#84 id=84 data-nosnippet>84</a>) -&gt; <span class="prelude-ty">Option</span>&lt;MoveTokenCommand&gt; {
+<a href=#85 id=85 data-nosnippet>85</a>    goose_ai_pick_move(session, player)
+<a href=#86 id=86 data-nosnippet>86</a>}
+<a href=#87 id=87 data-nosnippet>87</a>
+<a href=#88 id=88 data-nosnippet>88</a><span class="kw">pub fn </span>select_ai_move(
+<a href=#89 id=89 data-nosnippet>89</a>    session: <span class="kw-2">&amp;</span>Session,
+<a href=#90 id=90 data-nosnippet>90</a>    player: PlayerId,
+<a href=#91 id=91 data-nosnippet>91</a>    _difficulty: GooseAiDifficulty,
+<a href=#92 id=92 data-nosnippet>92</a>) -&gt; <span class="prelude-ty">Option</span>&lt;Box&lt;<span class="kw">dyn </span>Command&gt;&gt; {
+<a href=#93 id=93 data-nosnippet>93</a>    GooseMoveGenerator
+<a href=#94 id=94 data-nosnippet>94</a>        .legal_moves(session, player)
+<a href=#95 id=95 data-nosnippet>95</a>        .into_iter()
+<a href=#96 id=96 data-nosnippet>96</a>        .next()
+<a href=#97 id=97 data-nosnippet>97</a>}
+<a href=#98 id=98 data-nosnippet>98</a>
+<a href=#99 id=99 data-nosnippet>99</a><span class="attr">#[cfg(test)]
+<a href=#100 id=100 data-nosnippet>100</a></span><span class="kw">mod </span>tests {
+<a href=#101 id=101 data-nosnippet>101</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#102 id=102 data-nosnippet>102</a>    <span class="kw">use </span><span class="kw">crate</span>::new_goose_session;
+<a href=#103 id=103 data-nosnippet>103</a>
+<a href=#104 id=104 data-nosnippet>104</a>    <span class="kw">const </span>P1: PlayerId = PlayerId(<span class="number">1</span>);
+<a href=#105 id=105 data-nosnippet>105</a>    <span class="kw">const </span>P2: PlayerId = PlayerId(<span class="number">2</span>);
+<a href=#106 id=106 data-nosnippet>106</a>
+<a href=#107 id=107 data-nosnippet>107</a>    <span class="attr">#[test]
+<a href=#108 id=108 data-nosnippet>108</a>    </span><span class="kw">fn </span>test_goose_ai_pick_move_with_pending_roll() {
+<a href=#109 id=109 data-nosnippet>109</a>        <span class="kw">let </span><span class="kw-2">mut </span>session = new_goose_session(SessionId(<span class="number">1</span>), <span class="number">42</span>, <span class="macro">vec!</span>[P1, P2]);
+<a href=#110 id=110 data-nosnippet>110</a>        <span class="macro">assert!</span>(goose_ai_pick_move(<span class="kw-2">&amp;</span>session, P1).is_none());
+<a href=#111 id=111 data-nosnippet>111</a>
+<a href=#112 id=112 data-nosnippet>112</a>        session
+<a href=#113 id=113 data-nosnippet>113</a>            .world_mut()
+<a href=#114 id=114 data-nosnippet>114</a>            .resource_mut::&lt;PendingRollResource&gt;()
+<a href=#115 id=115 data-nosnippet>115</a>            .pending
+<a href=#116 id=116 data-nosnippet>116</a>            .insert(P1, <span class="number">4</span>);
+<a href=#117 id=117 data-nosnippet>117</a>
+<a href=#118 id=118 data-nosnippet>118</a>        <span class="kw">let </span>mv = goose_ai_pick_move(<span class="kw-2">&amp;</span>session, P1);
+<a href=#119 id=119 data-nosnippet>119</a>        <span class="macro">assert_eq!</span>(mv, <span class="prelude-val">Some</span>(MoveTokenCommand { player: P1 }));
+<a href=#120 id=120 data-nosnippet>120</a>    }
+<a href=#121 id=121 data-nosnippet>121</a>}
 </code></pre></div></section></main></body></html>

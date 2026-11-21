@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["MilleBornesCommand"],"fn":["best_move"],"type":["MilleBornesState"]};
+window.SIDEBAR_ITEMS = {"enum":["MilleBornesCommand"],"fn":["best_move","best_move_with_randomness"],"type":["MilleBornesState"]};

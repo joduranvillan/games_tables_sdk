@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["BackgammonCommand"],"fn":["backgammon_ai_pick_move","best_move","calculate_pip_count","clone_backgammon_session","should_accept_double","should_offer_double"]};
+window.SIDEBAR_ITEMS = {"enum":["BackgammonCommand"],"fn":["backgammon_ai_pick_move","backgammon_ai_pick_move_with_randomness","best_move","best_move_with_randomness","calculate_pip_count","clone_backgammon_session","should_accept_double","should_offer_double"]};

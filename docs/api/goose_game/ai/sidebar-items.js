@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["best_move","goose_ai_pick_move","select_ai_move"],"struct":["GooseMoveGenerator"],"type":["GooseAiDifficulty"]};
+window.SIDEBAR_ITEMS = {"fn":["best_move","best_move_with_randomness","goose_ai_pick_move","select_ai_move"],"struct":["GooseMoveGenerator"],"type":["GooseAiDifficulty"]};

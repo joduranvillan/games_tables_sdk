@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["best_move","chess_ai_pick_move","evaluate_position","generate_candidates","minimax"]};
+window.SIDEBAR_ITEMS = {"fn":["best_move","best_move_with_randomness","chess_ai_pick_move","evaluate_position","generate_candidates","minimax"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["UnoCommand"],"fn":["best_move","most_frequent_color"],"trait":["UnoStateAccess"]};
+window.SIDEBAR_ITEMS = {"enum":["UnoCommand"],"fn":["best_move","best_move_with_randomness","most_frequent_color"],"trait":["UnoStateAccess"]};

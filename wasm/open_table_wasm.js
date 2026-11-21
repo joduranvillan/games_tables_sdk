@@ -32,6 +32,20 @@ export class WasmGameBridge {
         return ret !== 0;
     }
     /**
+     * @returns {boolean}
+     */
+    can_redo() {
+        const ret = wasm.wasmgamebridge_can_redo(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * @returns {boolean}
+     */
+    can_undo() {
+        const ret = wasm.wasmgamebridge_can_undo(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
      * @returns {number}
      */
     current_player() {
@@ -114,6 +128,27 @@ export class WasmGameBridge {
         }
     }
     /**
+     * @returns {bigint}
+     */
+    get_ai_difficulty() {
+        const ret = wasm.wasmgamebridge_get_ai_difficulty(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @returns {number}
+     */
+    get_ai_randomness() {
+        const ret = wasm.wasmgamebridge_get_ai_randomness(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @returns {bigint}
+     */
+    get_ai_seed() {
+        const ret = wasm.wasmgamebridge_get_ai_seed(this.__wbg_ptr);
+        return BigInt.asUintN(64, ret);
+    }
+    /**
      * @returns {string}
      */
     get_current_game_type() {
@@ -134,6 +169,21 @@ export class WasmGameBridge {
     get_current_replay_step() {
         const ret = wasm.wasmgamebridge_get_current_replay_step(this.__wbg_ptr);
         return ret >>> 0;
+    }
+    /**
+     * @returns {string}
+     */
+    get_last_ai_telemetry_json() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.wasmgamebridge_get_last_ai_telemetry_json(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free_command_export(deferred1_0, deferred1_1, 1);
+        }
     }
     /**
      * @param {number} player_id
@@ -157,6 +207,21 @@ export class WasmGameBridge {
     get_replay_step_count() {
         const ret = wasm.wasmgamebridge_get_replay_step_count(this.__wbg_ptr);
         return ret >>> 0;
+    }
+    /**
+     * @returns {string}
+     */
+    get_state_checksum_hex() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.wasmgamebridge_get_state_checksum_hex(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free_command_export(deferred1_0, deferred1_1, 1);
+        }
     }
     /**
      * @returns {string}
@@ -187,6 +252,13 @@ export class WasmGameBridge {
         return this;
     }
     /**
+     * @returns {boolean}
+     */
+    redo_step() {
+        const ret = wasm.wasmgamebridge_redo_step(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
      * @param {number} step_index
      * @returns {boolean}
      */
@@ -213,6 +285,18 @@ export class WasmGameBridge {
         } finally {
             wasm.__wbindgen_free_command_export(deferred3_0, deferred3_1, 1);
         }
+    }
+    /**
+     * @param {number} randomness_pct
+     */
+    set_ai_randomness(randomness_pct) {
+        wasm.wasmgamebridge_set_ai_randomness(this.__wbg_ptr, randomness_pct);
+    }
+    /**
+     * @param {bigint} seed
+     */
+    set_ai_seed(seed) {
+        wasm.wasmgamebridge_set_ai_seed(this.__wbg_ptr, seed);
     }
     /**
      * @param {string} game_type
@@ -258,6 +342,13 @@ export class WasmGameBridge {
         } finally {
             wasm.__wbindgen_free_command_export(deferred1_0, deferred1_1, 1);
         }
+    }
+    /**
+     * @returns {boolean}
+     */
+    undo_step() {
+        const ret = wasm.wasmgamebridge_undo_step(this.__wbg_ptr);
+        return ret !== 0;
     }
 }
 if (Symbol.dispose) WasmGameBridge.prototype[Symbol.dispose] = WasmGameBridge.prototype.free;

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["best_move","cannon_has_screen","clone_xiangqi_session","evaluate_position","minimax","piece_value","xiangqi_ai_pick_move"]};
+window.SIDEBAR_ITEMS = {"fn":["best_move","best_move_with_randomness","cannon_has_screen","clone_xiangqi_session","evaluate_position","minimax","piece_value","xiangqi_ai_pick_move"]};

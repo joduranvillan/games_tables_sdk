@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["best_move","checkers_ai_pick_move"]};
+window.SIDEBAR_ITEMS = {"fn":["best_move","best_move_with_randomness","checkers_ai_pick_move","evaluate_checkers_board"]};

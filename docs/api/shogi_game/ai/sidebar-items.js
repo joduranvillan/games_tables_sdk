@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["ShogiAction"],"fn":["best_move","clone_shogi_session","evaluate_position","generate_shogi_candidates","minimax","piece_value","shogi_ai_pick_move"]};
+window.SIDEBAR_ITEMS = {"enum":["ShogiAction"],"fn":["best_move","best_move_with_randomness","clone_shogi_session","evaluate_position","generate_shogi_candidates","minimax","piece_value","shogi_ai_pick_move"]};
