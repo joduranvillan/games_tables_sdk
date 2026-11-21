@@ -1,5 +1,5 @@
 [package]
-name = "shogi_game"
+name = "open_table_shogi_game"
 version = "1.1.0"
 edition = "2021"
 rust-version = "1.82"
@@ -9,6 +9,10 @@ repository = "https://github.com/joduranvillan/games_tables_sdk"
 keywords = ["game", "board-game", "shogi", "japanese-chess", "rules"]
 categories = ["game-engines", "games"]
 readme = "README.md"
+
+[lib]
+name = "shogi_game"
+path = "src/lib.rs"
 
 [dependencies]
 open_table_core = { path = "../open_table_core", version = "1.1.0" }

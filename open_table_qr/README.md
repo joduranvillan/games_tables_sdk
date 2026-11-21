@@ -1,4 +1,4 @@
-# `open_table_qr`
+# `open_table_qr` (`lib: open_table_qr`)
 
 [![Crates.io](https://img.shields.io/crates/v/open_table_qr.svg)](https://crates.io/crates/open_table_qr)
 [![Docs.rs](https://docs.rs/open_table_qr/badge.svg)](https://docs.rs/open_table_qr)
@@ -7,7 +7,7 @@
 
 **Documentation Languages:** [English](../docs/i18n/en/README.md) · [Español](../docs/i18n/es/README.md) · [Português (BR)](../docs/i18n/pt-BR/README.md) · [Français](../docs/i18n/fr/README.md) · [Deutsch](../docs/i18n/de/README.md) · [简体中文](../docs/i18n/zh-CN/README.md) · [日本語](../docs/i18n/ja/README.md)
 
-**Architectural Layer:** Transports, Relay & Discovery · **Version:** `1.1.0` · **Edition:** `2021`
+**Architectural Layer:** Transports, Relay & Discovery · **Package:** `open_table_qr` · **Library Name (`[lib]`):** `open_table_qr` · **Version:** `1.1.0` · **Edition:** `2021`
 
 Compact session invitation payloads and SVG/terminal QR code generation for LAN, Relay room codes, and mobile P2P pairing.
 

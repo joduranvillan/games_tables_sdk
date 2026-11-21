@@ -1,13 +1,13 @@
-# `battleship_game`
+# `open_table_battleship_game` (`lib: battleship_game`)
 
-[![Crates.io](https://img.shields.io/crates/v/battleship_game.svg)](https://crates.io/crates/battleship_game)
-[![Docs.rs](https://docs.rs/battleship_game/badge.svg)](https://docs.rs/battleship_game)
+[![Crates.io](https://img.shields.io/crates/v/open_table_battleship_game.svg)](https://crates.io/crates/open_table_battleship_game)
+[![Docs.rs](https://docs.rs/open_table_battleship_game/badge.svg)](https://docs.rs/open_table_battleship_game)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](../LICENSE)
 [![Rust 1.82+](https://img.shields.io/badge/rust-1.82%2B-orange.svg)](https://www.rust-lang.org)
 
 **Documentation Languages:** [English](../docs/i18n/en/README.md) · [Español](../docs/i18n/es/README.md) · [Português (BR)](../docs/i18n/pt-BR/README.md) · [Français](../docs/i18n/fr/README.md) · [Deutsch](../docs/i18n/de/README.md) · [简体中文](../docs/i18n/zh-CN/README.md) · [日本語](../docs/i18n/ja/README.md)
 
-**Architectural Layer:** 14 Canonical Board Game Engines · **Version:** `1.1.0` · **Edition:** `2021`
+**Architectural Layer:** 14 Canonical Board Game Engines · **Package:** `open_table_battleship_game` · **Library Name (`[lib]`):** `battleship_game` · **Version:** `1.1.0` · **Edition:** `2021`
 
 Canonical 10x10 Naval Combat (Battleship) engine with 5-ship fleet deployment (`[5,4,3,3,2]`), optional `extra_turn_on_hit` salvo rule, rematch command, and Hunt/Target parity AI.
 
@@ -29,7 +29,7 @@ Canonical 10x10 Naval Combat (Battleship) engine with 5-ship fleet deployment (`
 
 ```toml
 [dependencies]
-battleship_game = "1.1.0"
+battleship_game = { package = "open_table_battleship_game", version = "1.1.0" }
 ```
 
 ## Quick Start & Usage Example

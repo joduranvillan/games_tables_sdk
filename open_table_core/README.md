@@ -1,4 +1,4 @@
-# `open_table_core`
+# `open_table_core` (`lib: open_table_core`)
 
 [![Crates.io](https://img.shields.io/crates/v/open_table_core.svg)](https://crates.io/crates/open_table_core)
 [![Docs.rs](https://docs.rs/open_table_core/badge.svg)](https://docs.rs/open_table_core)
@@ -7,7 +7,7 @@
 
 **Documentation Languages:** [English](../docs/i18n/en/README.md) · [Español](../docs/i18n/es/README.md) · [Português (BR)](../docs/i18n/pt-BR/README.md) · [Français](../docs/i18n/fr/README.md) · [Deutsch](../docs/i18n/de/README.md) · [简体中文](../docs/i18n/zh-CN/README.md) · [日本語](../docs/i18n/ja/README.md)
 
-**Architectural Layer:** Core & Engine Foundation · **Version:** `1.1.0` · **Edition:** `2021`
+**Architectural Layer:** Core & Engine Foundation · **Package:** `open_table_core` · **Library Name (`[lib]`):** `open_table_core` · **Version:** `1.1.0` · **Edition:** `2021`
 
 Foundational deterministic traits, serializable Commands/Events, seeded ChaCha8 RNG, and transport contracts for turn-based board game engines.
 

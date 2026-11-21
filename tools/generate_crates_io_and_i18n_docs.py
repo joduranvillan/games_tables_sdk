@@ -488,6 +488,7 @@ assert!(cmd.is_some());''',
 
 def generate_crate_readme(crate: dict) -> str:
     name = crate["name"]
+    pkg_name = f"open_table_{name}" if name.endswith("_game") else name
     layer = crate["layer"]
     summary_en = crate["summary_en"]
     summary_es = crate["summary_es"]
@@ -495,17 +496,22 @@ def generate_crate_readme(crate: dict) -> str:
     exports_md = ", ".join(f"`{e}`" for e in crate["exports"])
     example_code = crate["example"]
     code_lang = "gdscript" if name == "open_table_godot" else "rust"
+    dep_line = (
+        f'{name} = {{ package = "{pkg_name}", version = "1.1.0" }}'
+        if pkg_name != name
+        else f'{pkg_name} = "1.1.0"'
+    )
 
-    return f"""# `{name}`
+    return f"""# `{pkg_name}` (`lib: {name}`)
 
-[![Crates.io](https://img.shields.io/crates/v/{name}.svg)](https://crates.io/crates/{name})
-[![Docs.rs](https://docs.rs/{name}/badge.svg)](https://docs.rs/{name})
+[![Crates.io](https://img.shields.io/crates/v/{pkg_name}.svg)](https://crates.io/crates/{pkg_name})
+[![Docs.rs](https://docs.rs/{pkg_name}/badge.svg)](https://docs.rs/{pkg_name})
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](../LICENSE)
 [![Rust 1.82+](https://img.shields.io/badge/rust-1.82%2B-orange.svg)](https://www.rust-lang.org)
 
 {LANG_BAR_CRATE}
 
-**Architectural Layer:** {layer} · **Version:** `1.1.0` · **Edition:** `2021`
+**Architectural Layer:** {layer} · **Package:** `{pkg_name}` · **Library Name (`[lib]`):** `{name}` · **Version:** `1.1.0` · **Edition:** `2021`
 
 {summary_en}
 
@@ -525,7 +531,7 @@ def generate_crate_readme(crate: dict) -> str:
 
 ```toml
 [dependencies]
-{name} = "1.1.0"
+{dep_line}
 ```
 
 ## Quick Start & Usage Example

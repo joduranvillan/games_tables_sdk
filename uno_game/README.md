@@ -1,13 +1,13 @@
-# `uno_game`
+# `open_table_uno_game` (`lib: uno_game`)
 
-[![Crates.io](https://img.shields.io/crates/v/uno_game.svg)](https://crates.io/crates/uno_game)
-[![Docs.rs](https://docs.rs/uno_game/badge.svg)](https://docs.rs/uno_game)
+[![Crates.io](https://img.shields.io/crates/v/open_table_uno_game.svg)](https://crates.io/crates/open_table_uno_game)
+[![Docs.rs](https://docs.rs/open_table_uno_game/badge.svg)](https://docs.rs/open_table_uno_game)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](../LICENSE)
 [![Rust 1.82+](https://img.shields.io/badge/rust-1.82%2B-orange.svg)](https://www.rust-lang.org)
 
 **Documentation Languages:** [English](../docs/i18n/en/README.md) · [Español](../docs/i18n/es/README.md) · [Português (BR)](../docs/i18n/pt-BR/README.md) · [Français](../docs/i18n/fr/README.md) · [Deutsch](../docs/i18n/de/README.md) · [简体中文](../docs/i18n/zh-CN/README.md) · [日本語](../docs/i18n/ja/README.md)
 
-**Architectural Layer:** 14 Canonical Board Game Engines · **Version:** `1.1.0` · **Edition:** `2021`
+**Architectural Layer:** 14 Canonical Board Game Engines · **Package:** `open_table_uno_game` · **Library Name (`[lib]`):** `uno_game` · **Version:** `1.1.0` · **Edition:** `2021`
 
 Canonical 108-card UNO engine with Skip, Reverse, Draw Two, Wild, Wild Draw Four challenge verification, mandatory UNO! call/penalty, and Jump-In interception.
 
@@ -29,7 +29,7 @@ Canonical 108-card UNO engine with Skip, Reverse, Draw Two, Wild, Wild Draw Four
 
 ```toml
 [dependencies]
-uno_game = "1.1.0"
+uno_game = { package = "open_table_uno_game", version = "1.1.0" }
 ```
 
 ## Quick Start & Usage Example

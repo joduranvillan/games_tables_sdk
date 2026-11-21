@@ -1,13 +1,13 @@
-# `crisis_game`
+# `open_table_crisis_game` (`lib: crisis_game`)
 
-[![Crates.io](https://img.shields.io/crates/v/crisis_game.svg)](https://crates.io/crates/crisis_game)
-[![Docs.rs](https://docs.rs/crisis_game/badge.svg)](https://docs.rs/crisis_game)
+[![Crates.io](https://img.shields.io/crates/v/open_table_crisis_game.svg)](https://crates.io/crates/open_table_crisis_game)
+[![Docs.rs](https://docs.rs/open_table_crisis_game/badge.svg)](https://docs.rs/open_table_crisis_game)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](../LICENSE)
 [![Rust 1.82+](https://img.shields.io/badge/rust-1.82%2B-orange.svg)](https://www.rust-lang.org)
 
 **Documentation Languages:** [English](../docs/i18n/en/README.md) · [Español](../docs/i18n/es/README.md) · [Português (BR)](../docs/i18n/pt-BR/README.md) · [Français](../docs/i18n/fr/README.md) · [Deutsch](../docs/i18n/de/README.md) · [简体中文](../docs/i18n/zh-CN/README.md) · [日本語](../docs/i18n/ja/README.md)
 
-**Architectural Layer:** 14 Canonical Board Game Engines · **Version:** `1.1.0` · **Edition:** `2021`
+**Architectural Layer:** 14 Canonical Board Game Engines · **Package:** `open_table_crisis_game` · **Library Name (`[lib]`):** `crisis_game` · **Version:** `1.1.0` · **Edition:** `2021`
 
 Canonical 30-territory, 6-continent global strategy engine (TEG / Risk) with secret objectives, continent bonuses, 3v3 sorted dice combat, 3-card trades, and multi-phase AI.
 
@@ -29,7 +29,7 @@ Canonical 30-territory, 6-continent global strategy engine (TEG / Risk) with sec
 
 ```toml
 [dependencies]
-crisis_game = "1.1.0"
+crisis_game = { package = "open_table_crisis_game", version = "1.1.0" }
 ```
 
 ## Quick Start & Usage Example

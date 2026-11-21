@@ -13,7 +13,7 @@ libfuzzer-sys = "0.4"
 serde_json = "1.0"
 open_table_core = { path = "../open_table_core" }
 
-crisis_game = { path = "../crisis_game" }
+crisis_game = { package = "open_table_crisis_game", path = "../crisis_game" }
 
 [[bin]]
 name = "fuzz_crisis"

@@ -138,7 +138,9 @@ verify_crates_metadata() {
       failed=1
     fi
 
-    echo "  [OK] $crate (metadata, README.md & versioned dependencies verified)"
+    local pkg_name
+    pkg_name=$(grep -m1 '^name = ' "$manifest" | sed -E 's/name = "(.*)"/\1/')
+    echo "  [OK] $crate -> package=${pkg_name} (metadata, README.md & versioned dependencies verified)"
   done
 
   for bridge in "${FFI_CDYLIB_BRIDGES[@]}"; do
@@ -199,26 +201,28 @@ publish_tier() {
 
   for crate in "${crates[@]}"; do
     local manifest="$SDK_ROOT/$crate/Cargo.toml"
+    local pkg_name
+    pkg_name=$(grep -m1 '^name = ' "$manifest" | sed -E 's/name = "(.*)"/\1/')
     local ver
     ver=$(grep -m1 '^version = ' "$manifest" | sed -E 's/version = "(.*)"/\1/')
 
-    if is_crate_version_published "$crate" "$ver"; then
-      echo "  [SKIP] ${crate}@${ver} is already published on crates.io."
+    if is_crate_version_published "$pkg_name" "$ver"; then
+      echo "  [SKIP] ${pkg_name}@${ver} (${crate}) is already published on crates.io."
       continue
     fi
 
-    echo "  [PUBLISH] cargo publish -p ${crate} (v${ver})..."
+    echo "  [PUBLISH] cargo publish -p ${pkg_name} (dir: ${crate}, v${ver})..."
     local output_file
     output_file=$(mktemp)
-    if cargo publish -p "$crate" --no-verify 2>&1 | tee "$output_file"; then
-      echo "  [SUCCESS] Published ${crate}@${ver} to crates.io."
+    if cargo publish -p "$pkg_name" --no-verify 2>&1 | tee "$output_file"; then
+      echo "  [SUCCESS] Published ${pkg_name}@${ver} to crates.io."
       published_any=1
     else
       if grep -qiE "already uploaded|already exists" "$output_file"; then
-        echo "  [SKIP] ${crate}@${ver} was already uploaded to crates.io."
+        echo "  [SKIP] ${pkg_name}@${ver} was already uploaded to crates.io."
       else
         rm -f "$output_file"
-        echo "ERROR: Failed to publish ${crate}@${ver} to crates.io." >&2
+        echo "ERROR: Failed to publish ${pkg_name}@${ver} to crates.io." >&2
         exit 1
       fi
     fi

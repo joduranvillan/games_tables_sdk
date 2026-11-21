@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 [package]
-name = "goose_game"
+name = "open_table_goose_game"
 version = "1.1.0"
 authors = ["joduranvillan"]
 edition = "2021"
@@ -13,6 +13,10 @@ repository = "https://github.com/joduranvillan/games_tables_sdk"
 keywords = ["game", "board-game", "goose", "oca", "opentable"]
 categories = ["game-engines", "games"]
 readme = "README.md"
+
+[lib]
+name = "goose_game"
+path = "src/lib.rs"
 
 [dependencies]
 open_table_core = { version = "1.1.0", path = "../open_table_core" }

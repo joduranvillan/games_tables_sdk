@@ -1,4 +1,4 @@
-# `open_table_transport_websocket`
+# `open_table_transport_websocket` (`lib: open_table_transport_websocket`)
 
 [![Crates.io](https://img.shields.io/crates/v/open_table_transport_websocket.svg)](https://crates.io/crates/open_table_transport_websocket)
 [![Docs.rs](https://docs.rs/open_table_transport_websocket/badge.svg)](https://docs.rs/open_table_transport_websocket)
@@ -7,7 +7,7 @@
 
 **Documentation Languages:** [English](../docs/i18n/en/README.md) · [Español](../docs/i18n/es/README.md) · [Português (BR)](../docs/i18n/pt-BR/README.md) · [Français](../docs/i18n/fr/README.md) · [Deutsch](../docs/i18n/de/README.md) · [简体中文](../docs/i18n/zh-CN/README.md) · [日本語](../docs/i18n/ja/README.md)
 
-**Architectural Layer:** Transports, Relay & Discovery · **Version:** `1.1.0` · **Edition:** `2021`
+**Architectural Layer:** Transports, Relay & Discovery · **Package:** `open_table_transport_websocket` · **Library Name (`[lib]`):** `open_table_transport_websocket` · **Version:** `1.1.0` · **Edition:** `2021`
 
 WebSocket client transport connecting desktop, mobile, and WebAssembly peers through `open_table_relay` rooms.
 

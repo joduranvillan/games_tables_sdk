@@ -21,9 +21,9 @@ tokio-tungstenite = "0.30"
 futures-util = "0.3"
 
 [dev-dependencies]
-checkers_game = { path = "../checkers_game" }
+checkers_game = { package = "open_table_checkers_game", path = "../checkers_game" }
 
-chess_game = { path = "../chess_game" }
+chess_game = { package = "open_table_chess_game", path = "../chess_game" }
 
 open_table_engine = { path = "../open_table_engine" }
 

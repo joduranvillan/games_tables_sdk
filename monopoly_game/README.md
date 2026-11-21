@@ -1,13 +1,13 @@
-# `monopoly_game`
+# `open_table_monopoly_game` (`lib: monopoly_game`)
 
-[![Crates.io](https://img.shields.io/crates/v/monopoly_game.svg)](https://crates.io/crates/monopoly_game)
-[![Docs.rs](https://docs.rs/monopoly_game/badge.svg)](https://docs.rs/monopoly_game)
+[![Crates.io](https://img.shields.io/crates/v/open_table_monopoly_game.svg)](https://crates.io/crates/open_table_monopoly_game)
+[![Docs.rs](https://docs.rs/open_table_monopoly_game/badge.svg)](https://docs.rs/open_table_monopoly_game)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](../LICENSE)
 [![Rust 1.82+](https://img.shields.io/badge/rust-1.82%2B-orange.svg)](https://www.rust-lang.org)
 
 **Documentation Languages:** [English](../docs/i18n/en/README.md) · [Español](../docs/i18n/es/README.md) · [Português (BR)](../docs/i18n/pt-BR/README.md) · [Français](../docs/i18n/fr/README.md) · [Deutsch](../docs/i18n/de/README.md) · [简体中文](../docs/i18n/zh-CN/README.md) · [日本語](../docs/i18n/ja/README.md)
 
-**Architectural Layer:** 14 Canonical Board Game Engines · **Version:** `1.1.0` · **Edition:** `2021`
+**Architectural Layer:** 14 Canonical Board Game Engines · **Package:** `open_table_monopoly_game` · **Library Name (`[lib]`):** `monopoly_game` · **Version:** `1.1.0` · **Edition:** `2021`
 
 Canonical 40-square Monopoly economic engine with property auctions, Chance/Community Chest decks, even house/hotel building, mortgages, jail, P2P trades, and ROI AI.
 
@@ -29,7 +29,7 @@ Canonical 40-square Monopoly economic engine with property auctions, Chance/Comm
 
 ```toml
 [dependencies]
-monopoly_game = "1.1.0"
+monopoly_game = { package = "open_table_monopoly_game", version = "1.1.0" }
 ```
 
 ## Quick Start & Usage Example

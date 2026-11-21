@@ -1,4 +1,4 @@
-# `open_table_transport_tcp`
+# `open_table_transport_tcp` (`lib: open_table_transport_tcp`)
 
 [![Crates.io](https://img.shields.io/crates/v/open_table_transport_tcp.svg)](https://crates.io/crates/open_table_transport_tcp)
 [![Docs.rs](https://docs.rs/open_table_transport_tcp/badge.svg)](https://docs.rs/open_table_transport_tcp)
@@ -7,7 +7,7 @@
 
 **Documentation Languages:** [English](../docs/i18n/en/README.md) · [Español](../docs/i18n/es/README.md) · [Português (BR)](../docs/i18n/pt-BR/README.md) · [Français](../docs/i18n/fr/README.md) · [Deutsch](../docs/i18n/de/README.md) · [简体中文](../docs/i18n/zh-CN/README.md) · [日本語](../docs/i18n/ja/README.md)
 
-**Architectural Layer:** Transports, Relay & Discovery · **Version:** `1.1.0` · **Edition:** `2021`
+**Architectural Layer:** Transports, Relay & Discovery · **Package:** `open_table_transport_tcp` · **Library Name (`[lib]`):** `open_table_transport_tcp` · **Version:** `1.1.0` · **Edition:** `2021`
 
 Length-prefixed TCP host/client transport implementation of `open_table_core::Transport` for low-latency LAN multiplayer.
 

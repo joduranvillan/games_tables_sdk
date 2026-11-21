@@ -266,6 +266,13 @@ function makeCrateEntry(params: {
     ja: string[];
   };
 }): CrateDocEntry {
+  const pkgName = params.name.endsWith("_game")
+    ? `open_table_${params.name}`
+    : params.name;
+  const cargoDepLine =
+    pkgName !== params.name
+      ? `${params.name} = { package = "${pkgName}", version = "1.1.0" }`
+      : `${pkgName} = "1.1.0"`;
   return {
     name: params.name,
     version: "1.1.0",
@@ -274,10 +281,10 @@ function makeCrateEntry(params: {
     rustVersion: "1.82+",
     layer: params.layer,
     readmePath: `${params.name}/README.md`,
-    cratesIoUrl: `https://crates.io/crates/${params.name}`,
-    docsRsUrl: `https://docs.rs/${params.name}`,
+    cratesIoUrl: `https://crates.io/crates/${pkgName}`,
+    docsRsUrl: `https://docs.rs/${pkgName}`,
     exports: params.exports,
-    cargoToml: `[dependencies]\n${params.name} = "1.1.0"`,
+    cargoToml: `[dependencies]\n${cargoDepLine}`,
     codeExample: params.codeExample,
     summaryByLocale: {
       en: params.summaries.en,
@@ -1015,20 +1022,20 @@ export const TRUSTED_PUBLISHING_OIDC_CONFIG: TrustedPublishingOidcConfig = {
       tier: 3,
       label: "Tier 3 · 14 Canonical Board Games (14)",
       crates: [
-        "chess_game",
-        "checkers_game",
-        "shogi_game",
-        "xiangqi_game",
-        "go_game",
-        "chinese_checkers_game",
-        "backgammon_game",
-        "ludo_game",
-        "battleship_game",
-        "mille_bornes_game",
-        "monopoly_game",
-        "uno_game",
-        "crisis_game",
-        "goose_game",
+        "open_table_chess_game",
+        "open_table_checkers_game",
+        "open_table_shogi_game",
+        "open_table_xiangqi_game",
+        "open_table_go_game",
+        "open_table_chinese_checkers_game",
+        "open_table_backgammon_game",
+        "open_table_ludo_game",
+        "open_table_battleship_game",
+        "open_table_mille_bornes_game",
+        "open_table_monopoly_game",
+        "open_table_uno_game",
+        "open_table_crisis_game",
+        "open_table_goose_game",
       ],
     },
     {

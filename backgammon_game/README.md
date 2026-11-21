@@ -1,13 +1,13 @@
-# `backgammon_game`
+# `open_table_backgammon_game` (`lib: backgammon_game`)
 
-[![Crates.io](https://img.shields.io/crates/v/backgammon_game.svg)](https://crates.io/crates/backgammon_game)
-[![Docs.rs](https://docs.rs/backgammon_game/badge.svg)](https://docs.rs/backgammon_game)
+[![Crates.io](https://img.shields.io/crates/v/open_table_backgammon_game.svg)](https://crates.io/crates/open_table_backgammon_game)
+[![Docs.rs](https://docs.rs/open_table_backgammon_game/badge.svg)](https://docs.rs/open_table_backgammon_game)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](../LICENSE)
 [![Rust 1.82+](https://img.shields.io/badge/rust-1.82%2B-orange.svg)](https://www.rust-lang.org)
 
 **Documentation Languages:** [English](../docs/i18n/en/README.md) · [Español](../docs/i18n/es/README.md) · [Português (BR)](../docs/i18n/pt-BR/README.md) · [Français](../docs/i18n/fr/README.md) · [Deutsch](../docs/i18n/de/README.md) · [简体中文](../docs/i18n/zh-CN/README.md) · [日本語](../docs/i18n/ja/README.md)
 
-**Architectural Layer:** 14 Canonical Board Game Engines · **Version:** `1.1.0` · **Edition:** `2021`
+**Architectural Layer:** 14 Canonical Board Game Engines · **Package:** `open_table_backgammon_game` · **Library Name (`[lib]`):** `backgammon_game` · **Version:** `1.1.0` · **Edition:** `2021`
 
 Canonical 24-point Backgammon engine with doubles (4 moves), mandatory bar re-entry, exact/highest bear-off, Doubling Cube (2..64), and Crawford rule.
 
@@ -29,7 +29,7 @@ Canonical 24-point Backgammon engine with doubles (4 moves), mandatory bar re-en
 
 ```toml
 [dependencies]
-backgammon_game = "1.1.0"
+backgammon_game = { package = "open_table_backgammon_game", version = "1.1.0" }
 ```
 
 ## Quick Start & Usage Example

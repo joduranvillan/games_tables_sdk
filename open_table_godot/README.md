@@ -1,4 +1,4 @@
-# `open_table_godot`
+# `open_table_godot` (`lib: open_table_godot`)
 
 [![Crates.io](https://img.shields.io/crates/v/open_table_godot.svg)](https://crates.io/crates/open_table_godot)
 [![Docs.rs](https://docs.rs/open_table_godot/badge.svg)](https://docs.rs/open_table_godot)
@@ -7,7 +7,7 @@
 
 **Documentation Languages:** [English](../docs/i18n/en/README.md) · [Español](../docs/i18n/es/README.md) · [Português (BR)](../docs/i18n/pt-BR/README.md) · [Français](../docs/i18n/fr/README.md) · [Deutsch](../docs/i18n/de/README.md) · [简体中文](../docs/i18n/zh-CN/README.md) · [日本語](../docs/i18n/ja/README.md)
 
-**Architectural Layer:** Runtime Bridges (Godot & WebAssembly) · **Version:** `1.1.0` · **Edition:** `2021`
+**Architectural Layer:** Runtime Bridges (Godot & WebAssembly) · **Package:** `open_table_godot` · **Library Name (`[lib]`):** `open_table_godot` · **Version:** `1.1.0` · **Edition:** `2021`
 
 GDExtension C-ABI bridge exposing all 14 canonical board games, 4-level AI with 0-100% randomness, ELO rating, and networking to Godot 4 / Redot 4.
 

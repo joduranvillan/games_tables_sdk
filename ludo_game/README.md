@@ -1,13 +1,13 @@
-# `ludo_game`
+# `open_table_ludo_game` (`lib: ludo_game`)
 
-[![Crates.io](https://img.shields.io/crates/v/ludo_game.svg)](https://crates.io/crates/ludo_game)
-[![Docs.rs](https://docs.rs/ludo_game/badge.svg)](https://docs.rs/ludo_game)
+[![Crates.io](https://img.shields.io/crates/v/open_table_ludo_game.svg)](https://crates.io/crates/open_table_ludo_game)
+[![Docs.rs](https://docs.rs/open_table_ludo_game/badge.svg)](https://docs.rs/open_table_ludo_game)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](../LICENSE)
 [![Rust 1.82+](https://img.shields.io/badge/rust-1.82%2B-orange.svg)](https://www.rust-lang.org)
 
 **Documentation Languages:** [English](../docs/i18n/en/README.md) · [Español](../docs/i18n/es/README.md) · [Português (BR)](../docs/i18n/pt-BR/README.md) · [Français](../docs/i18n/fr/README.md) · [Deutsch](../docs/i18n/de/README.md) · [简体中文](../docs/i18n/zh-CN/README.md) · [日本語](../docs/i18n/ja/README.md)
 
-**Architectural Layer:** 14 Canonical Board Game Engines · **Version:** `1.1.0` · **Edition:** `2021`
+**Architectural Layer:** 14 Canonical Board Game Engines · **Package:** `open_table_ludo_game` · **Library Name (`[lib]`):** `ludo_game` · **Version:** `1.1.0` · **Edition:** `2021`
 
 Canonical 52-track + 5-goal Ludo (Parcheesi) engine with 8 safe star squares, triple-six penalty, capture/goal bonus rolls, and threat-aware tactical AI.
 
@@ -29,7 +29,7 @@ Canonical 52-track + 5-goal Ludo (Parcheesi) engine with 8 safe star squares, tr
 
 ```toml
 [dependencies]
-ludo_game = "1.1.0"
+ludo_game = { package = "open_table_ludo_game", version = "1.1.0" }
 ```
 
 ## Quick Start & Usage Example
