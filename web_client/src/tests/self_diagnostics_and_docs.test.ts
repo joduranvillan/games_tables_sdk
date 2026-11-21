@@ -15,6 +15,7 @@ import {
   CRATES_IO_CATALOG_24,
   getCrateHighlightsForLocale,
   NATIVE_DOC_LANGUAGES,
+  TRUSTED_PUBLISHING_OIDC_CONFIG,
 } from "../i18n/cratesIoCatalogI18n";
 import {
   filterAndGroupCatalogGames,
@@ -210,7 +211,23 @@ console.log("=== INICIANDO SUITE DE GARANTIA FUNCIONAL E2E (14 JUEGOS & CENTRO D
       );
     }
   }
-  console.log("  [PASS] 24/24 Crates (crates.io & rustdoc) y 7 idiomas nativos (EN, ES, PT-BR, FR, DE, ZH-CN, JA) verificados.");
+  assert(
+    TRUSTED_PUBLISHING_OIDC_CONFIG.authAction === "rust-lang/crates-io-auth-action@v1" &&
+      TRUSTED_PUBLISHING_OIDC_CONFIG.workflowFilename === "release.yml" &&
+      TRUSTED_PUBLISHING_OIDC_CONFIG.environment === "release" &&
+      TRUSTED_PUBLISHING_OIDC_CONFIG.publishableCratesCount === 22 &&
+      TRUSTED_PUBLISHING_OIDC_CONFIG.topologicalTiers.length === 4,
+    "Configuración de Crates.io Trusted Publishing (OIDC) debe definir 4 niveles topológicos y 22 crates publicables"
+  );
+  const totalTopologicalCrates = TRUSTED_PUBLISHING_OIDC_CONFIG.topologicalTiers.reduce(
+    (sum, t) => sum + t.crates.length,
+    0
+  );
+  assert(
+    totalTopologicalCrates === 22,
+    `Los 4 niveles topológicos deben sumar exactamente 22 crates publicables, encontrados: ${totalTopologicalCrates}`
+  );
+  console.log("  [PASS] 24/24 Crates (crates.io & rustdoc), Trusted Publishing OIDC (22 crates / 4 tiers) y 7 idiomas nativos verificados.");
 }
 
 console.log("=== SUITE DE GARANTIA FUNCIONAL E2E COMPLETADA AL 100% ===");

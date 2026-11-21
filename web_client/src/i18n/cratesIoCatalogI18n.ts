@@ -963,3 +963,96 @@ export function getCrateHighlightsForLocale(
   }
   return crate.highlightsByLocale.en;
 }
+
+export interface TrustedPublishingOidcConfig {
+  platform: "GitHub";
+  repositoryOwner: string;
+  repositoryName: string;
+  workflowFilename: string;
+  environment: string;
+  authAction: string;
+  tokenTtlMinutes: number;
+  scriptPath: string;
+  publishableCratesCount: number;
+  ffiBridgesCount: number;
+  topologicalTiers: Array<{
+    tier: number;
+    label: string;
+    crates: string[];
+  }>;
+  workflowYamlSnippet: string;
+}
+
+export const TRUSTED_PUBLISHING_OIDC_CONFIG: TrustedPublishingOidcConfig = {
+  platform: "GitHub",
+  repositoryOwner: "joduranvillan",
+  repositoryName: "games_tables_sdk",
+  workflowFilename: "release.yml",
+  environment: "release",
+  authAction: "rust-lang/crates-io-auth-action@v1",
+  tokenTtlMinutes: 30,
+  scriptPath: "tools/publish_crates_io.sh",
+  publishableCratesCount: 22,
+  ffiBridgesCount: 2,
+  topologicalTiers: [
+    {
+      tier: 1,
+      label: "Tier 1 · Foundation Base (2)",
+      crates: ["open_table_core", "open_table_macros"],
+    },
+    {
+      tier: 2,
+      label: "Tier 2 · ECS Engine, QR & Transports (5)",
+      crates: [
+        "open_table_engine",
+        "open_table_qr",
+        "open_table_transport_tcp",
+        "open_table_transport_websocket",
+        "open_table_transport_native_bridge",
+      ],
+    },
+    {
+      tier: 3,
+      label: "Tier 3 · 14 Canonical Board Games (14)",
+      crates: [
+        "chess_game",
+        "checkers_game",
+        "shogi_game",
+        "xiangqi_game",
+        "go_game",
+        "chinese_checkers_game",
+        "backgammon_game",
+        "ludo_game",
+        "battleship_game",
+        "mille_bornes_game",
+        "monopoly_game",
+        "uno_game",
+        "crisis_game",
+        "goose_game",
+      ],
+    },
+    {
+      tier: 4,
+      label: "Tier 4 · Standalone Relay Server (1)",
+      crates: ["open_table_relay"],
+    },
+  ],
+  workflowYamlSnippet: `  publish-crates-io:
+    name: Publish to crates.io (Trusted Publishing OIDC)
+    needs: [verify-release-readiness]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - run: ./tools/publish_crates_io.sh --dry-run
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - run: ./tools/publish_crates_io.sh --publish
+        env:
+          CARGO_REGISTRY_TOKEN: \${{ steps.auth.outputs.token }}`,
+};
+

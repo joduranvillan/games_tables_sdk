@@ -70,6 +70,10 @@ jobs:
       - name: Verify workspace consistency
         run: ./tools/verify_workspace.sh
 
+      - name: Verify Crates.io Trusted Publishing metadata & dry-run
+        if: matrix.rust == 'stable'
+        run: ./tools/publish_crates_io.sh --dry-run
+
   build-godot-bridge:
     name: Build Godot Bridge
     runs-on: ubuntu-latest

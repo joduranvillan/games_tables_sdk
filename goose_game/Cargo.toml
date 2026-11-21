@@ -4,11 +4,15 @@
 [package]
 name = "goose_game"
 version = "1.1.0"
+authors = ["joduranvillan"]
 edition = "2021"
 rust-version = "1.82"
-description = "El Juego de la Oca clásico de 63 casillas para 2 o más jugadores sobre OpenTable Engine."
+description = "Canonical 63-square Game of the Goose (El Juego de la Oca) engine for OpenTable SDK."
 license = "GPL-3.0-or-later"
-publish = false
+repository = "https://github.com/joduranvillan/games_tables_sdk"
+keywords = ["game", "board-game", "goose", "oca", "opentable"]
+categories = ["game-engines", "games"]
+readme = "README.md"
 
 [dependencies]
 open_table_core = { version = "1.1.0", path = "../open_table_core" }

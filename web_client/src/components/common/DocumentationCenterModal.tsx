@@ -21,6 +21,7 @@ import {
   CRATES_IO_CATALOG_24,
   getCrateHighlightsForLocale,
   NATIVE_DOC_LANGUAGES,
+  TRUSTED_PUBLISHING_OIDC_CONFIG,
 } from "../../i18n/cratesIoCatalogI18n";
 
 export type DocCategory = "usage" | "games" | "developer" | "crates";
@@ -589,6 +590,70 @@ export const DocumentationCenterModal: React.FC<
                     >
                       {layerFilter.label}
                     </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Crates.io Trusted Publishing (OIDC) & 4-Tier Topological Pipeline Card */}
+              <div
+                data-testid="trusted-publishing-oidc-card"
+                className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-3"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs text-slate-400 font-mono">
+                      OIDC Trusted Publishing · {TRUSTED_PUBLISHING_OIDC_CONFIG.authAction} · TTL {TRUSTED_PUBLISHING_OIDC_CONFIG.tokenTtlMinutes}m
+                    </div>
+                    <h4 className="text-sm font-bold text-white font-display mt-0.5">
+                      Crates.io Trusted Publishing ({TRUSTED_PUBLISHING_OIDC_CONFIG.publishableCratesCount} Crates · {TRUSTED_PUBLISHING_OIDC_CONFIG.workflowFilename} · Environment: {TRUSTED_PUBLISHING_OIDC_CONFIG.environment})
+                    </h4>
+                  </div>
+
+                  <button
+                    type="button"
+                    data-testid="copy-oidc-workflow-btn"
+                    onClick={() =>
+                      handleCopySnippet(
+                        "oidc-workflow-yaml",
+                        TRUSTED_PUBLISHING_OIDC_CONFIG.workflowYamlSnippet
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 hover:bg-slate-800 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer self-start sm:self-auto"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>
+                      {copiedId === "oidc-workflow-yaml"
+                        ? cratesUi.copiedLabel
+                        : cratesUi.copyRustBtn}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="text-xs text-slate-300 font-mono tabular-nums">
+                  <span>Owner: {TRUSTED_PUBLISHING_OIDC_CONFIG.repositoryOwner}</span>
+                  <span aria-hidden="true"> · </span>
+                  <span>Repo: {TRUSTED_PUBLISHING_OIDC_CONFIG.repositoryName}</span>
+                  <span aria-hidden="true"> · </span>
+                  <span>Workflow: .github/workflows/{TRUSTED_PUBLISHING_OIDC_CONFIG.workflowFilename}</span>
+                  <span aria-hidden="true"> · </span>
+                  <span>Environment: {TRUSTED_PUBLISHING_OIDC_CONFIG.environment}</span>
+                  <span aria-hidden="true"> · </span>
+                  <span>Script: {TRUSTED_PUBLISHING_OIDC_CONFIG.scriptPath}</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {TRUSTED_PUBLISHING_OIDC_CONFIG.topologicalTiers.map((t) => (
+                    <div
+                      key={t.tier}
+                      className="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex flex-col gap-1"
+                    >
+                      <div className="text-xs font-semibold text-emerald-400">
+                        {t.label}
+                      </div>
+                      <div className="text-[11px] text-slate-300 font-mono leading-relaxed">
+                        {t.crates.join(", ")}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
