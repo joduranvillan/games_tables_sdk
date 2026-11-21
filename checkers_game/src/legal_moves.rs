@@ -64,11 +64,7 @@ impl CheckersLegalMoveGenerator {
                             if (0..8).contains(&nr) && (0..8).contains(&nc) {
                                 let to = Position::new(nr as u8, nc as u8);
                                 if to.is_dark_square() && board.get(to).is_none() {
-                                    candidates.push(MovePieceCommand {
-                                        player,
-                                        from,
-                                        to,
-                                    });
+                                    candidates.push(MovePieceCommand { player, from, to });
                                 }
                             }
                         }

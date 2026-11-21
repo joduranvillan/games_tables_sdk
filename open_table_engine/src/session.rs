@@ -1085,7 +1085,8 @@ impl Session {
 
     /// Verifica si el checksum actual de la sesión coincide con `expected_hex`.
     pub fn verify_checksum(&self, expected_hex: &str) -> bool {
-        self.state_checksum_hex().eq_ignore_ascii_case(expected_hex.trim())
+        self.state_checksum_hex()
+            .eq_ignore_ascii_case(expected_hex.trim())
     }
 
     /// Exporta el log completo de comandos comprimido con gzip (flate2).

@@ -167,8 +167,7 @@ pub fn best_move_with_randomness(
         let edge_dist_y = candidate.y.min(board_size.saturating_sub(1 + candidate.y));
         let min_edge = edge_dist_x.min(edge_dist_y);
         let center = (board_size as f32 - 1.0) * 0.5;
-        let center_dist =
-            (candidate.x as f32 - center).abs() + (candidate.y as f32 - center).abs();
+        let center_dist = (candidate.x as f32 - center).abs() + (candidate.y as f32 - center).abs();
         let positional_prior = match difficulty {
             AiDifficulty::Easy => {
                 if min_edge == 0 {

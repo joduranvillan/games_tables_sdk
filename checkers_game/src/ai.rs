@@ -269,10 +269,7 @@ pub fn best_move_with_randomness(
                     let mut worst_reply = score;
                     for opp_cmd in opp_moves.into_iter().take(8) {
                         let mut reply_sess = clone_checkers_session(&next_session);
-                        if reply_sess
-                            .process_command(opp, Box::new(opp_cmd))
-                            .is_ok()
-                        {
+                        if reply_sess.process_command(opp, Box::new(opp_cmd)).is_ok() {
                             let reply_eval = evaluate_checkers_board(&reply_sess, player);
                             if reply_eval < worst_reply {
                                 worst_reply = reply_eval;

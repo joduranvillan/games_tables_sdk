@@ -187,9 +187,8 @@ pub fn best_move_with_randomness(
     };
 
     let rollouts = difficulty.rollouts().max(1);
-    let mut rng = FastRng::new(
-        (state.id.0 ^ ((ai.0 as u64) << 16) ^ (rollouts as u64) ^ seed).max(1),
-    );
+    let mut rng =
+        FastRng::new((state.id.0 ^ ((ai.0 as u64) << 16) ^ (rollouts as u64) ^ seed).max(1));
 
     let mut visit_counts = vec![0u32; pool.len()];
     let mut total_scores = vec![0.0f64; pool.len()];

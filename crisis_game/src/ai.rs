@@ -435,9 +435,8 @@ pub fn best_move_with_randomness(
                     let dice = std::cmp::min(3, att_armies - 1) as u8;
 
                     attack_candidates.push((from, to, dice));
-                    attack_scores.push(
-                        (combined_score as f32) + if is_obj_target { 10.0 } else { 0.0 },
-                    );
+                    attack_scores
+                        .push((combined_score as f32) + if is_obj_target { 10.0 } else { 0.0 });
 
                     let should_pick = match (is_obj_target, best_priority_obj) {
                         (true, false) => true,

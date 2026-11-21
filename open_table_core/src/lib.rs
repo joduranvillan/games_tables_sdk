@@ -168,7 +168,8 @@ impl AiDifficulty {
                 best_idx = i;
             }
         }
-        if randomness_pct == 0 || scores.len() <= 1 || safety_band <= 0.0 || !max_score.is_finite() {
+        if randomness_pct == 0 || scores.len() <= 1 || safety_band <= 0.0 || !max_score.is_finite()
+        {
             return Some(best_idx);
         }
         let pct = f32::from(randomness_pct.min(100)) / 100.0;
@@ -180,7 +181,8 @@ impl AiDifficulty {
             if !s.is_finite() || (max_score - s) > effective_band + 1e-4 {
                 continue;
             }
-            let jitter = Self::noise_unit_float(seed, i, u64::from(randomness_pct)) * effective_band * 1.25;
+            let jitter =
+                Self::noise_unit_float(seed, i, u64::from(randomness_pct)) * effective_band * 1.25;
             let perturbed = s + jitter;
             if perturbed > best_perturbed {
                 best_perturbed = perturbed;
